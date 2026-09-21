@@ -28,7 +28,7 @@ per UTC day, with the day's players split into new and returning, each mode's
 starts, and podium Play Now / View Replays beside them. The chart shows the most
 recent 45 daily buckets so individual bars stay legible; the daily table retains
 the full summary range. The newest row carries the red accent. The cohort-retention card uses a contained milestone table with
-exact UTC-day D1/D7/D30 return rates; signed-in racers are the denominator and
+exact UTC-day D1/D2/D3/D7/D14/D30 return rates; signed-in racers are the denominator and
 immature milestones render as a dash. The page keeps its labels concise without
 implementation notes. The Head to Head surface uses a responsive
 race-poster composition: the duel/target brief owns the left reading path, the

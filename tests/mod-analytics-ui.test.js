@@ -78,14 +78,20 @@ function summaryFixture(overrides = {}) {
                 date: '2026-08-14',
                 players: 4,
                 d1: { retained: 2, rate: 50 },
+                d2: { retained: 1, rate: 25 },
+                d3: { retained: null, rate: null },
                 d7: { retained: null, rate: null },
+                d14: { retained: null, rate: null },
                 d30: { retained: null, rate: null },
             },
             {
                 date: '2026-08-15',
                 players: 6,
                 d1: { retained: null, rate: null },
+                d2: { retained: null, rate: null },
+                d3: { retained: null, rate: null },
                 d7: { retained: null, rate: null },
+                d14: { retained: null, rate: null },
                 d30: { retained: null, rate: null },
             },
         ],
@@ -112,7 +118,11 @@ describe('moderator analytics page', () => {
         expect(document.getElementById('analytics-months').textContent).toContain('29');
         expect(document.getElementById('analytics-months').textContent).toContain('2026-07');
         expect(document.getElementById('analytics-cohorts').textContent).toContain('Cohort retention');
+        expect(document.getElementById('analytics-cohorts').textContent).toContain('D2');
+        expect(document.getElementById('analytics-cohorts').textContent).toContain('D3');
+        expect(document.getElementById('analytics-cohorts').textContent).toContain('D14');
         expect(document.getElementById('analytics-cohorts').textContent).toContain('50% (2)');
+        expect(document.getElementById('analytics-cohorts').textContent).toContain('25% (1)');
         expect(document.getElementById('analytics-cohorts').textContent).toContain('Exact UTC-day return');
         expect(document.querySelector('.analytics-table--cohorts')).toBeTruthy();
         expect(document.getElementById('analytics-trend').textContent).toContain('Returning');

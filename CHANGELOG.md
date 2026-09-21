@@ -1,5 +1,8 @@
 # Changelog
 
+- Moderator analytics cohort retention now also shows exact UTC-day D2, D3,
+  and D14 return rates next to D1, D7, and D30.
+
 - A Head to Head Accept tap works before the rest of the card loads. Your
   own post is recognised by Reddit account ID stored on the post (not by
   name). Old posts fall back to the post-author ID Reddit sometimes sends.

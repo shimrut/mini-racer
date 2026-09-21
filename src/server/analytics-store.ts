@@ -73,7 +73,10 @@ export type AnalyticsCohort = {
     date: string;
     players: number;
     d1: AnalyticsCohortRetention;
+    d2: AnalyticsCohortRetention;
+    d3: AnalyticsCohortRetention;
     d7: AnalyticsCohortRetention;
+    d14: AnalyticsCohortRetention;
     d30: AnalyticsCohortRetention;
 };
 
@@ -562,7 +565,10 @@ function buildCohorts(
             date,
             players: members.length,
             d1: cohortRetention(members, date, 1, to, activityByDate),
+            d2: cohortRetention(members, date, 2, to, activityByDate),
+            d3: cohortRetention(members, date, 3, to, activityByDate),
             d7: cohortRetention(members, date, 7, to, activityByDate),
+            d14: cohortRetention(members, date, 14, to, activityByDate),
             d30: cohortRetention(members, date, 30, to, activityByDate),
         }));
 }

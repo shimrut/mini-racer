@@ -394,8 +394,11 @@ function renderCohorts(doc, cohorts) {
     const table = element(doc, 'table', 'analytics-table analytics-table--cohorts');
     const head = element(doc, 'thead');
     const labels = element(doc, 'tr');
+    const milestones = [
+        ['D1', 'd1'], ['D2', 'd2'], ['D3', 'd3'], ['D7', 'd7'], ['D14', 'd14'], ['D30', 'd30'],
+    ];
     for (const [label, milestone] of [
-        ['Cohort', false], ['Started', false], ['D1', true], ['D7', true], ['D30', true],
+        ['Cohort', false], ['Started', false], ...milestones.map(([label]) => [label, true]),
     ]) {
         const cell = element(doc, 'th', milestone ? 'analytics-table__milestone' : undefined, label);
         cell.scope = 'col';
@@ -414,9 +417,9 @@ function renderCohorts(doc, cohorts) {
         row.append(
             date,
             element(doc, 'td', undefined, formatCount(cohort?.players)),
-            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d1)),
-            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d7)),
-            element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.d30)),
+            ...milestones.map(([, key]) => (
+                element(doc, 'td', 'analytics-table__milestone', cohortMetricText(cohort?.[key]))
+            )),
         );
         body.append(row);
     }

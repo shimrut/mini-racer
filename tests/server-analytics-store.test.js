@@ -131,6 +131,22 @@ describe('server analytics store', () => {
             subredditName: SUBREDDIT,
             now: day('2026-08-02T09:00:00.000Z'),
         });
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:beta',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-03T09:00:00.000Z'),
+        });
+        for (const playerId of ['reddit:alpha', 'reddit:beta']) {
+            await recordAnalyticsRace({
+                mode: 'campaign',
+                action: 'start',
+                playerId,
+                subredditName: SUBREDDIT,
+                now: day('2026-08-04T09:00:00.000Z'),
+            });
+        }
         for (const playerId of ['reddit:alpha', 'reddit:beta']) {
             await recordAnalyticsRace({
                 mode: 'challenge',
@@ -140,6 +156,13 @@ describe('server analytics store', () => {
                 now: day('2026-08-08T09:00:00.000Z'),
             });
         }
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:beta',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
         await recordAnalyticsRace({
             mode: 'daily',
             action: 'start',
@@ -158,7 +181,10 @@ describe('server analytics store', () => {
             date: '2026-08-01',
             players: 2,
             d1: { retained: 1, rate: 50 },
+            d2: { retained: 1, rate: 50 },
+            d3: { retained: 2, rate: 100 },
             d7: { retained: 2, rate: 100 },
+            d14: { retained: 1, rate: 50 },
             d30: { retained: 1, rate: 50 },
         });
     });
@@ -184,7 +210,10 @@ describe('server analytics store', () => {
             date: '2026-08-15',
             players: 1,
             d1: { retained: null, rate: null },
+            d2: { retained: null, rate: null },
+            d3: { retained: null, rate: null },
             d7: { retained: null, rate: null },
+            d14: { retained: null, rate: null },
             d30: { retained: null, rate: null },
         }]);
     });

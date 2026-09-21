@@ -170,7 +170,7 @@ still fills the limit.
   has ever read it (`git log -S lastSeenAt -- game` is empty).
 - `updatedAt`: after Part A, only the 24-hour rule in A1 reads it.
 - Moderator analytics (`src/server/analytics-store.ts`) reads the profile's `firstSeenAt` only,
-  in `claimFirstSeen`, for the new/returning label. D1/D7/D30 use the analytics ledger:
+  in `claimFirstSeen`, for the new/returning label. D1/D2/D3/D7/D14/D30 use the analytics ledger:
   `cohort-starts` and the per-day player hashes, written by `recordAnalyticsRace`.
   `src/server/storage-usage.ts` measures the size of the profile key only.
 - `game/player/profile-cache.js` has its own `updatedAt`, which the browser sets. It is not the
