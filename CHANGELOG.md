@@ -1,3 +1,5 @@
+- Three tracks join the Daily rotation: **Slate Circuit**, **Black Water**, and **Raven Rock**.
+
 - Upgraded the Devvit toolchain from 0.14.1 to 0.14.5. The releases in between are documentation, a fallback-text option this app does not use, CLI log fixes, and settings help-text line breaks. No game behavior changes.
 
 - Concede shows on a loss after five starts, including restarts that never finish. A wall that sends the car back to the line is still the same start. A tie still offers its own button immediately. Posting the concede starts the five again.

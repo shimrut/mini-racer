@@ -177,6 +177,9 @@ describe('track runtime integrity', () => {
             'bullShield',
             'battleHook',
             'thunderCat',
+            'slateCircuit',
+            'blackWater',
+            'ravenRock',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -214,7 +217,7 @@ describe('track runtime integrity', () => {
             '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '1b7d23d65ea76de29eb88a17e7f63ddb951fa848cfff1de243d2e7d30958b05b',
+            '4f6d9e60b03060b5e82472a02657774ee9d55be71800c7c3880dad06de6b3aa9',
         );
     });
 

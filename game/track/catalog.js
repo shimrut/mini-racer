@@ -125,6 +125,9 @@ export const TRACK_CATALOG = {
     bullShield: { name: "Bull Shield" },
     battleHook: { name: "Battle Hook" },
     thunderCat: { name: "Thunder Cat" },
+    slateCircuit: { name: "Slate Circuit" },
+    blackWater: { name: "Black Water" },
+    ravenRock: { name: "Raven Rock" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -238,6 +241,9 @@ export const TRACK_SCHEDULE_KEYS = [
     'bullShield',
     'battleHook',
     'thunderCat',
+    'slateCircuit',
+    'blackWater',
+    'ravenRock',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';
