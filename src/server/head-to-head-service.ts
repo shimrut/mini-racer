@@ -845,15 +845,11 @@ export function createHeadToHeadService(
                 runAs: 'USER',
                 userGeneratedContent: { text: preparedRecord.title },
             });
-            const postedAuthor = String((post as { authorName?: unknown })?.authorName || '');
-            if (normalizeName(postedAuthor) !== normalizeName(request.username)) {
-                if (postedAuthor.trim()) {
-                    const remove = (post as { delete?: () => Promise<void> }).delete;
-                    if (typeof remove === 'function') {
-                        await remove.call(post).catch((error: unknown) => {
-                            console.error('A challenge posted under another name could not be removed:', error);
-                        });
-                    }
+            if (normalizeName((post as any)?.authorName || '') !== normalizeName(request.username)) {
+                if (String((post as any)?.authorName || '').trim()) {
+                    await (post as { delete?: () => Promise<void> }).delete?.().catch((error: unknown) => {
+                        console.error('A challenge posted under another name could not be removed:', error);
+                    });
                 }
                 await releaseHeadToHeadPostSlot(
                     request.subredditName,

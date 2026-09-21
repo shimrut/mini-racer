@@ -260,7 +260,8 @@ describe.each([
             error: `Reddit user-attributed ${action === 'brag' ? 'sharing' : 'commenting'} is not available for this app version.`,
         });
         expect(deleteComment).toHaveBeenCalledOnce();
-        expect(strings.has(resultKey(action))).toBe(false);
+        expect((await confirm(input, context)).body.status).toBe('user_action_unavailable');
+        expect(reddit.submitComment).toHaveBeenCalledTimes(1);
     });
 
     it('answers posted_without_link when Reddit returns no comment id, and posts once', async () => {

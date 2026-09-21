@@ -271,15 +271,6 @@ export async function submitHeadToHeadShareComment({
                 },
             };
         }
-        if (outcome.status === 'foreign_author') {
-            return {
-                status: 409,
-                body: {
-                    status: 'user_action_unavailable',
-                    error: `Reddit user-attributed ${action === 'brag' ? 'sharing' : 'commenting'} is not available for this app version.`,
-                },
-            };
-        }
         if (outcome.status === 'already') {
             await redis.del(tokenKey);
             return postedBody(outcome.record, postUrl);

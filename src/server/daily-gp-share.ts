@@ -624,15 +624,6 @@ export async function confirmDailyGpShare(
                 },
             };
         }
-        if (outcome.status === 'foreign_author') {
-            return {
-                status: 409,
-                body: {
-                    status: 'user_action_unavailable',
-                    error: 'Reddit user-attributed sharing is not available for this app version.',
-                },
-            };
-        }
         // The helper recorded the publication. Both answers below describe a live comment, so
         // nothing here deletes it: Reddit lets only the author delete a comment, and on an
         // approved app the author is the player, not the app.

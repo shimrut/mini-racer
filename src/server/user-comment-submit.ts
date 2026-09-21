@@ -24,7 +24,6 @@ export type UserCommentOutcome =
     | { status: 'already'; record: UserCommentRecord }
     | { status: 'posted'; record: UserCommentRecord }
     | { status: 'posted_without_link'; record: UserCommentRecord }
-    | { status: 'foreign_author' }
     | { status: 'unconfirmed' }
     | { status: 'lock_lost' };
 
@@ -136,24 +135,6 @@ function isUserCommentId(value: unknown): value is `t1_${string}` {
 // The compare every caller uses.
 function sameAuthor(one: string, other: string): boolean {
     return one.trim().toLowerCase() === other.trim().toLowerCase();
-}
-
-/** A name Reddit returned that is not the player's. An empty name is not this. */
-function foreignAuthor(comment: SubmittedUserComment, username: string): boolean {
-    const authorName = typeof comment?.authorName === 'string' ? comment.authorName.trim() : '';
-    return authorName.length > 0 && !sameAuthor(authorName, username);
-}
-
-async function discardForeignComment(comment: SubmittedUserComment): Promise<boolean> {
-    const remove = (comment as { delete?: () => Promise<void> }).delete;
-    if (typeof remove !== 'function') return false;
-    try {
-        await remove.call(comment);
-        return true;
-    } catch (error) {
-        console.error('A comment posted under another name could not be removed:', error);
-        return false;
-    }
 }
 
 /**
@@ -283,22 +264,11 @@ export async function submitUserComment({
     await writeUserCommentRecord(record.key, record.ttlSeconds, claim);
     try {
         const comment = await reddit.submitComment({ id: parentId ?? postId, text, runAs: 'USER' });
-        if (foreignAuthor(comment, username)) {
-            const removed = await discardForeignComment(comment);
-            if (removed) {
-                await redis.del(record.key).catch((error: unknown) => {
-                    console.error('A refused comment could not clear its record:', error);
-                });
-            } else {
-                await writeUserCommentRecord(record.key, record.ttlSeconds, {
-                    ...claim,
-                    postedAt: new Date().toISOString(),
-                    authorName: comment.authorName,
-                }).catch((error: unknown) => {
-                    console.error('A posted comment could not be recorded:', error);
-                });
-            }
-            return { status: 'foreign_author' };
+        const authorName = typeof comment?.authorName === 'string' ? comment.authorName : '';
+        if (authorName.trim() && !sameAuthor(authorName, username)) {
+            await (comment as { delete?: () => Promise<void> }).delete?.().catch((error: unknown) => {
+                console.error('A comment posted under another name could not be removed:', error);
+            });
         }
         return publicationOutcome(await recordPublication({
             key: record.key,
