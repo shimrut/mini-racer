@@ -561,7 +561,7 @@ export class ModalShell {
      */
     _challengeCommentButtonText(phase, spent = null) {
         if (spent && phase === 'lost') {
-            return { label: 'New Challenge', aria: 'Open another challenge' };
+            return { label: 'Change Track', aria: 'Open a different challenge' };
         }
         if (spent) {
             return { label: 'Brag', aria: 'Brag available after beating this challenge' };
@@ -586,8 +586,8 @@ export class ModalShell {
         if (!button) return;
         button.style.display = '';
         button.disabled = false;
-        this._setShareButtonLabel(button, 'New Challenge');
-        button.setAttribute('aria-label', 'Open another challenge');
+        this._setShareButtonLabel(button, 'Change Track');
+        button.setAttribute('aria-label', 'Open a different challenge');
         this._bindClickAction(button, () => void this._openNextChallengePost(postUrl));
     }
 
@@ -622,8 +622,8 @@ export class ModalShell {
             return;
         }
         if (this._nextChallengeLookup) return this._nextChallengeLookup;
-        this._setShareButtonLabel(button, 'New Challenge');
-        button.setAttribute('aria-label', 'Open another challenge');
+        this._setShareButtonLabel(button, 'Change Track');
+        button.setAttribute('aria-label', 'Open a different challenge');
         button.disabled = true;
         this._nextChallengeLookup = (async () => {
             try {

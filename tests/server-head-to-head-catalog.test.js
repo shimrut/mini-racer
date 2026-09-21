@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getRaceMedalThresholds } from '../game/medals/medal-timing.js';
 import { TRACKS } from '../game/track/tracks.js';
 
 const strings = new Map();
@@ -64,6 +65,7 @@ const redis = {
         }
         return rows;
     }),
+    hMGet: vi.fn(async (key, fields) => fields.map((field) => hashFor(key).get(field) ?? null)),
     watch: vi.fn(async () => {
         const commands = [];
         return {
@@ -94,11 +96,19 @@ const {
     pickNextHeadToHeadChallenge,
     sweepHeadToHeadCatalog,
     catalogHeadToHeadSize,
+    readHeadToHeadCatalogCard,
 } = await import('../src/server/head-to-head-catalog.ts');
 const { createTrackFingerprint } = await import('../src/server/pb-ghost-trace.ts');
 
 const TRACK_KEY = Object.keys(TRACKS)[0];
 const OTHER_TRACK_KEY = Object.keys(TRACKS)[1];
+
+function timeInBand(trackKey, band) {
+    const thresholds = getRaceMedalThresholds(trackKey, 1);
+    if (band === 'gold') return Math.floor(thresholds.gold * 1000);
+    if (band === 'silver') return Math.floor(((thresholds.gold + thresholds.silver) / 2) * 1000);
+    return Math.floor(thresholds.bronze * 1000) + 1000;
+}
 
 function card(overrides = {}) {
     return {
@@ -130,116 +140,40 @@ describe('Head to Head catalog', () => {
         await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
     });
 
-    it('picks a slower time on the same track before a different track', async () => {
-        await upsertHeadToHeadCatalogCard(card());
+    it('opens the quietest challenge in the same medal band', async () => {
+        const current = timeInBand(TRACK_KEY, 'gold');
+        await upsertHeadToHeadCatalogCard(card({ targetTimeMs: current, createdAt: '2026-09-10T00:00:00.000Z' }));
         await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'challenge-easier',
-            postId: 't3_easier',
-            postUrl: 'https://reddit.com/r/miniracer/easier',
+            challengeId: 'loud',
+            postId: 't3_loud',
+            postUrl: 'https://reddit.com/r/miniracer/loud',
             challengerUsername: 'Other',
-            targetTimeMs: 14_000,
+            trackKey: OTHER_TRACK_KEY,
+            targetTimeMs: timeInBand(OTHER_TRACK_KEY, 'gold'),
+            commentCount: 4,
+            upvoteCount: 20,
+            createdAt: '2026-09-01T00:00:00.000Z',
+        }));
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'quiet',
+            postId: 't3_quiet',
+            postUrl: 'https://reddit.com/r/miniracer/quiet',
+            challengerUsername: 'Other',
+            trackKey: OTHER_TRACK_KEY,
+            targetTimeMs: timeInBand(OTHER_TRACK_KEY, 'gold'),
+            commentCount: 0,
+            upvoteCount: 1,
             createdAt: '2026-09-02T00:00:00.000Z',
         }));
         await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'challenge-other',
-            postId: 't3_other',
-            postUrl: 'https://reddit.com/r/miniracer/other',
+            challengeId: 'other-band',
+            postId: 't3_silver',
+            postUrl: 'https://reddit.com/r/miniracer/silver',
             challengerUsername: 'Other',
             trackKey: OTHER_TRACK_KEY,
-            targetTimeMs: 9_000,
-            createdAt: '2026-09-03T00:00:00.000Z',
-        }));
-
-        const picked = await pickNextHeadToHeadChallenge({
-            subredditName: 'MiniRacer',
-            excludeChallengeId: 'challenge-1',
-            excludeUsername: 'Racer',
-            trackKey: TRACK_KEY,
-            targetTimeMs: 12_000,
-        });
-
-        expect(picked).toMatchObject({ challengeId: 'challenge-easier', postUrl: 'https://reddit.com/r/miniracer/easier' });
-    });
-
-    it('skips the player’s own posts and the current challenge', async () => {
-        await upsertHeadToHeadCatalogCard(card({
-            challengerUsername: 'Racer',
-            challengeId: 'own',
-            postId: 't3_own',
-            postUrl: 'https://reddit.com/r/miniracer/own',
-            targetTimeMs: 20_000,
-        }));
-        await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'challenge-other',
-            postId: 't3_other',
-            postUrl: 'https://reddit.com/r/miniracer/other',
-            challengerUsername: 'Other',
-            trackKey: OTHER_TRACK_KEY,
-        }));
-
-        const picked = await pickNextHeadToHeadChallenge({
-            subredditName: 'MiniRacer',
-            excludeChallengeId: 'challenge-1',
-            excludeUsername: 'Racer',
-            trackKey: TRACK_KEY,
-            targetTimeMs: 12_000,
-        });
-
-        expect(picked).toMatchObject({ challengeId: 'challenge-other' });
-    });
-
-    it('drops a deleted post and continues', async () => {
-        reddit.getPostById
-            .mockRejectedValueOnce(new Error('gone'))
-            .mockResolvedValueOnce({ removed: false });
-        await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'dead',
-            postId: 't3_dead',
-            postUrl: 'https://reddit.com/r/miniracer/dead',
-            challengerUsername: 'Other',
-            targetTimeMs: 18_000,
-        }));
-        await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'live',
-            postId: 't3_live',
-            postUrl: 'https://reddit.com/r/miniracer/live',
-            challengerUsername: 'Other',
-            trackKey: OTHER_TRACK_KEY,
-        }));
-
-        const picked = await pickNextHeadToHeadChallenge({
-            subredditName: 'MiniRacer',
-            excludeChallengeId: 'challenge-1',
-            excludeUsername: 'Racer',
-            trackKey: TRACK_KEY,
-            targetTimeMs: 12_000,
-        });
-
-        expect(picked).toMatchObject({ challengeId: 'live' });
-        await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
-    });
-
-    it('keeps looking after a full page of removed posts', async () => {
-        reddit.getPostById.mockImplementation(async (postId) => {
-            if (postId === 't3_live') return { removed: false };
-            throw new Error('gone');
-        });
-        for (let index = 0; index < 12; index += 1) {
-            await upsertHeadToHeadCatalogCard(card({
-                challengeId: `dead-${index}`,
-                postId: `t3_dead_${index}`,
-                postUrl: `https://reddit.com/r/miniracer/dead-${index}`,
-                challengerUsername: 'Other',
-                trackKey: OTHER_TRACK_KEY,
-                createdAt: new Date(Date.parse('2026-09-20T00:00:00.000Z') - index * 60_000).toISOString(),
-            }));
-        }
-        await upsertHeadToHeadCatalogCard(card({
-            challengeId: 'live',
-            postId: 't3_live',
-            postUrl: 'https://reddit.com/r/miniracer/live',
-            challengerUsername: 'Other',
-            trackKey: OTHER_TRACK_KEY,
+            targetTimeMs: timeInBand(OTHER_TRACK_KEY, 'silver'),
+            commentCount: 0,
+            upvoteCount: 99,
             createdAt: '2026-08-01T00:00:00.000Z',
         }));
 
@@ -248,10 +182,141 @@ describe('Head to Head catalog', () => {
             excludeChallengeId: 'challenge-1',
             excludeUsername: 'Racer',
             trackKey: TRACK_KEY,
-            targetTimeMs: 12_000,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
         });
 
-        expect(picked).toMatchObject({ challengeId: 'live' });
+        expect(picked).toMatchObject({ challengeId: 'quiet' });
+        expect(reddit.getPostById).not.toHaveBeenCalled();
+    });
+
+    it('uses more upvotes when the comment count matches', async () => {
+        const current = timeInBand(TRACK_KEY, 'gold');
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'few-votes',
+            postId: 't3_few',
+            postUrl: 'https://reddit.com/r/miniracer/few',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            commentCount: 0,
+            upvoteCount: 1,
+            createdAt: '2026-08-01T00:00:00.000Z',
+        }));
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'more-votes',
+            postId: 't3_more',
+            postUrl: 'https://reddit.com/r/miniracer/more',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            commentCount: 0,
+            upvoteCount: 8,
+            createdAt: '2026-09-01T00:00:00.000Z',
+        }));
+
+        const picked = await pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
+        });
+
+        expect(picked).toMatchObject({ challengeId: 'more-votes' });
+    });
+
+    it('uses an older challenge when comments and upvotes match, otherwise a newer one', async () => {
+        const current = timeInBand(TRACK_KEY, 'gold');
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'older',
+            postId: 't3_older',
+            postUrl: 'https://reddit.com/r/miniracer/older',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            createdAt: '2026-08-01T00:00:00.000Z',
+        }));
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'newer',
+            postId: 't3_newer',
+            postUrl: 'https://reddit.com/r/miniracer/newer',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            createdAt: '2026-09-20T00:00:00.000Z',
+        }));
+
+        const picked = await pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
+        });
+        expect(picked).toMatchObject({ challengeId: 'older' });
+
+        hashes.clear();
+        zsets.clear();
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'only-newer',
+            postId: 't3_only_newer',
+            postUrl: 'https://reddit.com/r/miniracer/only-newer',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            createdAt: '2026-09-20T00:00:00.000Z',
+        }));
+        const later = await pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
+        });
+        expect(later).toMatchObject({ challengeId: 'only-newer' });
+    });
+
+    it('skips the player’s own posts and a target slower than bronze', async () => {
+        const current = timeInBand(TRACK_KEY, 'gold');
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'own',
+            postId: 't3_own',
+            postUrl: 'https://reddit.com/r/miniracer/own',
+            challengerUsername: 'Racer',
+            targetTimeMs: current,
+            commentCount: 0,
+        }));
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'other',
+            postId: 't3_other',
+            postUrl: 'https://reddit.com/r/miniracer/other',
+            challengerUsername: 'Other',
+            targetTimeMs: current,
+            commentCount: 2,
+        }));
+
+        await expect(pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
+        })).resolves.toMatchObject({ challengeId: 'other' });
+
+        await expect(pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: timeInBand(TRACK_KEY, 'slow'),
+            createdAt: '2026-09-10T00:00:00.000Z',
+        })).resolves.toBeNull();
     });
 
     it('collects valid Challenges posts and skips junk', async () => {
@@ -264,6 +329,8 @@ describe('Head to Head catalog', () => {
                     authorName: 'Poster',
                     subredditName: 'MiniRacer',
                     removed: false,
+                    numberOfComments: 3,
+                    score: 7,
                     flair: { text: 'Challenge' },
                     getPostData: async () => ({
                         postType: 'head-to-head',
@@ -298,6 +365,10 @@ describe('Head to Head catalog', () => {
 
         expect(result).toEqual({ scanned: 3, saved: 1, skipped: 2, status: 'done' });
         await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
+        await expect(readHeadToHeadCatalogCard('MiniRacer', 'swept-1')).resolves.toMatchObject({
+            commentCount: 3,
+            upvoteCount: 7,
+        });
     });
 
     it('does not double-count a post already saved', async () => {

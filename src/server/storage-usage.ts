@@ -29,8 +29,8 @@ import { DAILY_PODIUM_AUTOPOST_SUBREDDITS_KEY } from './daily-podium-autopost-st
 import { createPodiumPostRecordKey } from './daily-podium-post-store.js';
 import {
     headToHeadCatalogAllKey,
+    headToHeadCatalogBandKeys,
     headToHeadCatalogCardsKey,
-    headToHeadCatalogTrackKeys,
 } from './head-to-head-catalog.js';
 import { LAUNCHER_POSTS_KEY } from './launcher-post-store.js';
 import { MOD_ANALYTICS_POSTS_KEY } from './moderator-analytics-post.js';
@@ -387,7 +387,7 @@ function buildKeyGroups({
             ],
             sortedSets: [
                 headToHeadCatalogAllKey(subredditName),
-                ...headToHeadCatalogTrackKeys(subredditName),
+                ...headToHeadCatalogBandKeys(subredditName),
             ],
         },
     ];

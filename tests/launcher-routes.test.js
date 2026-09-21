@@ -61,7 +61,7 @@ describe('launcher moderator routes', () => {
             .toHaveBeenCalledWith('MiniRacer', kind);
     });
 
-    it('collects existing challenge posts for New Challenge', async () => {
+    it('collects existing challenge posts for Change Track', async () => {
         const { routes, dependencies } = createRouteHarness();
 
         await expect(invoke(routes, '/internal/menu/head-to-head-catalog-sweep')).resolves.toEqual({

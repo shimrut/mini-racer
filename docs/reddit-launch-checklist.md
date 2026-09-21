@@ -131,10 +131,10 @@ Mini Racer is a **game**, so the most important launch requirements are:
   leaderboard data.
 - [ ] Run **Collect Mini Racer challenges** on the live community until it says
   the last month is covered. One click does not read every challenge. Click
-  again while it says to keep going. New Challenge then has those posts to open.
+  again while it says to keep going. Change Track then has those posts to open.
 - [ ] After three finished losses, Concede posts the comment, then the finish
-  row becomes Improve / New Challenge / Home. New Challenge opens another
-  challenge, not this one and not the player's own. A tie, a win, a skipped
+  row becomes Improve / Change Track / Home. Change Track opens a different
+  challenge in the same medal band, not this one and not the player's own. A tie, a win, a skipped
   Concede, and a guest never see that button.
 - [ ] A guest can race a Head to Head from the in-feed post; a verified win
   remains visible for five minutes, creates no durable Head to Head history,

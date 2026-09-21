@@ -5,13 +5,14 @@
 - Head to Head posts use the `Challenge` flair. The app was looking for
   `Challenges`, so it would not find the template on the community.
 
-- After a posted Head to Head concede, Improve / New Challenge / Home replaces
-  the spent Concede button. New Challenge opens another challenge post. A
-  moderator Collect Mini Racer challenges action fills that list from existing
-  Challenge posts so it works on day one. One click reads as far as it can, then
-  you click again until it says the month is covered. New posts are saved as
-  they go up. New Challenge keeps looking past removed posts instead of giving
-  up after the first handful, and the unused extra indexes are gone.
+- After a posted Head to Head concede, Improve / Change Track / Home replaces
+  the spent Concede button. Change Track opens a different challenge in the same
+  medal band: fewest comments, then most upvotes, then an older challenge, or a
+  newer one if none is older. A moderator Collect Mini Racer challenges action
+  fills that list from existing Challenge posts, including each post's comment
+  count and upvotes, so the tap does not ask Reddit. One click reads as far as
+  it can, then you click again until it says the month is covered. New posts are
+  saved as they go up.
   Ties, wins, skipped Concede taps, and guests stay as they are.
 
 - Daily and Podium posts now get their flair the same way Head to Head

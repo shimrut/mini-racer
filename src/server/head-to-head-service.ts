@@ -1204,7 +1204,9 @@ export function createHeadToHeadService(
             excludeChallengeId: challengeId,
             excludeUsername: request.username,
             trackKey: current?.trackKey ?? null,
+            lapCount: current?.lapCount ?? null,
             targetTimeMs: current?.targetTimeMs ?? null,
+            createdAt: current?.createdAt ?? null,
         });
         if (!picked) {
             return {

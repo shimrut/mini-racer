@@ -86,7 +86,7 @@ describe('a challenge finish that has spent its comment', () => {
         `);
     }
 
-    // A posted concession offers New Challenge. A spent tie still goes back to the locked Brag.
+    // A posted concession offers Change Track. A spent tie still goes back to the locked Brag.
     it.each([
         ['posted', 'lost', 'next'],
         ['unconfirmed', 'lost', 'next'],
@@ -121,7 +121,7 @@ describe('a challenge finish that has spent its comment', () => {
         }
     });
 
-    it('offers New Challenge after a posted concede when another post exists', async () => {
+    it('offers Change Track after a posted concede when another post exists', async () => {
         const originalDocument = global.document;
         const dom = finishDom();
         global.document = dom.window.document;
@@ -141,7 +141,7 @@ describe('a challenge finish that has spent its comment', () => {
 
             expect(context.combinedPlaylistBtn.disabled).toBe(false);
             expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
-                .toBe('NEW CHALLENGE');
+                .toBe('CHANGE TRACK');
             await context.combinedPlaylistBtn.onclick();
             expect(openChallengePost).toHaveBeenCalledWith('https://reddit.com/r/miniracer/next');
         } finally {
@@ -1633,7 +1633,7 @@ describe('Daily finish share chooser', () => {
             expect(panel.querySelector('.result-share-panel__title').textContent).toBe('Comment posted');
             expect(shell.confirmShare).toHaveBeenCalledWith('share-1', request);
             await shell._nextChallengeLookup;
-            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('NEW CHALLENGE');
+            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('CHANGE TRACK');
             expect(triggerButton.disabled).toBe(false);
             await triggerButton.onclick();
             expect(shell.openChallengePost).toHaveBeenCalledWith('https://reddit.com/r/miniracer/next');
