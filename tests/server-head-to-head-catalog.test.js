@@ -264,7 +264,7 @@ describe('Head to Head catalog', () => {
                     authorName: 'Poster',
                     subredditName: 'MiniRacer',
                     removed: false,
-                    flair: { text: 'Challenges' },
+                    flair: { text: 'Challenge' },
                     getPostData: async () => ({
                         postType: 'head-to-head',
                         challengeId: 'swept-1',

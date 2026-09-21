@@ -171,8 +171,8 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] The **Create Mini Racer post** menu item successfully creates a playable post.
 - [ ] The **Create current Daily launcher**, **Create Campaign launcher**, and **Create Lobby launcher** menu items each create the correct canonical post and navigate to it.
 - [ ] Repeating any launcher creation action reuses the existing subreddit launcher post instead of creating a duplicate.
-- [ ] The subreddit has the three Mini Racer post flair templates: `Daily`, `Challenges`, and `Podiums`. All three can stay moderator-only: the app sets the flair after each post exists, including a Head to Head post that the player makes. Launcher posts do not use a flair.
-- [ ] Reddit's post-flair navigation is enabled, and newly created dated Daily, Head to Head, and podium posts appear under `Daily`, `Challenges`, and `Podiums` respectively.
+- [ ] The subreddit has the three Mini Racer post flair templates: `Daily`, `Challenge`, and `Podiums`. All three can stay moderator-only: the app sets the flair after each post exists, including a Head to Head post that the player makes. Launcher posts do not use a flair.
+- [ ] Reddit's post-flair navigation is enabled, and newly created dated Daily, Head to Head, and podium posts appear under `Daily`, `Challenge`, and `Podiums` respectively.
 - [ ] At least one example post has been created and reviewed end to end.
 - [ ] Moderator, scheduler, and repeated create actions reuse the same canonical post for the subreddit and UTC day.
 - [ ] The pinned `🏁 Mini Racer score thread` comment exists before a newly triggered post action reports success, and an older recoverable post is repaired before sharing.

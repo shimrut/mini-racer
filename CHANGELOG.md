@@ -1,7 +1,10 @@
+- Head to Head posts use the `Challenge` flair. The app was looking for
+  `Challenges`, so it would not find the template on the community.
+
 - After a posted Head to Head concede, Improve / New Challenge / Home replaces
   the spent Concede button. New Challenge opens another challenge post. A
   moderator Collect Mini Racer challenges action fills that list from existing
-  Challenges posts so it works on day one. One click reads as far as it can, then
+  Challenge posts so it works on day one. One click reads as far as it can, then
   you click again until it says the month is covered. New posts are saved as
   they go up. New Challenge keeps looking past removed posts instead of giving
   up after the first handful, and the unused extra indexes are gone.
@@ -86,7 +89,7 @@
   confirmation. The finish stays on VERIFYING and retries. UNVERIFIED is only
   for a run the server actually rejected.
 
-- Fixed Head to Head posts without the "Challenges" flair. Reddit dropped the
+- Fixed Head to Head posts without the "Challenge" flair. Reddit dropped the
   flair from a post that the player makes. Now the app sets it after the post.
 - A Campaign challenge now posts the run the player just finished, as a Daily
   challenge does. Before, it posted the player's saved best on that race.

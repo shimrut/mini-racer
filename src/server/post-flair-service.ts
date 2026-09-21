@@ -7,7 +7,7 @@ export type MiniRacerPostType =
 
 const POST_FLAIR_TEXT_BY_TYPE: Record<MiniRacerPostType, string> = {
     'daily-race': 'Daily',
-    'head-to-head': 'Challenges',
+    'head-to-head': 'Challenge',
     'daily-podium': 'Podiums',
 };
 

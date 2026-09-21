@@ -134,7 +134,7 @@
       },
       {
         "label": "Collect Mini Racer challenges",
-        "description": "Save existing Challenges posts so New Challenge can send players to another race",
+        "description": "Save existing Challenge posts so New Challenge can send players to another race",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/head-to-head-catalog-sweep"

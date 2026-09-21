@@ -15,7 +15,7 @@ describe('Mini Racer post flair service', () => {
         vi.clearAllMocks();
         mockReddit.getPostFlairTemplates.mockResolvedValue([
             { id: 'daily-template', text: 'Daily' },
-            { id: 'challenge-template', text: 'Challenges' },
+            { id: 'challenge-template', text: 'Challenge' },
             { id: 'podium-template', text: 'Podiums' },
         ]);
     });
@@ -33,7 +33,7 @@ describe('Mini Racer post flair service', () => {
 
     it('matches template text without depending on capitalization or surrounding spaces', async () => {
         mockReddit.getPostFlairTemplates.mockResolvedValue([
-            { id: 'challenge-template', text: '  challenges ' },
+            { id: 'challenge-template', text: '  challenge ' },
         ]);
 
         await expect(
