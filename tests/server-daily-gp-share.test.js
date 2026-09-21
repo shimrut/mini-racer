@@ -344,7 +344,7 @@ describe('daily GP result sharing', () => {
         expect(strings.get(shareLockKey)).toBe('successor-token');
     });
 
-    it('fails closed without deleting if Reddit does not attribute the comment to the player', async () => {
+    it('removes a comment Reddit did not attribute to the player', async () => {
         const preview = await previewDailyGpShare({
             source: 'standings',
             challengeId: challenge.id,
@@ -360,7 +360,7 @@ describe('daily GP result sharing', () => {
             status: 409,
             body: { status: 'user_action_unavailable' },
         });
-        expect(userComment.delete).not.toHaveBeenCalled();
+        expect(userComment.delete).toHaveBeenCalledOnce();
     });
 
     it('allows a result to be shared again after its prior comment is deleted', async () => {

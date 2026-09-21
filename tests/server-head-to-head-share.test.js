@@ -250,22 +250,17 @@ describe.each([
         error.mockRestore();
     });
 
-    it('rejects an incorrectly attributed comment without deleting it', async () => {
+    it('rejects an incorrectly attributed comment and removes it', async () => {
         const deleteComment = vi.fn(async () => undefined);
         reddit.submitComment.mockResolvedValueOnce({
             id: 't1_result', authorName: 'AppAccount', delete: deleteComment,
         });
-        expect((await confirm(input, context)).body.status).toBe('user_action_unavailable');
-        expect(deleteComment).not.toHaveBeenCalled();
-        expect(strings.has(key)).toBe(true);
-        // The comment is live, so the receipt must record it. An id would make it the player's.
-        const stored = JSON.parse(strings.get(resultKey(action)));
-        expect(stored.postedAt).toEqual(expect.any(String));
-        expect(stored.authorName).toBe('AppAccount');
-        expect(stored.commentId).toBeUndefined();
-
-        expect((await confirm(input, context)).body.status).toBe('user_action_unavailable');
-        expect(reddit.submitComment).toHaveBeenCalledTimes(1);
+        expect((await confirm(input, context)).body).toMatchObject({
+            status: 'user_action_unavailable',
+            error: `Reddit user-attributed ${action === 'brag' ? 'sharing' : 'commenting'} is not available for this app version.`,
+        });
+        expect(deleteComment).toHaveBeenCalledOnce();
+        expect(strings.has(resultKey(action))).toBe(false);
     });
 
     it('answers posted_without_link when Reddit returns no comment id, and posts once', async () => {

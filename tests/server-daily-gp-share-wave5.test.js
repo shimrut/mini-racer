@@ -242,12 +242,13 @@ describe('daily GP share wave5', () => {
             source: 'standings',
             challengeId: challenge.id,
         }, requestContext);
+        const deleteComment = vi.fn(async () => undefined);
         reddit.submitComment.mockImplementation(async ({ runAs }) => {
             if (runAs === 'USER') {
                 return {
                     id: 't1_wrong_author',
                     authorName: 'BotAccount',
-                    delete: vi.fn(async () => undefined),
+                    delete: deleteComment,
                 };
             }
             return {
@@ -269,6 +270,7 @@ describe('daily GP share wave5', () => {
                 error: 'Reddit user-attributed sharing is not available for this app version.',
             },
         });
+        expect(deleteComment).toHaveBeenCalledOnce();
     });
 
     it('rejects finish previews when replay validation fails (L451-L454)', async () => {

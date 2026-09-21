@@ -1164,14 +1164,9 @@ export class ModalShell {
                         });
                         return;
                     }
-                    // Reddit has the comment. Try Again would post a second one.
-                    // Create Challenge answers user_action_unavailable for a post, not a comment,
-                    // so it keeps its failure.
                     const publishedNote = confirmed?.body?.status === 'posted_without_link'
                         ? 'Your comment is up. Reddit did not return a link to it.'
-                        : (!isChallenge && confirmed?.body?.status === 'user_action_unavailable')
-                            ? 'Your comment is up under the app\'s name, not yours.'
-                            : '';
+                        : '';
                     if (publishedNote) {
                         markCommentSpent('posted');
                         this._showShareOutcome(panel, triggerButton, confirmed.body, {

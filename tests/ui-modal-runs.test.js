@@ -1821,11 +1821,6 @@ describe('Daily finish share chooser', () => {
             'Reddit did not return a link to your comment.',
             'Your comment is up. Reddit did not return a link to it.',
         ],
-        [
-            'user_action_unavailable',
-            'Reddit user-attributed sharing is not available for this app version.',
-            "Your comment is up under the app's name, not yours.",
-        ],
     ])('shows a Brag as posted, with no Try Again, for %s', async (status, error, note) => {
         const originalDocument = global.document;
         const dom = shareDom();
@@ -1842,6 +1837,28 @@ describe('Daily finish share chooser', () => {
             expect(panel.querySelector('.result-share-panel__button--primary')).toBeNull();
             expect(panel.querySelector('.result-share-panel__button').textContent).toBe('Done');
             expect(shell._challengeFinishCommentSpent).toBe('posted');
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('shows the user-attributed error when a comment is not the player\'s', async () => {
+        const originalDocument = global.document;
+        const dom = shareDom();
+        global.document = dom.window.document;
+        const error = 'Reddit user-attributed sharing is not available for this app version.';
+
+        try {
+            const { shell, panel } = await confirmWith(
+                dom,
+                { status: 'user_action_unavailable', error },
+                { kind: 'challenge-brag', acceptToken: 'accept-1' },
+            );
+
+            const retry = panel.querySelector('.result-share-panel__button--primary');
+            expect(retry.textContent).toBe('Try Again');
+            expect(panel.querySelector('.result-share-panel__status').textContent).toBe(error);
+            expect(shell._challengeFinishCommentSpent).toBeFalsy();
         } finally {
             global.document = originalDocument;
         }

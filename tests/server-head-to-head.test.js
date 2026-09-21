@@ -799,7 +799,7 @@ describe('head-to-head service', () => {
                 error: 'Reddit user-attributed posting is not available for this app version.',
             },
         });
-        expect(fallbackPost.delete).not.toHaveBeenCalled();
+        expect(fallbackPost.delete).toHaveBeenCalledOnce();
         expect(reddit.setPostFlair).not.toHaveBeenCalled();
         expect(result.body).not.toHaveProperty('carUnlocks');
         expect([...hashes.values()].every((hash) => !hash.has('post:track:numberThree'))).toBe(true);

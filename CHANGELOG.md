@@ -1,3 +1,5 @@
+- A comment or Head to Head challenge that comes back under anyone but the player is removed, and the finish shows the usual “not available for this app version” error. It is not treated as posted.
+
 - Ranking is skipped only after a freeze lasts a quarter of a second. The car still catches up for a tenth of a second, and the rest of the freeze is not added to the lap.
 
 - A lap that froze too long now says “Rank disabled due to frame stalls.”
