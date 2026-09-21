@@ -133,6 +133,13 @@
         "endpoint": "/internal/menu/podium-disable-daily"
       },
       {
+        "label": "Collect Mini Racer challenges",
+        "description": "Save existing Challenges posts so New Challenge can send players to another race",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/head-to-head-catalog-sweep"
+      },
+      {
         "label": "Open Mini Racer analytics",
         "description": "Open the moderator-only unique player and race summary",
         "location": "subreddit",

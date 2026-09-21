@@ -196,4 +196,49 @@ describe('Head to Head route identity forwarding', () => {
         );
         expect(confirmResponse.statusCode).toBe(200);
     });
+
+    it('asks for another challenge from the signed-in next route', async () => {
+        const context = {
+            username: 'Racer',
+            subredditName: 'MiniRacer',
+            postId: 't3_challenge1',
+            postData: { postType: 'head-to-head', challengeId: 'challenge-1' },
+        };
+        const getNextHeadToHead = vi.fn(async () => ({
+            status: 200,
+            body: { status: 'ready', postUrl: 'https://reddit.com/r/miniracer/next' },
+        }));
+        const handlers = routeHandlers({
+            getHeadToHeadRequestContext: () => context,
+            readContextPostData: () => context.postData,
+            previewHeadToHead: vi.fn(),
+            createHeadToHead: vi.fn(),
+            getHeadToHead: vi.fn(),
+            submitHeadToHead: vi.fn(),
+            previewHeadToHeadBrag: vi.fn(),
+            confirmHeadToHeadBrag: vi.fn(),
+            previewHeadToHeadComment: vi.fn(),
+            confirmHeadToHeadComment: vi.fn(),
+            getNextHeadToHead,
+        });
+
+        const response = responseRecorder();
+        await handlers.get['/api/head-to-head/next']({
+            query: { challengeId: 'challenge-1' },
+        }, response);
+
+        expect(getNextHeadToHead).toHaveBeenCalledWith(
+            { challengeId: 'challenge-1' },
+            {
+                ...context,
+                playerId: null,
+                guestToken: null,
+            },
+        );
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toEqual({
+            status: 'ready',
+            postUrl: 'https://reddit.com/r/miniracer/next',
+        });
+    });
 });

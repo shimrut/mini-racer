@@ -144,9 +144,11 @@ finishes also do not award Campaign medals or ranks, and they never appear on
 Campaign or Daily standings.
 A win shows a display-only challenge medal and **Challenge beaten** after the
 result is verified (you’ll see VERIFYING first).
-Finish buttons are always **Improve**, **Brag**, and **Home**; **Brag** unlocks
-only after a verified beat. A loss or tie uses the same buttons, but **Brag**
-stays disabled.
+Finish buttons start as **Improve**, **Concede** or **A tie?**, and **Home**.
+**Concede** waits until the third finished loss. After that comment is posted,
+the middle button becomes **New Challenge** and opens another challenge post
+when one exists. A tie keeps its own comment and does not offer New Challenge.
+A win still uses **Brag**, **The Daily**, and **Campaign**.
 
 ### The challenge finish says UNVERIFIED
 

@@ -29,6 +29,7 @@ function createRouteHarness(overrides = {}) {
             created: false,
             postUrl: 'https://reddit.com/analytics',
         })),
+        sweepHeadToHeadCatalog: vi.fn(async () => ({ scanned: 4, saved: 2, skipped: 2 })),
         ...overrides,
     };
     registerInternalRoutes(app, dependencies);
@@ -58,6 +59,18 @@ describe('launcher moderator routes', () => {
         });
         expect(dependencies.ensureMiniRacerLauncherPostForSubreddit)
             .toHaveBeenCalledWith('MiniRacer', kind);
+    });
+
+    it('collects existing challenge posts for New Challenge', async () => {
+        const { routes, dependencies } = createRouteHarness();
+
+        await expect(invoke(routes, '/internal/menu/head-to-head-catalog-sweep')).resolves.toEqual({
+            showToast: {
+                text: 'Collected 2 Mini Racer challenges for r/MiniRacer.',
+                appearance: 'success',
+            },
+        });
+        expect(dependencies.sweepHeadToHeadCatalog).toHaveBeenCalledWith('MiniRacer');
     });
 
     it('returns a context toast when Reddit omits the subreddit target', async () => {

@@ -129,6 +129,12 @@ Mini Racer is a **game**, so the most important launch requirements are:
   locked Campaign track or expired Daily track only for that duel, reports
   win/tie/loss correctly, and writes no Daily/Campaign progress, PB, or
   leaderboard data.
+- [ ] Run **Collect Mini Racer challenges** once on the live community so
+  New Challenge has existing Challenges posts to open on day one.
+- [ ] After three finished losses, Concede posts the comment, then the finish
+  row becomes Improve / New Challenge / Home. New Challenge opens another
+  challenge, not this one and not the player's own. A tie, a win, a skipped
+  Concede, and a guest never see that button.
 - [ ] A guest can race a Head to Head from the in-feed post; a verified win
   remains visible for five minutes, creates no durable Head to Head history,
   cannot be used to Brag while signed out, and does not merge at sign-in.

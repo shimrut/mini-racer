@@ -91,6 +91,8 @@ export class ModalShell {
         getRedditUsername = () => null,
         previewShare = null,
         confirmShare = null,
+        getNextChallenge = null,
+        openChallengePost = null,
     } = {}) {
         this.content = content;
         this.getLeaderboards = getLeaderboards;
@@ -102,6 +104,8 @@ export class ModalShell {
         this.getRedditUsername = getRedditUsername;
         this.previewShare = previewShare;
         this.confirmShare = confirmShare;
+        this.getNextChallenge = getNextChallenge;
+        this.openChallengePost = openChallengePost;
         this._modalCloseFallbackTimer = null;
         this._modalCloseTransitionEndHandler = null;
         this._modalKind = null;
@@ -552,16 +556,98 @@ export class ModalShell {
 
     /**
      * The middle button of a challenge finish when the share on it is a comment. A tie says its
-     * own line at once; a loss that has earned the offer concedes. A finish that has spent its
-     * comment falls back to the locked Brag, the same button the sheet showed before the offer.
+     * own line at once; a loss that has earned the offer concedes. A posted concession offers
+     * another challenge. Any other spent comment falls back to the locked Brag.
      */
     _challengeCommentButtonText(phase, spent = null) {
+        if (spent && phase === 'lost') {
+            return { label: 'New Challenge', aria: 'Open another challenge' };
+        }
         if (spent) {
             return { label: 'Brag', aria: 'Brag available after beating this challenge' };
         }
         return phase === 'tie'
             ? { label: 'A tie?', aria: 'Comment that you tied this challenge' }
             : { label: 'Concede', aria: 'Concede this challenge' };
+    }
+
+    _isPostedConcede() {
+        return Boolean(
+            this._challengeFinishCommentSpent
+            && this._challengeFinishShareRequest?.kind === 'challenge-comment'
+            && (
+                this._challengeFinishPhase === 'lost'
+                || this._challengeFinishShareRequest?.outcome === 'lost'
+            ),
+        );
+    }
+
+    _bindNextChallengeButton(button, postUrl) {
+        if (!button) return;
+        button.style.display = '';
+        button.disabled = false;
+        this._setShareButtonLabel(button, 'New Challenge');
+        button.setAttribute('aria-label', 'Open another challenge');
+        this._bindClickAction(button, () => void this._openNextChallengePost(postUrl));
+    }
+
+    _hideChallengeMiddleButton(button) {
+        if (!button) return;
+        button.style.display = 'none';
+        button.disabled = true;
+        this._bindClickAction(button, null);
+    }
+
+    async _openNextChallengePost(postUrl) {
+        try {
+            if (typeof this.openChallengePost === 'function') {
+                await this.openChallengePost(postUrl);
+                return;
+            }
+            const { navigateTo } = await import('@devvit/web/client');
+            navigateTo(postUrl);
+        } catch (error) {
+            console.error('Could not open the next challenge:', error);
+        }
+    }
+
+    async _offerPostedConcedeNextChallenge(button) {
+        if (!button) return;
+        if (typeof this._nextChallengePostUrl === 'string') {
+            this._bindNextChallengeButton(button, this._nextChallengePostUrl);
+            return;
+        }
+        if (this._nextChallengePostUrl === false) {
+            this._hideChallengeMiddleButton(button);
+            return;
+        }
+        if (this._nextChallengeLookup) return this._nextChallengeLookup;
+        this._setShareButtonLabel(button, 'New Challenge');
+        button.setAttribute('aria-label', 'Open another challenge');
+        button.disabled = true;
+        this._nextChallengeLookup = (async () => {
+            try {
+                const challengeId = this._challengeFinishShareRequest?.challengeId;
+                const response = typeof this.getNextChallenge === 'function'
+                    ? await this.getNextChallenge({ challengeId })
+                    : null;
+                const postUrl = response?.ok && typeof response.body?.postUrl === 'string'
+                    ? response.body.postUrl
+                    : null;
+                if (!postUrl) {
+                    this._nextChallengePostUrl = false;
+                    this._hideChallengeMiddleButton(button);
+                    return;
+                }
+                this._nextChallengePostUrl = postUrl;
+                this._bindNextChallengeButton(button, postUrl);
+            } catch (error) {
+                console.error('Could not find another challenge:', error);
+                this._nextChallengePostUrl = false;
+                this._hideChallengeMiddleButton(button);
+            }
+        })();
+        return this._nextChallengeLookup;
     }
 
     _setShareButtonLabel(button, label) {
@@ -841,10 +927,19 @@ export class ModalShell {
         actions.appendChild(done);
         panel.append(title, copy, actions);
         triggerButton.disabled = !keepShareAvailable;
-        // A challenge comment is spent for good, so the finish goes back to the button it showed
-        // before the offer: the locked Brag, which the next race can still unlock.
+        // A posted concession trades the spent comment for another challenge. A spent tie still
+        // goes back to the locked Brag.
+        if (this._isPostedConcede()) {
+            void this._offerPostedConcedeNextChallenge(triggerButton);
+            resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
+                preferredIndex: 0,
+                container: actions,
+                focusPreferred: true,
+            });
+            return;
+        }
         const spentCommentText = !keepShareAvailable && commented
-            ? this._challengeCommentButtonText(null, 'posted')
+            ? this._challengeCommentButtonText(this._challengeFinishPhase, 'posted')
             : null;
         this._setShareButtonLabel(
             triggerButton,
@@ -924,6 +1019,9 @@ export class ModalShell {
         const isDailyShare = isChallenge
             ? request?.source === 'daily'
             : request?.source === 'finish';
+        if (isBrag || isChallengeComment) {
+            this._challengeFinishShareRequest = request;
+        }
         this._closeSharePanel?.({ restoreScroll: false });
         const scrim = document.createElement('section');
         scrim.className = 'result-share-panel';
@@ -1249,6 +1347,8 @@ export class ModalShell {
         if (lapData.challengeFinish || lapData.challengeConfirmPhase) {
             this._challengeFinishShareRequest = options.shareRequest || null;
             this._challengeFinishCommentSpent = null;
+            this._nextChallengePostUrl = null;
+            this._nextChallengeLookup = null;
             this._challengeFinishPhase = lapData.challengeConfirmPhase
                 ?? (lapData.lapMedal === 'challenge' ? 'won' : 'pending');
         } else {
@@ -1511,35 +1611,39 @@ export class ModalShell {
         );
 
         if (this.combinedPlaylistBtn && challengeShareRequest) {
-            const commentText = isChallengeComment
-                ? this._challengeCommentButtonText(finishPhase, spent)
-                : null;
-            this.combinedPlaylistBtn.style.display = '';
-            this._setShareButtonLabel(
-                this.combinedPlaylistBtn,
-                commentText
-                    ? commentText.label
-                    : (spent === 'posted' ? 'Bragged' : 'Brag'),
-            );
-            this.combinedPlaylistBtn.setAttribute(
-                'aria-label',
-                commentText
-                    ? commentText.aria
-                    : shareEnabled
-                        ? 'Brag that you beat this challenge'
-                        : 'Brag available after beating this challenge',
-            );
-            this.combinedPlaylistBtn.disabled = !shareEnabled;
-            this._bindClickAction(
-                this.combinedPlaylistBtn,
-                shareEnabled
-                    ? () => void this._startShare(
-                        challengeShareRequest,
-                        this.combinedPlaylistBtn,
-                        this.modalCombinedView,
-                    )
-                    : null,
-            );
+            if (spent && isChallengeComment && finishPhase === 'lost') {
+                void this._offerPostedConcedeNextChallenge(this.combinedPlaylistBtn);
+            } else {
+                const commentText = isChallengeComment
+                    ? this._challengeCommentButtonText(finishPhase, spent)
+                    : null;
+                this.combinedPlaylistBtn.style.display = '';
+                this._setShareButtonLabel(
+                    this.combinedPlaylistBtn,
+                    commentText
+                        ? commentText.label
+                        : (spent === 'posted' ? 'Bragged' : 'Brag'),
+                );
+                this.combinedPlaylistBtn.setAttribute(
+                    'aria-label',
+                    commentText
+                        ? commentText.aria
+                        : shareEnabled
+                            ? 'Brag that you beat this challenge'
+                            : 'Brag available after beating this challenge',
+                );
+                this.combinedPlaylistBtn.disabled = !shareEnabled;
+                this._bindClickAction(
+                    this.combinedPlaylistBtn,
+                    shareEnabled
+                        ? () => void this._startShare(
+                            challengeShareRequest,
+                            this.combinedPlaylistBtn,
+                            this.modalCombinedView,
+                        )
+                        : null,
+                );
+            }
         }
 
         if (phase === 'won' && !phaseUnchanged) {

@@ -49,6 +49,7 @@ export type InternalRouteDependencies = {
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
     ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
+    sweepHeadToHeadCatalog(subredditName: string): Promise<{ scanned: number; saved: number; skipped: number }>;
 };
 
 function createMenuToast(text: string, appearance: 'neutral' | 'success' = 'neutral') {
@@ -161,6 +162,26 @@ export function registerInternalRoutes(
         '/internal/menu/launcher-lobby-create',
         'lobby',
         'Lobby launcher post',
+    );
+
+    registerMenuAction(
+        app,
+        dependencies,
+        '/internal/menu/head-to-head-catalog-sweep',
+        {
+            missingContextMessage: 'Reddit did not provide a subreddit context for this collect.',
+            failureLogMessage: 'Failed to collect Mini Racer challenges:',
+            failureToastPrefix: 'Could not collect Mini Racer challenges',
+        },
+        async (subredditName, res) => {
+            const result = await dependencies.sweepHeadToHeadCatalog(subredditName);
+            res.json(createMenuToast(
+                result.saved > 0
+                    ? `Collected ${result.saved} Mini Racer challenge${result.saved === 1 ? '' : 's'} for r/${subredditName}.`
+                    : `No new Mini Racer challenges to collect for r/${subredditName}.`,
+                'success',
+            ));
+        },
     );
 
     registerMenuAction(

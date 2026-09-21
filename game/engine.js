@@ -89,6 +89,7 @@ import {
   confirmHeadToHeadBrag,
   createHeadToHead,
   getHeadToHead,
+  getNextHeadToHead,
   previewHeadToHeadComment,
   previewHeadToHead,
   previewHeadToHeadBrag,
@@ -482,6 +483,7 @@ export class RealTimeRacer {
         }
         return confirmDailyChallengeShare(shareToken);
       },
+      getNextChallenge: async ({ challengeId } = {}) => getNextHeadToHead({ challengeId }),
     });
     this.leaderboards = new LeaderboardsUi({
       showRunsModal: (...args) => this.modal.showRunsModal(...args),

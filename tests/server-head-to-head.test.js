@@ -29,12 +29,23 @@ const redis = {
         return next;
     }),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
+    hGet: vi.fn(async (key, field) => (hashes.get(key) ?? new Map()).get(field) ?? null),
     hSet: vi.fn(async (key, entries) => {
         const hash = hashes.get(key) ?? new Map();
         for (const [field, value] of Object.entries(entries)) hash.set(field, value);
         hashes.set(key, hash);
         return Object.keys(entries).length;
     }),
+    hDel: vi.fn(async (key, fields) => {
+        const hash = hashes.get(key) ?? new Map();
+        for (const field of fields) hash.delete(field);
+        hashes.set(key, hash);
+        return fields.length;
+    }),
+    zAdd: vi.fn(async () => 1),
+    zRem: vi.fn(async () => 1),
+    zCard: vi.fn(async () => 0),
+    zRange: vi.fn(async () => []),
     hSetNX: vi.fn(async (key, field, value) => {
         const hash = hashes.get(key) ?? new Map();
         if (hash.has(field)) return 0;

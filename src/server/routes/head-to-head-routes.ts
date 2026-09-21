@@ -40,6 +40,10 @@ export type HeadToHeadRouteDependencies = {
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult>;
+    getNextHeadToHead(
+        input: Record<string, unknown>,
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult>;
 };
 
 function postChallengeId(postData: Record<string, unknown> | null): string | null {
@@ -190,6 +194,25 @@ export function registerHeadToHeadRoutes(
         } catch (error) {
             console.error('Failed to confirm Mini Racer challenge comment:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not post this comment.' });
+        }
+    });
+
+    app.get('/api/head-to-head/next', async (req, res) => {
+        try {
+            const queryId = typeof req.query?.challengeId === 'string'
+                ? req.query.challengeId
+                : '';
+            const result = await dependencies.getNextHeadToHead(
+                { challengeId: queryId },
+                withRequestIdentity(
+                    await dependencies.getHeadToHeadRequestContext(),
+                    req.query as Record<string, unknown>,
+                ),
+            );
+            res.status(result.status).json(result.body);
+        } catch (error) {
+            console.error('Failed to find another Mini Racer challenge:', error);
+            res.status(500).json({ status: 'none', error: 'Could not find another challenge.' });
         }
     });
 }

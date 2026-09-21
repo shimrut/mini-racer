@@ -27,6 +27,12 @@ import {
 import { createPostRecordKey } from './daily-gp-post-store.js';
 import { DAILY_PODIUM_AUTOPOST_SUBREDDITS_KEY } from './daily-podium-autopost-store.js';
 import { createPodiumPostRecordKey } from './daily-podium-post-store.js';
+import {
+    headToHeadCatalogAllKey,
+    headToHeadCatalogCardsKey,
+    headToHeadCatalogPostsKey,
+    headToHeadCatalogTrackKeys,
+} from './head-to-head-catalog.js';
 import { LAUNCHER_POSTS_KEY } from './launcher-post-store.js';
 import { MOD_ANALYTICS_POSTS_KEY } from './moderator-analytics-post.js';
 import { challengeCollectionKey } from './pb-ghost-store.js';
@@ -368,7 +374,7 @@ function buildKeyGroups({
         {
             id: 'posts',
             label: 'Posts and settings',
-            detail: 'Which post holds which challenge, and the autopost subscriptions',
+            detail: 'Which post holds which challenge, autopost subscriptions, and the Head to Head challenge directory',
             strings: [
                 ...challengeIds.map((challengeId) => createPostRecordKey(subredditName, challengeId)),
                 ...challengeIds.map((challengeId) => createPodiumPostRecordKey(subredditName, challengeId)),
@@ -378,14 +384,19 @@ function buildKeyGroups({
                 MOD_ANALYTICS_POSTS_KEY,
                 DAILY_AUTPOST_SUBREDDITS_KEY,
                 DAILY_PODIUM_AUTOPOST_SUBREDDITS_KEY,
+                headToHeadCatalogCardsKey(subredditName),
+                headToHeadCatalogPostsKey(subredditName),
             ],
-            sortedSets: [],
+            sortedSets: [
+                headToHeadCatalogAllKey(subredditName),
+                ...headToHeadCatalogTrackKeys(subredditName),
+            ],
         },
     ];
 }
 
 const NOT_COUNTED = [
-    'Head to Head records — every one of them expires within half an hour and none of them is listed anywhere.',
+    'Head to Head create locks, 10-minute post identity, and share previews — short-lived, and none of them is listed anywhere.',
     'Locks, rate limits and share links — all short-lived, and none of them is listed anywhere.',
     'Signed-out guest records — a guest is only listed once they have Campaign progress.',
     'Redis adds its own overhead per key and per row on top of the stored data measured here.',

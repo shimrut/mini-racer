@@ -31,6 +31,12 @@ import {
     writeHeadToHeadPostIdentityByChallengeId,
 } from './head-to-head-store.js';
 import { resolveHeadToHeadRecord, resolveHeadToHeadRecordResult } from './head-to-head-post.js';
+import {
+    catalogCardFromRecord,
+    pickNextHeadToHeadChallenge,
+    readHeadToHeadCatalogCard,
+    upsertHeadToHeadCatalogCardBestEffort,
+} from './head-to-head-catalog.js';
 import { resolveMiniRacerPostFlairId } from './post-flair-service.js';
 import {
     encodeHeadToHeadReplay,
@@ -609,6 +615,7 @@ async function savePost(
     post: { postId: `t3_${string}`; postUrl: string },
 ): Promise<HeadToHeadRecord> {
     const saved = { ...record, ...post };
+    await upsertHeadToHeadCatalogCardBestEffort(catalogCardFromRecord(saved, post));
     await writeHeadToHeadPostIdentityByChallengeId({
         challengeId: record.challengeId,
         ...post,
@@ -754,6 +761,14 @@ export function createHeadToHeadService(
             const existing = await activePost(identity, request.username);
             if (existing) {
                 await writeHeadToHeadPostIdentityByChallengeId(existing);
+                await upsertHeadToHeadCatalogCardBestEffort(catalogCardFromRecord({
+                    ...preparedRecord,
+                    trackKey: source.trackKey,
+                    lapCount: source.lapCount,
+                    targetTimeMs: source.bestTimeMs,
+                    medal: source.medal,
+                    challengerUsername: preparedRecord.username,
+                }, existing));
                 const carUnlocks = await recordChallengePostUnlock(
                     playerIdForUsername(request.username),
                     source.trackKey,
@@ -1159,5 +1174,54 @@ export function createHeadToHeadService(
         };
     }
 
-    return { preview, create, get, submit };
+    async function next(
+        input: Record<string, unknown>,
+        context: HeadToHeadRequestContext,
+    ): Promise<HeadToHeadServiceResult> {
+        const request = signedContext(context);
+        if (!request) {
+            return {
+                status: 401,
+                body: {
+                    status: 'signed_in_required',
+                    error: 'Sign in to Reddit to open another challenge.',
+                },
+            };
+        }
+        const challengeId = typeof input.challengeId === 'string' && input.challengeId
+            ? input.challengeId
+            : (typeof context.postData?.challengeId === 'string' ? context.postData.challengeId : '');
+        if (!challengeId) {
+            return {
+                status: 404,
+                body: { status: 'none', error: 'No other challenge is available.' },
+            };
+        }
+        const cataloged = await readHeadToHeadCatalogCard(request.subredditName, challengeId);
+        const current = cataloged ?? (await resolveChallengeRecord(challengeId, context)).record;
+        const picked = await pickNextHeadToHeadChallenge({
+            subredditName: request.subredditName,
+            excludeChallengeId: challengeId,
+            excludeUsername: request.username,
+            trackKey: current?.trackKey ?? null,
+            targetTimeMs: current?.targetTimeMs ?? null,
+            sweepIfEmpty: true,
+        });
+        if (!picked) {
+            return {
+                status: 200,
+                body: { status: 'none' },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                status: 'ready',
+                postUrl: picked.postUrl,
+                challengeId: picked.challengeId,
+            },
+        };
+    }
+
+    return { preview, create, get, submit, next };
 }

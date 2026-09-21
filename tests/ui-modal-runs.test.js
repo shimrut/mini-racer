@@ -66,7 +66,12 @@ describe('a challenge finish that has spent its comment', () => {
             _setShareButtonLabel: ModalShell.prototype._setShareButtonLabel,
             _challengeCommentButtonText: ModalShell.prototype._challengeCommentButtonText,
             _bindClickAction: ModalShell.prototype._bindClickAction,
+            _offerPostedConcedeNextChallenge: ModalShell.prototype._offerPostedConcedeNextChallenge,
+            _bindNextChallengeButton: ModalShell.prototype._bindNextChallengeButton,
+            _hideChallengeMiddleButton: ModalShell.prototype._hideChallengeMiddleButton,
+            _openNextChallengePost: ModalShell.prototype._openNextChallengePost,
             _startShare: () => {},
+            getNextChallenge: null,
         };
     }
 
@@ -81,15 +86,14 @@ describe('a challenge finish that has spent its comment', () => {
         `);
     }
 
-    // A spent comment goes back to the locked Brag, whatever spent it: the finish has said its
-    // piece, and only the next race can unlock the button again.
+    // A posted concession offers New Challenge. A spent tie still goes back to the locked Brag.
     it.each([
-        ['posted', 'lost', true, 'BRAG'],
-        ['unconfirmed', 'lost', true, 'BRAG'],
-        ['posted', 'tie', true, 'BRAG'],
-        [null, 'lost', false, 'CONCEDE'],
-        [null, 'tie', false, 'A TIE?'],
-    ])('leaves the button %s on a %s when a late rank answer repaints it', (spent, phase, disabled, label) => {
+        ['posted', 'lost', 'next'],
+        ['unconfirmed', 'lost', 'next'],
+        ['posted', 'tie', 'brag'],
+        [null, 'lost', 'concede'],
+        [null, 'tie', 'tie'],
+    ])('leaves the button %s on a %s when a late rank answer repaints it', async (spent, phase, expected) => {
         const originalDocument = global.document;
         const dom = finishDom();
         global.document = dom.window.document;
@@ -99,10 +103,47 @@ describe('a challenge finish that has spent its comment', () => {
             ModalShell.prototype.updateChallengeFinishHero.call(context, {
                 bestUpdate: { mode: 'campaign', improved: false, bestTimeMs: 11_200, rank: 2 },
             });
+            await context._nextChallengeLookup;
 
-            expect(context.combinedPlaylistBtn.disabled).toBe(disabled);
+            if (expected === 'next') {
+                expect(context.combinedPlaylistBtn.style.display).toBe('none');
+            } else if (expected === 'brag') {
+                expect(context.combinedPlaylistBtn.disabled).toBe(true);
+                expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
+                    .toBe('BRAG');
+            } else {
+                expect(context.combinedPlaylistBtn.disabled).toBe(false);
+                expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
+                    .toBe(expected === 'tie' ? 'A TIE?' : 'CONCEDE');
+            }
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('offers New Challenge after a posted concede when another post exists', async () => {
+        const originalDocument = global.document;
+        const dom = finishDom();
+        global.document = dom.window.document;
+        const openChallengePost = vi.fn(async () => undefined);
+        const context = finishContext(dom, 'posted', 'lost');
+        context.getNextChallenge = vi.fn(async () => ({
+            ok: true,
+            body: { status: 'ready', postUrl: 'https://reddit.com/r/miniracer/next' },
+        }));
+        context.openChallengePost = openChallengePost;
+
+        try {
+            ModalShell.prototype.updateChallengeFinishHero.call(context, {
+                bestUpdate: { mode: 'campaign', improved: false, bestTimeMs: 11_200, rank: 2 },
+            });
+            await context._nextChallengeLookup;
+
+            expect(context.combinedPlaylistBtn.disabled).toBe(false);
             expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
-                .toBe(label);
+                .toBe('NEW CHALLENGE');
+            await context.combinedPlaylistBtn.onclick();
+            expect(openChallengePost).toHaveBeenCalledWith('https://reddit.com/r/miniracer/next');
         } finally {
             global.document = originalDocument;
         }
@@ -1565,11 +1606,17 @@ describe('Daily finish share chooser', () => {
                     commentText: '10.011s. Can’t believe I lost by 0.011s😤',
                 },
             })),
+            getNextChallenge: vi.fn(async () => ({
+                ok: true,
+                body: { status: 'ready', postUrl: 'https://reddit.com/r/miniracer/next' },
+            })),
+            openChallengePost: vi.fn(async () => undefined),
         });
         const request = {
             kind: 'challenge-comment',
             challengeId: 'challenge-1',
             reportedTimeMs: 10_011,
+            outcome: 'lost',
         };
 
         try {
@@ -1585,10 +1632,11 @@ describe('Daily finish share chooser', () => {
             await panel.querySelector('.result-share-panel__button--primary').onclick();
             expect(panel.querySelector('.result-share-panel__title').textContent).toBe('Comment posted');
             expect(shell.confirmShare).toHaveBeenCalledWith('share-1', request);
-            // The comment is spent, so the finish goes back to the button it had before the
-            // offer: the locked Brag, which only a win can unlock.
-            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('BRAG');
-            expect(triggerButton.disabled).toBe(true);
+            await shell._nextChallengeLookup;
+            expect(triggerButton.querySelector('.combined-action-btn-label').textContent).toBe('NEW CHALLENGE');
+            expect(triggerButton.disabled).toBe(false);
+            await triggerButton.onclick();
+            expect(shell.openChallengePost).toHaveBeenCalledWith('https://reddit.com/r/miniracer/next');
         } finally {
             global.document = originalDocument;
         }

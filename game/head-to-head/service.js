@@ -132,6 +132,14 @@ export async function confirmHeadToHeadComment(shareToken) {
     });
 }
 
+export async function getNextHeadToHead({ challengeId } = {}) {
+    const url = challengeUrl(API_ROUTES.headToHeadNextUrl);
+    if (typeof challengeId === 'string' && challengeId) {
+        url.searchParams.set('challengeId', challengeId);
+    }
+    return requestJson(url.toString());
+}
+
 const WON_CHALLENGE_KEY = 'MiniRacerHeadToHeadWin';
 const WON_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 

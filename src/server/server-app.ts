@@ -60,6 +60,7 @@ import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
+import { sweepHeadToHeadCatalog } from './head-to-head-catalog.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
@@ -156,6 +157,7 @@ function registerProductionRoutes(app: express.Application): void {
         confirmHeadToHeadBrag,
         previewHeadToHeadComment,
         confirmHeadToHeadComment,
+        getNextHeadToHead: headToHeadService.next,
     });
     registerLeaderboardRaceRoutes(app, {
         getRequestUsername,
@@ -195,6 +197,7 @@ function registerProductionRoutes(app: express.Application): void {
         readAllDailyAutopostSubscriptions,
         readAllDailyPodiumAutopostSubscriptions,
         ensureModeratorAnalyticsPostForSubreddit,
+        sweepHeadToHeadCatalog,
     });
 }
 
