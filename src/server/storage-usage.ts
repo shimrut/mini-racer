@@ -30,7 +30,6 @@ import { createPodiumPostRecordKey } from './daily-podium-post-store.js';
 import {
     headToHeadCatalogAllKey,
     headToHeadCatalogCardsKey,
-    headToHeadCatalogPostsKey,
     headToHeadCatalogTrackKeys,
 } from './head-to-head-catalog.js';
 import { LAUNCHER_POSTS_KEY } from './launcher-post-store.js';
@@ -385,7 +384,6 @@ function buildKeyGroups({
                 DAILY_AUTPOST_SUBREDDITS_KEY,
                 DAILY_PODIUM_AUTOPOST_SUBREDDITS_KEY,
                 headToHeadCatalogCardsKey(subredditName),
-                headToHeadCatalogPostsKey(subredditName),
             ],
             sortedSets: [
                 headToHeadCatalogAllKey(subredditName),

@@ -50,11 +50,18 @@ const redis = {
     zRange: vi.fn(async (key, start, stop, options = {}) => {
         let rows = [...zsetFor(key)].sort((left, right) => left.score - right.score);
         if (options.by === 'score') {
-            rows = rows.filter((row) => row.score >= start && row.score <= stop);
+            const low = Math.min(start, stop);
+            const high = Math.max(start, stop);
+            rows = rows.filter((row) => row.score >= low && row.score <= high);
         } else {
             rows = rows.slice(start, stop + 1);
         }
         if (options.reverse) rows.reverse();
+        if (options.limit) {
+            const offset = options.limit.offset ?? 0;
+            const count = options.limit.count ?? rows.length;
+            rows = rows.slice(offset, offset + count);
+        }
         return rows;
     }),
     watch: vi.fn(async () => {
@@ -210,6 +217,41 @@ describe('Head to Head catalog', () => {
 
         expect(picked).toMatchObject({ challengeId: 'live' });
         await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
+    });
+
+    it('keeps looking after a full page of removed posts', async () => {
+        reddit.getPostById.mockImplementation(async (postId) => {
+            if (postId === 't3_live') return { removed: false };
+            throw new Error('gone');
+        });
+        for (let index = 0; index < 12; index += 1) {
+            await upsertHeadToHeadCatalogCard(card({
+                challengeId: `dead-${index}`,
+                postId: `t3_dead_${index}`,
+                postUrl: `https://reddit.com/r/miniracer/dead-${index}`,
+                challengerUsername: 'Other',
+                trackKey: OTHER_TRACK_KEY,
+                createdAt: new Date(Date.parse('2026-09-20T00:00:00.000Z') - index * 60_000).toISOString(),
+            }));
+        }
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'live',
+            postId: 't3_live',
+            postUrl: 'https://reddit.com/r/miniracer/live',
+            challengerUsername: 'Other',
+            trackKey: OTHER_TRACK_KEY,
+            createdAt: '2026-08-01T00:00:00.000Z',
+        }));
+
+        const picked = await pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            targetTimeMs: 12_000,
+        });
+
+        expect(picked).toMatchObject({ challengeId: 'live' });
     });
 
     it('collects valid Challenges posts and skips junk', async () => {

@@ -15,8 +15,9 @@ const SWEEP_PAGE_SIZE = 100;
 const SWEEP_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
 const SWEEP_BUDGET_MS = 20_000;
 const SWEEP_LOCK_TTL_MS = 60_000;
-const SWEPT_MARKER_TTL_SECONDS = 60 * 60;
-const PICK_ATTEMPTS = 8;
+const PICK_WINDOW_SIZE = 10;
+const PICK_MAX_WINDOWS = 20;
+const PICK_CHECK_LIMIT = 60;
 const EASIER_SCORE_CEILING = Number.MAX_SAFE_INTEGER;
 
 export type HeadToHeadCatalogCard = {
@@ -64,10 +65,6 @@ export function headToHeadCatalogCardsKey(subredditName: string): string {
     return `${PREFIX}:${keyPart(subredditName)}:cards`;
 }
 
-export function headToHeadCatalogPostsKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:posts`;
-}
-
 export function headToHeadCatalogAllKey(subredditName: string): string {
     return `${PREFIX}:${keyPart(subredditName)}:all`;
 }
@@ -78,10 +75,6 @@ export function headToHeadCatalogByTrackKey(subredditName: string, trackKey: str
 
 export function headToHeadCatalogTrackKeys(subredditName: string): string[] {
     return Object.keys(TRACKS).map((trackKey) => headToHeadCatalogByTrackKey(subredditName, trackKey));
-}
-
-function sweptMarkerKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:swept-at`;
 }
 
 function sweepCursorKey(subredditName: string): string {
@@ -214,9 +207,6 @@ export async function upsertHeadToHeadCatalogCard(card: HeadToHeadCatalogCard): 
     }
     const createdMs = Date.parse(parsed.createdAt);
     await redis.hSet(cardsKey, { [parsed.challengeId]: JSON.stringify(parsed) });
-    await redis.hSet(headToHeadCatalogPostsKey(parsed.subredditName), {
-        [parsed.postId]: parsed.challengeId,
-    });
     await redis.zAdd(headToHeadCatalogAllKey(parsed.subredditName), {
         member: parsed.challengeId,
         score: Number.isFinite(createdMs) ? createdMs : 0,
@@ -244,7 +234,6 @@ async function dropCatalogCard(
     card: Pick<HeadToHeadCatalogCard, 'challengeId' | 'postId' | 'trackKey'>,
 ): Promise<void> {
     await redis.hDel(headToHeadCatalogCardsKey(subredditName), [card.challengeId]);
-    await redis.hDel(headToHeadCatalogPostsKey(subredditName), [card.postId]);
     await redis.zRem(headToHeadCatalogAllKey(subredditName), [card.challengeId]);
     await redis.zRem(headToHeadCatalogByTrackKey(subredditName, card.trackKey), [card.challengeId]);
 }
@@ -388,9 +377,6 @@ export async function sweepHeadToHeadCatalog(
 
         if (status === 'done') {
             await redis.del(sweepCursorKey(subredditName));
-            await redis.set(sweptMarkerKey(subredditName), new Date(started).toISOString(), {
-                expiration: new Date(started + SWEPT_MARKER_TTL_SECONDS * 1000),
-            });
         } else {
             await redis.set(sweepCursorKey(subredditName), JSON.stringify({ after } satisfies SweepCursor));
         }
@@ -409,17 +395,58 @@ async function postStillRaces(postId: `t3_${string}`): Promise<boolean> {
     }
 }
 
-async function nextCandidate(
-    key: string,
-    minScore: number,
-    maxScore: number,
-    reverse = false,
-): Promise<string[]> {
-    const ranked = await redis.zRange(key, minScore, maxScore, {
-        by: 'score',
-        reverse,
-    });
-    return ranked.map((row) => row.member);
+async function searchCatalogWindow({
+    subredditName,
+    key,
+    minScore,
+    maxScore,
+    reverse,
+    excludeName,
+    seen,
+    checks,
+}: {
+    subredditName: string;
+    key: string;
+    minScore: number;
+    maxScore: number;
+    reverse: boolean;
+    excludeName: string;
+    seen: Set<string>;
+    checks: { count: number };
+}): Promise<HeadToHeadCatalogCard | null> {
+    let offset = 0;
+    for (let window = 0; window < PICK_MAX_WINDOWS && checks.count < PICK_CHECK_LIMIT; window += 1) {
+        const ranked = await redis.zRange(key, reverse ? maxScore : minScore, reverse ? minScore : maxScore, {
+            by: 'score',
+            reverse,
+            limit: { offset, count: PICK_WINDOW_SIZE },
+        });
+        if (!ranked.length) return null;
+        let removed = 0;
+        for (const row of ranked) {
+            if (checks.count >= PICK_CHECK_LIMIT) return null;
+            const challengeId = row.member;
+            if (seen.has(challengeId)) continue;
+            seen.add(challengeId);
+            const card = await readHeadToHeadCatalogCard(subredditName, challengeId);
+            if (!card) {
+                await redis.zRem(key, [challengeId]);
+                removed += 1;
+                continue;
+            }
+            if (normalizeName(card.challengerUsername) === excludeName) continue;
+            checks.count += 1;
+            if (!await postStillRaces(card.postId)) {
+                await dropCatalogCard(subredditName, card);
+                removed += 1;
+                continue;
+            }
+            return card;
+        }
+        if (ranked.length < PICK_WINDOW_SIZE) return null;
+        offset += ranked.length - removed;
+    }
+    return null;
 }
 
 export async function pickNextHeadToHeadChallenge({
@@ -437,43 +464,28 @@ export async function pickNextHeadToHeadChallenge({
 }): Promise<HeadToHeadCatalogCard | null> {
     const excludeName = normalizeName(excludeUsername);
     const seen = new Set<string>([excludeChallengeId]);
-    const queues: string[][] = [];
+    const checks = { count: 0 };
     if (trackKey && Number.isSafeInteger(targetTimeMs) && Number(targetTimeMs) > 0) {
-        queues.push(await nextCandidate(
-            headToHeadCatalogByTrackKey(subredditName, trackKey),
-            Number(targetTimeMs) + 1,
-            EASIER_SCORE_CEILING,
-        ));
+        const sameTrack = await searchCatalogWindow({
+            subredditName,
+            key: headToHeadCatalogByTrackKey(subredditName, trackKey),
+            minScore: Number(targetTimeMs) + 1,
+            maxScore: EASIER_SCORE_CEILING,
+            reverse: false,
+            excludeName,
+            seen,
+            checks,
+        });
+        if (sameTrack) return sameTrack;
     }
-    queues.push(await nextCandidate(
-        headToHeadCatalogAllKey(subredditName),
-        0,
-        EASIER_SCORE_CEILING,
-        true,
-    ));
-
-    let attempts = 0;
-    for (const members of queues) {
-        for (const challengeId of members) {
-            if (seen.has(challengeId)) continue;
-            seen.add(challengeId);
-            const card = await readHeadToHeadCatalogCard(subredditName, challengeId);
-            if (!card) {
-                await redis.zRem(headToHeadCatalogAllKey(subredditName), [challengeId]);
-                if (trackKey) {
-                    await redis.zRem(headToHeadCatalogByTrackKey(subredditName, trackKey), [challengeId]);
-                }
-                continue;
-            }
-            if (normalizeName(card.challengerUsername) === excludeName) continue;
-            attempts += 1;
-            if (attempts > PICK_ATTEMPTS) return null;
-            if (!await postStillRaces(card.postId)) {
-                await dropCatalogCard(subredditName, card);
-                continue;
-            }
-            return card;
-        }
-    }
-    return null;
+    return searchCatalogWindow({
+        subredditName,
+        key: headToHeadCatalogAllKey(subredditName),
+        minScore: 0,
+        maxScore: EASIER_SCORE_CEILING,
+        reverse: true,
+        excludeName,
+        seen,
+        checks,
+    });
 }

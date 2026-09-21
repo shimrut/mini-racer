@@ -3,7 +3,8 @@
   moderator Collect Mini Racer challenges action fills that list from existing
   Challenges posts so it works on day one. One click reads as far as it can, then
   you click again until it says the month is covered. New posts are saved as
-  they go up.
+  they go up. New Challenge keeps looking past removed posts instead of giving
+  up after the first handful, and the unused extra indexes are gone.
   Ties, wins, skipped Concede taps, and guests stay as they are.
 
 - Daily and Podium posts now get their flair the same way Head to Head
