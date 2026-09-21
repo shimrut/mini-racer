@@ -11,6 +11,7 @@ import {
     monthCountersKey,
     monthModePlayersKey,
     monthPlayersKey,
+    summaryKey,
 } from './analytics-store.js';
 import { campaignProgressKey } from './campaign-progress-key.js';
 import { carUnlockHashKey } from './car-unlock-store.js';
@@ -352,7 +353,7 @@ function buildKeyGroups({
         {
             id: 'analytics',
             label: 'Analytics',
-            detail: 'This page: daily player marks, race counters, cohort starts, and the account ledger',
+            detail: 'This page: daily player marks, the summary totals, cohort starts, and the account ledger',
             strings: [],
             hashes: [
                 ...dates.flatMap((date) => [
@@ -365,6 +366,7 @@ function buildKeyGroups({
                     monthModePlayersKey(scope, month),
                     monthCountersKey(scope, month),
                 ]),
+                summaryKey(scope),
                 firstSeenKey(scope),
                 cohortStartsKey(scope),
             ],

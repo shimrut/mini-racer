@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hashes = new Map();
+const strings = new Map();
 const mockRedis = {
     hSetNX: vi.fn(async (key, field, value) => {
         const hash = hashes.get(key) ?? new Map();
@@ -23,7 +24,26 @@ const mockRedis = {
         return Object.keys(entries).length;
     }),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
+    hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field)),
+    hDel: vi.fn(async (key, fields) => {
+        const hash = hashes.get(key);
+        if (!hash) return 0;
+        let removed = 0;
+        for (const field of fields) {
+            if (hash.delete(field)) removed += 1;
+        }
+        return removed;
+    }),
+    set: vi.fn(async (key, value, options) => {
+        if (options?.nx && strings.has(key)) return '';
+        strings.set(key, String(value));
+        return 'OK';
+    }),
+    del: vi.fn(async (...keys) => {
+        for (const key of keys) strings.delete(key);
+    }),
     expire: vi.fn(async () => true),
+    exists: vi.fn(async (...keys) => keys.filter((key) => hashes.has(key) || strings.has(key)).length),
 };
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
@@ -52,10 +72,13 @@ function modeFor(bucket, mode) {
 }
 
 describe('server analytics store', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         hashes.clear();
+        strings.clear();
         profiles.clear();
         vi.clearAllMocks();
+        const { clearAnalyticsMaintenanceMemory } = await store();
+        clearAnalyticsMaintenanceMemory();
     });
 
     it('counts a signed-in player once per day however many races they start', async () => {
@@ -407,6 +430,111 @@ describe('server analytics store', () => {
         });
 
         expect(summary.today).toMatchObject({ players: 1, newPlayers: 1, returningPlayers: 0 });
+    });
+
+    it('refreshes expiry once per day on this server, and only for keys that event wrote', async () => {
+        const {
+            recordAnalyticsPodiumEvent,
+            recordAnalyticsRace,
+            summaryKey,
+            dayPlayersKey,
+            dayModePlayersKey,
+            monthPlayersKey,
+            monthModePlayersKey,
+            firstSeenKey,
+            cohortStartsKey,
+        } = await store();
+        const now = day('2026-08-15T09:00:00.000Z');
+        const scope = SUBREDDIT;
+
+        await recordAnalyticsPodiumEvent({ action: 'play', subredditName: scope, now });
+
+        expect(mockRedis.expire.mock.calls.map((call) => call[0])).toEqual([summaryKey(scope)]);
+        expect(mockRedis.hDel).toHaveBeenCalledTimes(1);
+
+        mockRedis.expire.mockClear();
+        mockRedis.hDel.mockClear();
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:racefan',
+            subredditName: scope,
+            now,
+        });
+
+        expect(mockRedis.expire.mock.calls.map((call) => call[0]).sort()).toEqual([
+            cohortStartsKey(scope),
+            dayModePlayersKey(scope, '2026-08-15'),
+            dayPlayersKey(scope, '2026-08-15'),
+            firstSeenKey(scope),
+            monthModePlayersKey(scope, '2026-08'),
+            monthPlayersKey(scope, '2026-08'),
+        ].sort());
+        expect(mockRedis.hDel).not.toHaveBeenCalled();
+
+        mockRedis.expire.mockClear();
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'finish',
+            playerId: 'reddit:racefan',
+            subredditName: scope,
+            now,
+        });
+        expect(mockRedis.expire).not.toHaveBeenCalled();
+    });
+
+    it('keeps older per-day counters when the summary hash takes over', async () => {
+        const {
+            dayCountersKey,
+            getServerAnalyticsSummary,
+            recordAnalyticsRace,
+        } = await store();
+
+        await mockRedis.hSet(dayCountersKey(SUBREDDIT, '2026-08-15'), { 'daily:start': '3' });
+        const first = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+        expect(modeFor(first.today, 'daily').starts).toBe(3);
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+        const second = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+
+        expect(modeFor(second.today, 'daily').starts).toBe(4);
+        expect(second.today.players).toBe(1);
+    });
+
+    it('reads the chart from the summary hash and day lists only for cohorts', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+        const now = day('2026-08-15T12:00:00.000Z');
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:racefan',
+            subredditName: SUBREDDIT,
+            now,
+        });
+        await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
+        mockRedis.hGetAll.mockClear();
+
+        const summary = await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
+        const keys = mockRedis.hGetAll.mock.calls.map((call) => call[0]);
+
+        expect(summary.today.players).toBe(1);
+        expect(keys.filter((key) => key.endsWith(':summary'))).toHaveLength(1);
+        expect(keys.filter((key) => key.endsWith(':players'))).toHaveLength(365);
+        expect(keys.filter((key) => key.endsWith(':cohort-starts'))).toHaveLength(1);
+        expect(keys.some((key) => key.includes(':mode-players') || key.includes(':counters') || key.includes(':m:'))).toBe(false);
     });
 
     it('swallows redis failures so gameplay callers stay unblocked', async () => {

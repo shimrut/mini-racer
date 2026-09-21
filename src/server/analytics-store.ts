@@ -152,6 +152,26 @@ function cohortStartsKey(scope: string): string {
     return scopedKey(scope, 'cohort-starts');
 }
 
+function summaryKey(scope: string): string {
+    return scopedKey(scope, 'summary');
+}
+
+function summaryLockKey(scope: string): string {
+    return scopedKey(scope, 'summary-lock');
+}
+
+const SUMMARY_READY = 'ready';
+const SUMMARY_LOCK_MS = 3 * 60 * 1000;
+const SUMMARY_WRITE_BATCH = 200;
+
+// Once per process per UTC day, and only after the command succeeds. A new
+// process refreshes the timers again, so a missed expire is retried.
+const retentionMemory = new Set<string>();
+
+export function clearAnalyticsMaintenanceMemory(): void {
+    retentionMemory.clear();
+}
+
 function toMonth(date: string): string {
     return date.slice(0, 7);
 }
@@ -199,6 +219,7 @@ export {
     monthModePlayersKey,
     monthCountersKey,
     cohortStartsKey,
+    summaryKey,
 };
 
 export function analyticsRetentionWindow(now = new Date()): { dates: string[]; months: string[] } {
@@ -304,6 +325,49 @@ async function claimFirstSeen(scope: string, playerId: string, date: string): Pr
  * A player is marked once per bucket. The mark itself carries the new/returning verdict,
  * so every figure on the page derives from one hash and the totals cannot drift apart.
  */
+function daySummaryPrefix(date: string): string {
+    return `d:${date}:`;
+}
+
+function monthSummaryPrefix(month: string): string {
+    return `m:${month}:`;
+}
+
+function wasCreated(result: unknown): boolean {
+    return result === 1 || result === true;
+}
+
+function summaryMetricSuffixes(): string[] {
+    return [
+        'players',
+        'new',
+        'returning',
+        'guests',
+        ...ANALYTICS_MODES.flatMap((mode) => [
+            countField(mode, 'start'),
+            countField(mode, 'finish'),
+            `${mode}:players`,
+        ]),
+        'challenge:create',
+        'podium:play',
+        'podium:replay',
+    ];
+}
+
+function uniqueFields(prefix: string, mark: PlayerMark): string[] {
+    if (mark === PLAYER_GUEST) return [`${prefix}guests`];
+    const fields = [`${prefix}players`];
+    if (mark === PLAYER_NEW) fields.push(`${prefix}new`);
+    else fields.push(`${prefix}returning`);
+    return fields;
+}
+
+async function incrementSummary(scope: string, fields: readonly string[]): Promise<void> {
+    if (fields.length === 0) return;
+    const key = summaryKey(scope);
+    await Promise.all(fields.map((field) => redis.hIncrBy(key, field, 1)));
+}
+
 async function markPlayerPresence(
     scope: string,
     date: string,
@@ -319,12 +383,23 @@ async function markPlayerPresence(
             ? PLAYER_NEW
             : PLAYER_RETURNING;
 
-    await Promise.all([
+    const [dayPlayer, dayMode, monthPlayer, monthMode] = await Promise.all([
         redis.hSetNX(dayPlayersKey(scope, date), player.id, mark),
         redis.hSetNX(dayModePlayersKey(scope, date), modeField, mark),
         redis.hSetNX(monthPlayersKey(scope, month), player.id, mark),
         redis.hSetNX(monthModePlayersKey(scope, month), modeField, mark),
     ]);
+
+    const fields: string[] = [];
+    if (wasCreated(dayPlayer)) fields.push(...uniqueFields(daySummaryPrefix(date), mark));
+    if (wasCreated(monthPlayer)) fields.push(...uniqueFields(monthSummaryPrefix(month), mark));
+    if (wasCreated(dayMode) && mark !== PLAYER_GUEST) {
+        fields.push(`${daySummaryPrefix(date)}${mode}:players`);
+    }
+    if (wasCreated(monthMode) && mark !== PLAYER_GUEST) {
+        fields.push(`${monthSummaryPrefix(month)}${mode}:players`);
+    }
+    await incrementSummary(scope, fields);
 }
 
 // Cohorts need the first date observed by analytics, not the profile's historical
@@ -343,24 +418,79 @@ async function markCohortStart(
     }
 }
 
-async function applyRetention(scope: string, date: string): Promise<void> {
+async function expireOnce(date: string, key: string, ttlSeconds: number): Promise<void> {
+    const token = `${date}:${key}`;
+    if (retentionMemory.has(token)) return;
+    await redis.expire(key, ttlSeconds);
+    retentionMemory.add(token);
+}
+
+function staleSummaryFields(date: string): string[] {
+    const fields: string[] = [];
+    const pushPrefix = (prefix: string) => {
+        for (const suffix of summaryMetricSuffixes()) {
+            fields.push(`${prefix}${suffix}`, `b:${prefix}${suffix}`);
+        }
+    };
+    for (let age = ANALYTICS_RETENTION_DAYS; age < ANALYTICS_RETENTION_DAYS + 14; age += 1) {
+        pushPrefix(daySummaryPrefix(addUtcDays(date, -age)));
+    }
+    const firstExpiredMonth = addUtcMonths(toMonth(date), -ANALYTICS_RETENTION_MONTHS);
+    for (let age = 0; age < 3; age += 1) {
+        pushPrefix(monthSummaryPrefix(addUtcMonths(firstExpiredMonth, -age)));
+    }
+    return fields;
+}
+
+async function trimSummaryOnce(scope: string, date: string): Promise<void> {
+    const token = `${date}:${summaryKey(scope)}:trim`;
+    if (retentionMemory.has(token)) return;
+    try {
+        await redis.hDel(summaryKey(scope), staleSummaryFields(date));
+        retentionMemory.add(token);
+    } catch (error) {
+        logAnalyticsFailure('summary trim', error);
+    }
+}
+
+async function refreshRollingLedgers(scope: string, date: string): Promise<void> {
+    const keys = [firstSeenKey(scope), cohortStartsKey(scope)];
+    await Promise.all(keys.map(async (key) => {
+        const token = `${date}:${key}`;
+        if (retentionMemory.has(token)) return;
+        // Missing keys are not remembered. Remembering one would skip the timer
+        // on the later event that actually creates the ledger.
+        if (!await redis.exists(key)) return;
+        await redis.expire(key, MONTH_TTL_SECONDS);
+        retentionMemory.add(token);
+    }));
+}
+
+async function finishAnalyticsWrite(
+    scope: string,
+    date: string,
+    keys: readonly { key: string; ttl: number }[],
+): Promise<void> {
+    await Promise.all(keys.map(({ key, ttl }) => expireOnce(date, key, ttl)));
+    await refreshRollingLedgers(scope, date);
+    await trimSummaryOnce(scope, date);
+}
+
+function raceRetentionKeys(scope: string, date: string) {
     const month = toMonth(date);
-    await Promise.all([
-        redis.expire(dayPlayersKey(scope, date), DAILY_GP_REDIS_TTL_SECONDS),
-        redis.expire(dayModePlayersKey(scope, date), DAILY_GP_REDIS_TTL_SECONDS),
-        redis.expire(dayCountersKey(scope, date), DAILY_GP_REDIS_TTL_SECONDS),
-        redis.expire(monthPlayersKey(scope, month), MONTH_TTL_SECONDS),
-        redis.expire(monthModePlayersKey(scope, month), MONTH_TTL_SECONDS),
-        redis.expire(monthCountersKey(scope, month), MONTH_TTL_SECONDS),
-        redis.expire(firstSeenKey(scope), MONTH_TTL_SECONDS),
-        redis.expire(cohortStartsKey(scope), MONTH_TTL_SECONDS),
-    ]);
+    return [
+        { key: dayPlayersKey(scope, date), ttl: DAILY_GP_REDIS_TTL_SECONDS },
+        { key: dayModePlayersKey(scope, date), ttl: DAILY_GP_REDIS_TTL_SECONDS },
+        { key: monthPlayersKey(scope, month), ttl: MONTH_TTL_SECONDS },
+        { key: monthModePlayersKey(scope, month), ttl: MONTH_TTL_SECONDS },
+        { key: summaryKey(scope), ttl: MONTH_TTL_SECONDS },
+    ];
 }
 
 async function bumpCounter(scope: string, date: string, field: string): Promise<void> {
-    await Promise.all([
-        redis.hIncrBy(dayCountersKey(scope, date), field, 1),
-        redis.hIncrBy(monthCountersKey(scope, toMonth(date)), field, 1),
+    await incrementSummary(scope, [
+        `${daySummaryPrefix(date)}${field}`,
+        `${monthSummaryPrefix(toMonth(date))}${field}`,
     ]);
 }
 
@@ -390,7 +520,7 @@ export async function recordAnalyticsRace({
         await markCohortStart(scope, date, player);
         await markPlayerPresence(scope, date, normalizedMode, player);
         await bumpCounter(scope, date, countField(normalizedMode, normalizedAction));
-        await applyRetention(scope, date);
+        await finishAnalyticsWrite(scope, date, raceRetentionKeys(scope, date));
     } catch (error) {
         logAnalyticsFailure('race', error);
     }
@@ -419,7 +549,9 @@ export async function recordAnalyticsChallengeCreate({
         const scope = sanitizeScope(subredditName ?? readScopeFromContext());
         const date = formatUtcChallengeDate(now);
         await bumpCounter(scope, date, 'challenge:create');
-        await applyRetention(scope, date);
+        await finishAnalyticsWrite(scope, date, [
+            { key: summaryKey(scope), ttl: MONTH_TTL_SECONDS },
+        ]);
     } catch (error) {
         logAnalyticsFailure('challenge create', error);
     }
@@ -444,7 +576,9 @@ export async function recordAnalyticsPodiumEvent({
         const scope = sanitizeScope(subredditName ?? readScopeFromContext());
         const date = formatUtcChallengeDate(now);
         await bumpCounter(scope, date, `podium:${normalizedAction}`);
-        await applyRetention(scope, date);
+        await finishAnalyticsWrite(scope, date, [
+            { key: summaryKey(scope), ttl: MONTH_TTL_SECONDS },
+        ]);
     } catch (error) {
         logAnalyticsFailure('podium', error);
     }
@@ -493,25 +627,160 @@ type LoadedAnalyticsDay = {
     rawPlayers: Record<string, string>;
 };
 
-async function loadAnalyticsDay(scope: string, date: string): Promise<LoadedAnalyticsDay> {
+type LegacyBucket = {
+    bucket: LoadedBucket;
+    rawPlayers: Record<string, string>;
+    hasPresence: boolean;
+    hasCounters: boolean;
+};
+
+function hashRecord(raw: Record<string, string> | undefined): Record<string, string> {
+    return raw || {};
+}
+
+async function loadLegacyBucket(
+    playersKey: string,
+    modeKey: string,
+    countersKey: string,
+): Promise<LegacyBucket> {
     const [players, modePlayers, counters] = await Promise.all([
-        redis.hGetAll(dayPlayersKey(scope, date)),
-        redis.hGetAll(dayModePlayersKey(scope, date)),
-        redis.hGetAll(dayCountersKey(scope, date)),
+        redis.hGetAll(playersKey),
+        redis.hGetAll(modeKey),
+        redis.hGetAll(countersKey),
     ]);
+    const presence = hashRecord(players);
+    const modes = hashRecord(modePlayers);
+    const counts = hashRecord(counters);
     return {
-        day: { date, ...summarizeBucket(players, modePlayers, counters) },
-        rawPlayers: players || {},
+        bucket: summarizeBucket(presence, modes, counts),
+        rawPlayers: presence,
+        hasPresence: Object.keys(presence).length > 0 || Object.keys(modes).length > 0,
+        hasCounters: Object.keys(counts).length > 0,
     };
 }
 
-async function loadAnalyticsMonth(scope: string, month: string): Promise<AnalyticsMonth> {
-    const [players, modePlayers, counters] = await Promise.all([
-        redis.hGetAll(monthPlayersKey(scope, month)),
-        redis.hGetAll(monthModePlayersKey(scope, month)),
-        redis.hGetAll(monthCountersKey(scope, month)),
-    ]);
-    return { month, ...summarizeBucket(players, modePlayers, counters) };
+function summaryCount(raw: Record<string, string>, field: string): number {
+    return toCount(raw[field]) + toCount(raw[`b:${field}`]);
+}
+
+function readSummaryBucket(raw: Record<string, string>, prefix: string): LoadedBucket {
+    const unique = (suffix: string) => toCount(raw[`${prefix}${suffix}`]);
+    const count = (suffix: string) => summaryCount(raw, `${prefix}${suffix}`);
+    return {
+        players: unique('players'),
+        newPlayers: unique('new'),
+        returningPlayers: unique('returning'),
+        guestPlayers: unique('guests'),
+        challengeCreates: count('challenge:create'),
+        podiumPlays: count('podium:play'),
+        podiumReplays: count('podium:replay'),
+        modes: ANALYTICS_MODES.map((mode) => ({
+            mode,
+            starts: count(countField(mode, 'start')),
+            finishes: count(countField(mode, 'finish')),
+            players: unique(`${mode}:players`),
+        })),
+    };
+}
+
+function counterPairs(bucket: LoadedBucket): [string, number][] {
+    return [
+        ['challenge:create', bucket.challengeCreates],
+        ['podium:play', bucket.podiumPlays],
+        ['podium:replay', bucket.podiumReplays],
+        ...bucket.modes.flatMap((mode) => [
+            [`${mode.mode}:start`, mode.starts],
+            [`${mode.mode}:finish`, mode.finishes],
+        ] as [string, number][]),
+    ];
+}
+
+function copyLegacyBucket(
+    fields: Record<string, string>,
+    current: Record<string, string>,
+    prefix: string,
+    legacy: LegacyBucket,
+): void {
+    if (legacy.hasPresence) {
+        const { bucket } = legacy;
+        fields[`${prefix}players`] = String(bucket.players);
+        fields[`${prefix}new`] = String(bucket.newPlayers);
+        fields[`${prefix}returning`] = String(bucket.returningPlayers);
+        fields[`${prefix}guests`] = String(bucket.guestPlayers);
+        for (const mode of bucket.modes) {
+            fields[`${prefix}${mode.mode}:players`] = String(mode.players);
+        }
+    }
+    if (!legacy.hasCounters) return;
+    for (const [suffix, legacyCount] of counterPairs(legacy.bucket)) {
+        if (!legacyCount) continue;
+        const baseField = `b:${prefix}${suffix}`;
+        if (current[baseField] !== undefined) continue;
+        fields[baseField] = String(legacyCount);
+    }
+}
+
+async function writeSummaryFields(key: string, fields: Record<string, string>): Promise<void> {
+    const entries = Object.entries(fields);
+    for (let index = 0; index < entries.length; index += SUMMARY_WRITE_BATCH) {
+        await redis.hSet(
+            key,
+            Object.fromEntries(entries.slice(index, index + SUMMARY_WRITE_BATCH)),
+        );
+    }
+}
+
+function analyticsWindow(now: Date) {
+    const to = formatUtcChallengeDate(now);
+    const from = addUtcDays(to, -(ANALYTICS_RETENTION_DAYS - 1));
+    return {
+        from,
+        to,
+        dates: buildDateRange(from, to),
+        months: buildMonthRange(toMonth(to), ANALYTICS_RETENTION_MONTHS),
+    };
+}
+
+async function migrateSummary(scope: string, now: Date): Promise<boolean> {
+    const key = summaryKey(scope);
+    if (await redis.hGet(key, SUMMARY_READY) === '1') return true;
+
+    const acquired = await redis.set(summaryLockKey(scope), '1', {
+        nx: true,
+        expiration: new Date(Date.now() + SUMMARY_LOCK_MS),
+    });
+    if (!acquired) return false;
+
+    try {
+        if (await redis.hGet(key, SUMMARY_READY) === '1') return true;
+        const current = hashRecord(await redis.hGetAll(key));
+        const { dates, months } = analyticsWindow(now);
+        const [days, monthBuckets] = await Promise.all([
+            Promise.all(dates.map((date) => loadLegacyBucket(
+                dayPlayersKey(scope, date),
+                dayModePlayersKey(scope, date),
+                dayCountersKey(scope, date),
+            ))),
+            Promise.all(months.map((month) => loadLegacyBucket(
+                monthPlayersKey(scope, month),
+                monthModePlayersKey(scope, month),
+                monthCountersKey(scope, month),
+            ))),
+        ]);
+        const fields: Record<string, string> = {};
+        dates.forEach((date, index) => {
+            copyLegacyBucket(fields, current, daySummaryPrefix(date), days[index]);
+        });
+        months.forEach((month, index) => {
+            copyLegacyBucket(fields, current, monthSummaryPrefix(month), monthBuckets[index]);
+        });
+        if (Object.keys(fields).length > 0) await writeSummaryFields(key, fields);
+        await redis.hSet(key, { [SUMMARY_READY]: '1' });
+        await expireOnce(formatUtcChallengeDate(now), key, MONTH_TTL_SECONDS);
+        return true;
+    } finally {
+        await redis.del(summaryLockKey(scope));
+    }
 }
 
 function cohortRetention(
@@ -573,6 +842,69 @@ function buildCohorts(
         }));
 }
 
+function visibleMonth(month: AnalyticsMonth): boolean {
+    return month.players > 0
+        || month.guestPlayers > 0
+        || month.podiumPlays > 0
+        || month.podiumReplays > 0;
+}
+
+async function buildSummaryFromHash(scope: string, now: Date): Promise<AnalyticsSummary> {
+    const { from, to, dates, months } = analyticsWindow(now);
+    const [rawSummary, playerHashes, cohortStarts] = await Promise.all([
+        redis.hGetAll(summaryKey(scope)),
+        Promise.all(dates.map((date) => redis.hGetAll(dayPlayersKey(scope, date)))),
+        redis.hGetAll(cohortStartsKey(scope)),
+    ]);
+    const summary = hashRecord(rawSummary);
+    const loadedDays = dates.map((date, index) => ({
+        day: { date, ...readSummaryBucket(summary, daySummaryPrefix(date)) },
+        rawPlayers: hashRecord(playerHashes[index]),
+    }));
+    const days = loadedDays.map(({ day }) => day);
+    return {
+        from,
+        to,
+        today: days[days.length - 1] ?? emptyAnalyticsDay(to),
+        days,
+        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
+        months: months
+            .map((month) => ({ month, ...readSummaryBucket(summary, monthSummaryPrefix(month)) }))
+            .filter(visibleMonth),
+    };
+}
+
+async function buildLegacySummary(scope: string, now: Date): Promise<AnalyticsSummary> {
+    const { from, to, dates, months } = analyticsWindow(now);
+    const [days, monthBuckets, cohortStarts] = await Promise.all([
+        Promise.all(dates.map((date) => loadLegacyBucket(
+            dayPlayersKey(scope, date),
+            dayModePlayersKey(scope, date),
+            dayCountersKey(scope, date),
+        ))),
+        Promise.all(months.map((month) => loadLegacyBucket(
+            monthPlayersKey(scope, month),
+            monthModePlayersKey(scope, month),
+            monthCountersKey(scope, month),
+        ))),
+        redis.hGetAll(cohortStartsKey(scope)),
+    ]);
+    const loadedDays = dates.map((date, index) => ({
+        day: { date, ...days[index].bucket },
+        rawPlayers: days[index].rawPlayers,
+    }));
+    return {
+        from,
+        to,
+        today: loadedDays[loadedDays.length - 1]?.day ?? emptyAnalyticsDay(to),
+        days: loadedDays.map(({ day }) => day),
+        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
+        months: months
+            .map((month, index) => ({ month, ...monthBuckets[index].bucket }))
+            .filter(visibleMonth),
+    };
+}
+
 export async function getServerAnalyticsSummary({
     subredditName,
     now = new Date(),
@@ -581,29 +913,10 @@ export async function getServerAnalyticsSummary({
     now?: Date;
 } = {}): Promise<AnalyticsSummary> {
     const scope = sanitizeScope(subredditName ?? readScopeFromContext());
-    const to = formatUtcChallengeDate(now);
-    const from = addUtcDays(to, -(ANALYTICS_RETENTION_DAYS - 1));
-    const [loadedDays, months, cohortStarts] = await Promise.all([
-        Promise.all(buildDateRange(from, to).map((date) => loadAnalyticsDay(scope, date))),
-        Promise.all(
-            buildMonthRange(toMonth(to), ANALYTICS_RETENTION_MONTHS)
-                .map((month) => loadAnalyticsMonth(scope, month)),
-        ),
-        redis.hGetAll(cohortStartsKey(scope)),
-    ]);
-    const days = loadedDays.map(({ day }) => day);
-
-    return {
-        from,
-        to,
-        today: days[days.length - 1] ?? emptyAnalyticsDay(to),
-        days,
-        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
-        months: months.filter((month) => (
-            month.players > 0
-            || month.guestPlayers > 0
-            || month.podiumPlays > 0
-            || month.podiumReplays > 0
-        )),
-    };
+    const ready = await redis.hGet(summaryKey(scope), SUMMARY_READY);
+    if (ready !== '1') {
+        const migrated = await migrateSummary(scope, now);
+        if (!migrated) return buildLegacySummary(scope, now);
+    }
+    return buildSummaryFromHash(scope, now);
 }
