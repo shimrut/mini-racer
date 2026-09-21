@@ -25,6 +25,19 @@ export function getDailyPreviewChallengeOptions(root = globalThis) {
     };
 }
 
+const DAILY_POSTER_CAR_ENTRANCE_MS = 480;
+
+export function dailyPosterCarTravelAt(elapsedMs, { reduceMotion = false } = {}) {
+    if (reduceMotion) return 1;
+    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
+    const progress = Math.min(1, elapsedMs / DAILY_POSTER_CAR_ENTRANCE_MS);
+    return 1 - (1 - progress) ** 3;
+}
+
+function prefersReducedDailyPosterMotion() {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+}
+
 export async function bootDailyPreview() {
     const playButton = document.getElementById('play-button');
     const trackNameEl = document.getElementById('track-name');
@@ -41,7 +54,37 @@ export async function bootDailyPreview() {
     let currentTrack = fallbackTrack;
     let currentSkin = 'default';
     let currentChallenge = null;
+    let posterCarImage = null;
+    let posterCarTravel = 1;
+    let posterEntranceFrame = 0;
     const postPreviewCarPromise = loadPostPreviewCar();
+
+    const paintPoster = () => {
+        renderTrackPreview(
+            canvas,
+            currentTrackKey,
+            currentTrack,
+            currentSkin,
+            posterCarImage,
+            posterCarTravel,
+        );
+    };
+
+    const drivePosterCar = (carImage) => {
+        posterCarImage = carImage;
+        cancelAnimationFrame(posterEntranceFrame);
+        const reduceMotion = prefersReducedDailyPosterMotion();
+        posterCarTravel = dailyPosterCarTravelAt(0, { reduceMotion });
+        paintPoster();
+        if (!carImage || posterCarTravel >= 1) return;
+        const startedAt = performance.now();
+        const frame = (now) => {
+            posterCarTravel = dailyPosterCarTravelAt(now - startedAt, { reduceMotion });
+            paintPoster();
+            if (posterCarTravel < 1) posterEntranceFrame = requestAnimationFrame(frame);
+        };
+        posterEntranceFrame = requestAnimationFrame(frame);
+    };
 
     try {
         const challenge = await getActiveDailyChallenge(getDailyPreviewChallengeOptions());
@@ -49,21 +92,24 @@ export async function bootDailyPreview() {
         currentTrackKey = TRACKS[challenge.trackKey] ? challenge.trackKey : 'circuit';
         currentTrack = TRACKS[currentTrackKey] || fallbackTrack;
         currentSkin = challenge.skin || 'default';
-        const carImage = await postPreviewCarPromise;
 
         const lapCount = getChallengeLapCount(challenge);
         setTrackName(trackNameEl, currentTrack.name);
-        renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
         await applyTimeToBeat(timeToBeatEl, currentTrackKey, lapCount);
         renderChallengeStatus(challenge);
+        paintPoster();
+        void postPreviewCarPromise.then(drivePosterCar);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
         setTrackName(trackNameEl, 'Challenge active');
-        const carImage = await postPreviewCarPromise;
+        currentTrackKey = 'circuit';
+        currentTrack = fallbackTrack;
+        currentSkin = 'default';
         if (fallbackTrack) {
-            renderTrackPreview(canvas, 'circuit', fallbackTrack, 'default', carImage);
+            await applyTimeToBeat(timeToBeatEl, 'circuit', 1);
+            paintPoster();
         }
-        await applyTimeToBeat(timeToBeatEl, 'circuit', 1);
+        void postPreviewCarPromise.then(drivePosterCar);
     }
 
     playButton.addEventListener('click', async (event) => {
@@ -77,11 +123,7 @@ export async function bootDailyPreview() {
         await openGame(event);
     });
 
-    window.addEventListener('resize', () => {
-        void postPreviewCarPromise.then((carImage) => {
-            renderTrackPreview(canvas, currentTrackKey, currentTrack, currentSkin, carImage);
-        });
-    });
+    window.addEventListener('resize', paintPoster);
 }
 
 if (typeof document !== 'undefined') {
@@ -198,7 +240,7 @@ function renderChallengeStatus(challenge) {
     statusEl.className = `challenge-status challenge-status--${status.key}`;
 }
 
-function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage = null) {
+function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage = null, carTravel = 1) {
     const presentation = resolveTrackPresentation(trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
         event: skin ? { key: 'daily-challenge', trackKey, skin } : null
@@ -220,6 +262,8 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage 
         showSchematicCarTrail: true,
         moveSchematicCarPastStartLine: true,
         schematicCarImage: carImage,
+        schematicCarTravel: carTravel,
+        schematicReserveCarSlot: true,
         hideSchematicStartArrow: true,
         runHistory: []
     });

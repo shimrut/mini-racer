@@ -730,8 +730,10 @@ These are useful, but they are not on the critical player path:
   current-track launcher and explicitly ignores any frozen challenge payload.
   Both show the scaled gold-medal threshold as the player-facing time to beat,
   with the lap count immediately before `TIME TO BEAT` above the gold medal
-  artwork, and the stock in-game car clearly past the start line. In-game
-  schematic previews do not use that post-only treatment.
+  artwork. The track name, time, and drawing appear before the car picture
+  loads. The stock car then drives from the back of the red dash to its place
+  past the start line, or appears already parked when reduced motion is on.
+  In-game schematic previews do not use that post-only treatment.
 - `campaign.html`, `campaign.js`, `campaign.css`
   Stable Campaign launcher surface, branded as `The Numbers` above the Campaign
   title. Its CTA stores the Campaign launch target and expands the shared

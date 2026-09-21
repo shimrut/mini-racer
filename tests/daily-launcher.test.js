@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    dailyPosterCarTravelAt,
     formatDailyPreviewTimeLabel,
     getDailyPreviewChallengeOptions,
     isCurrentDailyLauncherPost,
@@ -22,6 +23,13 @@ describe('current Daily launcher preview', () => {
         expect(getDailyPreviewChallengeOptions({
             devvit: { context: { postData: { postType: 'daily-launcher' } } },
         })).toEqual({ allowExpiredPost: true, ignorePostData: true });
+    });
+
+    it('drives the poster car from the back of the dash to its parking spot', () => {
+        expect(dailyPosterCarTravelAt(0)).toBe(0);
+        expect(dailyPosterCarTravelAt(240)).toBeGreaterThan(0.5);
+        expect(dailyPosterCarTravelAt(480)).toBe(1);
+        expect(dailyPosterCarTravelAt(0, { reduceMotion: true })).toBe(1);
     });
 
     it('frames the target as laps followed by time to beat', () => {

@@ -157,6 +157,70 @@ describe('track preview rendering', () => {
         global.Path2D = OriginalPath2D;
     });
 
+    it('starts the post car at the back of its dash and parks it at the end', () => {
+        const OriginalPath2D = global.Path2D;
+        global.Path2D = class Path2DMock {
+            addPath() {}
+            moveTo() {}
+            lineTo() {}
+            quadraticCurveTo() {}
+            closePath() {}
+        };
+        const geometry = {
+            trackGeometry: {
+                outer: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 8 },
+                    { x: 0, y: 8 }
+                ],
+                inner: [
+                    { x: 3, y: 3 },
+                    { x: 7, y: 3 },
+                    { x: 7, y: 5 },
+                    { x: 3, y: 5 }
+                ]
+            },
+            presentation: {},
+            startLine: { p1: { x: 1, y: 1 }, p2: { x: 1, y: 3 } },
+            startPos: { x: 0.5, y: 2 },
+            startAngle: 0,
+            transparentBackground: true,
+            previewRenderMode: 'schematic',
+            showSchematicCarTrail: true,
+            moveSchematicCarPastStartLine: true,
+            hideSchematicStartArrow: true,
+            schematicReserveCarSlot: true,
+        };
+        const parked = createPreviewContext();
+        const starting = createPreviewContext();
+        const waiting = createPreviewContext();
+        const canvasFor = (ctx) => ({
+            width: 320,
+            height: 200,
+            getContext: vi.fn(() => ctx)
+        });
+        const carImage = { width: 500, height: 500 };
+
+        renderTrackPreviewCanvas(canvasFor(parked), { ...geometry, schematicCarImage: carImage, schematicCarTravel: 1 });
+        renderTrackPreviewCanvas(canvasFor(starting), { ...geometry, schematicCarImage: carImage, schematicCarTravel: 0 });
+        renderTrackPreviewCanvas(canvasFor(waiting), geometry);
+
+        const markerY = (ctx) => ctx.translate.mock.calls.filter(([, y]) => y > 40 && y < 80);
+        const parkedMarkers = markerY(parked);
+        const startingMarkers = markerY(starting);
+        const waitingMarkers = markerY(waiting);
+        expect(parkedMarkers).toHaveLength(2);
+        expect(startingMarkers).toHaveLength(2);
+        expect(waitingMarkers).toHaveLength(1);
+        expect(waiting.drawImage).not.toHaveBeenCalled();
+        expect(waitingMarkers[0]).toEqual(parkedMarkers[0]);
+        expect(startingMarkers[0]).toEqual(parkedMarkers[0]);
+        expect(startingMarkers[1][0]).toBeCloseTo(parkedMarkers[1][0] - (48 * 200) / 420);
+        expect(startingMarkers[1][1]).toBeCloseTo(parkedMarkers[1][1]);
+        global.Path2D = OriginalPath2D;
+    });
+
     it('draws podium schematic car paths under the cars', () => {
         const OriginalPath2D = global.Path2D;
         global.Path2D = class Path2DMock {
