@@ -48,7 +48,7 @@ function challengeBragLines(
         case 'chase':
             return [
                 `I beat this challenge. ${myTime} on ${trackName}.`,
-                `${myTime} Good pace on ${trackName}.`,
+                `${myTime} - Good page on ${trackName}.`,
             ];
         case 'got_away':
             return [

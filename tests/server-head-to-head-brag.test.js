@@ -139,11 +139,11 @@ describe('head-to-head brag', () => {
         ]],
         [101, 'chase', [
             'I beat this challenge. 9.899s on Number One.',
-            '9.899s Good pace on Number One.',
+            '9.899s - Good page on Number One.',
         ]],
         [500, 'chase', [
             'I beat this challenge. 9.500s on Number One.',
-            '9.500s Good pace on Number One.',
+            '9.500s - Good page on Number One.',
         ]],
         [501, 'got_away', [
             'Won it. Easier than expected. 9.499s on Number One.',

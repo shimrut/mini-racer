@@ -62,18 +62,18 @@ function challengeCommentLines(
             ];
         case 'blink':
             return [
-                `${myTime}. Lost by ${gap} on ${trackName}. I was sure I had this.`,
+                `${myTime} - Lost by ${gap} on ${trackName}. I was sure I had this.`,
                 `${myTime} on ${trackName}. Can’t believe I lost by ${gap}.`,
             ];
         case 'chase':
             return [
-                `${myTime}. Not enough pace on ${trackName}.`,
+                `${myTime} - Not enough pace on ${trackName}.`,
                 `Definitely not my best run on ${trackName} - ${myTime}.`,
             ];
         case 'got_away':
             return [
-                `${myTime}. I have some improvements to do on ${trackName}.`,
-                `Need more practice on ${trackName} - ${myTime}.`,
+                `${myTime} - I have some improvements to do on ${trackName}.`,
+                `Need more practice on ${trackName} - ${myTime}`,
             ];
     }
 }
