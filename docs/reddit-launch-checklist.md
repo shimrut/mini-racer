@@ -129,8 +129,9 @@ Mini Racer is a **game**, so the most important launch requirements are:
   locked Campaign track or expired Daily track only for that duel, reports
   win/tie/loss correctly, and writes no Daily/Campaign progress, PB, or
   leaderboard data.
-- [ ] Run **Collect Mini Racer challenges** once on the live community so
-  New Challenge has existing Challenges posts to open on day one.
+- [ ] Run **Collect Mini Racer challenges** on the live community until it says
+  the last month is covered. One click does not read every challenge. Click
+  again while it says to keep going. New Challenge then has those posts to open.
 - [ ] After three finished losses, Concede posts the comment, then the finish
   row becomes Improve / New Challenge / Home. New Challenge opens another
   challenge, not this one and not the player's own. A tie, a win, a skipped

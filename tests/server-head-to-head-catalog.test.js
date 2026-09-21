@@ -254,7 +254,7 @@ describe('Head to Head catalog', () => {
             ]),
         });
 
-        expect(result).toEqual({ scanned: 3, saved: 1, skipped: 2 });
+        expect(result).toEqual({ scanned: 3, saved: 1, skipped: 2, status: 'done' });
         await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
     });
 
@@ -280,6 +280,53 @@ describe('Head to Head catalog', () => {
         await sweepHeadToHeadCatalog('MiniRacer', { listPosts: async () => [post] });
         const again = await sweepHeadToHeadCatalog('MiniRacer', { listPosts: async () => [post] });
         expect(again.saved).toBe(0);
+        expect(again.status).toBe('done');
         await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(1);
+    });
+
+    it('keeps going past one page until the posts are older than a month', async () => {
+        const fingerprint = createTrackFingerprint(TRACKS[TRACK_KEY]);
+        const recent = new Date().toISOString();
+        const posts = Array.from({ length: 150 }, (_, index) => {
+            const id = `t3_${String(index).padStart(4, '0')}`;
+            return {
+                id,
+                url: `https://reddit.com/r/miniracer/${id}`,
+                authorName: 'Poster',
+                subredditName: 'MiniRacer',
+                removed: false,
+                createdAt: recent,
+                getPostData: async () => ({
+                    postType: 'head-to-head',
+                    challengeId: id,
+                    trackKey: TRACK_KEY,
+                    lapCount: 1,
+                    targetTimeMs: 13_000,
+                    medal: 'silver',
+                    trackFingerprint: fingerprint,
+                    createdAt: recent,
+                }),
+            };
+        });
+        posts.push({
+            id: 't3_old',
+            url: 'https://reddit.com/r/miniracer/old',
+            authorName: 'Poster',
+            subredditName: 'MiniRacer',
+            removed: false,
+            createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
+            getPostData: async () => ({ postType: 'head-to-head' }),
+        });
+        const listPosts = async (_subredditName, after) => {
+            const start = after ? posts.findIndex((post) => post.id === after) + 1 : 0;
+            return posts.slice(start, start + 100);
+        };
+
+        const first = await sweepHeadToHeadCatalog('MiniRacer', { listPosts, maxPosts: 100 });
+        const second = await sweepHeadToHeadCatalog('MiniRacer', { listPosts, maxPosts: 100 });
+
+        expect(first).toMatchObject({ saved: 100, status: 'partial' });
+        expect(second).toMatchObject({ saved: 50, status: 'done' });
+        await expect(catalogHeadToHeadSize('MiniRacer')).resolves.toBe(150);
     });
 });

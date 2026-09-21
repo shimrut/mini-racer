@@ -1,7 +1,9 @@
 - After a posted Head to Head concede, Improve / New Challenge / Home replaces
   the spent Concede button. New Challenge opens another challenge post. A
   moderator Collect Mini Racer challenges action fills that list from existing
-  Challenges posts so it works on day one; new posts are saved as they go up.
+  Challenges posts so it works on day one. One click reads as far as it can, then
+  you click again until it says the month is covered. New posts are saved as
+  they go up.
   Ties, wins, skipped Concede taps, and guests stay as they are.
 
 - Daily and Podium posts now get their flair the same way Head to Head

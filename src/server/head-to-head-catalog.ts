@@ -11,7 +11,9 @@ import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { acquireRedisLock, releaseRedisLock } from './redis-lock.js';
 
 const PREFIX = 'miniracer:head-to-head:catalog';
-const SWEEP_POST_LIMIT = 100;
+const SWEEP_PAGE_SIZE = 100;
+const SWEEP_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
+const SWEEP_BUDGET_MS = 20_000;
 const SWEEP_LOCK_TTL_MS = 60_000;
 const SWEPT_MARKER_TTL_SECONDS = 60 * 60;
 const PICK_ATTEMPTS = 8;
@@ -34,6 +36,8 @@ export type HeadToHeadCatalogSweepResult = {
     scanned: number;
     saved: number;
     skipped: number;
+    /** locked: another collect is running. partial: click again. done: the month is covered. */
+    status: 'locked' | 'partial' | 'done';
 };
 
 type SweepPost = {
@@ -78,6 +82,10 @@ export function headToHeadCatalogTrackKeys(subredditName: string): string[] {
 
 function sweptMarkerKey(subredditName: string): string {
     return `${PREFIX}:${keyPart(subredditName)}:swept-at`;
+}
+
+function sweepCursorKey(subredditName: string): string {
+    return `${PREFIX}:${keyPart(subredditName)}:sweep-cursor`;
 }
 
 function sweepLockKey(subredditName: string): string {
@@ -241,102 +249,152 @@ async function dropCatalogCard(
     await redis.zRem(headToHeadCatalogByTrackKey(subredditName, card.trackKey), [card.challengeId]);
 }
 
-async function listingPosts(subredditName: string): Promise<SweepPost[]> {
-    const api = reddit as unknown as Record<string, ((input: Record<string, unknown>) => Promise<unknown>) | undefined>;
-    const attempts = [
-        () => api.searchPosts?.({
-            subredditName,
-            query: 'flair:Challenges',
-            sort: 'new',
-            timeframe: 'month',
-            limit: SWEEP_POST_LIMIT,
-            pageSize: SWEEP_POST_LIMIT,
-        }),
-        () => api.getNewPosts?.({
-            subredditName,
-            limit: SWEEP_POST_LIMIT,
-            pageSize: SWEEP_POST_LIMIT,
-        }),
-    ];
-    for (const attempt of attempts) {
-        try {
-            const listing = await attempt();
-            if (!listing) continue;
-            const posts = typeof (listing as { all?: () => Promise<unknown> }).all === 'function'
-                ? await (listing as { all: () => Promise<unknown> }).all()
-                : listing;
-            if (Array.isArray(posts)) return posts.slice(0, SWEEP_POST_LIMIT) as SweepPost[];
-        } catch {
-            // Try the next listing shape Reddit actually gave this app version.
-        }
-    }
-    return [];
+function postCreatedMs(post: SweepPost): number | null {
+    const value = post.createdAt;
+    const ms = value instanceof Date ? value.getTime() : Date.parse(String(value ?? ''));
+    return Number.isFinite(ms) ? ms : null;
 }
 
-function flairText(post: SweepPost): string {
-    const fromFlair = typeof post.flair?.text === 'string' ? post.flair.text : '';
-    const fromLink = typeof post.linkFlairText === 'string' ? post.linkFlairText : '';
-    return (fromFlair || fromLink).trim().toLowerCase();
+async function listingPosts(subredditName: string, after: string | null): Promise<SweepPost[] | null> {
+    try {
+        const listing = await reddit.getNewPosts({
+            subredditName,
+            limit: SWEEP_PAGE_SIZE,
+            pageSize: SWEEP_PAGE_SIZE,
+            ...(after ? { after } : {}),
+        });
+        const posts = typeof listing?.all === 'function' ? await listing.all() : [];
+        return Array.isArray(posts) ? posts.slice(0, SWEEP_PAGE_SIZE) as SweepPost[] : [];
+    } catch {
+        return null;
+    }
+}
+
+type SweepCursor = {
+    after: string | null;
+};
+
+async function readSweepCursor(subredditName: string): Promise<SweepCursor | null> {
+    const raw = await redis.get(sweepCursorKey(subredditName));
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw) as Partial<SweepCursor>;
+        return {
+            after: typeof parsed.after === 'string' && parsed.after ? parsed.after : null,
+        };
+    } catch {
+        return null;
+    }
 }
 
 export async function sweepHeadToHeadCatalog(
     subredditName: string,
     {
         listPosts = listingPosts,
+        now = Date.now,
+        budgetMs = SWEEP_BUDGET_MS,
+        maxPosts = null,
     }: {
-        listPosts?: (subredditName: string) => Promise<SweepPost[]>;
+        listPosts?: (subredditName: string, after: string | null) => Promise<SweepPost[] | null>;
+        now?: () => number;
+        budgetMs?: number;
+        maxPosts?: number | null;
     } = {},
 ): Promise<HeadToHeadCatalogSweepResult> {
     const lock = await acquireRedisLock(sweepLockKey(subredditName), SWEEP_LOCK_TTL_MS);
     if (!lock) {
-        return { scanned: 0, saved: 0, skipped: 0 };
+        return { scanned: 0, saved: 0, skipped: 0, status: 'locked' };
     }
+    const started = now();
+    const monthCutoff = started - SWEEP_MONTH_MS;
     try {
-        const posts = await listPosts(subredditName);
+        const cursor = await readSweepCursor(subredditName);
+        let after = cursor?.after ?? null;
+        let scanned = 0;
         let saved = 0;
         let skipped = 0;
-        for (const post of posts) {
-            if (post?.removed === true || !validPostId(post?.id) || typeof post?.url !== 'string' || !post.url) {
-                skipped += 1;
-                continue;
+        const seen = new Set<string>();
+        let status: 'partial' | 'done' = 'partial';
+        const outOfTime = () => now() - started >= budgetMs;
+        const pageFull = () => maxPosts !== null && scanned >= maxPosts;
+
+        while (!outOfTime() && !pageFull()) {
+            const page = await listPosts(subredditName, after);
+            if (page === null) {
+                status = 'partial';
+                break;
             }
-            if (
-                normalizeName(typeof post.subredditName === 'string' ? post.subredditName : subredditName)
-                !== normalizeName(subredditName)
-            ) {
-                skipped += 1;
-                continue;
+            const fresh = page.filter((post) => typeof post?.id === 'string' && !seen.has(post.id));
+            if (fresh.length === 0) {
+                status = 'done';
+                break;
             }
-            const tagged = flairText(post) === 'challenges';
-            let postData: unknown = null;
-            if (tagged || typeof post.getPostData === 'function') {
-                try {
-                    postData = typeof post.getPostData === 'function' ? await post.getPostData() : null;
-                } catch {
+            let reachedMonth = false;
+            for (const post of fresh) {
+                if (outOfTime() || pageFull()) break;
+                seen.add(String(post.id));
+                const createdMs = postCreatedMs(post);
+                if (createdMs !== null && createdMs < monthCutoff) {
+                    reachedMonth = true;
+                    break;
+                }
+                after = typeof post.id === 'string' ? post.id : after;
+                scanned += 1;
+                if (post?.removed === true || !validPostId(post?.id) || typeof post?.url !== 'string' || !post.url) {
                     skipped += 1;
                     continue;
                 }
+                if (
+                    normalizeName(typeof post.subredditName === 'string' ? post.subredditName : subredditName)
+                    !== normalizeName(subredditName)
+                ) {
+                    skipped += 1;
+                    continue;
+                }
+                let postData: unknown = null;
+                if (typeof post.getPostData === 'function') {
+                    try {
+                        postData = await post.getPostData();
+                    } catch {
+                        skipped += 1;
+                        continue;
+                    }
+                }
+                if (!postData || typeof postData !== 'object' || Array.isArray(postData)) {
+                    skipped += 1;
+                    continue;
+                }
+                const card = catalogCardFromPostData(post, postData as Record<string, unknown>);
+                if (!card) {
+                    skipped += 1;
+                    continue;
+                }
+                const created = await upsertHeadToHeadCatalogCard({
+                    ...card,
+                    subredditName,
+                });
+                if (created) saved += 1;
+                else skipped += 1;
             }
-            if (!postData || typeof postData !== 'object' || Array.isArray(postData)) {
-                skipped += 1;
-                continue;
+            if (reachedMonth) {
+                status = 'done';
+                break;
             }
-            const card = catalogCardFromPostData(post, postData as Record<string, unknown>);
-            if (!card) {
-                skipped += 1;
-                continue;
+            if (outOfTime() || pageFull()) {
+                status = 'partial';
+                break;
             }
-            const created = await upsertHeadToHeadCatalogCard({
-                ...card,
-                subredditName,
-            });
-            if (created) saved += 1;
-            else skipped += 1;
         }
-        await redis.set(sweptMarkerKey(subredditName), new Date().toISOString(), {
-            expiration: new Date(Date.now() + SWEPT_MARKER_TTL_SECONDS * 1000),
-        });
-        return { scanned: posts.length, saved, skipped };
+
+        if (status === 'done') {
+            await redis.del(sweepCursorKey(subredditName));
+            await redis.set(sweptMarkerKey(subredditName), new Date(started).toISOString(), {
+                expiration: new Date(started + SWEPT_MARKER_TTL_SECONDS * 1000),
+            });
+        } else {
+            await redis.set(sweepCursorKey(subredditName), JSON.stringify({ after } satisfies SweepCursor));
+        }
+        return { scanned, saved, skipped, status };
     } finally {
         await releaseRedisLock(lock);
     }
@@ -370,22 +428,13 @@ export async function pickNextHeadToHeadChallenge({
     excludeUsername,
     trackKey = null,
     targetTimeMs = null,
-    sweepIfEmpty = false,
 }: {
     subredditName: string;
     excludeChallengeId: string;
     excludeUsername: string;
     trackKey?: string | null;
     targetTimeMs?: number | null;
-    sweepIfEmpty?: boolean;
 }): Promise<HeadToHeadCatalogCard | null> {
-    if (sweepIfEmpty && await catalogHeadToHeadSize(subredditName) === 0) {
-        const alreadySwept = await redis.get(sweptMarkerKey(subredditName));
-        if (!alreadySwept) {
-            await sweepHeadToHeadCatalog(subredditName);
-        }
-    }
-
     const excludeName = normalizeName(excludeUsername);
     const seen = new Set<string>([excludeChallengeId]);
     const queues: string[][] = [];

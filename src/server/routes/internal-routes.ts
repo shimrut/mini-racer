@@ -49,7 +49,12 @@ export type InternalRouteDependencies = {
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
     ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
-    sweepHeadToHeadCatalog(subredditName: string): Promise<{ scanned: number; saved: number; skipped: number }>;
+    sweepHeadToHeadCatalog(subredditName: string): Promise<{
+        scanned: number;
+        saved: number;
+        skipped: number;
+        status?: 'locked' | 'partial' | 'done';
+    }>;
 };
 
 function createMenuToast(text: string, appearance: 'neutral' | 'success' = 'neutral') {
@@ -175,12 +180,17 @@ export function registerInternalRoutes(
         },
         async (subredditName, res) => {
             const result = await dependencies.sweepHeadToHeadCatalog(subredditName);
-            res.json(createMenuToast(
-                result.saved > 0
-                    ? `Collected ${result.saved} Mini Racer challenge${result.saved === 1 ? '' : 's'} for r/${subredditName}.`
-                    : `No new Mini Racer challenges to collect for r/${subredditName}.`,
-                'success',
-            ));
+            const countLabel = `${result.saved} Mini Racer challenge${result.saved === 1 ? '' : 's'}`;
+            const text = result.status === 'locked'
+                ? `Already collecting challenges for r/${subredditName}. Try again in a moment.`
+                : result.status === 'partial'
+                    ? (result.saved > 0
+                        ? `Collected ${countLabel} for r/${subredditName}. Click again to keep going through the month.`
+                        : `Still collecting challenges for r/${subredditName}. Click again to keep going.`)
+                    : (result.saved > 0
+                        ? `Collected ${countLabel} for r/${subredditName}.`
+                        : `No new Mini Racer challenges to collect for r/${subredditName}.`);
+            res.json(createMenuToast(text, 'success'));
         },
     );
 

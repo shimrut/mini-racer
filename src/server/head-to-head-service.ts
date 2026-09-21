@@ -1205,7 +1205,6 @@ export function createHeadToHeadService(
             excludeUsername: request.username,
             trackKey: current?.trackKey ?? null,
             targetTimeMs: current?.targetTimeMs ?? null,
-            sweepIfEmpty: true,
         });
         if (!picked) {
             return {
