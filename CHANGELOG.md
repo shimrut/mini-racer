@@ -5,6 +5,10 @@
   sent with it. Accept is live immediately. Your own post still reads Open
   Mini Racer when your name matches. The game loads the ghost after Accept.
 
+- The Head to Head card glow and the challenger's avatar ring follow the
+  challenge time's medal: red below bronze, then bronze, silver, gold, and
+  author. Your ring stays red.
+
 - A lost Head to Head no longer asks the player to comment on the first loss.
   The finish keeps the locked Brag button for the first two losses. The third
   loss offers CONCEDE, which posts the loss comment the app already writes.

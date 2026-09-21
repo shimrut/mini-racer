@@ -8,6 +8,7 @@ import {
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
+import { getMedalForRaceTime } from './game/medals/medal-timing.js';
 
 const POST_TYPE = 'head-to-head';
 const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
@@ -103,9 +104,27 @@ export function renderHeadToHeadAvatars(documentRef, {
     );
 }
 
+export function posterMedalForChallenge(value) {
+    const challenge = value?.trackKey ? value : normalizeHeadToHeadPostData(value);
+    if (!challenge.trackKey || !Number.isInteger(challenge.targetTimeMs)) return null;
+    return getMedalForRaceTime(
+        challenge.trackKey,
+        challenge.targetTimeMs / 1000,
+        challenge.lapCount,
+    );
+}
+
+function applyPosterMedal(documentRef, medal) {
+    const root = documentRef?.body || documentRef?.documentElement;
+    if (!root) return;
+    if (medal) root.setAttribute('data-medal', medal);
+    else root.removeAttribute('data-medal');
+}
+
 export function renderHeadToHead(documentRef, rawValue) {
     const value = normalizeHeadToHeadPostData(rawValue);
     if (!documentRef) return value;
+    applyPosterMedal(documentRef, posterMedalForChallenge(value));
     const trackName = documentRef.getElementById('challenge-track-name');
     const target = documentRef.getElementById('challenge-target-time');
     const format = documentRef.getElementById('challenge-format');

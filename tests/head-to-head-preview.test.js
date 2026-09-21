@@ -7,8 +7,10 @@ import {
     normalizeHeadToHeadPostData,
     openHomeAsRedirect,
     OWN_CHALLENGE_MESSAGE,
+    posterMedalForChallenge,
     readHeadToHeadPostData,
     readHeadToHeadViewerIdentity,
+    renderHeadToHead,
     resolveHeadToHeadPosterAccess,
     showOwnChallengeMessage,
 } from '../head-to-head.js';
@@ -82,6 +84,44 @@ describe('head-to-head custom-post preview', () => {
         expect(formatHeadToHeadPreviewTime(25_640)).toBe('25.640');
         expect(formatHeadToHeadPreviewTime(9_005)).toBe('9.005');
         expect(formatHeadToHeadPreviewTime(null)).toBe('—');
+    });
+
+    it('maps challenge time to the same medal bands the game uses', () => {
+        const onNumberThree = (targetTimeMs, lapCount = 1) => posterMedalForChallenge({
+            trackKey: 'numberThree',
+            lapCount,
+            targetTimeMs,
+        });
+        expect(onNumberThree(15_000)).toBeNull();
+        expect(onNumberThree(14_000)).toBe('bronze');
+        expect(onNumberThree(13_400)).toBe('silver');
+        expect(onNumberThree(12_950)).toBe('gold');
+        expect(onNumberThree(12_600)).toBe('author');
+        expect(onNumberThree(26_500, 2)).toBe('silver');
+        expect(posterMedalForChallenge({ trackKey: '', targetTimeMs: 12_000 })).toBeNull();
+    });
+
+    it('stamps the poster medal on the document for the glow and challenger ring', () => {
+        const body = {
+            attributes: {},
+            setAttribute(name, value) { this.attributes[name] = value; },
+            removeAttribute(name) { delete this.attributes[name]; },
+        };
+        const documentRef = {
+            body,
+            getElementById: vi.fn(() => null),
+        };
+        renderHeadToHead(documentRef, { ...PLAYABLE_POST, lapCount: 1, targetTimeMs: 12_600 });
+        expect(body.attributes['data-medal']).toBe('author');
+        renderHeadToHead(documentRef, { ...PLAYABLE_POST, lapCount: 1, targetTimeMs: 20_000 });
+        expect(body.attributes['data-medal']).toBeUndefined();
+    });
+
+    it('tints only the challenger ring from the same glow token as the corner wash', () => {
+        const css = readFileSync(new URL('../head-to-head.css', import.meta.url), 'utf8');
+        expect(css).toMatch(/#challenger-avatar\s*\{[^}]*var\(--glow\)/s);
+        expect(css).toMatch(/body\[data-medal="author"\]/);
+        expect(css).not.toMatch(/#viewer-avatar\s*\{[^}]*var\(--glow\)/s);
     });
 
     it('reads the viewer name and snoovatar from client context when present', () => {

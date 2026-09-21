@@ -12,6 +12,11 @@
     --accent-color: #ef4444;
     --accent-bright: #ff3e3e;
     --accent-hover: #f87171;
+    --glow: var(--accent-color);
+    --medal-bronze: #c17f59;
+    --medal-silver: #b8c4d4;
+    --medal-gold: #e8b84a;
+    --medal-author: #c4b5fd;
 
     --header-font: "Outfit", sans-serif;
     --mono-font: "JetBrains Mono", monospace;
@@ -37,9 +42,14 @@ body {
     font-family: var(--header-font);
     color: var(--text-color);
     background:
-        radial-gradient(circle at 72% 22%, rgb(239 68 68 / 16%), transparent 38%),
+        radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--glow) 16%, transparent), transparent 38%),
         linear-gradient(145deg, #0f172a, var(--bg-color-darker) 68%);
 }
+
+body[data-medal="bronze"] { --glow: var(--medal-bronze); }
+body[data-medal="silver"] { --glow: var(--medal-silver); }
+body[data-medal="gold"] { --glow: var(--medal-gold); }
+body[data-medal="author"] { --glow: var(--medal-author); }
 
 .challenge-shell {
     --u: clamp(8px, 0.5vw + 0.75vh, 16px);
@@ -131,6 +141,11 @@ body {
     background: #171d27;
     object-fit: cover;
     box-shadow: 0 0 0 4px rgb(239 68 68 / 12%);
+}
+
+#challenger-avatar {
+    border-color: color-mix(in srgb, var(--glow) 55%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--glow) 12%, transparent);
 }
 
 .challenge-avatar--generic {
