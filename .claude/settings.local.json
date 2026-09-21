@@ -154,7 +154,13 @@
       "Read(//Users/bpopa/.claude/**)",
       "Bash(node .cursor/skills/devvit-docs/scripts/ensure-docs.cjs)",
       "Bash(D=node_modules/.cache/devvit-skills/devvit-docs; R=$D/versioned_docs/version-0.14; ls $R/capabilities/server 2>/dev/null | head -30; rg -n -i \"concurren|pipelin|commands per second|commands/s|40,000|40000|timeout|transactions? \\(limit|block\\)\" $R/capabilities/server/redis.md* $D/docs/capabilities/server/redis.md* 2>/dev/null | head -40)",
-      "Bash(awk 'NR>=2366 && NR<=2692 && /pendingAccountKey|pendingGuestKey|saveRecord\\\\\\(/ {print NR\": \"$0}' src/server/daily-gp-store.ts)"
+      "Bash(awk 'NR>=2366 && NR<=2692 && /pendingAccountKey|pendingGuestKey|saveRecord\\\\\\(/ {print NR\": \"$0}' src/server/daily-gp-store.ts)",
+      "Bash(ls ~/Documents 2>/dev/null | head -20; find / -maxdepth 4 -type d -name \"devvit-docs\" 2>/dev/null | head -5)",
+      "Bash(curl -sSL -o redis.mdx https://raw.githubusercontent.com/reddit/devvit-docs/main/versioned_docs/version-0.14/capabilities/server/redis.mdx)",
+      "Bash(curl -sSL \"https://api.github.com/repos/reddit/devvit-docs/git/trees/main?recursive=1\" -o tree.json)",
+      "Bash(curl -sSL -o cache-helper.md https://raw.githubusercontent.com/reddit/devvit-docs/main/versioned_docs/version-0.14/capabilities/server/cache-helper.md)",
+      "Bash(curl -sSL -o server-overview.md https://raw.githubusercontent.com/reddit/devvit-docs/main/versioned_docs/version-0.14/capabilities/server/overview.md)",
+      "Bash(node -e \"import\\('./game/campaign/manifest.js'\\).then\\(m=>console.log\\('stages:', \\(m.CAMPAIGN_STAGES||m.default?.CAMPAIGN_STAGES||[]\\).length\\)\\)\")"
     ]
   }
 }
