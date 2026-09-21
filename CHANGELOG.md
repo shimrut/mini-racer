@@ -1,5 +1,10 @@
 # Changelog
 
+- Next rival no longer walks everyone ahead on the board. The server asks for
+  the ten racers just faster than the player's stored best, checks them as a
+  group, and stops after sixty. Improve is still on the finish panel while
+  that lookup runs. Picking a row from the standings is unchanged.
+
 - Moderator analytics cohort retention now also shows exact UTC-day D2, D3,
   and D14 return rates next to D1, D7, and D30.
 

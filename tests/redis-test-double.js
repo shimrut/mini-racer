@@ -227,13 +227,27 @@ export class RedisTestDouble {
     return members.length;
   }
 
-  async zRange(key, start, stop) {
+  async zRange(key, start, stop, options) {
     this._isExpired(key);
     const ordered = [...(this.sortedSets.get(key)?.entries() || [])]
       .sort((a, b) => {
         if (a[1] === b[1]) return a[0].localeCompare(b[0]);
         return a[1] - b[1];
       });
+    if (options?.by === "score") {
+      const min = Number(start);
+      const max = Number(stop);
+      let rows = min > max
+        ? []
+        : ordered.filter(([, score]) => score >= min && score <= max);
+      if (options.reverse) rows = rows.slice().reverse();
+      const offset = options.limit?.offset ?? 0;
+      const count = options.limit?.count;
+      const sliced = Number.isInteger(count)
+        ? rows.slice(offset, offset + count)
+        : rows.slice(offset);
+      return sliced.map(([member, score]) => ({ member, score }));
+    }
     return ordered.slice(start, stop + 1).map(([member, score]) => ({ member, score }));
   }
 

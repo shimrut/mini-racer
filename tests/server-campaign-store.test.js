@@ -616,11 +616,21 @@ describe('Campaign server store', () => {
             { member: playerId, score: 140 },
         ];
         mockRedis.zCard.mockResolvedValue(ranked.length);
-        mockRedis.zRange.mockImplementation(async (_key, start, stop) => (
-            ranked.slice(start, stop + 1)
-        ));
+        mockRedis.zRange.mockImplementation(async (_key, start, stop, options) => {
+            if (options?.by !== 'score') return ranked.slice(start, stop + 1);
+            const min = Number(start);
+            const max = Number(stop);
+            if (min > max) return [];
+            let rows = ranked.filter((row) => row.score >= min && row.score <= max)
+                .sort((a, b) => a.score - b.score || a.member.localeCompare(b.member));
+            if (options.reverse) rows = rows.slice().reverse();
+            const offset = options.limit?.offset ?? 0;
+            const count = options.limit?.count;
+            return Number.isInteger(count) ? rows.slice(offset, offset + count) : rows.slice(offset);
+        });
         mockRedis.zRank.mockImplementation(async (_key, member) => {
-            const index = ranked.findIndex((row) => row.member === member);
+            const ordered = [...ranked].sort((a, b) => a.score - b.score || a.member.localeCompare(b.member));
+            const index = ordered.findIndex((row) => row.member === member);
             return index === -1 ? undefined : index;
         });
 
@@ -634,7 +644,7 @@ describe('Campaign server store', () => {
             body: { target: { rank: 1, displayName: 'Opponent', bestTimeMs: 100 } },
         });
 
-        ranked.reverse();
+        ranked[1] = { member: playerId, score: 80 };
         entries.set(playerId, JSON.stringify({
             ...baseResult,
             playerId,

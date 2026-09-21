@@ -2,12 +2,17 @@ import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import {
     isCompleteOpponentRecord,
+    parseStoredEntry,
     readEntryByPlayerId,
+    readPlayerRank,
 } from './competition-leaderboard.js';
 import { readPlayerProfileMap } from './competition-identity.js';
-import { getPlayerTrackPbRecord } from './pb-ghost-store.js';
+import { getPlayerTrackPbRecord, getPlayerTrackPbRecords } from './pb-ghost-store.js';
 import { resolveLeaderboardDisplayName } from '../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../game/track/tracks.js';
+
+const OPPONENT_WINDOW_SIZE = 10;
+const OPPONENT_WINDOW_LIMIT = 6;
 
 export type OpponentRowSelection = {
     kind: 'row';
@@ -67,6 +72,10 @@ async function readDisplayName(playerId: string): Promise<string> {
     });
 }
 
+function noFasterOpponent() {
+    return { status: 404, body: { error: 'No faster opponent ghost is available.', reason: 'no_faster_opponent' } };
+}
+
 export async function prepareCompetitionOpponentRace({
     competition,
     playerId,
@@ -89,49 +98,51 @@ export async function prepareCompetitionOpponentRace({
         return { status: 400, body: { error: 'Opponent selection is invalid.', reason: 'invalid_selection' } };
     }
 
-    const leaderboardKey = competition.leaderboardKey;
-    let rankedCandidates: Array<{ member: string; rank: number }> = [];
-    let benchmarkTimeMs: number | undefined;
     if (selection.kind === 'row') {
-        const ranked = await redis.zRange(leaderboardKey, selection.rank - 1, selection.rank - 1);
-        rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
-    } else {
-        const ownRankZeroBased = await redis.zRank(leaderboardKey, playerId);
-        const ownEntry = await readEntryByPlayerId(competition, playerId);
-        benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
-        if (!Number.isFinite(benchmarkTimeMs)) {
-            return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
-        }
-        const totalCount = await redis.zCard(leaderboardKey);
-        const stop = Number.isFinite(ownRankZeroBased)
-            ? Number(ownRankZeroBased) - 1
-            : totalCount - 1;
-        const ranked = stop >= 0 ? await redis.zRange(leaderboardKey, 0, stop) : [];
-        rankedCandidates = ranked
-            .map((row, index) => ({ member: row.member, rank: index + 1 }))
-            .reverse();
+        return prepareRowOpponentRace({
+            competition,
+            playerId,
+            race,
+            selection,
+        });
     }
+    return prepareNextFasterOpponentRace({
+        competition,
+        playerId,
+        race,
+        selection,
+    });
+}
+
+async function prepareRowOpponentRace({
+    competition,
+    playerId,
+    race,
+    selection,
+}: {
+    competition: Competition;
+    playerId: string;
+    race: unknown;
+    selection: OpponentRowSelection;
+}) {
+    const ranked = await redis.zRange(
+        competition.leaderboardKey,
+        selection.rank - 1,
+        selection.rank - 1,
+    );
+    const rankedCandidates = ranked.map((row) => ({ member: row.member, rank: selection.rank }));
 
     for (const candidate of rankedCandidates) {
         if (candidate.member === playerId) {
-            if (selection.kind === 'row') {
-                return { status: 409, body: { error: 'Choose another player to race.', reason: 'self_selection' } };
-            }
-            continue;
+            return { status: 409, body: { error: 'Choose another player to race.', reason: 'self_selection' } };
         }
         const entry = await readEntryByPlayerId(competition, candidate.member);
         if (!entry) continue;
-        if (selection.kind === 'next-faster' && (!benchmarkTimeMs || entry.bestTimeMs >= benchmarkTimeMs)) {
-            continue;
-        }
         const displayName = await readDisplayName(candidate.member);
         if (
-            selection.kind === 'row'
-            && (
-                displayName !== selection.displayName
-                || entry.bestTimeMs !== selection.bestTimeMs
-                || entry.updatedAt !== selection.updatedAt
-            )
+            displayName !== selection.displayName
+            || entry.bestTimeMs !== selection.bestTimeMs
+            || entry.updatedAt !== selection.updatedAt
         ) {
             return { status: 409, body: { error: 'Leaderboard row changed. Refresh and choose again.', reason: 'selection_changed' } };
         }
@@ -141,10 +152,7 @@ export async function prepareCompetitionOpponentRace({
             track: TRACKS[competition.trackKey],
         });
         if (!isCompleteOpponentRecord(entry, record, competition)) {
-            if (selection.kind === 'row') {
-                return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
-            }
-            continue;
+            return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
         }
         return {
             status: 200,
@@ -163,5 +171,86 @@ export async function prepareCompetitionOpponentRace({
             },
         };
     }
-    return { status: 404, body: { error: 'No faster opponent ghost is available.', reason: 'no_faster_opponent' } };
+    return noFasterOpponent();
+}
+
+async function prepareNextFasterOpponentRace({
+    competition,
+    playerId,
+    race,
+    selection,
+}: {
+    competition: Competition;
+    playerId: string;
+    race: unknown;
+    selection: NextFasterSelection;
+}) {
+    const ownEntry = await readEntryByPlayerId(competition, playerId);
+    const benchmarkTimeMs = ownEntry?.bestTimeMs ?? selection.benchmarkTimeMs;
+    if (!Number.isFinite(benchmarkTimeMs) || !benchmarkTimeMs) {
+        return { status: 409, body: { error: 'Set a time before choosing the next opponent.', reason: 'benchmark_required' } };
+    }
+
+    const track = TRACKS[competition.trackKey];
+    let fullWindows = 0;
+
+    for (let window = 0; window < OPPONENT_WINDOW_LIMIT; window += 1) {
+        const ranked = await redis.zRange(
+            competition.leaderboardKey,
+            0,
+            benchmarkTimeMs - 1,
+            {
+                by: 'score',
+                reverse: true,
+                limit: { offset: window * OPPONENT_WINDOW_SIZE, count: OPPONENT_WINDOW_SIZE },
+            },
+        );
+        if (!ranked.length) break;
+
+        if (ranked.length === OPPONENT_WINDOW_SIZE) fullWindows += 1;
+
+        const members = ranked.map((row) => row.member);
+        const rawEntries = await redis.hMGet(competition.entryHashKey, members);
+        const pbRecords = await getPlayerTrackPbRecords({
+            playerIds: members,
+            competition,
+            track,
+        });
+
+        for (let index = 0; index < ranked.length; index += 1) {
+            const member = ranked[index].member;
+            if (member === playerId) continue;
+            const entry = parseStoredEntry(rawEntries[index], competition.trackKey);
+            if (!entry) continue;
+            if (entry.bestTimeMs >= benchmarkTimeMs) continue;
+            const record = pbRecords.get(member) ?? null;
+            if (!isCompleteOpponentRecord(entry, record, competition)) continue;
+
+            const displayName = await readDisplayName(member);
+            const rank = await readPlayerRank(competition, member);
+            return {
+                status: 200,
+                body: {
+                    mode: competition.mode,
+                    race,
+                    target: {
+                        rank,
+                        displayName,
+                        bestTimeMs: entry.bestTimeMs,
+                        checkpointTimesSec: record!.checkpointTimesSec,
+                        lapCompletionTimesSec: record!.lapCompletionTimesSec,
+                        updatedAt: entry.updatedAt,
+                        ghost: record!.ghost,
+                    },
+                },
+            };
+        }
+
+        if (ranked.length < OPPONENT_WINDOW_SIZE) break;
+    }
+
+    if (fullWindows === OPPONENT_WINDOW_LIMIT) {
+        console.info('Next-rival lookup reached the 60-rival cap with no raceable opponent.');
+    }
+    return noFasterOpponent();
 }
