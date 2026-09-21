@@ -42,13 +42,13 @@ function challengeBragLines(
     switch (tier) {
         case 'blink':
             return [
-                `${myTime} on ${trackName}. Won by ${gap}. Didn’t think I had it.`,
-                `This was a close win. ${myTime} on ${trackName}`,
+                `${myTime} on ${trackName}. Won by ${gap}. Didn’t think I had it 🤯`,
+                `This was a close win 😱 ${myTime} on ${trackName}`,
             ];
         case 'chase':
             return [
                 `I beat this challenge. ${myTime} on ${trackName}.`,
-                `${myTime} - Good page on ${trackName}.`,
+                `${myTime} - I had a good page on ${trackName}.`,
             ];
         case 'got_away':
             return [

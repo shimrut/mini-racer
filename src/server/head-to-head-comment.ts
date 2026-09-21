@@ -58,12 +58,12 @@ function challengeCommentLines(
         case 'tie':
             return [
                 `${myTime}. Same time. That’s worse than losing.`,
-                'I tried so hard and all I got was a tie.',
+                'I tried so hard and all I got was a tie 🙄',
             ];
         case 'blink':
             return [
-                `${myTime} - Lost by ${gap} on ${trackName}. I was sure I had this.`,
-                `${myTime} on ${trackName}. Can’t believe I lost by ${gap}.`,
+                `${myTime} - Lost by ${gap} on ${trackName}. I was sure I had this 😤`,
+                `${myTime} on ${trackName}. Can’t believe I lost by ${gap} 🫠`,
             ];
         case 'chase':
             return [
@@ -73,7 +73,7 @@ function challengeCommentLines(
         case 'got_away':
             return [
                 `${myTime} - I have some improvements to do on ${trackName}.`,
-                `Need more practice on ${trackName} - ${myTime}`,
+                `Need more practice on ${trackName} - ${myTime} 🏎️`,
             ];
     }
 }

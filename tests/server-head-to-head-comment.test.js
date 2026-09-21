@@ -128,15 +128,15 @@ describe('head-to-head comments', () => {
     it.each([
         [0, [
             '10.000s. Same time. That’s worse than losing.',
-            'I tried so hard and all I got was a tie.',
+            'I tried so hard and all I got was a tie 🙄',
         ]],
         [1, [
-            '10.001s - Lost by 0.001s on Number One. I was sure I had this.',
-            '10.001s on Number One. Can’t believe I lost by 0.001s.',
+            '10.001s - Lost by 0.001s on Number One. I was sure I had this 😤',
+            '10.001s on Number One. Can’t believe I lost by 0.001s 🫠',
         ]],
         [100, [
-            '10.100s - Lost by 0.100s on Number One. I was sure I had this.',
-            '10.100s on Number One. Can’t believe I lost by 0.100s.',
+            '10.100s - Lost by 0.100s on Number One. I was sure I had this 😤',
+            '10.100s on Number One. Can’t believe I lost by 0.100s 🫠',
         ]],
         [101, [
             '10.101s - Not enough pace on Number One.',
@@ -148,7 +148,7 @@ describe('head-to-head comments', () => {
         ]],
         [501, [
             '10.501s - I have some improvements to do on Number One.',
-            'Need more practice on Number One - 10.501s',
+            'Need more practice on Number One - 10.501s 🏎️',
         ]],
     ])('picks one of the two Comment lines at %ims', (differenceMs, lines) => {
         const reportedTimeMs = 10_000 + differenceMs;
@@ -167,8 +167,8 @@ describe('head-to-head comments', () => {
         expect(preview.status).toBe(200);
         expect(preview.body).toMatchObject({ status: 'ready' });
         expect([
-            '10.011s - Lost by 0.011s on Number One. I was sure I had this.',
-            '10.011s on Number One. Can’t believe I lost by 0.011s.',
+            '10.011s - Lost by 0.011s on Number One. I was sure I had this 😤',
+            '10.011s on Number One. Can’t believe I lost by 0.011s 🫠',
         ]).toContain(preview.body.commentText);
 
         const confirmed = await confirmHeadToHeadComment(

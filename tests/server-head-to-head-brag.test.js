@@ -130,20 +130,20 @@ describe('head-to-head brag', () => {
 
     it.each([
         [1, 'blink', [
-            '9.999s on Number One. Won by 0.001s. Didn’t think I had it.',
-            'This was a close win. 9.999s on Number One',
+            '9.999s on Number One. Won by 0.001s. Didn’t think I had it 🤯',
+            'This was a close win 😱 9.999s on Number One',
         ]],
         [100, 'blink', [
-            '9.900s on Number One. Won by 0.100s. Didn’t think I had it.',
-            'This was a close win. 9.900s on Number One',
+            '9.900s on Number One. Won by 0.100s. Didn’t think I had it 🤯',
+            'This was a close win 😱 9.900s on Number One',
         ]],
         [101, 'chase', [
             'I beat this challenge. 9.899s on Number One.',
-            '9.899s - Good page on Number One.',
+            '9.899s - I had a good page on Number One.',
         ]],
         [500, 'chase', [
             'I beat this challenge. 9.500s on Number One.',
-            '9.500s - Good page on Number One.',
+            '9.500s - I had a good page on Number One.',
         ]],
         [501, 'got_away', [
             'Won it. Easier than expected. 9.499s on Number One.',
