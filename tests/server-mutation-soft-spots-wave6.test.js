@@ -12,6 +12,7 @@ const {
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
+        setPostFlair: vi.fn(),
         getPostById: vi.fn(),
     },
     mockShare: {
@@ -113,6 +114,7 @@ describe('server mutation soft spots wave 6', () => {
         mockShare.registerDailyGpPostWithScoreThread.mockResolvedValue({});
         mockShareImage.resolveDailyShareImageUrl.mockReturnValue(null);
         mockPostFlair.resolveMiniRacerPostFlairId.mockResolvedValue('flair-daily-race');
+        mockReddit.setPostFlair.mockResolvedValue(undefined);
         mockRedis.get.mockResolvedValue(null);
     });
 

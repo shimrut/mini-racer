@@ -11,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
+        setPostFlair: vi.fn(),
     },
     mockShare: {
         ensureDailyGpScoreThread: vi.fn(),
@@ -82,6 +83,7 @@ describe('daily post workflow', () => {
         mockShare.registerDailyGpPostWithScoreThread.mockResolvedValue({});
         mockShareImage.resolveDailyShareImageUrl.mockReturnValue(null);
         mockPostFlair.resolveMiniRacerPostFlairId.mockResolvedValue('flair-daily-race');
+        mockReddit.setPostFlair.mockResolvedValue(undefined);
     });
 
     it('enables autoposting while retaining existing post history', async () => {
@@ -149,11 +151,16 @@ describe('daily post workflow', () => {
         expect(mockReddit.submitCustomPost).toHaveBeenCalledWith(
             expect.objectContaining({
                 subredditName: 'MiniRacer',
-                flairId: 'flair-daily-race',
                 entry: 'default',
                 postData: expect.objectContaining({ postType: 'daily-race' }),
             }),
         );
+        expect(mockReddit.submitCustomPost.mock.calls[0][0]).not.toHaveProperty('flairId');
+        expect(mockReddit.setPostFlair).toHaveBeenCalledWith({
+            subredditName: 'MiniRacer',
+            postId: 't3_daily',
+            flairTemplateId: 'flair-daily-race',
+        });
         expect(mockReddit.submitCustomPost.mock.calls[0][0].styles).toBeUndefined();
         expect(mockShare.registerDailyGpPostWithScoreThread).toHaveBeenCalledWith({
             subredditName: 'MiniRacer',
@@ -166,6 +173,30 @@ describe('daily post workflow', () => {
             key: 'lock',
             value: 'value',
         });
+    });
+
+    it('still reports the daily post as created when the app cannot set its flair', async () => {
+        mockReddit.submitCustomPost.mockResolvedValue({
+            id: 't3_daily',
+            url: 'https://reddit.com/daily',
+        });
+        mockReddit.setPostFlair.mockRejectedValueOnce(new Error('flair refused'));
+        const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        try {
+            await expect(
+                ensureDailyMiniRacerPostForSubreddit('MiniRacer', challenge),
+            ).resolves.toEqual({
+                created: true,
+                postUrl: 'https://reddit.com/daily',
+            });
+            expect(error).toHaveBeenCalledWith(
+                'Daily post was created without its flair:',
+                expect.any(Error),
+            );
+        } finally {
+            error.mockRestore();
+        }
     });
 
     it('attaches the track share image URL when the asset resolves', async () => {

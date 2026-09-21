@@ -52,7 +52,6 @@ async function submitDailyMiniRacerPost(
     const post = await reddit.submitCustomPost({
         subredditName,
         title: formatDailyMiniRacerPostTitle(challenge),
-        flairId,
         entry: 'default',
         postData: {
             postType: 'daily-race',
@@ -74,6 +73,17 @@ async function submitDailyMiniRacerPost(
         postUrl: post.url,
         appSlug,
     });
+    // Reddit drops the flair passed at create time. The app is a moderator, so
+    // it sets the flair. The post is live either way, so a failure is only logged.
+    try {
+        await reddit.setPostFlair({
+            subredditName,
+            postId: post.id as `t3_${string}`,
+            flairTemplateId: flairId,
+        });
+    } catch (error) {
+        console.error('Daily post was created without its flair:', error);
+    }
     return post;
 }
 

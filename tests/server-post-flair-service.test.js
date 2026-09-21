@@ -14,7 +14,6 @@ describe('Mini Racer post flair service', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockReddit.getPostFlairTemplates.mockResolvedValue([
-            { id: 'launcher-template', text: 'Launcher' },
             { id: 'daily-template', text: 'Daily' },
             { id: 'challenge-template', text: 'Challenges' },
             { id: 'podium-template', text: 'Podiums' },
@@ -22,9 +21,6 @@ describe('Mini Racer post flair service', () => {
     });
 
     it.each([
-        ['daily-launcher', 'launcher-template'],
-        ['campaign-launcher', 'launcher-template'],
-        ['lobby-launcher', 'launcher-template'],
         ['daily-race', 'daily-template'],
         ['head-to-head', 'challenge-template'],
         ['daily-podium', 'podium-template'],
@@ -47,7 +43,7 @@ describe('Mini Racer post flair service', () => {
 
     it('fails before post creation when the required template is missing', async () => {
         mockReddit.getPostFlairTemplates.mockResolvedValue([
-            { id: 'launcher-template', text: 'Launcher' },
+            { id: 'daily-template', text: 'Daily' },
         ]);
 
         await expect(

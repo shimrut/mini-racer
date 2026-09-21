@@ -517,7 +517,6 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
         const post = await reddit.submitCustomPost({
             subredditName,
             title: formatDailyMiniRacerPodiumTitle(podium),
-            flairId,
             entry: 'podium',
             postData: {
                 postType: 'daily-podium',
@@ -551,6 +550,17 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             record.createdAt,
         );
         await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
+        // Reddit drops the flair passed at create time. The app is a moderator, so
+        // it sets the flair. The post is live either way, so a failure is only logged.
+        try {
+            await reddit.setPostFlair({
+                subredditName,
+                postId: post.id as `t3_${string}`,
+                flairTemplateId: flairId,
+            });
+        } catch (error) {
+            console.error('Podium post was created without its flair:', error);
+        }
         return { created: true, postUrl: post.url };
     } finally {
         await releaseDailyGpPodiumPostCreationLock(lock);

@@ -1,3 +1,7 @@
+- Daily and Podium posts now get their flair the same way Head to Head
+  already did: the app sets it after the post exists. Reddit was dropping
+  the flair attached at create time. Launcher posts no longer get a flair.
+
 - The “players near you” standings strip now uses the same ten-second shared
   save as the top ten. Opening Standings again at the same rank reuses it. A
   new best time still refreshes it. The five names around you do not change.

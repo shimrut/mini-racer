@@ -12,6 +12,7 @@ const {
 } = vi.hoisted(() => ({
     mockReddit: {
         submitCustomPost: vi.fn(),
+        setPostFlair: vi.fn(),
         getPostById: vi.fn(),
         getPostsByUser: vi.fn(),
         getSnoovatarUrl: vi.fn(),
@@ -112,6 +113,7 @@ describe('daily podium post workflow', () => {
             id: 't3_podium',
             url: 'https://reddit.com/podium',
         });
+        mockReddit.setPostFlair.mockResolvedValue(undefined);
         mockReddit.getPostById.mockResolvedValue({ id: 't3_existing' });
         mockReddit.getPostsByUser.mockReturnValue({ all: vi.fn(async () => []) });
         mockReddit.getSnoovatarUrl.mockResolvedValue('https://styles.redditmedia.com/avatar.png');
@@ -161,7 +163,6 @@ describe('daily podium post workflow', () => {
         expect(mockReddit.submitCustomPost).toHaveBeenCalledWith({
             subredditName: 'MiniRacer',
             title: 'Mini Racer Podium, 10 Jul: Circuit ProMax',
-            flairId: 'flair-daily-podium',
             entry: 'podium',
             postData: {
                 postType: 'daily-podium',
@@ -190,6 +191,12 @@ describe('daily podium post workflow', () => {
         expect(serializedPostData).not.toContain('profile');
         expect(serializedPostData).not.toContain('trackKey');
         expect(serializedPostData).not.toContain('timeSec');
+        expect(mockReddit.setPostFlair).toHaveBeenCalledWith({
+            subredditName: 'MiniRacer',
+            postId: 't3_podium',
+            flairTemplateId: 'flair-daily-podium',
+        });
+        expect(mockReddit.submitCustomPost.mock.calls[0][0]).not.toHaveProperty('flairId');
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledOnce();
         expect(mockReddit.getSnoovatarUrl).toHaveBeenCalledWith('RaceFan');
         expect(mockPostStore.writeDailyGpPodiumPendingSnapshot).toHaveBeenCalledWith({
@@ -213,6 +220,26 @@ describe('daily podium post workflow', () => {
             key: 'lock',
             value: 'owner',
         });
+    });
+
+    it('still reports the podium post as created when the app cannot set its flair', async () => {
+        mockReddit.setPostFlair.mockRejectedValueOnce(new Error('flair refused'));
+        const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        try {
+            await expect(
+                ensureDailyMiniRacerPodiumPostForSubreddit('MiniRacer', podium),
+            ).resolves.toEqual({
+                created: true,
+                postUrl: 'https://reddit.com/podium',
+            });
+            expect(error).toHaveBeenCalledWith(
+                'Podium post was created without its flair:',
+                expect.any(Error),
+            );
+        } finally {
+            error.mockRestore();
+        }
     });
 
     it('packs verified ghosts into the post body the same way Head to Head does', async () => {

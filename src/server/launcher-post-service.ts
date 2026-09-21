@@ -9,7 +9,6 @@ import {
 import {
     getRequestAppSlug,
 } from './request-context.js';
-import { resolveMiniRacerPostFlairId } from './post-flair-service.js';
 
 type LauncherPostConfig = {
     entry: 'daily' | 'campaign' | 'game';
@@ -75,11 +74,9 @@ async function submitLauncherPost(
     kind: LauncherPostKind,
 ) {
     const config = LAUNCHER_POST_CONFIG[kind];
-    const flairId = await resolveMiniRacerPostFlairId(subredditName, config.postType);
     const post = await reddit.submitCustomPost({
         subredditName,
         title: config.title,
-        flairId,
         entry: config.entry,
         postData: {
             postType: config.postType,

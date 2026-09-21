@@ -1,17 +1,11 @@
 import { reddit } from '@devvit/web/server';
 
 export type MiniRacerPostType =
-    | 'daily-launcher'
-    | 'campaign-launcher'
-    | 'lobby-launcher'
     | 'daily-race'
     | 'head-to-head'
     | 'daily-podium';
 
 const POST_FLAIR_TEXT_BY_TYPE: Record<MiniRacerPostType, string> = {
-    'daily-launcher': 'Launcher',
-    'campaign-launcher': 'Launcher',
-    'lobby-launcher': 'Launcher',
     'daily-race': 'Daily',
     'head-to-head': 'Challenges',
     'daily-podium': 'Podiums',
