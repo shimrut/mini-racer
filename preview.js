@@ -1,7 +1,11 @@
 import { TRACKS } from './game/track/tracks.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
-import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
+import {
+    createPosterCarDrive,
+    loadPosterCar,
+    posterCarTravelAt,
+} from './game/track/poster-car.js';
 import { createMedalIconSvg } from './game/medals/medal-icon.js';
 import {
     getActiveDailyChallenge,
@@ -25,17 +29,8 @@ export function getDailyPreviewChallengeOptions(root = globalThis) {
     };
 }
 
-const DAILY_POSTER_CAR_ENTRANCE_MS = 480;
-
-export function dailyPosterCarTravelAt(elapsedMs, { reduceMotion = false } = {}) {
-    if (reduceMotion) return 1;
-    if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return 0;
-    const progress = Math.min(1, elapsedMs / DAILY_POSTER_CAR_ENTRANCE_MS);
-    return 1 - (1 - progress) ** 3;
-}
-
-function prefersReducedDailyPosterMotion() {
-    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+export function dailyPosterCarTravelAt(elapsedMs, options) {
+    return posterCarTravelAt(elapsedMs, options);
 }
 
 export async function bootDailyPreview() {
@@ -54,37 +49,16 @@ export async function bootDailyPreview() {
     let currentTrack = fallbackTrack;
     let currentSkin = 'default';
     let currentChallenge = null;
-    let posterCarImage = null;
-    let posterCarTravel = 1;
-    let posterEntranceFrame = 0;
-    const postPreviewCarPromise = loadPostPreviewCar();
-
-    const paintPoster = () => {
+    const posterDrive = createPosterCarDrive((carImage, carTravel) => {
         renderTrackPreview(
             canvas,
             currentTrackKey,
             currentTrack,
             currentSkin,
-            posterCarImage,
-            posterCarTravel,
+            carImage,
+            carTravel,
         );
-    };
-
-    const drivePosterCar = (carImage) => {
-        posterCarImage = carImage;
-        cancelAnimationFrame(posterEntranceFrame);
-        const reduceMotion = prefersReducedDailyPosterMotion();
-        posterCarTravel = dailyPosterCarTravelAt(0, { reduceMotion });
-        paintPoster();
-        if (!carImage || posterCarTravel >= 1) return;
-        const startedAt = performance.now();
-        const frame = (now) => {
-            posterCarTravel = dailyPosterCarTravelAt(now - startedAt, { reduceMotion });
-            paintPoster();
-            if (posterCarTravel < 1) posterEntranceFrame = requestAnimationFrame(frame);
-        };
-        posterEntranceFrame = requestAnimationFrame(frame);
-    };
+    });
 
     try {
         const challenge = await getActiveDailyChallenge(getDailyPreviewChallengeOptions());
@@ -97,8 +71,8 @@ export async function bootDailyPreview() {
         setTrackName(trackNameEl, currentTrack.name);
         await applyTimeToBeat(timeToBeatEl, currentTrackKey, lapCount);
         renderChallengeStatus(challenge);
-        paintPoster();
-        void postPreviewCarPromise.then(drivePosterCar);
+        posterDrive.paintCurrent();
+        void loadPosterCar().then(posterDrive.drive);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
         setTrackName(trackNameEl, 'Challenge active');
@@ -107,9 +81,9 @@ export async function bootDailyPreview() {
         currentSkin = 'default';
         if (fallbackTrack) {
             await applyTimeToBeat(timeToBeatEl, 'circuit', 1);
-            paintPoster();
+            posterDrive.paintCurrent();
         }
-        void postPreviewCarPromise.then(drivePosterCar);
+        void loadPosterCar().then(posterDrive.drive);
     }
 
     playButton.addEventListener('click', async (event) => {
@@ -123,25 +97,12 @@ export async function bootDailyPreview() {
         await openGame(event);
     });
 
-    window.addEventListener('resize', paintPoster);
+    window.addEventListener('resize', () => posterDrive.paintCurrent());
 }
 
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         void bootDailyPreview();
-    });
-}
-
-function loadPostPreviewCar() {
-    const loader = new CarSpriteLoader();
-    return new Promise((resolve) => {
-        loader.load(STOCK_CAR_ASSET_NAME, {
-            onLoaded: resolve,
-            onError: () => {
-                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the custom post preview.`);
-                resolve(null);
-            }
-        });
     });
 }
 

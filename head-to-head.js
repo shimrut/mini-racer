@@ -1,6 +1,7 @@
 import { TRACKS } from './game/track/tracks.js';
 import { getTrackName } from './game/track/catalog.js';
 import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
+import { createPosterCarDrive, loadPosterCar } from './game/track/poster-car.js';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
@@ -115,7 +116,7 @@ function applyPosterMedal(documentRef, medal) {
     else root.removeAttribute('data-medal');
 }
 
-export function renderHeadToHead(documentRef, rawValue) {
+export function renderHeadToHead(documentRef, rawValue, car = null) {
     const value = normalizeHeadToHeadPostData(rawValue);
     if (!documentRef) return value;
     applyPosterMedal(documentRef, posterMedalForChallenge(value));
@@ -133,7 +134,12 @@ export function renderHeadToHead(documentRef, rawValue) {
     if (format) {
         format.textContent = `${value.lapCount} ${value.lapCount === 1 ? 'LAP' : 'LAPS'}`;
     }
-    renderChallengeTrack(documentRef, value.trackKey);
+    renderChallengeTrack(
+        documentRef,
+        value.trackKey,
+        car?.image ?? null,
+        car?.travel ?? 1,
+    );
     return value;
 }
 
@@ -155,7 +161,7 @@ function posterAvatars(challenge, viewer) {
     };
 }
 
-function renderChallengeTrack(documentRef, trackKey) {
+function renderChallengeTrack(documentRef, trackKey, carImage = null, carTravel = 1) {
     const canvas = documentRef.getElementById('challenge-track');
     const track = TRACKS[trackKey];
     if (!canvas || !track) return;
@@ -178,6 +184,9 @@ function renderChallengeTrack(documentRef, trackKey) {
         previewRenderMode: 'schematic',
         showSchematicCarTrail: true,
         moveSchematicCarPastStartLine: true,
+        schematicCarImage: carImage,
+        schematicCarTravel: carTravel,
+        schematicReserveCarSlot: true,
         hideSchematicStartArrow: true,
         runHistory: [],
     });
@@ -204,10 +213,12 @@ export async function openDailyAsRedirect(event) {
 }
 
 let lastPosterAvatars = null;
+let lastPosterCar = null;
+let posterCarDrive = null;
 
 export function bootHeadToHead(documentRef = document, root = globalThis) {
     const raw = readHeadToHeadPostData(root);
-    const challenge = renderHeadToHead(documentRef, raw);
+    const challenge = renderHeadToHead(documentRef, raw, lastPosterCar);
     const poster = resolveHeadToHeadPosterAccess(root);
     lastPosterAvatars = posterAvatars(challenge, readHeadToHeadViewerIdentity(root));
     renderHeadToHeadAvatars(documentRef, lastPosterAvatars);
@@ -217,6 +228,11 @@ export function bootHeadToHead(documentRef = document, root = globalThis) {
         poster,
     );
     exposeHeadToHeadLauncherTestHooks(challenge, poster);
+    posterCarDrive = createPosterCarDrive((image, travel) => {
+        lastPosterCar = { image, travel };
+        renderChallengeTrack(documentRef, challenge.trackKey, image, travel);
+    });
+    if (challenge.trackKey) void loadPosterCar().then(posterCarDrive.drive);
 }
 
 if (typeof document !== 'undefined') {
@@ -227,7 +243,7 @@ if (typeof document !== 'undefined') {
         start();
     }
     globalThis.addEventListener('resize', () => {
-        const challenge = renderHeadToHead(document, readHeadToHeadPostData());
+        const challenge = renderHeadToHead(document, readHeadToHeadPostData(), lastPosterCar);
         if (lastPosterAvatars) {
             renderHeadToHeadAvatars(document, {
                 ...lastPosterAvatars,

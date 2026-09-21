@@ -472,8 +472,9 @@ flowchart LR
   once when a stored guest token is stale, and treats a validated ready post as
   playable without waiting for Reddit viewer classification. It shows
   challenger and viewer avatars (generic Snoo while signed out), and labels
-  the mode Head to Head. Unavailable responses remain disabled but are not
-  presented as a sign-in requirement.
+  the mode Head to Head. The circuit is drawn immediately; the stock car then
+  drives along the red dash the same way the Daily poster does. Unavailable
+  responses remain disabled but are not presented as a sign-in requirement.
 - Expanded-game Head to Head startup begins the duel request before player
   bootstrap and never requests Daily or Campaign data before the challenge pane
   is ready. The authoritative challenge, target track, frozen opponent ghost,
@@ -733,7 +734,8 @@ These are useful, but they are not on the critical player path:
   artwork. The track name, time, and drawing appear before the car picture
   loads. The stock car then drives from the back of the red dash to its place
   past the start line, or appears already parked when reduced motion is on.
-  In-game schematic previews do not use that post-only treatment.
+  The Head to Head poster uses that same entrance. In-game schematic previews
+  do not use that post-only treatment.
 - `campaign.html`, `campaign.js`, `campaign.css`
   Stable Campaign launcher surface, branded as `The Numbers` above the Campaign
   title. Its CTA stores the Campaign launch target and expands the shared
