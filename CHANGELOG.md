@@ -1,3 +1,5 @@
+- Ranking is skipped only after a freeze lasts a quarter of a second. The car still catches up for a tenth of a second, and the rest of the freeze is not added to the lap.
+
 - A lap that froze too long now says “Rank disabled due to frame stalls.”
 
 - Head to Head posts use the `Challenge` flair. The app was looking for

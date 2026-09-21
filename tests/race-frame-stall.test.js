@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   MAX_SIMULATED_FRAME_DT,
+  RANKED_RUN_STALL_FRAME_MS,
   RANKED_RUN_STALL_MESSAGE,
   raceEngineMethods,
 } from '../game/race/engine-methods.js';
@@ -56,10 +57,20 @@ describe('race frame hitch ranking', () => {
     expect(engine.rankedSubmissionBlockedReason).toBeNull();
   });
 
-  it('refuses ranking when a hitch is longer than the game will simulate', () => {
+  it('still ranks a phone stutter and only drives the catch-up cap', () => {
     const engine = createLoopEngine();
 
-    raceEngineMethods.loop.call(engine, 1000 + MAX_SIMULATED_FRAME_DT * 1000 + 1);
+    raceEngineMethods.loop.call(engine, 1000 + RANKED_RUN_STALL_FRAME_MS);
+
+    expect(engine.update).toHaveBeenCalledTimes(6);
+    expect(engine.runHadTimingAnomaly).toBe(false);
+    expect(engine.rankedSubmissionBlockedReason).toBeNull();
+  });
+
+  it('refuses ranking when a freeze lasts longer than a quarter of a second', () => {
+    const engine = createLoopEngine();
+
+    raceEngineMethods.loop.call(engine, 1000 + RANKED_RUN_STALL_FRAME_MS + 1);
 
     expect(engine.update).toHaveBeenCalledTimes(6);
     expect(engine.runHadTimingAnomaly).toBe(true);

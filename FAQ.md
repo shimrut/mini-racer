@@ -27,7 +27,7 @@ Very long laps can’t be checked. Aim for a cleaner finish under about **50 sec
 
 ### It says Rank disabled due to frame stalls
 
-The race froze for more than a tenth of a second (switching apps, locking the phone, a hard hitch). That lap is **not** sent for ranking. A smaller stutter is fine. Keep the race open and the screen awake, then race again.
+The race froze for more than a quarter of a second (switching apps, locking the phone). That lap is **not** sent for ranking. A shorter stutter still counts. Keep the race open and the screen awake, then race again.
 
 ### I got **RUN REJECTED** after crossing the line
 
@@ -243,7 +243,7 @@ There’s a short launch lock so you don’t rocket off immediately after an aut
 | **GHOST UNAVAILABLE** | Expected PB ghost wasn’t ready at GO |
 | **RUN REJECTED** | Finish failed local checks; not submitted |
 | **Run too long to rank.** | Lap too long for server check (~50s+) |
-| **Rank disabled due to frame stalls** | Freeze mid-run longer than ~0.1s; ranking skipped |
+| **Rank disabled due to frame stalls** | Freeze mid-run longer than ~0.25s; ranking skipped |
 | **Submitting… / Verifying… / Retrying…** | Rank pipeline in progress |
 | **Rank rejected / Rank error** | That submit didn’t stick |
 | **Leaderboard submission expired.** | Pending check past the day’s deadline |

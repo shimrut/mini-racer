@@ -30,9 +30,10 @@ const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
 const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const COMPARISON_TIE_EPSILON_SEC = 0.005;
-// Same cap already used on per-frame dt. Catch up this much, and only refuse
-// ranking when a hitch is longer than we are willing to simulate.
+// The car catches up this much of a hitch. The rest is dropped from the car and the clock.
 export const MAX_SIMULATED_FRAME_DT = 0.1;
+// A normal phone stutter is shorter than this. Longer means the game stopped.
+export const RANKED_RUN_STALL_FRAME_MS = 250;
 export const RANKED_RUN_STALL_MESSAGE = "Rank disabled due to frame stalls";
 
 function finitePositive(value) {
@@ -1090,7 +1091,7 @@ export const raceEngineMethods = {
     const animateFrame = this.shouldAnimateFrame();
     const shouldUpdate = this.status === "playing";
 
-    if (shouldUpdate && frameTime > MAX_SIMULATED_FRAME_DT * 1000) {
+    if (shouldUpdate && frameTime > RANKED_RUN_STALL_FRAME_MS) {
       this.runHadTimingAnomaly = true;
       this.rankedSubmissionBlockedReason = RANKED_RUN_STALL_MESSAGE;
     }
