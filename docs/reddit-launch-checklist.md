@@ -132,7 +132,7 @@ Mini Racer is a **game**, so the most important launch requirements are:
 - [ ] Run **Collect Mini Racer challenges** on the live community until it says
   the last month is covered. One click does not read every challenge. Click
   again while it says to keep going. Change Track then has those posts to open.
-- [ ] After three finished losses, Concede posts the comment, then the finish
+- [ ] After five starts, finished or restarted, a loss offers Concede. Concede posts the comment, then the finish
   row becomes Improve / Change Track / Home. Change Track opens a different
   challenge in the same medal band, not this one and not the player's own. A tie, a win, a skipped
   Concede, and a guest never see that button.

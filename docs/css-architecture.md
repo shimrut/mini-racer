@@ -104,8 +104,8 @@ The verdict lockup and Daily/Campaign status heading enter with the same
 after the finish modal fade starts. Comparison rows and buttons do not
 stagger. A local Head to Head beat can swap Improve/Home for Daily/Campaign
 while VERIFYING is still showing; Brag stays disabled until the judged win.
-The judged tie/loss state instead enables Comment. Concede waits for three
-finished losses. After that comment is posted, the middle button becomes New
+The judged tie/loss state instead enables Comment. Concede waits for five
+starts, finished or restarted. After that comment is posted, the middle button becomes New
 Challenge. Its confirmation sheet shows
 the server-generated tiered copy as a text-only reply.
 Reduced motion turns the sequence off. Daily and Campaign put a

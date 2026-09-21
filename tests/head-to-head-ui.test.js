@@ -635,7 +635,7 @@ describe('Head to Head lobby and finish', () => {
         );
         expect(lossShowModal).toHaveBeenCalledTimes(1);
         // A first loss offers nothing: the locked Brag stays, exactly as it looks while a
-        // result is still confirming. Concede waits for the third try.
+        // result is still confirming. Concede waits for the fifth start.
         expect(lossShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
@@ -1924,9 +1924,9 @@ describe('Head to Head poster after the duel is beaten', () => {
     });
 });
 
-describe('Concede after three losses', () => {
+describe('Concede after five starts', () => {
     // One engine for the whole visit: Improve restarts the race on the same object, so the
-    // count of unwon finishes lives across every retry until the post is closed.
+    // count of starts lives across every retry until the post is closed.
     function visitContext(showModal) {
         return {
             activeHeadToHead: {
@@ -1952,55 +1952,72 @@ describe('Concede after three losses', () => {
     const finish = (context, lapTime) => (
         headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime })
     );
+    const start = (context) => {
+        headToHeadEngineMethods.recordHeadToHeadStart.call(context);
+    };
 
-    it('withholds the offer for two losses, then keeps it until a concession is posted', async () => {
+    it('shows Concede on a loss after five starts, including ones that never finish', async () => {
         headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
         const showModal = vi.fn();
         const context = visitContext(showModal);
         const sheet = (index) => showModal.mock.calls[index][3];
 
+        start(context);
+        start(context);
         await finish(context, 8.4);
-        await finish(context, 8.5);
         expect(sheet(0)).toMatchObject({
             shareRequest: { kind: 'challenge-brag', acceptToken: null },
             shareEnabled: false,
         });
-        expect(sheet(1).shareEnabled).toBe(false);
 
-        await finish(context, 8.6);
-        expect(sheet(2)).toMatchObject({
+        start(context);
+        start(context);
+        start(context);
+        await finish(context, 8.5);
+        expect(sheet(1)).toMatchObject({
             shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
             shareEnabled: true,
         });
 
         // Declining costs nothing: the offer stays up until the player uses it.
-        await finish(context, 8.7);
-        expect(sheet(3).shareEnabled).toBe(true);
+        start(context);
+        await finish(context, 8.6);
+        expect(sheet(2).shareEnabled).toBe(true);
 
-        // A posted concession starts the three again.
+        // A posted concession starts the five again.
         headToHeadEngineMethods.recordHeadToHeadConcede.call(context);
-        await finish(context, 8.8);
-        await finish(context, 8.9);
-        expect(sheet(4).shareEnabled).toBe(false);
-        expect(sheet(5).shareEnabled).toBe(false);
-        await finish(context, 9);
-        expect(sheet(6).shareEnabled).toBe(true);
+        for (let i = 0; i < 4; i += 1) {
+            start(context);
+            await finish(context, 8.7 + i * 0.1);
+            expect(sheet(3 + i).shareEnabled).toBe(false);
+        }
+        start(context);
+        await finish(context, 9.2);
+        expect(sheet(7)).toMatchObject({
+            shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
+            shareEnabled: true,
+        });
     });
 
-    it('offers a tie its own line at once, and still counts it as one of the three', async () => {
+    it('offers a tie its own line at once, and its start still counts toward the five', async () => {
         headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
         const showModal = vi.fn();
         const context = visitContext(showModal);
         const sheet = (index) => showModal.mock.calls[index][3];
 
+        start(context);
         await finish(context, 8);
         expect(sheet(0)).toMatchObject({
             shareRequest: { kind: 'challenge-comment', outcome: 'tie' },
             shareEnabled: true,
         });
 
+        start(context);
         await finish(context, 8.4);
         expect(sheet(1).shareEnabled).toBe(false);
+
+        for (let i = 0; i < 2; i += 1) start(context);
+        start(context);
         await finish(context, 8.5);
         expect(sheet(2)).toMatchObject({
             shareRequest: { kind: 'challenge-comment', outcome: 'lost' },
@@ -2025,23 +2042,31 @@ describe('Concede after three losses', () => {
             },
         });
 
+        start(context);
         await finish(context, 7.9);
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
                 phase: 'lost',
             }));
         });
+        start(context);
         await finish(context, 7.8);
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledTimes(2);
         });
-        // Two finishes, two counts. Had the pending open counted as well, this second repaint
-        // would already be offering Concede.
+        // Two starts. The server taking the win away must not count as another start, or this
+        // would be further along than two.
         for (const call of updateChallengeFinishHero.mock.calls) {
             expect(call[0].shareRequest).toEqual({ kind: 'challenge-brag', acceptToken: null });
         }
 
         headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({ ok: true, body: {} });
+        for (let i = 0; i < 2; i += 1) {
+            start(context);
+            await finish(context, 8.4 + i * 0.1);
+            expect(showModal.mock.calls.at(-1)[3].shareEnabled).toBe(false);
+        }
+        start(context);
         await finish(context, 8.6);
         expect(showModal.mock.calls.at(-1)[3]).toMatchObject({
             shareRequest: { kind: 'challenge-comment', outcome: 'lost' },

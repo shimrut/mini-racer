@@ -81,6 +81,7 @@ export const modeRouterEngineMethods = {
             return;
         }
         if (!this.currentChallengeRun) return;
+        if (this.activeRaceMode === 'challenge') this.recordHeadToHeadStart?.();
         void this.journeys?.endAttempt?.({ complete: false });
         void this.journeys?.startAttempt?.({ mode: this.activeRaceMode, reason: 'restart' });
         this.reset(true, { preserveDailyChallenge: true, showStartOverlay: false });

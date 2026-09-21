@@ -192,10 +192,10 @@ const CONCEDED_COMMENT_STATUSES = new Set([
 ]);
 
 /**
- * Whether this comment answer ends a concession, which restarts the count of losses before the
+ * Whether this comment answer ends a concession, which restarts the count of starts before the
  * finish offers to concede again. A tie is not a concession: it says its own line and leaves the
- * count alone. An unconfirmed comment may be live, so it counts as posted — waiting three more
- * losses is the cheap mistake, a second concession on the post is not.
+ * count alone. An unconfirmed comment may be live, so it counts as posted — waiting five more
+ * starts is the cheap mistake, a second concession on the post is not.
  */
 export function concedesHeadToHead(request, body) {
     if (request?.kind !== 'challenge-comment' || request?.outcome !== 'lost') return false;

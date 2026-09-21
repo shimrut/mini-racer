@@ -86,6 +86,24 @@ describe('mode router', () => {
         expect(campaign.journeys.startAttempt).toHaveBeenCalledWith({ mode: 'campaign', reason: 'restart' });
     });
 
+    it('counts a Head to Head restart as a start', () => {
+        const challenge = createEngine({
+            activeRaceMode: 'challenge',
+            currentChallengeRun: {},
+            recordHeadToHeadStart: vi.fn(),
+        });
+        challenge.restartActiveRace();
+        expect(challenge.recordHeadToHeadStart).toHaveBeenCalledTimes(1);
+
+        const campaign = createEngine({
+            activeRaceMode: 'campaign',
+            currentChallengeRun: {},
+            recordHeadToHeadStart: vi.fn(),
+        });
+        campaign.restartActiveRace();
+        expect(campaign.recordHeadToHeadStart).not.toHaveBeenCalled();
+    });
+
     it('does not restart a non-Daily mode with no active run', () => {
         const campaign = createEngine({ activeRaceMode: 'campaign', currentChallengeRun: null });
         campaign.restartActiveRace();

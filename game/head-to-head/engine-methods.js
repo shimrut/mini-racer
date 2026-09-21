@@ -22,8 +22,8 @@ import {
 
 export const HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
-/** Finishes the player has to lose before the sheet offers Concede. A tie never waits. */
-export const HEAD_TO_HEAD_CONCEDE_AFTER_LOSSES = 3;
+/** Starts, finished or abandoned, before a loss offers Concede. A tie never waits. */
+export const HEAD_TO_HEAD_CONCEDE_AFTER_STARTS = 5;
 
 function finitePositiveMs(value) {
     const ms = Number(value);
@@ -370,6 +370,7 @@ export const headToHeadEngineMethods = {
             this.applyDailyChallenge(toRaceChallenge(stage));
             this.activeRaceMode = 'challenge';
             void this.journeys?.startAttempt?.({ mode: 'challenge', reason: 'initial_start' });
+            this.recordHeadToHeadStart?.();
             this.startSequence();
         } catch (error) {
             console.error('Could not start Head to Head race:', error);
@@ -423,23 +424,15 @@ export const headToHeadEngineMethods = {
             // while a posted tie leaves it alone.
             outcome,
         });
-        // The middle button of the finish sheet. A finish that is not a win is one of the tries
-        // toward Concede, counted once whichever verdict settles it: the server answer can land
-        // after the local one, and repainting the same finish must not count it twice.
+        // The middle button of the finish sheet. Starts are counted when the run begins, so a
+        // restart that never finishes still counts, and a server verdict cannot count it twice.
         const resolveFinishShare = (phase, reportedTimeMs = null) => {
-            if (
-                (phase === 'lost' || phase === 'tie')
-                && this._headToHeadUnwonCountedAttempt !== finishAttempt
-            ) {
-                this._headToHeadUnwonCountedAttempt = finishAttempt;
-                this._headToHeadUnwonFinishes = (this._headToHeadUnwonFinishes ?? 0) + 1;
-            }
-            // A tie says its own line at once. A loss waits for the third try, and waits again
+            // A tie says its own line at once. A loss waits for the fifth start, and waits again
             // after every concession.
-            const triesSinceConcede = (this._headToHeadUnwonFinishes ?? 0)
+            const startsSinceConcede = (this._headToHeadStarts ?? 0)
                 - (this._headToHeadConcedeBaseline ?? 0);
             const offered = phase === 'tie'
-                || (phase === 'lost' && triesSinceConcede >= HEAD_TO_HEAD_CONCEDE_AFTER_LOSSES);
+                || (phase === 'lost' && startsSinceConcede >= HEAD_TO_HEAD_CONCEDE_AFTER_STARTS);
             return {
                 shareRequest: offered
                     ? buildCommentShareRequest(reportedTimeMs, phase)
@@ -687,11 +680,19 @@ export const headToHeadEngineMethods = {
     },
 
     /**
-     * A posted concession restarts the count: the next offer waits for three more losses.
+     * One start: the lobby start, or a restart from pause, the R key, or Improve.
+     * A wall that sends the car back to the line is the same start.
+     */
+    recordHeadToHeadStart() {
+        this._headToHeadStarts = (this._headToHeadStarts ?? 0) + 1;
+    },
+
+    /**
+     * A posted concession restarts the count: the next offer waits for five more starts.
      * Declining the offer leaves the count alone, so it stays available until it is used.
      */
     recordHeadToHeadConcede() {
-        this._headToHeadConcedeBaseline = this._headToHeadUnwonFinishes ?? 0;
+        this._headToHeadConcedeBaseline = this._headToHeadStarts ?? 0;
     },
 
     previewHeadToHeadBrag(request) {
