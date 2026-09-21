@@ -37,8 +37,9 @@ that trace. Its brand uses the shared stacked Mini/Racer lockup, the duel row
 marks the matchup with italic uppercase VS. (white V, red S), and its
 format line carries the lap count without adding ghost-status copy. Keep the existing
 `challenge-*` IDs stable because
-`head-to-head.js` hydrates them from immutable Reddit post data and
-authenticated access responses.
+`head-to-head.js` hydrates them from immutable Reddit post data. The Accept
+  tap is owned by `head-to-head-accept.js`, which is the HTML entry; the rest of
+  the card loads after.
 
 The split is structural. Its first priority is preserving the original cascade:
 the imported partials reproduce the previous stylesheet's rules in the same

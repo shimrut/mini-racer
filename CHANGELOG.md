@@ -1,5 +1,11 @@
 # Changelog
 
+- A Head to Head Accept tap works before the rest of the card loads. Your
+  own post is recognised by Reddit account ID stored on the post (not by
+  name). Old posts fall back to the post-author ID Reddit sometimes sends.
+  A post with no challenge says so itself. The card still does not ask the
+  server in the feed.
+
 - Head to Head posts no longer ask the server when they appear in the feed.
   The card uses the post plus your Reddit name and picture when those are
   sent with it. Accept is live immediately. Your own post still reads Open

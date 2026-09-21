@@ -38,6 +38,7 @@ export type HeadToHeadPostData = {
     campaignId?: typeof CAMPAIGN_ID;
     raceId?: string;
     challengerUsername: string;
+    challengerUserId?: string;
     challengerAvatarUrl: string | null;
     trackKey: string;
     lapCount: 1 | 2 | 3;
@@ -133,6 +134,9 @@ export function toHeadToHeadPostData(
     if (origin) postData.origin = origin;
     if (record.campaignId) postData.campaignId = record.campaignId;
     if (record.raceId) postData.raceId = record.raceId;
+    if (typeof record.challengerUserId === 'string' && record.challengerUserId.startsWith('t2_')) {
+        postData.challengerUserId = record.challengerUserId;
+    }
     if (typeof record.replayDataHash === 'string' && record.replayDataHash) {
         postData.replayDataHash = record.replayDataHash;
     }

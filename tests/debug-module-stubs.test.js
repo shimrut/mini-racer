@@ -26,7 +26,7 @@ describe('debug module stubs', () => {
     // The window surfaces must be assigned only from the stubbed modules, never
     // from engine or launcher code that always ships.
     it('keeps the debug globals out of every module that always ships', () => {
-        const shipped = ['game/engine.js', 'campaign.js', 'head-to-head.js'];
+        const shipped = ['game/engine.js', 'campaign.js', 'head-to-head.js', 'head-to-head-accept.js'];
         for (const file of shipped) {
             const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
             expect(source, `${file} must not assign debug globals`).not.toMatch(

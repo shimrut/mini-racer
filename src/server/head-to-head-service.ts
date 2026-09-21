@@ -59,6 +59,7 @@ export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
 
 export type HeadToHeadRequestContext = {
     username?: string | null;
+    userId?: string | null;
     subredditName?: string | null;
     appSlug?: string | null;
     postId?: string | null;
@@ -148,6 +149,7 @@ export type HeadToHeadServiceDependencies = {
 
 type PreviewRecord = {
     username: string;
+    userId?: string;
     subredditName: string;
     source: HeadToHeadSource;
     challengeId: string;
@@ -286,6 +288,11 @@ async function readChallengeCarUnlocks(playerId: string) {
 async function recordChallengePostUnlock(playerId: string, trackKey: string) {
     await recordHeadToHeadPost(playerId, trackKey);
     return readChallengeCarUnlocks(playerId);
+}
+
+function requestUserId(context: HeadToHeadRequestContext): string | undefined {
+    const id = typeof context.userId === 'string' ? context.userId.trim() : '';
+    return id.startsWith('t2_') ? id : undefined;
 }
 
 function signedContext(context: HeadToHeadRequestContext): {
@@ -504,6 +511,7 @@ function buildRecord(
             ? { campaignId: origin.campaignId, raceId: origin.raceId }
             : {}),
         challengerUsername: preview.username,
+        ...(preview.userId ? { challengerUserId: preview.userId } : {}),
         challengerAvatarUrl: normalizeAvatarUrl(challengerAvatarUrl),
         trackKey: preview.source.trackKey,
         lapCount: preview.source.lapCount,
@@ -637,8 +645,10 @@ export function createHeadToHeadService(
         const createdAt = now().toISOString();
         const title = formatHeadToHeadTitle(source.bestTimeMs, source.trackKey);
         const challengerAvatarUrl = await resolveRedditAvatarUrl(request.username);
+        const userId = requestUserId(context);
         const record: PreviewRecord = {
             username: request.username,
+            ...(userId ? { userId } : {}),
             subredditName: request.subredditName,
             source,
             challengeId,
@@ -654,6 +664,7 @@ export function createHeadToHeadService(
         const expiresAt = new Date(now().getTime() + PREVIEW_TTL_SECONDS * 1000);
         const previewRecord = {
             username: request.username,
+            ...(record.userId ? { userId: record.userId } : {}),
             subredditName: request.subredditName,
             challengeId,
             title,

@@ -9,24 +9,18 @@ import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
 import { getMedalForRaceTime } from './game/medals/medal-timing.js';
-
-const POST_TYPE = 'head-to-head';
-const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
+import {
+    applyHeadToHeadAccessState,
+    HEAD_TO_HEAD_POST_TYPE,
+    readHeadToHeadPosterPost,
+    resolveHeadToHeadPosterAccess,
+} from './game/head-to-head/poster-access.js';
 
 function cleanText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function sameName(left, right) {
-    return cleanText(left).toLowerCase() === cleanText(right).toLowerCase();
-}
-
-export function readHeadToHeadPostData(root = globalThis) {
-    const value = root?.devvit?.context?.postData;
-    return value && typeof value === 'object' && value.postType === POST_TYPE
-        ? value
-        : null;
-}
+export const readHeadToHeadPostData = readHeadToHeadPosterPost;
 
 export function normalizeHeadToHeadPostData(value) {
     const input = value && typeof value === 'object' ? value : {};
@@ -51,7 +45,7 @@ export function normalizeHeadToHeadPostData(value) {
                 }
                 : null;
     return {
-        postType: POST_TYPE,
+        postType: HEAD_TO_HEAD_POST_TYPE,
         challengeId: cleanText(input.challengeId),
         campaignId: input.campaignId === 'numbered-v1' ? input.campaignId : '',
         raceId: cleanText(input.raceId),
@@ -152,22 +146,6 @@ export function readHeadToHeadViewerIdentity(root = globalThis) {
     };
 }
 
-export function resolveHeadToHeadPosterAccess(rawValue, root = globalThis) {
-    const challenge = normalizeHeadToHeadPostData(rawValue);
-    const playable = Boolean(challenge.challengeId);
-    const viewer = readHeadToHeadViewerIdentity(root);
-    const ownChallenge = playable
-        && Boolean(viewer.username)
-        && sameName(viewer.username, challenge.challengerUsername);
-    return {
-        signedIn: Boolean(viewer.username),
-        canRace: playable && !ownChallenge,
-        ownChallenge,
-        viewer,
-        challenge,
-    };
-}
-
 function posterAvatars(challenge, viewer) {
     return {
         challengerUsername: challenge.challengerUsername,
@@ -205,83 +183,6 @@ function renderChallengeTrack(documentRef, trackKey) {
     });
 }
 
-export function showOwnChallengeMessage(documentRef, openLobby = openHomeAsRedirect) {
-    const doc = documentRef || document;
-    const existing = doc.getElementById('own-challenge-message');
-    if (existing) existing.remove();
-
-    const overlay = doc.createElement('div');
-    overlay.id = 'own-challenge-message';
-    overlay.className = 'expired-message';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-
-    const message = doc.createElement('p');
-    message.className = 'expired-message__text';
-    message.textContent = OWN_CHALLENGE_MESSAGE;
-
-    const button = doc.createElement('button');
-    button.className = 'expired-message__ok';
-    button.type = 'button';
-    button.textContent = 'OK';
-    button.addEventListener('click', async (event) => {
-        await openLobby(event);
-    });
-
-    overlay.append(message, button);
-    doc.body.append(overlay);
-    button.focus();
-    return overlay;
-}
-
-export function bindAcceptChallenge(
-    documentRef,
-    openGame = openHeadToHead,
-    { ownChallenge = false, openOwnChallenge = openHomeAsRedirect } = {},
-) {
-    const button = documentRef?.getElementById('accept-challenge');
-    if (!button || button.dataset.bound === '1') return button || null;
-    button.dataset.bound = '1';
-    button.addEventListener('click', async (event) => {
-        if (ownChallenge) {
-            event.preventDefault?.();
-            await openOwnChallenge(event);
-            return;
-        }
-        await openGame(event);
-    });
-    return button;
-}
-
-export function applyHeadToHeadAccessState(button, message, access = {}) {
-    if (!button) return;
-    const canRace = access.canRace === true;
-    const ownChallenge = access.ownChallenge === true;
-    button.disabled = !canRace && !ownChallenge;
-    button.textContent = ownChallenge
-        ? 'Open Mini Racer'
-        : canRace
-            ? 'Accept Challenge'
-            : 'Challenge Unavailable';
-    if (message) {
-        message.textContent = ownChallenge
-            ? OWN_CHALLENGE_MESSAGE
-            : canRace
-                ? ''
-                : access.body?.error || 'This Head to Head is unavailable right now.';
-    }
-}
-
-export async function openHomeAsRedirect(event) {
-    try {
-        requestGameLaunchTarget('home');
-        const { requestExpandedMode } = await import('@devvit/web/client');
-        await requestExpandedMode(event, 'game');
-    } catch (error) {
-        console.error('Failed to open Mini Racer Lobby:', error);
-    }
-}
-
 export async function openCampaignAsRedirect(event) {
     try {
         requestGameLaunchTarget('campaign');
@@ -302,33 +203,29 @@ export async function openDailyAsRedirect(event) {
     }
 }
 
-export async function openHeadToHead(event) {
-    try {
-        const { requestExpandedMode } = await import('@devvit/web/client');
-        await requestExpandedMode(event, 'game');
-    } catch (error) {
-        console.error('Failed to open Mini Racer Head to Head:', error);
-    }
-}
-
 let lastPosterAvatars = null;
 
-function boot() {
-    const raw = readHeadToHeadPostData();
-    const challenge = renderHeadToHead(document, raw);
-    const poster = resolveHeadToHeadPosterAccess(raw);
-    lastPosterAvatars = posterAvatars(challenge, poster.viewer);
-    renderHeadToHeadAvatars(document, lastPosterAvatars);
-    const button = bindAcceptChallenge(document, openHeadToHead, {
-        ownChallenge: poster.ownChallenge === true,
-        openOwnChallenge: openHomeAsRedirect,
-    });
-    applyHeadToHeadAccessState(button, document.getElementById('challenge-message'), poster);
+export function bootHeadToHead(documentRef = document, root = globalThis) {
+    const raw = readHeadToHeadPostData(root);
+    const challenge = renderHeadToHead(documentRef, raw);
+    const poster = resolveHeadToHeadPosterAccess(root);
+    lastPosterAvatars = posterAvatars(challenge, readHeadToHeadViewerIdentity(root));
+    renderHeadToHeadAvatars(documentRef, lastPosterAvatars);
+    applyHeadToHeadAccessState(
+        documentRef?.getElementById?.('accept-challenge'),
+        documentRef?.getElementById?.('challenge-message'),
+        poster,
+    );
     exposeHeadToHeadLauncherTestHooks(challenge, poster);
 }
 
 if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', boot);
+    const start = () => bootHeadToHead();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
     globalThis.addEventListener('resize', () => {
         const challenge = renderHeadToHead(document, readHeadToHeadPostData());
         if (lastPosterAvatars) {
@@ -343,4 +240,12 @@ if (typeof document !== 'undefined') {
     });
 }
 
-export { GENERIC_SNOO_URL, OWN_CHALLENGE_MESSAGE };
+export { GENERIC_SNOO_URL };
+export {
+    OWN_CHALLENGE_MESSAGE,
+    applyHeadToHeadAccessState,
+    bindAcceptChallenge,
+    openHeadToHead,
+    openHomeAsRedirect,
+    resolveHeadToHeadPosterAccess,
+} from './game/head-to-head/poster-access.js';

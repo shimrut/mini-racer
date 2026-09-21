@@ -12,9 +12,13 @@ import {
     readHeadToHeadViewerIdentity,
     renderHeadToHead,
     resolveHeadToHeadPosterAccess,
-    showOwnChallengeMessage,
 } from '../head-to-head.js';
+import { CHALLENGE_UNAVAILABLE_MESSAGE } from '../game/head-to-head/poster-access.js';
 import { LAUNCH_TARGET_KEY } from '../game/modes/launch-target.js';
+
+vi.mock('@devvit/web/client', () => ({
+    requestExpandedMode: vi.fn(async () => undefined),
+}));
 
 afterEach(() => {
     vi.useRealTimers();
@@ -24,25 +28,39 @@ const PLAYABLE_POST = {
     postType: 'head-to-head',
     challengeId: 'challenge-1',
     challengerUsername: 'RaceFan',
+    challengerUserId: 't2_racefan',
     challengerAvatarUrl: 'https://i.redd.it/avatar.png',
     trackKey: 'numberThree',
     lapCount: 2,
     targetTimeMs: 25_640,
 };
 
+function accessRoot(postData = PLAYABLE_POST, context = {}) {
+    return { devvit: { context: { postData, ...context } } };
+}
+
 describe('head-to-head custom-post preview', () => {
-    it('ships an enabled Accept Challenge CTA', () => {
+    it('ships an enabled Accept Challenge CTA from the early accept entry', () => {
         const html = readFileSync(new URL('../head-to-head.html', import.meta.url), 'utf8');
+        expect(html).toMatch(
+            /<script type="module" src="head-to-head-accept\.js"><\/script>/,
+        );
+        expect(html).not.toMatch(/src="head-to-head\.js"/);
         expect(html).toMatch(
             /<button id="accept-challenge" type="button">Accept Challenge<\/button>/,
         );
         expect(html).not.toMatch(/Checking Challenge/);
+        const accept = readFileSync(new URL('../head-to-head-accept.js', import.meta.url), 'utf8');
+        expect(accept).toMatch(/import\('\.\/head-to-head\.js'\)/);
     });
 
     it('does not fetch challenge access or player bootstrap from the poster', () => {
-        const source = readFileSync(new URL('../head-to-head.js', import.meta.url), 'utf8');
-        expect(source).not.toMatch(/\/api\/head-to-head/);
-        expect(source).not.toMatch(/\/api\/player\/bootstrap/);
+        const files = ['head-to-head.js', 'head-to-head-accept.js', 'game/head-to-head/poster-access.js'];
+        for (const file of files) {
+            const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+            expect(source, file).not.toMatch(/\/api\/head-to-head/);
+            expect(source, file).not.toMatch(/\/api\/player\/bootstrap/);
+        }
     });
 
     it('reads only the dedicated immutable post type', () => {
@@ -149,45 +167,68 @@ describe('head-to-head custom-post preview', () => {
     });
 
     it('enables Accept from post data without a server check', () => {
-        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {})).toMatchObject({
+        expect(resolveHeadToHeadPosterAccess(accessRoot())).toMatchObject({
             signedIn: false,
             canRace: true,
             ownChallenge: false,
         });
     });
 
-    it('treats a matching client username as the poster\'s own challenge', () => {
-        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
-            devvit: { context: { username: 'RaceFan' } },
-        })).toMatchObject({
+    it('treats a matching stored account ID as the poster\'s own challenge', () => {
+        expect(resolveHeadToHeadPosterAccess(accessRoot(PLAYABLE_POST, {
+            userId: 't2_racefan',
+            username: 'SomeoneElse',
+        }))).toMatchObject({
             signedIn: true,
             canRace: false,
             ownChallenge: true,
         });
-        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
-            devvit: { context: { username: '  racefan  ' } },
-        })).toMatchObject({
+    });
+
+    it('falls back to postAuthorId when the post carries no account ID', () => {
+        const { challengerUserId: _ignored, ...legacy } = PLAYABLE_POST;
+        expect(resolveHeadToHeadPosterAccess(accessRoot(legacy, {
+            userId: 't2_racefan',
+            postAuthorId: 't2_racefan',
+        }))).toMatchObject({
             ownChallenge: true,
+        });
+        expect(resolveHeadToHeadPosterAccess(accessRoot(legacy, {
+            userId: 't2_racefan',
+        }))).toMatchObject({
+            ownChallenge: false,
+            canRace: true,
         });
     });
 
-    it('keeps Accept live when client username is missing', () => {
-        expect(resolveHeadToHeadPosterAccess(PLAYABLE_POST, {
-            devvit: { context: {} },
-        })).toMatchObject({
+    it('does not treat a matching name as own-post', () => {
+        expect(resolveHeadToHeadPosterAccess(accessRoot(PLAYABLE_POST, {
+            username: 'RaceFan',
+        }))).toMatchObject({
+            signedIn: false,
+            canRace: true,
+            ownChallenge: false,
+        });
+    });
+
+    it('keeps Accept live when the viewer ID is missing', () => {
+        expect(resolveHeadToHeadPosterAccess(accessRoot(PLAYABLE_POST, {
+            username: 'RaceFan',
+        }))).toMatchObject({
             canRace: true,
             ownChallenge: false,
         });
     });
 
     it('disables Accept when the post has no challenge id', () => {
-        expect(resolveHeadToHeadPosterAccess({ postType: 'head-to-head' }, {
-            devvit: { context: { username: 'RaceFan' } },
-        })).toMatchObject({
+        expect(resolveHeadToHeadPosterAccess(accessRoot(
+            { postType: 'head-to-head' },
+            { userId: 't2_racefan' },
+        ))).toMatchObject({
             canRace: false,
             ownChallenge: false,
         });
-        expect(resolveHeadToHeadPosterAccess(null, {})).toMatchObject({
+        expect(resolveHeadToHeadPosterAccess({})).toMatchObject({
             canRace: false,
             ownChallenge: false,
         });
@@ -204,14 +245,11 @@ describe('head-to-head custom-post preview', () => {
         expect(button).toEqual({ disabled: false, textContent: 'Accept Challenge' });
         expect(message.textContent).toBe('');
 
-        applyHeadToHeadAccessState(button, message, {
-            signedIn: false,
-            canRace: false,
-            ownChallenge: false,
-            body: { error: 'This challenge is unavailable.' },
-        });
+        applyHeadToHeadAccessState(button, message, resolveHeadToHeadPosterAccess(
+            accessRoot({ postType: 'head-to-head' }),
+        ));
         expect(button).toEqual({ disabled: true, textContent: 'Challenge Unavailable' });
-        expect(message.textContent).toBe('This challenge is unavailable.');
+        expect(message.textContent).toBe(CHALLENGE_UNAVAILABLE_MESSAGE);
     });
 
     it('labels own challenge button as Open Mini Racer', () => {
@@ -224,43 +262,6 @@ describe('head-to-head custom-post preview', () => {
         });
         expect(button).toEqual({ disabled: false, textContent: 'Open Mini Racer' });
         expect(message.textContent).toBe(OWN_CHALLENGE_MESSAGE);
-    });
-
-    it('shows an own-challenge overlay and opens Mini Racer lobby on OK', async () => {
-        const appended = [];
-        const okButton = {
-            textContent: '',
-            focus: vi.fn(),
-            addEventListener: vi.fn((type, handler) => {
-                okButton._handler = handler;
-            }),
-            className: '',
-            type: '',
-        };
-        const messageEl = { textContent: '', className: '' };
-        const overlay = {
-            id: '',
-            className: '',
-            setAttribute: vi.fn(),
-            append: vi.fn(),
-        };
-        const documentRef = {
-            getElementById: vi.fn(() => null),
-            createElement: vi.fn((tag) => {
-                if (tag === 'div') return overlay;
-                if (tag === 'p') return messageEl;
-                return okButton;
-            }),
-            body: {
-                append: (node) => appended.push(node),
-            },
-        };
-        const openLobby = vi.fn(async () => undefined);
-        showOwnChallengeMessage(documentRef, openLobby);
-        expect(messageEl.textContent).toBe(OWN_CHALLENGE_MESSAGE);
-        expect(appended).toContain(overlay);
-        await okButton._handler({ type: 'click' });
-        expect(openLobby).toHaveBeenCalledTimes(1);
     });
 
     it('stores a home launch target when redirecting from an own challenge to Mini Racer lobby', async () => {

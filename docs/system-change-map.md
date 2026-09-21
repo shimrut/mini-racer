@@ -414,8 +414,14 @@ flowchart LR
   context only as a validated `t3_` post ID before re-reading the Reddit post.
   The challenger cannot accept or submit against their own post (`own_challenge`).
   The in-feed card paints from post data and client context (no Redis, no
-  `/api/head-to-head`); a matching `username` shows Open Mini Racer and opens
-  the lobby via a stored launch target that overrides challenge post data.
+  `/api/head-to-head`). `head-to-head-accept.js` is the HTML entry: it owns the
+  Accept tap before the track graph loads and writes Open Mini Racer /
+  unavailable from that same local decision. The rest of the card loads after. Own-post is the viewer's `userId` against
+  `postData.challengerUserId`, with an experimental `postAuthorId` fallback
+  when the stored ID is absent (empty on the unsigned web-view path). The
+  Reddit username still labels the viewer's seat and does not decide access.
+  Matching own-post opens the lobby via a stored launch target that overrides
+  challenge post data.
   The expanded game loads the ghost and enforces own-challenge and
   availability.   The duel
   verdict remains session-only even when its source run improves the ordinary
@@ -458,8 +464,9 @@ flowchart LR
   name, and its time stacked, matching checkpoint splits.
 - `head-to-head.html` is the dedicated in-feed Head to Head custom-post
   entrypoint. Public post data includes the immutable race target, replay hash,
-  and frozen challenger Reddit avatar URL (no ghost or player ID in public post
-  data). The human-readable text fallback is followed by the complete
+  and frozen challenger Reddit avatar URL (no ghost or Mini Racer player ID in
+  public post data). New posts also carry the challenger's Reddit account ID
+  for the in-feed own-post check. The human-readable text fallback is followed by the complete
   machine replay payload so old Reddit/third-party surfaces can still carry the
   challenge. The Accept card bootstraps a guest identity when needed, rotates
   once when a stored guest token is stale, and treats a validated ready post as

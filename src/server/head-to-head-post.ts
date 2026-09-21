@@ -77,6 +77,9 @@ function postDataProblem(value: unknown, challengeId: string): string | null {
             || (value.campaignId === CAMPAIGN_ID && isHeadToHeadRaceId(value.raceId))
         )],
         ['challengerUsername', typeof value.challengerUsername === 'string' && Boolean(value.challengerUsername)],
+        ['challengerUserId', value.challengerUserId === undefined || (
+            typeof value.challengerUserId === 'string' && value.challengerUserId.startsWith('t2_')
+        )],
         ['challengerAvatarUrl', value.challengerAvatarUrl === null || typeof value.challengerAvatarUrl === 'string'],
         ['trackKey', typeof value.trackKey === 'string' && Boolean(value.trackKey)],
         ['lapCount', value.lapCount === 1 || value.lapCount === 2 || value.lapCount === 3],

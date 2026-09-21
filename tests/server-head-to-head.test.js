@@ -112,6 +112,7 @@ const {
 } = await import('../src/server/guest-retirement.ts');
 const context = {
     username: 'RaceFan',
+    userId: 't2_racefan',
     subredditName: 'MiniRacer',
     appSlug: 'mini-racer',
     postId: 't3_challenge1',
@@ -213,6 +214,7 @@ describe('head-to-head service', () => {
         expect(preview.body.preview).not.toHaveProperty('ghost');
         expect(preview.body.preview).not.toHaveProperty('sourceId');
         expect(preview.body.preview.challengerAvatarUrl).toBe('https://i.redd.it/RaceFan.png');
+        expect(preview.body.preview.challengerUserId).toBe('t2_racefan');
         const previewKey = `miniracer:head-to-head:preview:${preview.body.challengeToken}`;
         expect(redis.set).toHaveBeenCalledWith(
             previewKey,
@@ -240,6 +242,7 @@ describe('head-to-head service', () => {
                 postType: 'head-to-head',
                 targetTimeMs: 25_640,
                 challengerUsername: 'RaceFan',
+                challengerUserId: 't2_racefan',
                 challengerAvatarUrl: 'https://i.redd.it/RaceFan.png',
             }),
         }));
@@ -472,6 +475,27 @@ describe('head-to-head service', () => {
             ok: false,
             reason: 'post_data_invalid',
             detail: 'fetched medal:string:"platinum"; request missing',
+        });
+    });
+
+    it('accepts a challenge post that has no challenger account ID and rejects a non-account ID', async () => {
+        const service = makeService();
+        const created = await createChallenge(service);
+        const post = activePosts.get('t3_challenge1');
+        const postData = await post.getPostData();
+
+        post.getPostData = vi.fn(async () => {
+            const { challengerUserId: _ignored, ...rest } = postData;
+            return rest;
+        });
+        expect(await resolveHeadToHeadRecordResult(created.body.challengeId, context))
+            .toMatchObject({ ok: true });
+
+        post.getPostData = vi.fn(async () => ({ ...postData, challengerUserId: 'RaceFan' }));
+        expect(await resolveHeadToHeadRecordResult(created.body.challengeId, context)).toEqual({
+            ok: false,
+            reason: 'post_data_invalid',
+            detail: 'fetched challengerUserId:string; request missing',
         });
     });
 

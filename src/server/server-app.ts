@@ -24,6 +24,7 @@ import {
     getRequestRateLimitIdentity,
     getRequestAppSlug,
     getRequestUsername,
+    getRequestUserId,
     readContextPostId,
     readContextPostData,
     readContextSubredditName,
@@ -139,6 +140,7 @@ function registerProductionRoutes(app: express.Application): void {
     registerHeadToHeadRoutes(app, {
         getHeadToHeadRequestContext: () => ({
             username: getRequestUsername(),
+            userId: getRequestUserId(),
             subredditName: readContextSubredditName(),
             appSlug: getRequestAppSlug(),
             postId: readContextPostId(),

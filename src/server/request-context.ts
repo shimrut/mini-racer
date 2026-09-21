@@ -7,6 +7,11 @@ export function getRequestUsername(): string | null {
         : null;
 }
 
+export function getRequestUserId(): string | null {
+    const id = typeof context.userId === 'string' ? context.userId.trim() : '';
+    return id.startsWith('t2_') ? id : null;
+}
+
 export function getRequestRateLimitIdentity(): string | null {
     return createRequestRateLimitIdentity({
         loid: context.loid,
