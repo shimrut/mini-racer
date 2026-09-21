@@ -414,6 +414,15 @@ describe('server route contracts', () => {
             pageOffset: 75,
             pageLimit: 25,
         });
+        expect(getServerDailyGpSnapshot).toHaveBeenLastCalledWith({
+            challengeId: activeChallenge.id,
+            loadedChallenge: activeChallenge,
+            playerId: undefined,
+            guestToken: undefined,
+            redditUsername: 'RaceFan',
+            limit: 25,
+            offset: 75,
+        });
     });
 
     it('preserves share service statuses and request context', async () => {

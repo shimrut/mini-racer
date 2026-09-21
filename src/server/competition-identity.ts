@@ -26,6 +26,11 @@ export type ResolvedPlayerIdentity = {
     guestPlayerId: string | null;
     guestToken: string | null;
     guestStatus?: GuestIdentityStatus;
+    /**
+     * Whether this guest's transfer flag is set. Absent means this request has not read it.
+     * The status above is not a substitute: a promoted guest can be pending while the flag is false.
+     */
+    guestSelectionPending?: boolean;
 };
 
 const MAX_CAR_SKIN_LENGTH = 160;
@@ -337,13 +342,14 @@ export async function resolveAuthorizedPlayerIdentity({
 
         const canonicalPlayerId = `guest:${verifiedGuestPlayerId}`;
         // A promoted guest's credential is spent: honouring it would write this browser's races into the account it was merged into.
-        const { status } = await resolveGuestIdentityStatus(canonicalPlayerId);
+        const { status, selectionPending } = await resolveGuestIdentityStatus(canonicalPlayerId);
         if (status === 'guest_identity_retired') {
             return {
                 canonicalPlayerId: null,
                 guestPlayerId: null,
                 guestToken: null,
                 guestStatus: status,
+                guestSelectionPending: selectionPending,
             };
         }
 
@@ -352,6 +358,7 @@ export async function resolveAuthorizedPlayerIdentity({
             guestPlayerId: verifiedGuestPlayerId,
             guestToken: normalizedGuestToken,
             guestStatus: status,
+            guestSelectionPending: selectionPending,
         };
     }
 
@@ -555,8 +562,18 @@ export async function upsertPlayerProfile({
 }
 
 /**
+ * What a profile read already found. `profile: null` means a value is stored and does not parse,
+ * which shows the constructed name. Missing means this call did not keep a body to reuse.
+ */
+export type LoadedPlayerProfile = {
+    profile: DailyGpPlayerProfile | null;
+};
+
+/**
  * A read path has no new identity to store. It creates the profile if it is missing and otherwise
  * leaves it alone, so parallel reads never race each other on the one profile key.
+ * A stored body is returned so the caller does not read the same key again. A create is not:
+ * the copy in hand loses when another request wins the create.
  */
 export async function ensurePlayerProfileExists({
     playerId,
@@ -566,9 +583,12 @@ export async function ensurePlayerProfileExists({
     playerId: string;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
-}): Promise<void> {
+}): Promise<LoadedPlayerProfile | undefined> {
     const profileKey = createRedisPlayerProfileKey(playerId);
-    if (await redis.get(profileKey)) return;
+    const rawProfile = await redis.get(profileKey);
+    if (rawProfile) {
+        return { profile: parseStoredPlayerProfile(rawProfile) };
+    }
     await redis.set(
         profileKey,
         JSON.stringify(buildPlayerProfile({
@@ -580,6 +600,7 @@ export async function ensurePlayerProfileExists({
         })),
         { nx: true, ...createPlayerProfileExpiration(playerId) },
     );
+    return undefined;
 }
 
 export async function readPlayerProfileMap(playerIds: string[]): Promise<Map<string, DailyGpPlayerProfile>> {

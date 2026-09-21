@@ -130,8 +130,8 @@ import {
     guestProgressTransferIndexKey,
     guestProgressSelectionPendingKey,
     isGuestProgressSelectionPending,
+    resolveGuestIdentityStatus,
     isPlayerProgressSelectionPending,
-    isRetiredGuestPlayerId,
 } from './guest-retirement.js';
 import {
     competitionSubmissionLockKey,
@@ -3242,12 +3242,17 @@ export async function getServerPlayerBootstrap({
     let guestJoinedAccount = false;
 
     // Claiming or adopting a retired guest id would resurrect a credential whose progress already moved to an account.
-    const retiredGuestId = !identity.canonicalPlayerId
+    // That check already reads the transfer flag. Keep the answer: the flag has no expiry, so a later claim of the same id still needs it, and reading it again would repeat the call.
+    const bareGuestId = !identity.canonicalPlayerId
         && !safeRequestRedditUsername
         && typeof playerId === 'string'
         && playerId.trim()
-        ? await isRetiredGuestPlayerId(`guest:${playerId.trim()}`)
-        : false;
+        ? `guest:${playerId.trim()}`
+        : null;
+    const bareGuestStatus = bareGuestId
+        ? await resolveGuestIdentityStatus(bareGuestId)
+        : null;
+    const retiredGuestId = bareGuestStatus?.status === 'guest_identity_retired';
     retireGuestIdentity ||= retiredGuestId;
 
     // A player id with no token is either a first visit or a guest whose token was lost: claiming covers the first, adopting the second.
@@ -3261,6 +3266,7 @@ export async function getServerPlayerBootstrap({
                 canonicalPlayerId: claimedGuest.canonicalPlayerId,
                 guestPlayerId: claimedGuest.guestPlayerId,
                 guestToken: claimedGuest.guestToken,
+                guestSelectionPending: bareGuestStatus?.selectionPending,
             };
             profile = claimedGuest.profile;
         } else {
@@ -3270,6 +3276,7 @@ export async function getServerPlayerBootstrap({
                     canonicalPlayerId: adoptedGuest.canonicalPlayerId,
                     guestPlayerId: adoptedGuest.guestPlayerId,
                     guestToken: adoptedGuest.guestToken,
+                    guestSelectionPending: bareGuestStatus?.selectionPending,
                 };
                 previousProfile = adoptedGuest.profile;
             }
@@ -3396,7 +3403,9 @@ export async function getServerPlayerBootstrap({
     // is a marker whose chooser was never answered. Only a guest has to be asked.
     const backfillBlockedByTransfer = identity.canonicalPlayerId.startsWith('reddit:')
         ? Boolean(accountTransfer) && accountTransfer.state !== 'completed'
-        : await isGuestProgressSelectionPending(identity.canonicalPlayerId);
+        : identity.guestSelectionPending ?? await isGuestProgressSelectionPending(
+            identity.canonicalPlayerId,
+        );
     const carUnlocks = await readPlayerCarUnlocks(
         identity.canonicalPlayerId,
         profile.hasAnyData,
@@ -3536,8 +3545,17 @@ export async function updateServerPlayerIdentity({
     };
 }
 
+function playableLoadedChallenge(
+    loaded: DailyGpChallenge | null | undefined,
+    requestedId: string | null,
+): DailyGpChallenge | null {
+    if (!loaded || !requestedId || loaded.id !== requestedId) return null;
+    return isDailyGpChallengePlayable(loaded) ? loaded : null;
+}
+
 export async function getServerDailyGpSnapshot({
     challengeId,
+    loadedChallenge,
     playerId,
     leaderboardIdentity,
     redditUsername,
@@ -3546,6 +3564,7 @@ export async function getServerDailyGpSnapshot({
     offset = 0,
 }: {
     challengeId?: string | null;
+    loadedChallenge?: DailyGpChallenge | null;
     playerId?: string | null;
     leaderboardIdentity?: unknown;
     redditUsername?: unknown;
@@ -3553,12 +3572,22 @@ export async function getServerDailyGpSnapshot({
     limit?: unknown;
     offset?: unknown;
 } = {}): Promise<SnapshotPayload> {
-    const activeChallenge = await getServerDailyGpChallenge();
-    const challenge = challengeId
-        ? await getServerDailyGpPlayableChallenge(challengeId)
-        : activeChallenge;
+    const requestedId = typeof challengeId === 'string' && challengeId ? challengeId : null;
+    const loaded = playableLoadedChallenge(loadedChallenge, requestedId);
+    let challenge: DailyGpChallenge | null = loaded;
+    if (!challenge && requestedId === getTodayChallengeId()) {
+        const activeChallenge = await getServerDailyGpChallenge();
+        if (!isDailyGpChallengePlayable(activeChallenge)) {
+            return createEmptyDailySnapshot(activeChallenge);
+        }
+        challenge = activeChallenge;
+    } else if (!challenge && requestedId) {
+        challenge = await getServerDailyGpPlayableChallenge(requestedId);
+    } else if (!challenge) {
+        challenge = await getServerDailyGpChallenge();
+    }
     if (!challenge) {
-        return createEmptyDailySnapshot(activeChallenge);
+        return createEmptyDailySnapshot(await getServerDailyGpChallenge());
     }
 
     const identity = await resolveAuthorizedPlayerIdentity({
@@ -3570,10 +3599,17 @@ export async function getServerDailyGpSnapshot({
     if (normalizedPlayerId) {
         // Standings carry no name or settings to store. Stamping the profile here only made every
         // parallel snapshot fetch collide on the one key.
-        await ensurePlayerProfileExists({
+        const loadedProfile = await ensurePlayerProfileExists({
             playerId: normalizedPlayerId,
             leaderboardIdentity,
             redditUsername,
+        });
+        return readSnapshot({
+            competition: toDailyCompetition(challenge),
+            playerId: normalizedPlayerId,
+            limit: normalizeLimit(limit),
+            offset: normalizeOffset(offset),
+            loadedProfile,
         });
     }
 

@@ -8,7 +8,7 @@ import {
     type DailyGpPlayerProfile,
 } from './daily-gp-model.js';
 import { createSharedStandingsCacheKey, type Competition } from './competition.js';
-import { readPlayerProfileMap } from './competition-identity.js';
+import { readPlayerProfileMap, type LoadedPlayerProfile } from './competition-identity.js';
 import { getPlayerTrackPbRecords } from './pb-ghost-store.js';
 import { normalizeCheckpointTimesSec } from '../../game/shared/checkpoint-times.js';
 import { resolveLeaderboardDisplayName } from '../../game/shared/leaderboard-identity.js';
@@ -443,11 +443,14 @@ export async function readSnapshot({
     playerId,
     limit,
     offset,
+    loadedProfile,
 }: {
     competition: Competition;
     playerId: string | null;
     limit: number;
     offset: number;
+    /** Set when this request already loaded the viewer's profile. Omit it to read the name here. */
+    loadedProfile?: LoadedPlayerProfile;
 }): Promise<SnapshotPayload> {
     const sharedPage = await readSharedStandingsPage(competition, offset, limit);
     const { leaderboardEntryCount } = sharedPage;
@@ -465,7 +468,9 @@ export async function readSnapshot({
     if (playerId && playerRank) {
         const storedEntry = await readEntryByPlayerId(competition, playerId);
         if (storedEntry) {
-            const profileMap = await readPlayerProfileMap([playerId]);
+            const profileMap = loadedProfile
+                ? new Map(loadedProfile.profile ? [[playerId, loadedProfile.profile]] : [])
+                : await readPlayerProfileMap([playerId]);
             currentPlayerRow = toSnapshotRow(storedEntry, playerRank, playerId, profileMap);
             currentPlayerRow.isCurrentPlayer = true;
         }

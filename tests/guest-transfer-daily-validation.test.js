@@ -24,6 +24,7 @@ const {
   carUnlockHashKey,
 } = await import("../src/server/car-unlock-store.ts");
 const { upsertPlayerProfile } = await import("../src/server/competition-identity.ts");
+const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
 const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
 const {
   guestProgressSelectionAccountPendingKey,
@@ -472,6 +473,105 @@ describe("the bootstrap unlock backfill waits for an open transfer", () => {
 
     expect(await redis.hGet(carUnlockHashKey(redditPlayerId), completedRaceField))
       .toBe("1");
+  });
+
+  async function pendingReadsDuring(guestPlayerId, run) {
+    const pendingKey = guestProgressSelectionPendingKey(guestPlayerId);
+    const reads = [];
+    const get = redis.get.bind(redis);
+    vi.spyOn(redis, "get").mockImplementation(async (key) => {
+      if (key === pendingKey) reads.push(key);
+      return get(key);
+    });
+    await run();
+    return reads.length;
+  }
+
+  it("reads a guest transfer flag once when the token already answered it", async () => {
+    const guestPlayerId = "guest:token-flag";
+    await upsertPlayerProfile({
+      playerId: guestPlayerId,
+      leaderboardIdentity: "constructed",
+      hasAnyData: true,
+    });
+    await redis.set(guestProgressSelectionPendingKey(guestPlayerId), "1");
+    const guestToken = await mintGuestPlayerToken("token-flag");
+
+    const reads = await pendingReadsDuring(guestPlayerId, () => getServerPlayerBootstrap({
+      playerId: "token-flag",
+      guestToken,
+    }));
+
+    expect(reads).toBe(1);
+    expect(await redis.hGet(carUnlockHashKey(guestPlayerId), completedRaceField)).toBeFalsy();
+  });
+
+  it("still repairs a promoted guest whose transfer flag is clear", async () => {
+    const guestPlayerId = "guest:promoted-clear-flag";
+    await upsertPlayerProfile({
+      playerId: guestPlayerId,
+      leaderboardIdentity: "constructed",
+      hasAnyData: true,
+    });
+    await redis.set(
+      `miniracer:car-unlocks:promotion:v1:${createHash("sha256").update(guestPlayerId, "utf8").digest("base64url")}`,
+      "reddit:keeper",
+    );
+    await redis.set(campaignProgressKey(guestPlayerId), "{}");
+    const guestToken = await mintGuestPlayerToken("promoted-clear-flag");
+
+    const reads = await pendingReadsDuring(guestPlayerId, () => getServerPlayerBootstrap({
+      playerId: "promoted-clear-flag",
+      guestToken,
+    }));
+
+    expect(reads).toBe(1);
+    expect(await redis.hGet(carUnlockHashKey("reddit:keeper"), completedRaceField)).toBe("1");
+  });
+
+  it("reads the transfer flag once when claiming an id whose profile is gone", async () => {
+    const guestPlayerId = "guest:claim-flag";
+    await redis.set(guestProgressSelectionPendingKey(guestPlayerId), "1");
+    await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T09:00:00.000Z",
+      resultsByRaceId: {
+        "numbered-v1-00": {
+          raceId: "numbered-v1-00",
+          trackKey: "numberZero",
+          lapCount: 2,
+          rulesRevision: 1,
+          bestTimeMs: 12_000,
+          medal: "gold",
+          checkpointTimesSec: [4.2, 9.8],
+          updatedAt: "2026-09-01T09:30:00.000Z",
+        },
+      },
+    }));
+
+    const reads = await pendingReadsDuring(guestPlayerId, () => getServerPlayerBootstrap({
+      playerId: "claim-flag",
+    }));
+
+    expect(reads).toBe(1);
+    expect(await redis.hGet(carUnlockHashKey(guestPlayerId), completedRaceField)).toBeFalsy();
+  });
+
+  it("reads the transfer flag once when adopting a guest", async () => {
+    const guestPlayerId = "guest:adopt-flag";
+    await upsertPlayerProfile({
+      playerId: guestPlayerId,
+      leaderboardIdentity: "constructed",
+      hasAnyData: true,
+    });
+    await redis.set(guestProgressSelectionPendingKey(guestPlayerId), "1");
+
+    const reads = await pendingReadsDuring(guestPlayerId, () => getServerPlayerBootstrap({
+      playerId: "adopt-flag",
+    }));
+
+    expect(reads).toBe(1);
+    expect(await redis.hGet(carUnlockHashKey(guestPlayerId), completedRaceField)).toBeFalsy();
   });
 });
 

@@ -4241,4 +4241,123 @@ describe('server daily gp store submissions', () => {
             body: { target: { ghost: { finishTimeMs: bestTimeMs } } },
         });
     });
+
+    it('does not read a challenge that this request already has', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const today = await getServerDailyGpChallenge();
+        const past = {
+            ...today,
+            id: 'daily-gp-2024-01-15',
+            challengeDate: '2024-01-15',
+            startsAt: '2024-01-15T00:00:00.000Z',
+            endsAt: '2024-01-16T00:00:00.000Z',
+            availableUntil: '2099-01-01T00:00:00.000Z',
+        };
+        mockRedis.hGet.mockImplementation(async (key, field) => {
+            if (key !== 'dailygp:challenges') return null;
+            if (field === past.id) return JSON.stringify(past);
+            if (field === today.id) return JSON.stringify(today);
+            return null;
+        });
+
+        mockRedis.hGet.mockClear();
+        await getServerDailyGpSnapshot({ challengeId: past.id });
+        expect(mockRedis.hGet.mock.calls
+            .filter(([key]) => key === 'dailygp:challenges')
+            .map(([, field]) => field)).toEqual([past.id]);
+
+        mockRedis.hGet.mockClear();
+        await getServerDailyGpSnapshot({ challengeId: past.id, loadedChallenge: past });
+        expect(mockRedis.hGet.mock.calls.filter(([key]) => key === 'dailygp:challenges')).toEqual([]);
+
+        mockRedis.hGet.mockClear();
+        await getServerDailyGpSnapshot({ challengeId: today.id });
+        expect(mockRedis.hGet.mock.calls
+            .filter(([key]) => key === 'dailygp:challenges')
+            .map(([, field]) => field)).toEqual([today.id]);
+    });
+
+    it('uses the profile already loaded for the viewer name', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        const playerId = 'reddit:seeded-name';
+        seedStoredPlayerProfile(playerId, {
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'Seeded-Name',
+            preferences: null,
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+        });
+        mockRedis.zCard.mockResolvedValue(1);
+        mockRedis.zRank.mockResolvedValue(0);
+        mockRedis.zRange.mockResolvedValue([]);
+        mockRedis.hGet.mockImplementation(async (key, field) => {
+            if (String(key).endsWith(':entries') && field === playerId) {
+                return JSON.stringify({
+                    playerId,
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: 10000,
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                });
+            }
+            return null;
+        });
+        mockRedis.mGet.mockResolvedValue([JSON.stringify({
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'From-Batch',
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+        })]);
+
+        const snapshot = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            loadedChallenge: challenge,
+            redditUsername: 'Seeded-Name',
+        });
+
+        expect(snapshot.currentPlayerRow.displayName).toBe('Seeded-Name');
+        expect(mockRedis.mGet).not.toHaveBeenCalled();
+    });
+
+    it('keeps the constructed name when the stored profile does not parse', async () => {
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const challenge = await getServerDailyGpChallenge();
+        const playerId = 'reddit:seeded-name';
+        storedStrings.set(playerProfileRedisKey(playerId), 'not-json');
+        mockRedis.zCard.mockResolvedValue(1);
+        mockRedis.zRank.mockResolvedValue(0);
+        mockRedis.zRange.mockResolvedValue([]);
+        mockRedis.hGet.mockImplementation(async (key, field) => {
+            if (String(key).endsWith(':entries') && field === playerId) {
+                return JSON.stringify({
+                    playerId,
+                    trackKey: challenge.trackKey,
+                    bestTimeMs: 10000,
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                });
+            }
+            return null;
+        });
+        mockRedis.mGet.mockResolvedValue([JSON.stringify({
+            playerId,
+            leaderboardIdentity: 'reddit',
+            redditUsername: 'From-Batch',
+            hasSeenGame: true,
+            hasAnyData: true,
+            firstSeenAt: '2026-01-01T00:00:00.000Z',
+        })]);
+
+        const snapshot = await getServerDailyGpSnapshot({
+            challengeId: challenge.id,
+            loadedChallenge: challenge,
+            redditUsername: 'Seeded-Name',
+        });
+
+        expect(snapshot.currentPlayerRow.displayName).not.toBe('From-Batch');
+        expect(mockRedis.mGet).not.toHaveBeenCalled();
+    });
 });

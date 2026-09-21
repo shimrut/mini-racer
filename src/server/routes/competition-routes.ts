@@ -53,6 +53,7 @@ export function registerCompetitionRoutes(
 
             const snapshot = await dependencies.getServerDailyGpSnapshot({
                 challengeId: challenge.id,
+                loadedChallenge: challenge,
                 playerId,
                 guestToken,
                 redditUsername: dependencies.getRequestUsername(),
