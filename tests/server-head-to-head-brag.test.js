@@ -129,19 +129,36 @@ describe('head-to-head brag', () => {
     });
 
     it.each([
-        [1, 'blink', 'This was a close win. 9.999s on Number One 😅'],
-        [100, 'blink', 'This was a close win. 9.900s on Number One 😅'],
-        [101, 'chase', 'Comfortable win. 9.899s on Number One 😎'],
-        [500, 'chase', 'Comfortable win. 9.500s on Number One 😎'],
-        [501, 'got_away', 'I smoked you: 9.499s on Number One 🏎️💨'],
-    ])('selects and formats the %s Brag tier at %ims', (differenceMs, expectedTier, expectedCopy) => {
+        [1, 'blink', [
+            '9.999s on Number One. Won by 0.001s. Didn’t think I had it.',
+            'This was a close win. 9.999s on Number One',
+        ]],
+        [100, 'blink', [
+            '9.900s on Number One. Won by 0.100s. Didn’t think I had it.',
+            'This was a close win. 9.900s on Number One',
+        ]],
+        [101, 'chase', [
+            'I beat this challenge. 9.899s on Number One.',
+            '9.899s Good pace on Number One.',
+        ]],
+        [500, 'chase', [
+            'I beat this challenge. 9.500s on Number One.',
+            '9.500s Good pace on Number One.',
+        ]],
+        [501, 'got_away', [
+            'Won it. Easier than expected. 9.499s on Number One.',
+            'Got a great time on Number One - 9.499s.',
+        ]],
+    ])('selects and formats the %s Brag tier at %ims', (differenceMs, expectedTier, lines) => {
         expect(challengeBragTier(differenceMs)).toBe(expectedTier);
-        expect(formatChallengeBragComment(10_000 - differenceMs, 10_000, 'Number One')).toBe(expectedCopy);
+        const bestTimeMs = 10_000 - differenceMs;
+        expect(formatChallengeBragComment(bestTimeMs, 10_000, 'Number One', () => 0)).toBe(lines[0]);
+        expect(formatChallengeBragComment(bestTimeMs, 10_000, 'Number One', () => 1)).toBe(lines[1]);
     });
 
     it('formats a tiered Brag from the verified lead', () => {
-        expect(formatChallengeBragComment(9_478, 9_729, 'Number One')).toBe(
-            'Comfortable win. 9.478s on Number One 😎',
+        expect(formatChallengeBragComment(9_478, 9_729, 'Number One', () => 0)).toBe(
+            'I beat this challenge. 9.478s on Number One.',
         );
     });
 
@@ -200,8 +217,11 @@ describe('head-to-head brag', () => {
         expect(preview.body).toMatchObject({
             status: 'ready',
             username: 'OtherRacer',
-            commentText: 'I smoked you: 9.000s on Number One 🏎️💨',
         });
+        expect([
+            'Won it. Easier than expected. 9.000s on Number One.',
+            'Got a great time on Number One - 9.000s.',
+        ]).toContain(preview.body.commentText);
         expect(typeof preview.body.shareToken).toBe('string');
 
         const confirmed = await confirmHeadToHeadBrag(

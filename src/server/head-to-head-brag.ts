@@ -22,18 +22,39 @@ export function formatChallengeBragComment(
     bestTimeMs: number,
     targetTimeMs: number,
     trackName: string,
+    roll: () => number = Math.random,
 ): string {
     const differenceMs = targetTimeMs - bestTimeMs;
     const tier = challengeBragTier(differenceMs);
     if (!tier) throw new Error('Challenge Brags require a positive millisecond lead.');
     const myTime = formatChallengeResultTime(bestTimeMs);
+    const gap = `${(differenceMs / 1000).toFixed(3)}s`;
+    const lines = challengeBragLines(tier, myTime, gap, trackName);
+    return lines[roll() < 0.5 ? 0 : 1];
+}
+
+function challengeBragLines(
+    tier: ChallengeBragTier,
+    myTime: string,
+    gap: string,
+    trackName: string,
+): readonly [string, string] {
     switch (tier) {
         case 'blink':
-            return `This was a close win. ${myTime} on ${trackName} 😅`;
+            return [
+                `${myTime} on ${trackName}. Won by ${gap}. Didn’t think I had it.`,
+                `This was a close win. ${myTime} on ${trackName}`,
+            ];
         case 'chase':
-            return `Comfortable win. ${myTime} on ${trackName} 😎`;
+            return [
+                `I beat this challenge. ${myTime} on ${trackName}.`,
+                `${myTime} Good pace on ${trackName}.`,
+            ];
         case 'got_away':
-            return `I smoked you: ${myTime} on ${trackName} 🏎️💨`;
+            return [
+                `Won it. Easier than expected. ${myTime} on ${trackName}.`,
+                `Got a great time on ${trackName} - ${myTime}.`,
+            ];
     }
 }
 

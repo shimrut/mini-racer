@@ -126,14 +126,34 @@ describe('head-to-head comments', () => {
     });
 
     it.each([
-        [0, 'I tried so hard and all I got was a tie 🙄'],
-        [1, '10.001s. Can’t believe I lost by 0.001s😤'],
-        [100, '10.100s. Can’t believe I lost by 0.100s😤'],
-        [101, '10.101s. Definitely not my best run 😬'],
-        [500, '10.500s. Definitely not my best run 😬'],
-        [501, '10.501s - I have some improvements to do 😓'],
-    ])('formats the Comment copy at %ims', (differenceMs, expected) => {
-        expect(formatChallengeComment(10_000 + differenceMs, differenceMs)).toBe(expected);
+        [0, [
+            '10.000s. Same time. That’s worse than losing.',
+            'I tried so hard and all I got was a tie.',
+        ]],
+        [1, [
+            '10.001s. Lost by 0.001s on Number One. I was sure I had this.',
+            '10.001s on Number One. Can’t believe I lost by 0.001s.',
+        ]],
+        [100, [
+            '10.100s. Lost by 0.100s on Number One. I was sure I had this.',
+            '10.100s on Number One. Can’t believe I lost by 0.100s.',
+        ]],
+        [101, [
+            '10.101s. Not enough pace on Number One.',
+            'Definitely not my best run on Number One - 10.101s.',
+        ]],
+        [500, [
+            '10.500s. Not enough pace on Number One.',
+            'Definitely not my best run on Number One - 10.500s.',
+        ]],
+        [501, [
+            '10.501s. I have some improvements to do on Number One.',
+            'Need more practice on Number One - 10.501s.',
+        ]],
+    ])('picks one of the two Comment lines at %ims', (differenceMs, lines) => {
+        const reportedTimeMs = 10_000 + differenceMs;
+        expect(formatChallengeComment(reportedTimeMs, differenceMs, 'Number One', () => 0)).toBe(lines[0]);
+        expect(formatChallengeComment(reportedTimeMs, differenceMs, 'Number One', () => 1)).toBe(lines[1]);
     });
 
     it('previews and confirms a self-reported loss as text', async () => {
@@ -145,10 +165,11 @@ describe('head-to-head comments', () => {
             context,
         );
         expect(preview.status).toBe(200);
-        expect(preview.body).toMatchObject({
-            status: 'ready',
-            commentText: '10.011s. Can’t believe I lost by 0.011s😤',
-        });
+        expect(preview.body).toMatchObject({ status: 'ready' });
+        expect([
+            '10.011s. Lost by 0.011s on Number One. I was sure I had this.',
+            '10.011s on Number One. Can’t believe I lost by 0.011s.',
+        ]).toContain(preview.body.commentText);
 
         const confirmed = await confirmHeadToHeadComment(
             {
@@ -161,7 +182,7 @@ describe('head-to-head comments', () => {
         expect(reddit.submitComment).toHaveBeenCalledWith(expect.objectContaining({
             id: challenge.postId,
             runAs: 'USER',
-            text: '10.011s. Can’t believe I lost by 0.011s😤',
+            text: preview.body.commentText,
         }));
     });
 
@@ -188,7 +209,7 @@ describe('head-to-head comments', () => {
         expect(repeat.body).toEqual({
             status: 'already_commented',
             username: 'OtherRacer',
-            commentText: 'I tried so hard and all I got was a tie 🙄',
+            commentText: first.body.commentText,
             commentUrl: 'https://reddit.com/r/miniracer/challenge1/comment1',
         });
         expect(reddit.submitComment).toHaveBeenCalledTimes(1);
@@ -214,7 +235,7 @@ describe('head-to-head comments', () => {
         expect(confirmed.status).toBe(200);
         expect(confirmed.body.status).toBe('commented');
         expect(reddit.submitComment).toHaveBeenCalledWith(expect.objectContaining({
-            text: 'I tried so hard and all I got was a tie 🙄',
+            text: preview.body.commentText,
         }));
     });
 

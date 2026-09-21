@@ -3,6 +3,7 @@ import type {
     HeadToHeadRequestContext,
     HeadToHeadServiceResult,
 } from './head-to-head-service.js';
+import { getTrackName } from '../../game/track/catalog.js';
 import {
     HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS,
     headToHeadShareResultKey,
@@ -33,24 +34,47 @@ export function challengeCommentTier(differenceMs: number): ChallengeCommentTier
 export function formatChallengeComment(
     reportedTimeMs: number,
     differenceMs: number,
+    trackName: string,
+    roll: () => number = Math.random,
 ): string {
     if (!Number.isSafeInteger(reportedTimeMs) || reportedTimeMs <= 0) {
         throw new Error('Challenge comments require a positive reported time.');
     }
     const tier = challengeCommentTier(differenceMs);
     if (!tier) throw new Error('Challenge comments require a non-negative millisecond difference.');
-    if (tier === 'tie') {
-        return 'I tried so hard and all I got was a tie 🙄';
-    }
-    const gap = `${(differenceMs / 1000).toFixed(3)}s`;
     const myTime = formatChallengeResultTime(reportedTimeMs);
+    const gap = `${(differenceMs / 1000).toFixed(3)}s`;
+    const lines = challengeCommentLines(tier, myTime, gap, trackName);
+    return lines[roll() < 0.5 ? 0 : 1];
+}
+
+function challengeCommentLines(
+    tier: ChallengeCommentTier,
+    myTime: string,
+    gap: string,
+    trackName: string,
+): readonly [string, string] {
     switch (tier) {
+        case 'tie':
+            return [
+                `${myTime}. Same time. That’s worse than losing.`,
+                'I tried so hard and all I got was a tie.',
+            ];
         case 'blink':
-            return `${myTime}. Can’t believe I lost by ${gap}😤`;
+            return [
+                `${myTime}. Lost by ${gap} on ${trackName}. I was sure I had this.`,
+                `${myTime} on ${trackName}. Can’t believe I lost by ${gap}.`,
+            ];
         case 'chase':
-            return `${myTime}. Definitely not my best run 😬`;
+            return [
+                `${myTime}. Not enough pace on ${trackName}.`,
+                `Definitely not my best run on ${trackName} - ${myTime}.`,
+            ];
         case 'got_away':
-            return `${myTime} - I have some improvements to do 😓`;
+            return [
+                `${myTime}. I have some improvements to do on ${trackName}.`,
+                `Need more practice on ${trackName} - ${myTime}.`,
+            ];
     }
 }
 
@@ -92,7 +116,11 @@ export async function previewHeadToHeadComment(
             body: { status: 'win_uses_brag', error: 'Faster finishes use the Brag action.' },
         };
     }
-    const commentText = formatChallengeComment(reportedTimeMs, differenceMs);
+    const commentText = formatChallengeComment(
+        reportedTimeMs,
+        differenceMs,
+        getTrackName(challenge.trackKey, challenge.trackKey),
+    );
     const resultKey = headToHeadShareResultKey({
         action: 'comment',
         challengeId,
