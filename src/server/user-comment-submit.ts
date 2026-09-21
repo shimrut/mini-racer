@@ -266,9 +266,21 @@ export async function submitUserComment({
         const comment = await reddit.submitComment({ id: parentId ?? postId, text, runAs: 'USER' });
         const authorName = typeof comment?.authorName === 'string' ? comment.authorName : '';
         if (authorName.trim() && !sameAuthor(authorName, username)) {
-            await (comment as { delete?: () => Promise<void> }).delete?.().catch((error: unknown) => {
-                console.error('A comment posted under another name could not be removed:', error);
-            });
+            const remove = (comment as { delete?: () => Promise<void> }).delete;
+            if (typeof remove === 'function') {
+                try {
+                    await remove.call(comment);
+                    await redis.del(record.key).catch((error: unknown) => {
+                        console.error('A refused comment could not clear its record:', error);
+                    });
+                    return {
+                        status: 'posted_without_link',
+                        record: { ...claim, authorName },
+                    };
+                } catch (error) {
+                    console.error('A comment posted under another name could not be removed:', error);
+                }
+            }
         }
         return publicationOutcome(await recordPublication({
             key: record.key,
