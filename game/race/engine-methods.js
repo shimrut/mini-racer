@@ -33,8 +33,7 @@ const COMPARISON_TIE_EPSILON_SEC = 0.005;
 // Same cap already used on per-frame dt. Catch up this much, and only refuse
 // ranking when a hitch is longer than we are willing to simulate.
 export const MAX_SIMULATED_FRAME_DT = 0.1;
-export const RANKED_RUN_STALL_MESSAGE =
-  "This lap lagged, so it didn't go to Standings. Race again.";
+export const RANKED_RUN_STALL_MESSAGE = "Rank disabled due to frame stalls";
 
 function finitePositive(value) {
   const number = Number(value);

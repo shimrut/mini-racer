@@ -1,3 +1,5 @@
+- A lap that froze too long now says “Rank disabled due to frame stalls.”
+
 - Head to Head posts use the `Challenge` flair. The app was looking for
   `Challenges`, so it would not find the template on the community.
 
