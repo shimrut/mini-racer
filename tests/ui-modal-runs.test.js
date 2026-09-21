@@ -68,7 +68,7 @@ describe('a challenge finish that has spent its comment', () => {
             _bindClickAction: ModalShell.prototype._bindClickAction,
             _offerPostedConcedeNextChallenge: ModalShell.prototype._offerPostedConcedeNextChallenge,
             _bindNextChallengeButton: ModalShell.prototype._bindNextChallengeButton,
-            _hideChallengeMiddleButton: ModalShell.prototype._hideChallengeMiddleButton,
+            _showLockedBragButton: ModalShell.prototype._showLockedBragButton,
             _openNextChallengePost: ModalShell.prototype._openNextChallengePost,
             _startShare: () => {},
             getNextChallenge: null,
@@ -88,8 +88,8 @@ describe('a challenge finish that has spent its comment', () => {
 
     // A posted concession offers Change Track. A spent tie still goes back to the locked Brag.
     it.each([
-        ['posted', 'lost', 'next'],
-        ['unconfirmed', 'lost', 'next'],
+        ['posted', 'lost', 'brag'],
+        ['unconfirmed', 'lost', 'brag'],
         ['posted', 'tie', 'brag'],
         [null, 'lost', 'concede'],
         [null, 'tie', 'tie'],
@@ -105,9 +105,7 @@ describe('a challenge finish that has spent its comment', () => {
             });
             await context._nextChallengeLookup;
 
-            if (expected === 'next') {
-                expect(context.combinedPlaylistBtn.style.display).toBe('none');
-            } else if (expected === 'brag') {
+            if (expected === 'brag') {
                 expect(context.combinedPlaylistBtn.disabled).toBe(true);
                 expect(context.combinedPlaylistBtn.querySelector('.combined-action-btn-label').textContent)
                     .toBe('BRAG');

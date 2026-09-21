@@ -310,6 +310,31 @@ async function readBandCards(subredditName: string, band: EngagementBand): Promi
     });
 }
 
+function adjacentBands(band: EngagementBand): EngagementBand[] {
+    const index = ENGAGEMENT_BANDS.indexOf(band);
+    return [ENGAGEMENT_BANDS[index - 1], ENGAGEMENT_BANDS[index + 1]].filter(
+        (candidate): candidate is EngagementBand => Boolean(candidate),
+    );
+}
+
+function chooseChallenge(
+    cards: HeadToHeadCatalogCard[],
+    excludeChallengeId: string,
+    excludeName: string,
+    currentMs: number,
+): HeadToHeadCatalogCard | null {
+    const candidates = cards
+        .filter((card) => card.challengeId !== excludeChallengeId)
+        .filter((card) => normalizeName(card.challengerUsername) !== excludeName)
+        .sort((left, right) => (
+            left.commentCount - right.commentCount
+            || right.upvoteCount - left.upvoteCount
+        ));
+    if (!candidates.length) return null;
+    const quietest = candidates.filter((card) => sameEngagement(card, candidates[0]));
+    return pickByAge(quietest, currentMs);
+}
+
 function sameEngagement(left: HeadToHeadCatalogCard, right: HeadToHeadCatalogCard): boolean {
     return left.commentCount === right.commentCount && left.upvoteCount === right.upvoteCount;
 }
@@ -363,16 +388,18 @@ export async function pickNextHeadToHeadChallenge({
     if (!band) return null;
     const excludeName = normalizeName(excludeUsername);
     const currentMs = Date.parse(createdAt ?? '');
-    const candidates = (await readBandCards(subredditName, band))
-        .filter((card) => card.challengeId !== excludeChallengeId)
-        .filter((card) => normalizeName(card.challengerUsername) !== excludeName)
-        .sort((left, right) => (
-            left.commentCount - right.commentCount
-            || right.upvoteCount - left.upvoteCount
-        ));
-    if (!candidates.length) return null;
-    const quietest = candidates.filter((card) => sameEngagement(card, candidates[0]));
-    return pickByAge(quietest, Number.isFinite(currentMs) ? currentMs : 0);
+    const ageMs = Number.isFinite(currentMs) ? currentMs : 0;
+    const sameBand = chooseChallenge(
+        await readBandCards(subredditName, band),
+        excludeChallengeId,
+        excludeName,
+        ageMs,
+    );
+    if (sameBand) return sameBand;
+    const neighbors = (await Promise.all(
+        adjacentBands(band).map((candidate) => readBandCards(subredditName, candidate)),
+    )).flat();
+    return chooseChallenge(neighbors, excludeChallengeId, excludeName, ageMs);
 }
 
 function postCreatedMs(post: SweepPost): number | null {

@@ -591,10 +591,12 @@ export class ModalShell {
         this._bindClickAction(button, () => void this._openNextChallengePost(postUrl));
     }
 
-    _hideChallengeMiddleButton(button) {
+    _showLockedBragButton(button) {
         if (!button) return;
-        button.style.display = 'none';
+        button.style.display = '';
         button.disabled = true;
+        this._setShareButtonLabel(button, 'Brag');
+        button.setAttribute('aria-label', 'Brag available after beating this challenge');
         this._bindClickAction(button, null);
     }
 
@@ -618,7 +620,7 @@ export class ModalShell {
             return;
         }
         if (this._nextChallengePostUrl === false) {
-            this._hideChallengeMiddleButton(button);
+            this._showLockedBragButton(button);
             return;
         }
         if (this._nextChallengeLookup) return this._nextChallengeLookup;
@@ -636,7 +638,7 @@ export class ModalShell {
                     : null;
                 if (!postUrl) {
                     this._nextChallengePostUrl = false;
-                    this._hideChallengeMiddleButton(button);
+                    this._showLockedBragButton(button);
                     return;
                 }
                 this._nextChallengePostUrl = postUrl;
@@ -644,7 +646,7 @@ export class ModalShell {
             } catch (error) {
                 console.error('Could not find another challenge:', error);
                 this._nextChallengePostUrl = false;
-                this._hideChallengeMiddleButton(button);
+                this._showLockedBragButton(button);
             }
         })();
         return this._nextChallengeLookup;

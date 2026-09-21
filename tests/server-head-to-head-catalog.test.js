@@ -105,6 +105,7 @@ const OTHER_TRACK_KEY = Object.keys(TRACKS)[1];
 
 function timeInBand(trackKey, band) {
     const thresholds = getRaceMedalThresholds(trackKey, 1);
+    if (band === 'author' && thresholds.author != null) return Math.floor(thresholds.author * 1000);
     if (band === 'gold') return Math.floor(thresholds.gold * 1000);
     if (band === 'silver') return Math.floor(((thresholds.gold + thresholds.silver) / 2) * 1000);
     return Math.floor(thresholds.bronze * 1000) + 1000;
@@ -189,6 +190,39 @@ describe('Head to Head catalog', () => {
 
         expect(picked).toMatchObject({ challengeId: 'quiet' });
         expect(reddit.getPostById).not.toHaveBeenCalled();
+    });
+
+    it('uses the next medal band when the same band is empty', async () => {
+        const current = timeInBand(TRACK_KEY, 'gold');
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'easier',
+            postId: 't3_easier',
+            postUrl: 'https://reddit.com/r/miniracer/easier',
+            challengerUsername: 'Other',
+            targetTimeMs: timeInBand(OTHER_TRACK_KEY, 'silver'),
+            trackKey: OTHER_TRACK_KEY,
+            commentCount: 3,
+        }));
+        await upsertHeadToHeadCatalogCard(card({
+            challengeId: 'harder',
+            postId: 't3_harder',
+            postUrl: 'https://reddit.com/r/miniracer/harder',
+            challengerUsername: 'Other',
+            targetTimeMs: timeInBand(TRACK_KEY, 'author'),
+            commentCount: 0,
+        }));
+
+        const picked = await pickNextHeadToHeadChallenge({
+            subredditName: 'MiniRacer',
+            excludeChallengeId: 'challenge-1',
+            excludeUsername: 'Racer',
+            trackKey: TRACK_KEY,
+            lapCount: 1,
+            targetTimeMs: current,
+            createdAt: '2026-09-10T00:00:00.000Z',
+        });
+
+        expect(picked).toMatchObject({ challengeId: 'harder' });
     });
 
     it('uses more upvotes when the comment count matches', async () => {

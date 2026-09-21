@@ -147,7 +147,7 @@ result is verified (you’ll see VERIFYING first).
 Finish buttons start as **Improve**, **Concede** or **A tie?**, and **Home**.
 **Concede** waits until the third finished loss. After that comment is posted,
 the middle button becomes **Change Track** and opens a different challenge in the same medal band
-when one exists. It prefers the one with the fewest comments, then the most upvotes. A tie keeps its own comment and does not offer Change Track.
+when one exists. If that band is empty, it uses the next band on either side. It prefers the one with the fewest comments, then the most upvotes. If none exists, the greyed-out **Brag** stays. A tie keeps its own comment and does not offer Change Track.
 A win still uses **Brag**, **The Daily**, and **Campaign**.
 
 ### The challenge finish says UNVERIFIED

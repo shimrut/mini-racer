@@ -8,7 +8,8 @@
 - After a posted Head to Head concede, Improve / Change Track / Home replaces
   the spent Concede button. Change Track opens a different challenge in the same
   medal band: fewest comments, then most upvotes, then an older challenge, or a
-  newer one if none is older. A moderator Collect Mini Racer challenges action
+  newer one if none is older. If that band is empty, it checks the next band
+  on either side. If none of those exist, the greyed-out Brag stays. A moderator Collect Mini Racer challenges action
   fills that list from existing Challenge posts, including each post's comment
   count and upvotes, so the tap does not ask Reddit. One click reads as far as
   it can, then you click again until it says the month is covered. New posts are
