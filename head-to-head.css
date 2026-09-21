@@ -42,7 +42,7 @@ body {
     font-family: var(--header-font);
     color: var(--text-color);
     background:
-        radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--glow) 16%, transparent), transparent 38%),
+        radial-gradient(circle at 72% 22%, color-mix(in srgb, var(--glow) 28%, transparent), transparent 46%),
         linear-gradient(145deg, #0f172a, var(--bg-color-darker) 68%);
 }
 
