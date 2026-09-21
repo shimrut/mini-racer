@@ -30,6 +30,7 @@ import {
     campaignEngineMethods,
     normalizeCampaignLeaderboardSnapshot,
 } from '../game/campaign/engine-methods.js';
+import { RANKED_RUN_STALL_MESSAGE } from '../game/race/engine-methods.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import {
     clearCampaignVerification,
@@ -556,8 +557,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('does not queue or score a run blocked by a timing anomaly', () => {
         const context = createCampaignFinishContext({
-            rankedSubmissionBlockedReason:
-                'Leaderboard rank disabled because the run had severe frame stalls.',
+            rankedSubmissionBlockedReason: RANKED_RUN_STALL_MESSAGE,
         });
 
         context.handleCampaignWin({ lapTime: 8.25 });
@@ -568,7 +568,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect.objectContaining({
                 scoreboardSnapshot: expect.objectContaining({
                     verificationState: 'error',
-                    statusText: 'Leaderboard rank disabled because the run had severe frame stalls.',
+                    statusText: RANKED_RUN_STALL_MESSAGE,
                 }),
             }),
             expect.anything(),

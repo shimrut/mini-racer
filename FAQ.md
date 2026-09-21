@@ -25,9 +25,9 @@ Leave the finish screen open for a bit, or come back shortly. Retries usually fi
 
 Very long laps can’t be checked. Aim for a cleaner finish under about **50 seconds**, then try again.
 
-### It says leaderboard rank was disabled because of frame stalls
+### It says this lap lagged, so it didn’t go to Standings
 
-The game hitch badly mid-run (lag, switching apps, locking the phone, low power). That lap is **not** sent for ranking. Keep the race open and the screen awake, then race again.
+The race froze for more than a tenth of a second (switching apps, locking the phone, a hard hitch). That lap is **not** sent for ranking. A smaller stutter is fine. Keep the race open and the screen awake, then race again.
 
 ### I got **RUN REJECTED** after crossing the line
 
@@ -241,7 +241,7 @@ There’s a short launch lock so you don’t rocket off immediately after an aut
 | **GHOST UNAVAILABLE** | Expected PB ghost wasn’t ready at GO |
 | **RUN REJECTED** | Finish failed local checks; not submitted |
 | **Run too long to rank.** | Lap too long for server check (~50s+) |
-| **…severe frame stalls.** | Lag mid-run; ranking disabled for that lap |
+| **This lap lagged, so it didn't go to Standings.** | Freeze mid-run longer than ~0.1s; ranking skipped |
 | **Submitting… / Verifying… / Retrying…** | Rank pipeline in progress |
 | **Rank rejected / Rank error** | That submit didn’t stick |
 | **Leaderboard submission expired.** | Pending check past the day’s deadline |

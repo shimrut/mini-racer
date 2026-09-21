@@ -1,5 +1,10 @@
 # Changelog
 
+- A short hitch no longer voids Standings. The race now catches up a tenth
+  of a second of physics (the same cap it already used) and only skips ranking
+  when a freeze is longer than that. The finish line says the lap lagged
+  instead of “severe frame stalls.”
+
 - Next rival no longer walks everyone ahead on the board. The server asks for
   the ten racers just faster than the player's stored best, checks them as a
   group, and stops after sixty. Improve is still on the finish panel while

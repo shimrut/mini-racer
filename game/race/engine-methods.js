@@ -30,6 +30,11 @@ const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
 const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const COMPARISON_TIE_EPSILON_SEC = 0.005;
+// Same cap already used on per-frame dt. Catch up this much, and only refuse
+// ranking when a hitch is longer than we are willing to simulate.
+export const MAX_SIMULATED_FRAME_DT = 0.1;
+export const RANKED_RUN_STALL_MESSAGE =
+  "This lap lagged, so it didn't go to Standings. Race again.";
 
 function finitePositive(value) {
   const number = Number(value);
@@ -1079,17 +1084,16 @@ export const raceEngineMethods = {
   loop(now) {
     this._frameRequestId = null;
 
-    const rawDt = Math.min((now - this.lastTime) / 1000, 0.1);
+    const rawDt = Math.min((now - this.lastTime) / 1000, MAX_SIMULATED_FRAME_DT);
     const frameTime = now - this.lastTime;
     this.lastTime = now;
 
     const animateFrame = this.shouldAnimateFrame();
     const shouldUpdate = this.status === "playing";
-    const timingAnomalyMessage = "Leaderboard rank disabled because the run had severe frame stalls.";
 
-    if (shouldUpdate && frameTime >= 250) {
+    if (shouldUpdate && frameTime > MAX_SIMULATED_FRAME_DT * 1000) {
       this.runHadTimingAnomaly = true;
-      this.rankedSubmissionBlockedReason = timingAnomalyMessage;
+      this.rankedSubmissionBlockedReason = RANKED_RUN_STALL_MESSAGE;
     }
 
     if (frameTime < 250) {
@@ -1108,7 +1112,10 @@ export const raceEngineMethods = {
     if (shouldUpdate) {
       this.accumulator += rawDt;
       let stepCount = 0;
-      const maxStepsPerFrame = 3;
+      const maxStepsPerFrame = Math.max(
+        1,
+        Math.ceil(MAX_SIMULATED_FRAME_DT / this.FIXED_DT),
+      );
       while (this.accumulator >= this.FIXED_DT && stepCount < maxStepsPerFrame) {
         this.prevPos.x = this.pos.x;
         this.prevPos.y = this.pos.y;
@@ -1118,8 +1125,6 @@ export const raceEngineMethods = {
         stepCount++;
       }
       if (this.accumulator >= this.FIXED_DT) {
-        this.runHadTimingAnomaly = true;
-        this.rankedSubmissionBlockedReason = timingAnomalyMessage;
         this.accumulator = 0;
       }
     } else if (this.particles.length > 0) {

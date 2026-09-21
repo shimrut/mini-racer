@@ -30,6 +30,7 @@ import {
     headToHeadEngineMethods,
     resolveHeadToHeadHeldBest,
 } from '../game/head-to-head/engine-methods.js';
+import { RANKED_RUN_STALL_MESSAGE } from '../game/race/engine-methods.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 
@@ -53,7 +54,7 @@ afterEach(() => {
 describe('Head to Head lobby and finish', () => {
     it('does not submit or celebrate a run blocked by severe frame stalls', async () => {
         const storedWins = stubLocalStorage();
-        const stallMessage = 'Leaderboard rank disabled because the run had severe frame stalls.';
+        const stallMessage = RANKED_RUN_STALL_MESSAGE;
         const setChallengeWinActions = vi.fn();
         const applyCarUnlockSnapshot = vi.fn();
         const context = {
@@ -116,7 +117,7 @@ describe('Head to Head lobby and finish', () => {
             },
             rankedSubmissionBlockedReason: replayStub
                 ? null
-                : 'Leaderboard rank disabled because the run had severe frame stalls.',
+                : RANKED_RUN_STALL_MESSAGE,
             journeys: { endAttempt: vi.fn() },
             scoreboardReplay: replayStub
                 ?? { getPayload: vi.fn(() => ({ revision: 1, segments: [] })) },
