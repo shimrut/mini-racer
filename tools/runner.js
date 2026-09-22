@@ -1,5 +1,6 @@
 import { CONFIG } from '../game/config.js';
 import { getIntersection } from '../game/track/geometry.js';
+import { clamp, distance, distanceSq, lerp, midpoint } from './geometry.js';
 
 const DT = 1 / 60;
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
@@ -8,31 +9,6 @@ const SEAM_TOLERANCE = 0.2;
 const GUIDE_RAY_STEPS = 16;
 const CONTINUITY_WEIGHT = 0.6;
 const MAX_OFFSET_SLACK = 0.75;
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
-
-function lerp(a, b, t) {
-    return a + (b - a) * t;
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function distanceSq(a, b) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return dx * dx + dy * dy;
-}
-
-function midpoint(a, b) {
-    return {
-        x: (a.x + b.x) / 2,
-        y: (a.y + b.y) / 2
-    };
-}
 
 function pointInPolygon(point, polygon) {
     let inside = false;

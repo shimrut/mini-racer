@@ -1,24 +1,10 @@
+import { clonePoint, distance, normalizeVector } from '../geometry.js';
+
 const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
 const MIN_ARC_STEPS = 2;
 const MAX_ARC_STEPS = 12;
 const INFLATE_ITERS = 10;
-
-function clonePoint(point) {
-    return { x: Number(point.x), y: Number(point.y) };
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function normalizeVector(x, y) {
-    const length = Math.hypot(x, y);
-    if (length < 0.000001) {
-        return { x: 0, y: 0 };
-    }
-    return { x: x / length, y: y / length };
-}
 
 function signedArea(points) {
     if (!points || points.length < 3) {

@@ -4,6 +4,7 @@ import { TRACKS } from '../game/track/tracks.js';
 import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js';
 import { updateSimulation } from '../game/race/simulation.js';
 import { RingBuffer } from '../game/race/ring-buffer.js';
+import { clamp, distance, distanceSq, lerp } from './geometry.js';
 
 const MP4_MUXER_CDN = 'https://esm.sh/mp4-muxer@5.2.3';
 
@@ -429,14 +430,6 @@ function createPromoCarSprite() {
     return canvas;
 }
 
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
-
-function lerp(a, b, t) {
-    return a + (b - a) * t;
-}
-
 function easeOutCubic(t) {
     return 1 - Math.pow(1 - clamp(t, 0, 1), 3);
 }
@@ -458,16 +451,6 @@ function easeOutBack(t) {
     const c3 = c1 + 1;
     const clamped = clamp(t, 0, 1);
     return 1 + c3 * Math.pow(clamped - 1, 3) + c1 * Math.pow(clamped - 1, 2);
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function distanceSq(a, b) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return dx * dx + dy * dy;
 }
 
 function wrapText(ctx, text, maxWidth) {

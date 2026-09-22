@@ -1,11 +1,6 @@
-const START_POS_OFFSET = 1.25;
+import { midpoint } from '../geometry.js';
 
-function midpoint(a, b) {
-    return {
-        x: (a.x + b.x) / 2,
-        y: (a.y + b.y) / 2,
-    };
-}
+const START_POS_OFFSET = 1.25;
 
 function angleDelta(a, b) {
     let delta = Math.abs(a - b) % (Math.PI * 2);

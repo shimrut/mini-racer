@@ -1,4 +1,5 @@
 import { CONFIG } from '../../game/config.js';
+import { clamp } from '../geometry.js';
 
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
@@ -55,10 +56,6 @@ const RESERVED_TRACK_KEYS = new Set([
     'with',
     'yield',
 ]);
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
 
 export function formatTrackNumber(value) {
     if (!Number.isFinite(value)) {

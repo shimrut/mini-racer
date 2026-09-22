@@ -23,6 +23,7 @@ import {
     getTrackModuleFilename,
     isValidTrackKey
 } from './mapmaker/track-source.js';
+import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geometry.js';
 
 const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
@@ -66,33 +67,6 @@ function cloneTracks(source) {
         return structuredClone(source);
     }
     return JSON.parse(JSON.stringify(source));
-}
-
-function clonePoint(point) {
-    return { x: Number(point.x), y: Number(point.y) };
-}
-
-function midpoint(a, b) {
-    return {
-        x: (a.x + b.x) / 2,
-        y: (a.y + b.y) / 2
-    };
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
-
-function normalizeVector(x, y) {
-    const length = Math.hypot(x, y);
-    if (length < 0.000001) {
-        return { x: 0, y: 0 };
-    }
-    return { x: x / length, y: y / length };
 }
 
 function totalLoopLength(points) {

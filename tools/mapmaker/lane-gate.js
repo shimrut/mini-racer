@@ -1,33 +1,12 @@
+import { clonePoint, distance, midpoint, normalizeVector } from '../geometry.js';
+
 const SEGMENT_EPSILON = 1e-9;
 const MAX_GATE_LENGTH = 20;
 const CORNER_T = 0.08;
 export const GATE_WALL_OVERHANG = 0.75;
 
-function clonePoint(point) {
-    return { x: Number(point.x), y: Number(point.y) };
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function normalizeVector(x, y) {
-    const length = Math.hypot(x, y);
-    if (length < 0.000001) {
-        return { x: 0, y: 0 };
-    }
-    return { x: x / length, y: y / length };
-}
-
 function dot(a, b) {
     return a.x * b.x + a.y * b.y;
-}
-
-function midpoint(a, b) {
-    return {
-        x: (a.x + b.x) / 2,
-        y: (a.y + b.y) / 2,
-    };
 }
 
 export function closestPointOnPolygon(point, polygon) {
