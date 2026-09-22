@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
     createDailyChallengePresentationEvent,
-    getAvailableDailyChallengeSkins,
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES
 } from '../game/track/presentation.js';
@@ -37,13 +36,6 @@ describe('track presentation resolver', () => {
         });
 
         expect(presentation.key).toBe('track:kettleRun:default');
-    });
-
-    it('lists only the supported daily challenge skins for Kettle Run', () => {
-        expect(getAvailableDailyChallengeSkins('kettleRun')).toEqual([
-            'default',
-            'desert'
-        ]);
     });
 
     it('uses the same base color for the infield and outer runoff on regular tracks', () => {

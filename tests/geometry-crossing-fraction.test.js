@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getCrossingFraction, segmentsIntersect } from '../game/track/geometry.js';
+import { getCrossingFraction } from '../game/track/geometry.js';
 
 describe('getCrossingFraction', () => {
     it('returns null when segments miss', () => {
@@ -19,12 +19,6 @@ describe('getCrossingFraction', () => {
             { x: 1, y: 0 }
         );
         expect(t).toBeCloseTo(0.5, 9);
-        expect(segmentsIntersect(
-            { x: 0, y: -1 },
-            { x: 0, y: 1 },
-            { x: -1, y: 0 },
-            { x: 1, y: 0 }
-        )).toBe(true);
     });
 
     it('clamps near-endpoint hits into [0, 1]', () => {

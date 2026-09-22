@@ -18,8 +18,6 @@ import {
     DAILY_GP_DEFAULT_LIMIT,
     DAILY_GP_GUEST_PROFILE_TTL_SECONDS,
     DAILY_GP_LEGACY_RULES_REVISION,
-    DAILY_GP_MAX_TIME_SECONDS,
-    DAILY_GP_MIN_TIME_SECONDS,
     DAILY_GP_NEARBY_RADIUS,
     DAILY_GP_PLAYLIST_DAYS,
     DAILY_GP_REDIS_TTL_SECONDS,
@@ -31,17 +29,13 @@ import {
     getDailyGpEligibleLapCounts,
     getUtcDayIndex,
     isDailyGpChallengePlayable,
-    isValidDailyGpTime,
     normalizeDailyGpRaceContract,
     selectDailyGpLapCount,
-    toBestTimeMs,
 } from '../src/server/daily-gp-model.ts';
 
 describe('reddit daily gp model', () => {
     it('pins retention and window constants to exact second/ms budgets', () => {
         expect(DAY_MS).toBe(86_400_000);
-        expect(DAILY_GP_MIN_TIME_SECONDS).toBe(2);
-        expect(DAILY_GP_MAX_TIME_SECONDS).toBe(3_600);
         expect(DAILY_GP_NEARBY_RADIUS).toBe(2);
         expect(DAILY_GP_DEFAULT_LIMIT).toBe(10);
         expect(DAILY_GP_REDIS_TTL_SECONDS).toBe(31_536_000);
@@ -203,13 +197,6 @@ describe('reddit daily gp model', () => {
         expect(formatRankLabel(null)).toBe(null);
         expect(formatRankLabel(undefined)).toBe(null);
         expect(formatRankLabel(Number.NaN)).toBe(null);
-        expect(isValidDailyGpTime(2)).toBe(true);
-        expect(isValidDailyGpTime(1.999)).toBe(false);
-        expect(isValidDailyGpTime(3600)).toBe(true);
-        expect(isValidDailyGpTime(3600.001)).toBe(false);
-        expect(isValidDailyGpTime(7200)).toBe(false);
-        expect(isValidDailyGpTime('12')).toBe(false);
-        expect(toBestTimeMs(12.345)).toBe(12345);
     });
 
     it('marks challenges playable only inside the availability window', () => {
@@ -259,16 +246,12 @@ describe('reddit daily gp model', () => {
         expect(encodeDailyGpLeaderboardScore(12345)).toBe(12345);
     });
 
-    it('rejects invalid race times and unplayable challenge windows', () => {
+    it('rejects unplayable challenge windows', () => {
         const challenge = buildDailyGpChallengeForDayIndexWithTrack(
             getUtcDayIndex(new Date('2026-05-06T00:00:00.000Z')),
             'circuit',
         );
 
-        expect(isValidDailyGpTime(0)).toBe(false);
-        expect(isValidDailyGpTime(-1)).toBe(false);
-        expect(isValidDailyGpTime(Number.POSITIVE_INFINITY)).toBe(false);
-        expect(isValidDailyGpTime(null)).toBe(false);
         expect(formatRankLabel(Number.POSITIVE_INFINITY)).toBe(null);
 
         expect(isDailyGpChallengePlayable({

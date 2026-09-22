@@ -101,10 +101,6 @@ export function createCarSprite() {
   return c;
 }
 
-export function getCarAssetNameForPresetConfig(_runtimeConfig) {
-  return STOCK_CAR_ASSET_NAME;
-}
-
 export function sanitizeCarSpriteAsset(image) {
   const width = image?.naturalWidth || image?.width || 0;
   const height = image?.naturalHeight || image?.height || 0;

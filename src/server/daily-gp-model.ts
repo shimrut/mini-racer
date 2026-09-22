@@ -19,8 +19,6 @@ export type DailyGpRaceContract = Pick<
     'rulesRevision' | 'objectiveType' | 'objectiveParams'
 >;
 
-export const DAILY_GP_MIN_TIME_SECONDS = 2;
-export const DAILY_GP_MAX_TIME_SECONDS = 60 * 60;
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 365 * 24 * 60 * 60;
@@ -247,16 +245,6 @@ export function getDailyGpCompetitionTtlSeconds(
     const deadlineMs = getDailyGpCompetitionDeadlineMs(challenge);
     if (!Number.isFinite(deadlineMs)) return 0;
     return Math.max(0, Math.ceil((deadlineMs - now.getTime()) / 1000));
-}
-
-export function isValidDailyGpTime(bestTimeSeconds: unknown): bestTimeSeconds is number {
-    return Number.isFinite(bestTimeSeconds)
-        && Number(bestTimeSeconds) >= DAILY_GP_MIN_TIME_SECONDS
-        && Number(bestTimeSeconds) <= DAILY_GP_MAX_TIME_SECONDS;
-}
-
-export function toBestTimeMs(bestTimeSeconds: number): number {
-    return Math.round(bestTimeSeconds * 1000);
 }
 
 export function encodeDailyGpLeaderboardScore(bestTimeMs: number): number {

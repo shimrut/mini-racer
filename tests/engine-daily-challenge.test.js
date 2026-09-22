@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RealTimeRacer } from "../game/engine.js";
 import { modeRouterEngineMethods } from "../game/modes/engine-methods.js";
-import { CarSpriteLoader, getCarAssetNameForPresetConfig, getCarAssetUrlCandidates } from "../game/car/sprite.js";
+import { CarSpriteLoader, getCarAssetUrlCandidates } from "../game/car/sprite.js";
 import { readTrackLastLapMedal } from "../game/medals/last-lap-medal-storage.js";
 import {
   enqueueDailyChallengeVerification,
@@ -1546,18 +1546,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       bestTime: 41.25,
     });
     expect(engine.sessionBestLapSecByTrackKey["daily-1"]).toBe(41.25);
-  });
-
-  it("uses the single stock car asset for any physics overrides", () => {
-    expect(
-      getCarAssetNameForPresetConfig({
-        accel: 30,
-        brakePower: 52,
-        maxSpeed: 280,
-        turnRate: 5.25,
-        grip: 1.1,
-      }),
-    ).toBe("assets/cars/mr_mr_red.webp");
   });
 
   it("loads car sprites from app-relative asset URLs", () => {

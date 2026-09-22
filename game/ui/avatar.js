@@ -57,10 +57,3 @@ export function applyAvatar(img, url, { alt = '', genericClass = '', hidden = fa
     img.setAttribute?.('aria-hidden', hidden || !alt ? 'true' : 'false');
     return !own;
 }
-
-export function createAvatarImage(documentRef, url, { className = '', ...options } = {}) {
-    const img = documentRef.createElement('img');
-    if (className) img.className = className;
-    applyAvatar(img, url, options);
-    return img;
-}

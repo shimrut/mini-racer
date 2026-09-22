@@ -103,11 +103,6 @@ function getForcedPresentationEventSkin(trackKey) {
     return firstSkinKey || 'default';
 }
 
-export function getAvailableDailyChallengeSkins(trackKey) {
-    const configuredSkins = EVENT_TRACK_PRESENTATION_OVERRIDES['daily-challenge']?.[trackKey];
-    return ['default', ...Object.keys(configuredSkins || {})];
-}
-
 export function createDailyChallengePresentationEvent(challenge) {
     const forcedTrackKey = getForcedPresentationEventTrackKey();
     if (forcedTrackKey) {

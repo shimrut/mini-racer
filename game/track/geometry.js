@@ -21,10 +21,6 @@ function segmentIntersectionParams(A, B, C, D) {
     return null;
 }
 
-export function segmentsIntersect(A, B, C, D) {
-    return segmentIntersectionParams(A, B, C, D) !== null;
-}
-
 export function getCrossingFraction(A, B, C, D) {
     const params = segmentIntersectionParams(A, B, C, D);
     if (!params) return null;

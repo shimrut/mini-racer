@@ -14,6 +14,12 @@ The removals run on branch `chore/dead-code-removal`, one commit per phase, in o
   The now-unused imports went with them. `competitionFor` in `campaign-store.ts` lost its
   ignored player argument at all 18 call sites. Unused TypeScript diagnostics went from 6
   to 0. The tests and the build pass.
+- **Phase 2 — done.** Six test-only functions (§12): `getCarAssetNameForPresetConfig`,
+  `createAvatarImage`, `getAvailableDailyChallengeSkins`, `isValidDailyGpTime`,
+  `toBestTimeMs`, and `segmentsIntersect`, with the tests that only exercised them. The
+  `DAILY_GP_MIN_TIME_SECONDS` and `DAILY_GP_MAX_TIME_SECONDS` constants went too, because
+  `isValidDailyGpTime` was their only reader. The avatar test for the `hidden` option now
+  calls `applyAvatar` directly, so that coverage stays.
 
 The last full audit ran on 2026-08-01. That audit found no dead module files. This audit
 repeats the file check and adds five more checks: exported names, engine methods, CSS

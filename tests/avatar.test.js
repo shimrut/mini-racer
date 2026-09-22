@@ -3,7 +3,6 @@ import { JSDOM } from 'jsdom';
 import {
     applyAvatar,
     AVATAR_PLACEHOLDER_SRC,
-    createAvatarImage,
     GENERIC_SNOO_URL,
     isRedditAvatarUrl,
     resolveAvatarUrl,
@@ -89,12 +88,9 @@ describe('avatar seating', () => {
     });
 
     it('hides a purely decorative seat from the accessibility tree', () => {
-        const img = createAvatarImage(dom.window.document, null, {
-            className: 'challenge-avatar challenge-avatar--hero',
-            hidden: true,
-        });
+        const img = imageIn(dom);
+        applyAvatar(img, null, { hidden: true });
 
-        expect(img.className).toBe('challenge-avatar challenge-avatar--hero');
         expect(img.getAttribute('aria-hidden')).toBe('true');
         expect(img.alt).toBe('');
     });
