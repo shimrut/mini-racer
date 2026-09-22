@@ -22,7 +22,6 @@ import {
 
 export const HEAD_TO_HEAD_CONFIRM_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
 
-/** Starts, finished or abandoned, before a loss offers Concede. A tie never waits. */
 export const HEAD_TO_HEAD_CONCEDE_AFTER_STARTS = 5;
 
 function finitePositiveMs(value) {
@@ -69,11 +68,6 @@ function isRetryableHeadToHeadConfirmation(response, threw) {
     return isRetryableVerificationFailure(response);
 }
 
-/**
- * Same origin best Daily and Campaign finishes already use: the challenge GET, then Campaign
- * progress / Daily storage. Head to Head start wipes the in-race PB cache so the HUD stays
- * opponent-only; this must not empty VS. YOUR PB.
- */
 export function resolveHeadToHeadHeldBest(engine, challenge) {
     const viewer = challenge?.viewerBest && typeof challenge.viewerBest === 'object'
         ? challenge.viewerBest
@@ -271,9 +265,6 @@ export const headToHeadEngineMethods = {
         });
     },
 
-    // Home / Back after a race. The challenge, track, and ghost are already in
-    // memory from the open that started it, so this only puts the lobby back on
-    // screen. loadChallengeLobby remains the cold open (first visit, Retry).
     showChallengeLobby() {
         cancelDeferredLobbyWork(this);
         const challenge = this.activeHeadToHead;
@@ -420,15 +411,9 @@ export const headToHeadEngineMethods = {
             kind: 'challenge-comment',
             challengeId: challenge.challengeId,
             reportedTimeMs: finitePositiveMs(reportedTimeMs) ?? finalTimeMs,
-            // Never sent to the server. It is what lets a posted concession restart the count
-            // while a posted tie leaves it alone.
             outcome,
         });
-        // The middle button of the finish sheet. Starts are counted when the run begins, so a
-        // restart that never finishes still counts, and a server verdict cannot count it twice.
         const resolveFinishShare = (phase, reportedTimeMs = null) => {
-            // A tie says its own line at once. A loss waits for the fifth start, and waits again
-            // after every concession.
             const startsSinceConcede = (this._headToHeadStarts ?? 0)
                 - (this._headToHeadConcedeBaseline ?? 0);
             const offered = phase === 'tie'
@@ -441,8 +426,6 @@ export const headToHeadEngineMethods = {
             };
         };
 
-        // Same origin best Daily and Campaign finishes already use. The GET can miss it; local
-        // Campaign progress and Daily storage still know.
         const heldBest = resolveHeadToHeadHeldBest(this, challenge);
         const viewerBestMs = finitePositiveMs(heldBest?.bestTimeMs);
         const hasViewerBest = viewerBestMs !== null;
@@ -473,8 +456,6 @@ export const headToHeadEngineMethods = {
                     challengeViewerBest: heldBest ?? null,
                     trackKey: challenge.trackKey,
                     showGlobalLeaderboard: false,
-                    // Rank is already on this row; a personal best may replace the number, but the
-                    // Head to Head finish still has no board sheet behind it.
                     allowLeaderboardOpen: false,
                 },
                 {
@@ -498,8 +479,6 @@ export const headToHeadEngineMethods = {
                 campaignAction: () => this.showCampaignLobby(),
             });
         };
-        // Clock already faster than the target: show Daily/Campaign now. Brag stays locked
-        // until the server signs the beat. A miss or failed confirm puts Improve/Home back.
         const optimisticWin = localDifferenceMs !== null && localDifferenceMs < 0;
         const revertOptimisticWin = () => {
             if (!optimisticWin) return;
@@ -513,9 +492,6 @@ export const headToHeadEngineMethods = {
             && this.activeHeadToHead?.challengeId === challenge.challengeId
         );
 
-        // A settled loss keeps its instant verdict, but the run is still a real run on the stage or
-        // Daily behind the challenge. Send it when it beats what the player already holds there, so the
-        // personal best it earned is not thrown away. A slower run would be refused anyway, so it stays home.
         const beatsViewerBest = finalTimeMs !== null
             && (!hasViewerBest || finalTimeMs < viewerBestMs);
         const paintBestUpdate = (response) => {
@@ -537,8 +513,6 @@ export const headToHeadEngineMethods = {
         };
         const claimSettledBest = async () => {
             try {
-                // Same submit as a claimed win: origin personal best and place come back on this
-                // body so the finish sheet can replace RANK.
                 const response = await submitHeadToHeadRun({
                     challengeId: challenge.challengeId,
                     replay,
@@ -679,18 +653,10 @@ export const headToHeadEngineMethods = {
         })();
     },
 
-    /**
-     * One start: the lobby start, or a restart from pause, the R key, or Improve.
-     * A wall that sends the car back to the line is the same start.
-     */
     recordHeadToHeadStart() {
         this._headToHeadStarts = (this._headToHeadStarts ?? 0) + 1;
     },
 
-    /**
-     * A posted concession restarts the count: the next offer waits for five more starts.
-     * Declining the offer leaves the count alone, so it stays available until it is used.
-     */
     recordHeadToHeadConcede() {
         this._headToHeadConcedeBaseline = this._headToHeadStarts ?? 0;
     },

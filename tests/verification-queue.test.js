@@ -100,8 +100,6 @@ describe('verification queue', () => {
             replay: REPLAY,
         });
 
-        // Reconciliation acts on the receipt captured before the choice was sent. Without one it
-        // cannot prove which entries the selection covered, and quarantines them instead.
         prepareVerificationQueueGuestProgressReconciliation({
             transferId: 'guest-transfer:selected',
             guestPlayerId: 'guest:guest-choice',
@@ -125,7 +123,6 @@ describe('verification queue', () => {
     });
 
     it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {
-        // Pinned: the derived expiry below is a fixed date, so a real clock would prune the entries under test.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const playlistMs = 7 * 24 * 60 * 60 * 1000;

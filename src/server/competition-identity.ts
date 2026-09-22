@@ -26,10 +26,6 @@ export type ResolvedPlayerIdentity = {
     guestPlayerId: string | null;
     guestToken: string | null;
     guestStatus?: GuestIdentityStatus;
-    /**
-     * Whether this guest's transfer flag is set. Absent means this request has not read it.
-     * The status above is not a substitute: a promoted guest can be pending while the flag is false.
-     */
     guestSelectionPending?: boolean;
 };
 
@@ -247,19 +243,10 @@ function createPlayerProfileExpiration(
 
 const PLAYER_PROFILE_WRITE_ATTEMPTS = 3;
 
-/**
- * Parse and build list the same keys in the same order, and parse drops anything else stored, so
- * equal strings mean equal profiles. A difference in preference key order only costs a write.
- */
 function sameProfile(stored: DailyGpPlayerProfile, next: DailyGpPlayerProfile): boolean {
     return JSON.stringify(stored) === JSON.stringify(next);
 }
 
-/**
- * A skipped write must still give an active guest another year, as the rewrite it replaces did.
- * EXPIRE is one command, not a transaction. It is extra to a write that was not needed, so its
- * failure must not fail the request that skipped.
- */
 async function renewSkippedProfileExpiry(profileKey: string, playerId: string): Promise<void> {
     const ttlSeconds = playerProfileTtlSeconds(playerId);
     if (ttlSeconds === null) return;
@@ -341,7 +328,6 @@ export async function resolveAuthorizedPlayerIdentity({
         }
 
         const canonicalPlayerId = `guest:${verifiedGuestPlayerId}`;
-        // A promoted guest's credential is spent: honouring it would write this browser's races into the account it was merged into.
         const { status, selectionPending } = await resolveGuestIdentityStatus(canonicalPlayerId);
         if (status === 'guest_identity_retired') {
             return {
@@ -448,7 +434,6 @@ export async function claimNewGuestPlayerProfile({
     };
 }
 
-/** A guest whose token is lost keeps their player id; without re-issuing one, every ghost, unlock and stage keyed to that id is unreachable for good. */
 export async function adoptExistingGuestPlayerProfile({
     playerId,
 }: {
@@ -497,10 +482,7 @@ export async function upsertPlayerProfile({
     hasAnyData?: boolean;
 }): Promise<DailyGpPlayerProfile> {
     const profileKey = createRedisPlayerProfileKey(playerId);
-    // Every start-up and every Daily finish reaches here. A WATCH holds one of the transactions
-    // Reddit allows an installation at a time (20 to 30), and on 2026-09-16 these writes filled
-    // the limit: start-ups and saved runs failed for an hour and a half. Most calls change nothing,
-    // and a new profile can be created without a transaction, so only a real change takes one.
+    // Reddit caps open transactions; WATCH only changes.
     const rawProfile = await redis.get(profileKey);
     const storedProfile = parseStoredPlayerProfile(rawProfile);
     const nextProfile = buildPlayerProfile({
@@ -512,13 +494,10 @@ export async function upsertPlayerProfile({
         previousProfile: storedProfile,
     });
     if (storedProfile && sameProfile(storedProfile, nextProfile)) {
-        // Skipping writes nothing, so a writer racing this read loses nothing to it.
         await renewSkippedProfileExpiry(profileKey, playerId);
         return storedProfile;
     }
     if (!rawProfile) {
-        // NX never overwrites. If another request created the profile first, the loop below
-        // reads that profile and merges this request onto it.
         const created = await redis.set(
             profileKey,
             JSON.stringify(nextProfile),
@@ -529,7 +508,6 @@ export async function upsertPlayerProfile({
     for (let attempt = 0; attempt < PLAYER_PROFILE_WRITE_ATTEMPTS; attempt += 1) {
         const transaction = await redis.watch(profileKey);
         try {
-            // Read through the base client after WATCH; EXEC rejects any write that raced this snapshot.
             const currentProfile = parseStoredPlayerProfile(await redis.get(profileKey));
             const nextProfile = buildPlayerProfile({
                 playerId,
@@ -547,34 +525,21 @@ export async function upsertPlayerProfile({
             );
             const results = await transaction.exec();
             if (Array.isArray(results) && results.length > 0) return nextProfile;
-            // An empty EXEC is a lost race. Read the winner's profile and build on it.
         } catch (error) {
             try {
                 await transaction.discard();
             } catch (_discardError) {
-                // EXEC may already have closed the transaction.
             }
             if (!isRedisTransactionConflict(error)) throw error;
-            // Reddit throws the lost race instead of returning an empty EXEC. Same answer: retry.
         }
     }
     throw new Error('Player profile update was interrupted. Try again.');
 }
 
-/**
- * What a profile read already found. `profile: null` means a value is stored and does not parse,
- * which shows the constructed name. Missing means this call did not keep a body to reuse.
- */
 export type LoadedPlayerProfile = {
     profile: DailyGpPlayerProfile | null;
 };
 
-/**
- * A read path has no new identity to store. It creates the profile if it is missing and otherwise
- * leaves it alone, so parallel reads never race each other on the one profile key.
- * A stored body is returned so the caller does not read the same key again. A create is not:
- * the copy in hand loses when another request wins the create.
- */
 export async function ensurePlayerProfileExists({
     playerId,
     leaderboardIdentity,

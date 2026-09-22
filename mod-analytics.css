@@ -11,7 +11,6 @@
     --line: rgba(148, 163, 184, 0.16);
     --hair: rgba(148, 163, 184, 0.1);
     --accent: #ef4444;
-    /* Two-series palette, validated for CVD separation against the panel surface. */
     --returning: #ef4444;
     --new: #0e9bd6;
     --deemph: #475569;
@@ -59,8 +58,6 @@ body {
 .analytics-summary > * {
     min-width: 0;
 }
-
-/* Header */
 
 .analytics-header {
     display: flex;
@@ -121,7 +118,7 @@ h1 {
 
 .analytics-status[data-state="error"] {
     color: var(--accent);
-}/* Cards */
+}
 
 .analytics-card {
     min-width: 0;
@@ -152,8 +149,6 @@ h1 {
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
 }
-
-/* Today summary */
 
 .analytics-summary {
     display: grid;
@@ -244,8 +239,6 @@ h1 {
 .analytics-kpi__since {
     color: var(--faint);
 }
-
-/* Chart row */
 
 .analytics-main {
     display: grid;
@@ -422,8 +415,6 @@ h1 {
     color: var(--ink);
 }
 
-/* Daily table */
-
 .analytics-table-wrap {
     min-width: 0;
     max-width: 100%;
@@ -459,8 +450,6 @@ h1 {
     white-space: nowrap;
 }
 
-/* Only the long daily table is worth pinning: on a three-row table the pinned
-   header just sits on top of the first row of data. */
 .analytics-table--sticky thead th {
     position: sticky;
     top: 1.5rem;
@@ -518,7 +507,6 @@ h1 {
     box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* Cohort milestones are the one table where the columns are a progression. */
 .analytics-table--cohorts .analytics-table__milestone {
     min-width: 7.5rem;
     border-left: 1px solid var(--hair);

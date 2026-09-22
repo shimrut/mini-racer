@@ -42,12 +42,10 @@ function readStoredQueue() {
     return JSON.parse(globalThis.window.localStorage.getItem(STORAGE_KEY));
 }
 
-/** Rewrites storage the way another tab would, behind this module's back. */
 function writeStoredQueue(queueState) {
     globalThis.window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queueState));
 }
 
-/** Reads one queued entry by owner, without depending on who is active right now. */
 function storedEntry(ownerPlayerId, challengeId) {
     return readStoredQueue().daily[`${ownerPlayerId}::${challengeId}`] ?? null;
 }
@@ -79,7 +77,6 @@ describe('transfer blocking is durable and scoped to its owners', () => {
         });
         const persisted = readStoredQueue();
 
-        // A reload keeps the storage and loses every module variable.
         vi.resetModules();
         writeStoredQueue(persisted);
 
@@ -135,7 +132,6 @@ describe('transfer blocking is durable and scoped to its owners', () => {
         queueRun(ACCOUNT, 'in-flight-race', 12);
         expect(getDueDailyChallengeVerifications()).toHaveLength(1);
 
-        // Another tab writes the block directly, the way it lands in storage.
         globalThis.window.localStorage.setItem(BLOCKS_KEY, JSON.stringify({
             [ACCOUNT]: { accountPlayerId: ACCOUNT, guestPlayerId: GUEST, state: 'resume_required' },
         }));
@@ -148,7 +144,6 @@ describe('transfer blocking is durable and scoped to its owners', () => {
             guestPlayerId: GUEST,
             accountPlayerId: ACCOUNT,
         });
-        // A tab that read the queue before the block existed finishes an ordinary queue write.
         const staleQueue = { daily: {}, campaign: {} };
         writeStoredQueue(staleQueue);
 
@@ -199,7 +194,6 @@ describe('queue reconciliation acts only on what it can prove', () => {
     it('moves the captured guest entries and leaves later ones alone', () => {
         queueRun(GUEST, 'captured-race', 12);
         expect(prepare('guest').prepared).toBe(true);
-        // Raced after the choice was captured, so it was never part of the selection.
         queueRun(GUEST, 'later-race', 11);
 
         const result = resolve('guest');
@@ -212,7 +206,6 @@ describe('queue reconciliation acts only on what it can prove', () => {
     it('keeps a captured entry that changed before the transfer finished', () => {
         queueRun(GUEST, 'edited-race', 12);
         expect(prepare('guest').prepared).toBe(true);
-        // A faster run replaced the captured one under the same key.
         queueRun(GUEST, 'edited-race', 9);
 
         const result = resolve('guest');
@@ -263,7 +256,6 @@ describe('queue reconciliation acts only on what it can prove', () => {
     });
 
     it('quarantines ambiguous entries when the receipt is missing, and records that decision', () => {
-        // No prepare() ran here: this is another device, or a browser that lost its receipt.
         queueRun(GUEST, 'unprovable-race', 12);
 
         const result = resolve('guest', { completedAt: new Date(Date.now() + 60_000).toISOString() });
@@ -324,15 +316,12 @@ describe('a receipt captured before the server named the transfer is still found
 
     it('moves the captured entries when the choice was sent without a transfer id', () => {
         queueRun(GUEST, 'pre-named-race', 12);
-        // The chooser was built before the server had named the transfer, so the receipt is filed
-        // under the guest-and-account fallback key.
         expect(prepareVerificationQueueGuestProgressReconciliation({
             guestPlayerId: GUEST,
             accountPlayerId: ACCOUNT,
             choice: 'guest',
         }).prepared).toBe(true);
 
-        // The POST reply carries the server's real transfer id.
         const result = resolveVerificationQueueAfterGuestProgressSelection({
             transferId: 'guest-transfer:named-by-server',
             guestPlayerId: GUEST,
@@ -348,8 +337,6 @@ describe('a receipt captured before the server named the transfer is still found
     it('leaves the account queue alone when the kept progress was the account\'s', () => {
         queueRun(ACCOUNT, 'account-race', 11);
 
-        // No receipt: another device. The account chose to keep its own progress, so its queued
-        // runs were never at risk and must not be quarantined.
         const result = resolveVerificationQueueAfterGuestProgressSelection({
             transferId: 'guest-transfer:elsewhere',
             guestPlayerId: GUEST,
@@ -427,13 +414,6 @@ describe('two runs wanting the same queue slot', () => {
         });
     }
 
-    /**
-     * The only way both runs end up wanting one slot.
-     *
-     * A Guest choice removes the account's captured entries first, which frees the slot. The
-     * account has to race that day *again* after the receipt was captured: its entry then no longer
-     * matches its snapshot, so it is kept rather than removed, and the guest's run collides with it.
-     */
     function raceBothThenAccountAgain(guestTime, accountFirstTime, accountSecondTime) {
         queueRun(GUEST, CHALLENGE, guestTime);
         queueRun(ACCOUNT, CHALLENGE, accountFirstTime);
@@ -457,7 +437,6 @@ describe('two runs wanting the same queue slot', () => {
         const result = resolve('guest');
 
         expect(storedEntry(ACCOUNT, CHALLENGE).bestTime).toBe(9);
-        // The losing run does not linger under a guest id nothing can claim back.
         expect(storedEntry(GUEST, CHALLENGE)).toBeNull();
         expect(result.removed).toBeGreaterThan(0);
     });

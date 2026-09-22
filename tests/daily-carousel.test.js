@@ -42,7 +42,6 @@ describe('daily carousel card model', () => {
         const source = challenge({ availableUntil: '2026-08-03T00:00:00.000Z' });
         const [card] = buildDailyCarouselCards([source], { nowMs: NOW });
 
-        // The label is resolved at paint time, not frozen into the card here.
         expect(card.challenge).toBe(source);
         expect(card.expiryLabel).toBeUndefined();
     });
@@ -271,7 +270,6 @@ function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320
     };
 }
 
-/** Lets `render()` take its rebuild path without a DOM behind it. */
 function stubRailRebuild(carousel, rail) {
     rail.replaceChildren = vi.fn();
     carousel.edgeSpacer = vi.fn(() => ({}));
@@ -363,7 +361,6 @@ describe('TrackCarousel expiry line', () => {
             expect(line.textContent).toBe('Expires in 2m');
             expect(vi.getTimerCount()).toBe(1);
 
-            // A repaint from elsewhere must not leave a second timer behind.
             carousel.applySelectionClasses();
             expect(vi.getTimerCount()).toBe(1);
 
@@ -617,7 +614,6 @@ describe('TrackCarousel selection', () => {
         carousel.select(2);
         onSelect.mockClear();
 
-        // A refresh stage that has not caught up with the requested day yet.
         carousel.render(
             [
                 { challengeId: 'c0', challenge: { id: 'c0' } },

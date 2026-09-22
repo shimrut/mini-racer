@@ -203,7 +203,6 @@ export async function submitCampaignRun({ raceId, trackKey, replay, submissionOw
     return requestJson(API_ROUTES.campaignSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // submissionOwnerId names the account this run was raced under; the server refuses it if that changed.
         body: JSON.stringify(playerIdentityBody({ raceId, trackKey, replay, submissionOwnerId })),
     });
 }

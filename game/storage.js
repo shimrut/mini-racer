@@ -122,7 +122,6 @@ async function fetchHostedPlayerProgressState() {
     if (error?.status !== 401) {
       throw error;
     }
-    // Keep the player id and drop only the token: the id is the only handle on this guest's progress, and the server re-issues a token for it.
     setGuestPlayerToken(null);
     return await fetchRemotePlayerProgressState();
   }
@@ -130,7 +129,6 @@ async function fetchHostedPlayerProgressState() {
 
 function getLocalPlayerProgressState() {
   const hasAnyData = hasAnyDailyChallengeStoredData();
-  // Local development has no server to name an owner, so it owns its own namespace and keeps its queue working.
   setActivePlayerOwnerId(`local:${getOrCreatePlayerId("player bootstrap")}`);
   return {
     hasAnyData,
@@ -144,11 +142,6 @@ function getLocalPlayerProgressState() {
   };
 }
 
-/**
- * A hosted bootstrap that never answered says nothing about this player. Presenting the all-locked
- * default as if it were the answer resets an unlocked selection the server still recognises, so the
- * last confirmed profile stands in and an unknown one stays unknown.
- */
 function getHostedFallbackPlayerProgressState() {
   const cached = readCachedPlayerProfile(readLastConfirmedProfileOwnerId());
   return {
@@ -193,18 +186,12 @@ function enrichProgressSelection(selection, { guestOwnerId, accountOwnerId }) {
 }
 
 async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelectionRequired = null } = {}) {
-  // Set when a resolved transfer's pause could not be taken off this browser. Availability, not
-  // safety: the player stays paused until a later start-up succeeds in removing it.
   let pauseReleaseFailed = false;
   setGuestPlayerToken(remoteState.guestToken);
   const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
   const isSignedInAccount = Boolean(remoteState.redditUsername)
     && remoteState.leaderboardPlayerId?.startsWith("reddit:");
   const progressSelection = remoteState.progressSelection;
-  // A guest the server retired has no transfer left to make, so its unsent runs are no reason to
-  // ask. Asking anyway let a Guest choice replace the account with an empty guest. When the server
-  // joined that guest to this account, its runs are the account's now and move to it below. A guest
-  // joined to another account keeps its runs where they are.
   const guestRetiredWithoutTransfer = isSignedInAccount
     && remoteState.retireGuestIdentity
     && !progressSelection;
@@ -220,8 +207,6 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       || progressSelection?.state === "completed"
       || hasPendingGuestRuns,
   );
-  // A completion this browser already reconciled is old news. Doing the work again would wipe the
-  // local Daily caches and medals on every launch for as long as the server keeps reporting it.
   const alreadyReconciled = progressSelection?.state === "completed"
     && isVerificationQueueGuestProgressReconciled({
       transferId: progressSelection.transferId,
@@ -230,10 +215,6 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       choice: progressSelection.choice,
     });
   if (hasKnownTransfer && !alreadyReconciled) {
-    // Written down before anything else, and scoped to the two identities this transfer names.
-    // A reload followed by a network failure finds it again, so this browser cannot slip into
-    // ordinary offline mode with the transfer still open. If it cannot be written, this browser
-    // cannot be trusted to hold the pause, so the transfer stays unresolved.
     const blocked = recordVerificationQueueTransferBlock({
       transferId: progressSelection?.transferId,
       guestPlayerId: progressSelection?.sourceGuestPlayerId || guestOwnerId,
@@ -251,7 +232,6 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     let selectionResult;
     let selectionReturnedRawState = true;
     if (progressSelection?.state === "completed") {
-      // remoteState is already normalized here, so it must not be normalized a second time.
       selectionReturnedRawState = false;
       selectionResult = {
         choice: progressSelection.choice,
@@ -326,8 +306,6 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       accountPlayerId: remoteState.leaderboardPlayerId,
       choice,
     });
-    // Reconciliation must be on disk before the account's own state is applied and before any
-    // submission resumes. A storage failure is an unresolved recovery, not a success.
     if (reconciliation.persisted === false) {
       const error = new Error("Your saved result is being protected while this transfer is reconciled.");
       error.reason = "guest_progress_recovery_required";
@@ -338,15 +316,11 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
     clearDailyChallengeClientCaches();
     clearTrackLastLapMedals();
-    // The transfer is resolved and its reconciliation is durable, so the pause may go. A removal
-    // that storage refuses leaves this browser paused on work that is actually finished. That
-    // costs the player racing, not data, so it is reported rather than thrown.
     pauseReleaseFailed = !clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
     if (pauseReleaseFailed) {
       console.error("Could not release the transfer pause for", remoteState.leaderboardPlayerId);
     }
   }
-  // Before the rotation below: after it, nothing on this device can name the old guest again.
   let guestRunsStillUnmoved = false;
   if (guestJoinedAccount) {
     const { persisted } = moveVerificationEntriesToOwner(
@@ -355,13 +329,11 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     );
     guestRunsStillUnmoved = !persisted;
     if (guestRunsStillUnmoved) {
-      // The server still reports the join on the next start-up, and the move is tried again then.
       console.error("Could not move this device's unsent guest runs to the account.");
     }
   }
   if (remoteState.retireGuestIdentity && !guestRunsStillUnmoved) {
     rotateGuestPlayerIdentity("completed guest promotion");
-    // The server refused a spent guest credential: this browser needs a fresh identity before it owns anything again.
     if (!remoteState.leaderboardPlayerId) {
       const rebootstrapped = await fetchRemotePlayerProgressState();
       if (rebootstrapped) {
@@ -371,15 +343,10 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     }
   }
   setLeaderboardIdentityPreference(remoteState.leaderboardIdentity);
-  // Without a player id the server did not recognise anyone, so nothing here may be treated as this account's state.
   if (!remoteState.leaderboardPlayerId) {
     return { ...remoteState, authoritative: false };
   }
-  // The server named this account and left nothing unresolved for it, so a marker from an earlier
-  // visit is stale. Another owner's block is left alone.
   if (!hasKnownTransfer || alreadyReconciled) {
-    // The server named this account and left nothing unresolved for it. That is the only thing
-    // that can settle transfer safety for a browser whose storage cannot be read.
     confirmVerificationQueueTransferSafety();
     if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
       pauseReleaseFailed = true;
@@ -404,14 +371,10 @@ export async function getPlayerProgressState({
     return getLocalPlayerProgressState();
   }
 
-  // A transfer this browser knows about but could not resolve. Held for the whole call, because
-  // the browser storage that would normally remember it is exactly what may have failed.
   let transferRecoveryUnresolved = false;
   const isTransferRecoveryError = (error) => Boolean(
     error?.transferRecovery || error?.reason === "guest_progress_recovery_required",
   );
-  // An ordinary connection failure may fall back to offline play. An unresolved transfer may not:
-  // racing offline now would build results on top of a replacement that never finished.
   const offlineState = () => {
     const fallback = getHostedFallbackPlayerProgressState();
     return transferRecoveryUnresolved
@@ -456,8 +419,6 @@ export async function getPlayerProgressState({
     if (decision?.action === "retry") {
       continue;
     }
-    // Offline was not on offer while the transfer is unresolved, so this is a dismissal rather
-    // than a choice to play offline. The state says so, and the queue keeps submissions paused.
     return offlineState();
   }
 }

@@ -22,7 +22,6 @@ function campaignEntry(ownerPlayerId, bestTime) {
     };
 }
 
-/** The bootstrap for a guest the server found empty and joined to this account. */
 const JOINED_BOOTSTRAP = {
     hasAnyData: true,
     isReturningPlayer: true,
@@ -79,7 +78,6 @@ describe('an empty guest joined to the account at sign-in', () => {
                 bestTime: 12.3,
             }),
         });
-        // The spent guest id is replaced only once its runs are safe.
         expect(dom.window.localStorage.getItem(PLAYER_ID_KEY)).toBe('new-guest');
     });
 
@@ -128,7 +126,6 @@ describe('an empty guest joined to the account at sign-in', () => {
         });
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(200, JOINED_BOOTSTRAP)));
         vi.spyOn(console, 'error').mockImplementation(() => {});
-        // On the prototype: jsdom stores any property written on the storage object as an item.
         const setItem = dom.window.Storage.prototype.setItem;
         vi.spyOn(dom.window.Storage.prototype, 'setItem').mockImplementation(function (key, value) {
             if (key === QUEUE_KEY) throw new Error('QuotaExceededError');

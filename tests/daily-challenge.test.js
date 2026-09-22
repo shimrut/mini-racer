@@ -161,8 +161,6 @@ describe('daily-challenge service', () => {
         };
         const DAY_MS = 24 * 60 * 60 * 1000;
 
-        // A dated label only changes when the track drops into its last day, so
-        // that is exactly how long the one pending timer waits.
         expect(getDailyChallengeExpiry(week, Date.parse('2026-06-02T10:00:00.000Z'))).toEqual({
             label: 'Expires on Jun 09',
             refreshMs: Date.parse('2026-06-09T00:00:00.000Z')
@@ -176,7 +174,6 @@ describe('daily-challenge service', () => {
             label: 'Expires in 42m',
             refreshMs: 60 * 1000,
         });
-        // Nothing left to count down to, so nothing is scheduled.
         expect(getDailyChallengeExpiry(week, Date.parse('2026-06-09T00:00:00.000Z'))).toEqual({
             label: 'Expired',
             refreshMs: null,

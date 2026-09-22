@@ -1,4 +1,3 @@
-// Creates missing per-track share JPGs under `assets/share/`; existing files are left alone. Run: `npm run generate:share-images`
 import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

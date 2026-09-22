@@ -86,7 +86,6 @@ describe('leaderboard identity', () => {
 
         expect(getConstructedLeaderboardName('a')).toBe('Flying Meteor');
         expect(getConstructedLeaderboardName('x')).toBe('Rocket Koala');
-        // Suffix uses modulo 98 (not multiply) so the printed number stays small.
         expect(getConstructedLeaderboardName('player-stable')).toBe('Arctic Mustang 33');
         expect(getConstructedLeaderboardName('player-1')).toBe('Turbo Mustang 54');
     });

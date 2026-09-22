@@ -111,7 +111,6 @@ describe('mode-priority startup', () => {
                 onReady: async ({ mode: selected }) => calls.push(`ready:${selected}`),
             });
 
-            // Both groups are in flight before either one has answered.
             await Promise.resolve();
             await Promise.resolve();
             expect(calls).toEqual([`runtime:${mode}`, 'graphics', 'race-data']);
@@ -146,7 +145,6 @@ describe('mode-priority startup', () => {
             [30, 'Loading Campaign data…'],
         ]);
 
-        // The contract answered mid-wait, so the bar has to move before the group settles.
         reportTrackPhase();
         expect(phases.at(-1)).toEqual([65, 'Preparing the track…']);
 

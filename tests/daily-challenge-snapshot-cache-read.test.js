@@ -1,8 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getCachedDailyChallengeSnapshot } from '../game/daily-challenge/service.js';
 
-// Fresh module graph: first snapshot-cache touch hydrates from localStorage here.
-
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {

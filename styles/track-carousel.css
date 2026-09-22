@@ -62,7 +62,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     row-gap: clamp(0.55rem, 2.2vh, 1.35rem);
 }
 
-/* The rail's lane is pinned to the carousel, not a percentage of it: a percentage resolves against an indefinite height in the Reddit WebView. */
+/* Percentages break in the Reddit WebView. */
 .track-carousel__viewport {
     grid-area: 1 / 1;
     position: relative;
@@ -73,7 +73,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
     overscroll-behavior-x: contain;
-    /* #game-container turns off touch gestures for steering; the rail needs horizontal panning back. */
     touch-action: pan-x;
 }
 
@@ -81,7 +80,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     display: none;
 }
 
-/* `height: 100%` is safe here: the lane above is a `minmax(0, 1fr)` grid track, so its height is definite. */
 .track-carousel__rail {
     display: flex;
     align-items: stretch;
@@ -92,12 +90,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
     padding-block: 0;
 }
 
-/* Room for the end cards to reach the middle, in real flex items — some WebKit builds drop a scroll container's trailing padding. */
+/* WebKit can drop a scroller's trailing padding. */
 .track-carousel__edge {
     flex: 0 0 var(--track-carousel-edge-space, 0px);
 }
 
-/* Rounding can still leave the last card short of centre, so JS tops this up from the measured scroll range. */
 .track-carousel__edge--tail {
     flex-basis: calc(
         var(--track-carousel-edge-space, 0px)
@@ -113,16 +110,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
     );
 }
 
-/* Prev/Next flank the schematic in row 1, so the rows below it read as one
-   block about the selected track: how long it lasts, its position in the rail,
-   then its record. */
 .track-carousel--lobby {
     grid-template-rows: minmax(0, 1fr) 1.25rem 4rem;
     row-gap: clamp(0.25rem, 1.2vh, 0.75rem);
 }
 
-/* Daily is the only mode whose tracks run out, so only its carousel carries the
-   line — and the row stays reserved so moving between days never shifts it. */
 .track-carousel--lobby:has(.track-carousel__expiry) {
     grid-template-rows: minmax(0, 1fr) 1.1rem 1.25rem 4rem;
 }
@@ -168,9 +160,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     cursor: pointer;
 }
 
-/* The padding is there for the keyboard cue in `lobby-modes.css`: the ring
-   needs room around the digits, and reserving it in both states keeps the row
-   from shifting when selection arrives. */
 .track-carousel__count {
     grid-column: 2;
     min-width: 4.5rem;
@@ -626,9 +615,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     right: 0;
 }
 
-/* Grid-placed over the schematic's own row rather than absolutely positioned:
-   that row is a `1fr` track whose height is only known at layout time, so an
-   offset from the carousel's edges could not stay centred on the artwork. */
 .track-carousel--lobby .track-carousel__nav {
     grid-area: 1 / 1;
     position: static;
@@ -670,7 +656,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     align-items: center;
     justify-content: center;
     margin: 0;
-    /* `hidden` is display:none globally, so the entrance has to be a keyframe rather than a transition. */
     animation: trackCarouselStatusIn var(--dur-base) ease-out both;
 }
 

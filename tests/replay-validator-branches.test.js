@@ -8,7 +8,6 @@ vi.mock('../game/race/simulation.js', () => ({
     updateSimulation: mockUpdateSimulation,
 }));
 
-// Force the validator through its fixedDt fallback (Number(0) || 1/60).
 vi.mock('../game/config.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {

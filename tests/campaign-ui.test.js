@@ -1152,8 +1152,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(html).toContain(
                 `id="${prefix}-carousel" class="track-carousel track-carousel--lobby"`,
             );
-            // Prev/Next flank the schematic, so they leave the count's row and
-            // sit alongside it rather than around it.
             expect(html).toMatch(
                 new RegExp(
                     `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-next"[\\s\\S]*id="${prefix}-carousel-navigation"[\\s\\S]*id="${prefix}-carousel-count"`,
@@ -1552,8 +1550,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(global.document.body.dataset.lobbyMode).toBe('campaign');
             expect(global.document.body.dataset.lobbyPaneSwap).toBe('toggle');
 
-            // The Campaign bootstrap repaints the pane it is already on; that must
-            // not move the entrance off the carousel and replay it.
             lobby.showPane('campaign');
 
             expect(global.document.body.dataset.lobbyPaneSwap).toBe('toggle');
@@ -1564,7 +1560,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             expect(overlay.classList.contains('is-lobby-transitioning')).toBe(true);
             expect(startViewTransition).toHaveBeenCalledTimes(1);
             expect(global.document.body.dataset.lobbyPaneSwap).toBe('mode');
-            // Let the view transition's cleanup run before `document` is restored.
             await Promise.resolve();
             await Promise.resolve();
         } finally {
@@ -2556,8 +2551,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         const launch = await context.prepareInitialCampaignLaunch({ prepareTrack: false });
 
-        // The loader derives the track it draws from this stage, so a launch that
-        // resolves to null leaves startup with no playable track at all.
         expect(launch?.stage).toMatchObject({
             raceId: firstStage.raceId,
             trackKey: firstStage.trackKey,
@@ -2794,7 +2787,6 @@ describe('Campaign lobby and shared modal adapters', () => {
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
         campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false, body: {} });
         const context = createStartContext({
-            // Tracks switches mode before invoking the selected Campaign start.
             activeRaceMode: 'campaign',
             activeCampaignStage: null,
             currentTrackKey: 'circuit',

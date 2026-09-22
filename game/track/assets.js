@@ -74,14 +74,7 @@ export function getTrackCanvasAsset(trackKey, track, options = {}) {
     if (!canvasAsset) {
         const geometry = getTrackPreviewGeometry(trackKey, track, options);
         canvasAsset = buildTrackCanvas(track, geometry, options.presentation || null);
-        // Evict the entry, but do not touch the canvas it holds. The engine keeps the
-        // canvas object itself for the whole race and never reads the cache again, so
-        // its entry ages to the oldest slot while the race runs. Resizing the canvas to
-        // 0x0 here to free memory therefore blanked the track of the active race: the
-        // engine still held a truthy canvas, the visible slice measured 0 wide, and the
-        // draw step skipped it without an error, so the car and the trail stayed on an
-        // empty background. Dropping the reference is enough. The browser frees the
-        // pixels once the race stops using the canvas.
+        // Do not resize; active races draw it.
         cacheValue(canvasCache, key, canvasAsset, CANVAS_CACHE_LIMIT);
     }
     return canvasAsset;

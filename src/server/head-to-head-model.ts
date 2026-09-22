@@ -59,7 +59,6 @@ export type HeadToHeadRecord = HeadToHeadPostData & {
     postUrl: string | null;
 };
 
-/** The Campaign manifest decides which races exist, so a stage added there can be challenged at once. */
 export function isHeadToHeadRaceId(value: unknown): value is string {
     return getCampaignStage(value) !== null;
 }

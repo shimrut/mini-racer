@@ -68,9 +68,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     text-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* The wordmark is the way back to the mode menu, so it carries the hit area.
-   `.lobby-title` keeps `pointer-events: none` and the button takes them back,
-   leaving the empty header width beside the letters unclickable. */
 .lobby-title__home {
     display: flex;
     flex-direction: column;
@@ -91,8 +88,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     -webkit-tap-highlight-color: transparent;
 }
 
-/* Home already is the destination. The wordmark has to keep its own colours
-   there — the UA's disabled button style would grey "MINI" out. */
 .lobby-title__home:disabled {
     color: inherit;
     opacity: 1;

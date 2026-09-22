@@ -49,7 +49,6 @@ async function seedGuest(guestPlayerId, redditPlayerId) {
   await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
 }
 
-/** Stops the transfer after preparation froze the baseline, leaving it open in `copying`. */
 async function interruptAfterPreparation(guestPlayerId, redditPlayerId) {
   redis.failTransferRecordWriteAt = 3;
   await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
@@ -83,7 +82,6 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
     const guestPlayerId = "guest:owed-drop";
     const redditPlayerId = "reddit:owed-drop";
     await seedGuest(guestPlayerId, redditPlayerId);
-    // The win is owed, not held: its Garage write failed after the player was told they won.
     vi.spyOn(redis, "hSetNX").mockRejectedValueOnce(new Error("reward busy"));
     await expect(recordHeadToHeadWin(redditPlayerId, "challenge-owed"))
       .rejects.toThrow("reward busy");
@@ -98,13 +96,10 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
   it("keeps a reward earned again whose ordinary write was a no-op", async () => {
     const guestPlayerId = "guest:repeat-reward";
     const redditPlayerId = "reddit:repeat-reward";
-    // Held before the choice, so the baseline names it and replacement would remove it.
     await recordHeadToHeadPost(redditPlayerId, "numberZero");
     await seedGuest(guestPlayerId, redditPlayerId);
     await interruptAfterPreparation(guestPlayerId, redditPlayerId);
 
-    // Earned again. The field is already "1", so the hash does not change and only the
-    // journal records that it happened.
     await recordHeadToHeadPost(redditPlayerId, "numberZero");
     await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
 
@@ -121,7 +116,6 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
     await seedGuest(guestPlayerId, redditPlayerId);
     await interruptAfterPreparation(guestPlayerId, redditPlayerId);
 
-    // A sixth post is accepted, but the cap stops the hash write.
     await recordHeadToHeadPost(redditPlayerId, "numberFive");
     await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
 
@@ -146,13 +140,11 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
     const guestPlayerId = "guest:frozen-baseline";
     const redditPlayerId = "reddit:frozen-baseline";
     await seedGuest(guestPlayerId, redditPlayerId);
-    // Stop inside preparation, so the next attempt re-enters it.
     redis.failTransferRecordWriteAt = 2;
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .rejects.toThrow();
     redis.failTransferRecordWriteAt = null;
 
-    // A reward lands before the retry. A recaptured baseline would swallow it.
     await recordHeadToHeadWin(redditPlayerId, "challenge-1");
     await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
 
@@ -178,7 +170,6 @@ describe("a legitimate late guest event does not strand the transfer", () => {
     const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
 
     expect(result.status).toBe("completed");
-    // The addition came across with the rest.
     expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["post:track:numberZero"])
       .toBe("1");
   });
@@ -221,7 +212,6 @@ describe("an older interrupted transfer gets no invented baseline", () => {
     redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" })).rejects.toThrow();
     redis.failTransferRecordWriteAt = null;
-    // Simulate a record written before baselines existed.
     await redis.del(`miniracer:car-unlocks:transfer-baseline:v1:${createHash("sha256").update(r,"utf8").digest("base64url")}`);
     await recordHeadToHeadPost(r, "numberZero");
 
@@ -250,7 +240,6 @@ describe("a Garage evidence cleanup that fails cannot spoil the next transfer", 
       guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest",
     });
 
-    // A cleanup is housekeeping. It must never turn a committed transfer into a failure.
     expect(result.status).toBe("completed");
     expect(await redis.get(baselineKey(ACCOUNT))).not.toBeNull();
     expect(console.error).toHaveBeenCalled();
@@ -259,8 +248,6 @@ describe("a Garage evidence cleanup that fails cannot spoil the next transfer", 
   it("attempts the journal delete even when the baseline delete is refused", async () => {
     await seedGuest(GUEST, ACCOUNT);
     await recordCompletedRace(ACCOUNT);
-    // The journal only records while a baseline is open, so the reward has to be earned after
-    // preparation froze one. Without this the journal is empty and proves nothing.
     await interruptAfterPreparation(GUEST, ACCOUNT);
     await recordHeadToHeadWin(ACCOUNT, "duringTransfer");
     expect(Object.keys(await redis.hGetAll(journalKey(ACCOUNT)))).toContain("win:challenge:duringTransfer");
@@ -268,7 +255,6 @@ describe("a Garage evidence cleanup that fails cannot spoil the next transfer", 
     redis.failDelKeys = new Set(["transfer-baseline"]);
     await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
 
-    // Awaited in sequence, a refused baseline delete skipped its partner and left both keys.
     expect(await redis.hGetAll(journalKey(ACCOUNT))).toEqual({});
   });
 
@@ -276,13 +262,10 @@ describe("a Garage evidence cleanup that fails cannot spoil the next transfer", 
     await seedGuest(GUEST, ACCOUNT);
     await recordHeadToHeadPost(ACCOUNT, "givenUpTrack");
 
-    // The first transfer's cleanup is refused, so its baseline outlives it.
     redis.failDelKeys = new Set(["transfer-baseline"]);
     await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
     const leaked = JSON.parse(await redis.get(baselineKey(ACCOUNT)));
 
-    // A second guest, a second Guest choice. Its baseline must describe the Garage as it stands
-    // now, not the one the first transfer froze. The delete stays refused so it survives to be read.
     await seedGuest(NEXT_GUEST, ACCOUNT);
     await recordHeadToHeadWin(ACCOUNT, "earnedBeforeSecondChoice");
     const beforeSecondChoice = await redis.hGetAll(carUnlockHashKey(ACCOUNT));
@@ -307,7 +290,6 @@ describe("the transfer's logging names no player", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
-  /** Every argument the transfer wrote to an ordinary log, flattened to strings. */
   function loggedArguments() {
     return [...console.error.mock.calls, ...console.log.mock.calls]
       .flat()
@@ -317,8 +299,6 @@ describe("the transfer's logging names no player", () => {
   it("keeps the account out of the missing-baseline log", async () => {
     await seedGuest(GUEST, ACCOUNT);
     await recordCompletedRace(ACCOUNT);
-    // A record written before baselines existed. Its replacement takes the keep-everything path,
-    // which is a normal path for a legacy transfer rather than a rare fault.
     await interruptAfterPreparation(GUEST, ACCOUNT);
     await redis.del(baselineKey(ACCOUNT));
 

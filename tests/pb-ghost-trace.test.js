@@ -51,13 +51,11 @@ describe('pb-ghost-trace validation and recording edges', () => {
     });
 
     it('enforces finish-time window between penultimate and next regular sample', () => {
-        // 2 samples => penultimate 0, next regular 50. finish must be > 0 and <= 50
         expect(isValidPbGhostTrace(validTrace({ finishTimeMs: 1, deltas: [0, 0, 0] }))).toBe(true);
         expect(isValidPbGhostTrace(validTrace({ finishTimeMs: 0, deltas: [0, 0, 0] }))).toBe(false);
         expect(isValidPbGhostTrace(validTrace({ finishTimeMs: 50, deltas: [0, 0, 0] }))).toBe(true);
         expect(isValidPbGhostTrace(validTrace({ finishTimeMs: 51, deltas: [0, 0, 0] }))).toBe(false);
 
-        // 3 samples => penultimate 50, next regular 100
         expect(isValidPbGhostTrace(validTrace({
             finishTimeMs: 50,
             deltas: [0, 0, 0, 0, 0, 0],
@@ -183,7 +181,6 @@ describe('pb-ghost-trace validation and recording edges', () => {
             angle: 0,
         });
         expect(trace).not.toBeNull();
-        // At 50ms, between 33.3ms (x=1) and 66.7ms (x=3): (0.05 - 1/30) / (1/15) = 0.5 → x = 2.
         expect(trace.origin).toEqual([0, 0, 0]);
         expect(trace.deltas[0]).toBe(200);
         expect(trace.deltas[1]).toBe(0);
@@ -217,7 +214,6 @@ describe('pb-ghost-trace validation and recording edges', () => {
             angle: 0,
         });
         expect(trace).not.toBeNull();
-        // 3/60 === 0.05 exactly → on-grid hit uses current pose x=0.6 → 60cm
         expect(trace.deltas[0]).toBe(60);
     });
 
@@ -293,7 +289,6 @@ describe('pb-ghost-trace validation and recording edges', () => {
             angle: -Math.PI + 0.1,
         });
         expect(trace).not.toBeNull();
-        // Mid-grid at 50ms is halfway on the short arc (+0.1 rad from start).
         const samples = reconstructRegularSamples(trace);
         const midAngle = samples[1].angleMilli / 1000;
         expect(midAngle).toBeCloseTo(Math.PI, 2);

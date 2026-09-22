@@ -15,11 +15,6 @@ function phase(onPhase, progress, label) {
     onPhase?.({ progress, label });
 }
 
-/**
- * Runs the selected mode's startup to completion and only then reveals the lobby.
- * Graphics and race data are both started up front: the graphics never wait on a
- * server answer they do not need, and nothing here gives up on a slow request.
- */
 export async function runInitialStartupPlan({
     mode,
     prepareRuntime,
@@ -36,17 +31,11 @@ export async function runInitialStartupPlan({
         phase(onPhase, 10, `Loading ${modeLabel}…`);
         await prepareRuntime?.(selectedMode);
 
-        // The graphics group reports its own phases. Everything the player waits on lives
-        // inside it, and most of that wait is the contract round trips that have to answer
-        // before the track key is even known -- a bar that holds one number across all of
-        // it reads as a stall rather than as work.
         const graphics = Promise.resolve(startGraphics?.(selectedMode, {
             onContractPhase: () => phase(onPhase, 30, `Loading ${modeLabel} data…`),
             onTrackPhase: () => phase(onPhase, 65, 'Preparing the track…'),
         }));
         const raceData = Promise.resolve(startRaceData?.(selectedMode));
-        // Both groups are in flight from here, so a race-data failure must not count as
-        // unhandled while the graphics are still being awaited.
         raceData.catch(() => {});
 
         await graphics;

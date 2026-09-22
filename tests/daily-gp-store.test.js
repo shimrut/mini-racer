@@ -198,7 +198,6 @@ class RedisTestDouble {
         return a[1] - b[1];
       });
     if (options?.by === 'score') {
-      // Devvit keeps start as the low bound under reverse; only the answer's order turns around.
       const lo = Number(start);
       const hi = Number(stop);
       let rows = lo > hi
@@ -741,7 +740,6 @@ describe("daily-gp-store submission hardening", () => {
       accepted: false,
       reason: "submission_identity_changed",
     });
-    // Refused before rate limiting, so a paused result cannot burn the owner's submission budget.
     expect(validateDailyGpReplayDetailedMock).not.toHaveBeenCalled();
   });
 

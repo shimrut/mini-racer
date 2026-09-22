@@ -42,11 +42,8 @@ describe('direct-mode startup identity matrix', () => {
                 racer.loadStartupRaceData(mode),
             ]);
 
-            // Identity is an essential in every mode. The car starts with graphics
-            // but does not have to finish before the splash can hide.
             expect(calls).toContain(`profile:${identity}`);
             expect(calls).toContain('car');
-            // One shared contract request, however many groups asked for it.
             expect(racer.loadDailyChallengeCritical.mock.calls.length
                 + racer.prepareInitialCampaignLaunch.mock.calls.length
                 + racer.loadChallengeLobby.mock.calls.length).toBe(1);
@@ -58,7 +55,6 @@ describe('direct-mode startup identity matrix', () => {
                 expect(calls).not.toContain('campaign-contract');
                 expect(calls).not.toContain('challenge-contract');
             } else if (mode === 'campaign') {
-                // Campaign progress picks the stage, so identity settles first.
                 expect(calls.indexOf(`profile:${identity}`))
                     .toBeLessThan(calls.indexOf('campaign-contract'));
                 expect(calls).toContain('track:campaign-track');
@@ -66,7 +62,6 @@ describe('direct-mode startup identity matrix', () => {
                 expect(calls).not.toContain('challenge-contract');
             } else {
                 expect(calls).toContain('challenge-contract');
-                // Head to Head prepares its own target track and opponent ghost.
                 expect(racer.loadTrack).not.toHaveBeenCalled();
                 expect(calls).not.toContain('daily-contract');
                 expect(calls).not.toContain('campaign-contract');
@@ -80,8 +75,6 @@ describe('direct-mode startup identity matrix', () => {
 
         const graphics = racer.loadStartupGraphics('campaign');
 
-        // Local preferences name the car, so it has nothing to learn from identity or the
-        // campaign bootstrap and must not spend their round trips waiting.
         expect(calls).toEqual(['car']);
 
         await graphics;

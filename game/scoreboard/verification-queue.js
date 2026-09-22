@@ -275,12 +275,11 @@ export function isRetryableVerificationFailure(result) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-/** Bucket field names persist in localStorage across deploys, and an unreadable entry is deleted — renaming one discards real queued runs. */
+// Entry fields persist; renaming drops queued runs.
 function getEntry(bucket, entryId) {
   if (!entryId) return null;
   const queueState = readQueueState();
   const entry = queueState[bucket][resolveEntryKey(queueState, bucket, entryId)] || null;
-  // Another owner's queued result is theirs to see, not this account's.
   if (entry?.ownerPlayerId && !isVisibleQueueEntry(entry)) return null;
   return cloneEntry(entry);
 }
@@ -332,9 +331,6 @@ function markTerminal(bucket, entryId, verificationState, stage, statusText) {
   }).entry;
 }
 
-/**
- * A queued result belongs to the account that raced it. Only the active owner's due entries are sent.
- */
 function isOwnedByActivePlayer(entry) {
   const activeOwnerId = getActivePlayerOwnerId();
   if (!activeOwnerId) return false;
@@ -349,8 +345,6 @@ function isVisibleQueueEntry(entry) {
 
 function getDue(bucket, now = Date.now()) {
   const queueState = readQueueState();
-  // Read the block from storage on every pass, so another tab's recovery cannot be missed and a
-  // completion in this tab releases the queue only once it is durable.
   if (isBlockedByTransfer()) return [];
   return Object.values(queueState[bucket])
     .filter(
@@ -367,41 +361,11 @@ function normalizedTransferValue(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-/**
- * Blocks live in their own storage key, not inside the queue. Every queue function is a
- * read-modify-write of the queue key, so a tab holding a stale copy would otherwise wipe a block
- * another tab had just written, and quietly release racing during an open transfer.
- */
-/**
- * What this tab knows about open transfers, whether or not storage accepted it.
- *
- * Storage is the durable record, and it is the only one that survives a reload. It can also be
- * missing, full, or blocked by the browser, and a block that was never written is invisible to
- * the very check that decides whether racing may continue. This map holds the same blocks in
- * memory so a storage failure cannot quietly release the pause inside one session.
- *
- * `persisted` separates the two cases, and the difference matters when reading:
- *  - persisted: storage accepted it. If a later read no longer finds it, another tab finished
- *    the recovery and removed it, and this tab should let it go.
- *  - unpersisted: storage never accepted it. A read that does not find it proves nothing, so it
- *    is kept until this tab resolves it itself.
- *
- * The boundary this shares with `activePlayerOwnerId` in `game/player/active-owner.js`: both are
- * module state, so a reload starts with neither. A browser whose storage failed comes back
- * knowing nothing, and only the server can tell it about the transfer again. Missing durable
- * evidence plus unavailable storage therefore needs an online confirmation; cleared browser data
- * cannot be reconstructed from here.
- */
 const knownTransferBlocks = new Map();
 
 function readStoredTransferBlocks() {
-  // No window at all is not a browser session, so there is no durable record to be missing and
-  // nothing to be unsure about. A window whose storage is missing or refuses to be read is the
-  // case that matters: this browser is playing, and it cannot say whether a transfer is open.
   if (typeof window === "undefined") return { ok: true, blocks: {} };
   try {
-    // Reading the property is itself the throwing operation when a browser denies site data, so
-    // it belongs inside the handler rather than in a guard in front of it.
     const storage = window.localStorage;
     if (!storage) return { ok: false, blocks: {} };
     const raw = storage.getItem(TRANSFER_BLOCKS_STORAGE_KEY);
@@ -417,21 +381,10 @@ function readStoredTransferBlocks() {
   }
 }
 
-/**
- * True once a bootstrap has confirmed, with the server, that this browser has nothing unresolved.
- * Until then an unreadable store means transfer safety is simply unknown.
- */
 let transferSafetyConfirmed = false;
 
-/** True when the last attempt to read the durable record failed rather than came back empty. */
 let storageReadFailed = false;
 
-/**
- * Every block this tab must honour: what storage holds, plus what it knows storage never took.
- *
- * A successful read is also adopted into memory. Without that a block only ever read back from
- * storage lives nowhere else, and the first failed read afterwards releases it.
- */
 function readTransferBlocks() {
   const stored = readStoredTransferBlocks();
   storageReadFailed = !stored.ok;
@@ -439,10 +392,6 @@ function readTransferBlocks() {
   if (stored.ok) {
     for (const [accountPlayerId, block] of Object.entries(stored.blocks)) {
       const cached = knownTransferBlocks.get(accountPlayerId);
-      // Refresh what storage already owns, rather than only adopting keys that are new. The same
-      // account can be named with a different guest later, and a stale cached copy would restore
-      // the older pairing on the next failed read, leaving the newer guest unblocked.
-      // An unpersisted entry is left alone: storage never took it, so storage cannot replace it.
       if (!cached || cached.persisted) {
         knownTransferBlocks.set(accountPlayerId, { block, persisted: true });
       }
@@ -451,7 +400,6 @@ function readTransferBlocks() {
   for (const [accountPlayerId, entry] of knownTransferBlocks) {
     if (!entry) continue;
     if (entry.persisted && stored.ok) {
-      // Storage had it and no longer does: another tab completed this recovery.
       if (!(accountPlayerId in stored.blocks)) {
         knownTransferBlocks.delete(accountPlayerId);
         continue;
@@ -462,13 +410,6 @@ function readTransferBlocks() {
   return merged;
 }
 
-/**
- * Records that the server answered for this account and left nothing unresolved.
- *
- * This is the only thing that can settle transfer safety for a browser whose storage cannot be
- * read. Without it a cold start with both storage and the server unavailable knows nothing, and
- * an unresolved transfer would be indistinguishable from a clean browser.
- */
 export function confirmVerificationQueueTransferSafety() {
   transferSafetyConfirmed = true;
 }
@@ -476,7 +417,6 @@ export function confirmVerificationQueueTransferSafety() {
 function writeTransferBlocks(blocks) {
   if (typeof window === "undefined") return false;
   try {
-    // Same as the read: the property access can throw before any method is called.
     const storage = window.localStorage;
     if (!storage) return false;
     storage.setItem(TRANSFER_BLOCKS_STORAGE_KEY, JSON.stringify(blocks));
@@ -487,19 +427,9 @@ function writeTransferBlocks(blocks) {
   }
 }
 
-/**
- * A known transfer stops racing and submitting for the identity it names. Until a bootstrap has
- * confirmed who this browser is, any open transfer counts: guessing from a stale profile is how a
- * blocked player slips through the gate and is offered ordinary offline play. Once an owner is
- * confirmed, only a transfer naming that owner blocks, so signing into a different account
- * inherits nothing.
- */
 function isBlockedByTransfer(ownerPlayerId) {
   const blocks = Object.values(readTransferBlocks());
   if (blocks.length === 0) {
-    // Nothing is known, but nothing has been ruled out either. An unreadable store cannot say
-    // whether a transfer is open, and the agreed answer to that is a server connection rather
-    // than ordinary offline play.
     return storageReadFailed && !transferSafetyConfirmed;
   }
   const owner = ownerPlayerId === undefined ? getActivePlayerOwnerId() : ownerPlayerId;
@@ -513,7 +443,6 @@ export function isVerificationQueueSubmissionBlocked(ownerPlayerId) {
   return isBlockedByTransfer(ownerPlayerId);
 }
 
-/** Records that this browser knows about an unresolved transfer. Survives a reload. */
 export function recordVerificationQueueTransferBlock({
   transferId = null,
   guestPlayerId = null,
@@ -528,16 +457,12 @@ export function recordVerificationQueueTransferBlock({
     state,
     updatedAt: new Date().toISOString(),
   };
-  // Written down in memory before storage is asked. If the write fails this call still reports
-  // failure, so the caller treats the transfer as unresolved, but the pause itself holds for the
-  // guest, the account, and an identity this tab has not confirmed yet.
   knownTransferBlocks.set(accountPlayerId, { block, persisted: false });
   const persisted = writeTransferBlocks({ ...readTransferBlocks(), [accountPlayerId]: block });
   if (persisted) knownTransferBlocks.set(accountPlayerId, { block, persisted: true });
   return persisted;
 }
 
-/** Lifts the block for one account once its reconciliation is durable. */
 export function clearVerificationQueueTransferBlock(accountPlayerId) {
   if (!normalizedTransferValue(accountPlayerId)) return false;
   const blocks = readTransferBlocks();
@@ -547,7 +472,6 @@ export function clearVerificationQueueTransferBlock(accountPlayerId) {
   }
   const next = { ...blocks };
   delete next[accountPlayerId];
-  // Only this account's block goes. Another account's pause is not this resolution's to lift.
   const removed = writeTransferBlocks(next);
   if (removed) knownTransferBlocks.delete(accountPlayerId);
   return removed;
@@ -584,10 +508,6 @@ function matchesTransferEntrySnapshot(entry, snapshot) {
     && (entry.raceId ?? null) === snapshot.raceId;
 }
 
-/**
- * An entry named by an unfinished reconciliation, or one already quarantined, is never claimed by
- * whoever signs in next. Ownership it cannot prove is not ownership.
- */
 function isEntryProtectedByTransfer(queueState, bucket, entryKey) {
   if (queueState[bucket]?.[entryKey]?.transferRecoveryRequired) return true;
   return Object.values(queueState[TRANSFER_RECONCILIATIONS_KEY] || {}).some((receipt) => (
@@ -596,7 +516,6 @@ function isEntryProtectedByTransfer(queueState, bucket, entryKey) {
   ));
 }
 
-/** Marks entries this browser cannot prove ownership of, and keeps them out of every queue path. */
 function quarantineEntries(queueState, entries) {
   for (const { bucket, entryKey, entry } of entries) {
     queueState[bucket][entryKey] = {
@@ -611,7 +530,6 @@ function quarantineEntries(queueState, entries) {
   }
 }
 
-/** Capture exact local entries before the server choice is sent. The first choice is immutable. */
 export function prepareVerificationQueueGuestProgressReconciliation({
   transferId = null,
   guestPlayerId,
@@ -653,11 +571,6 @@ export function prepareVerificationQueueGuestProgressReconciliation({
   return { prepared: persisted, receiptKey, persisted };
 }
 
-/**
- * True when this browser already finished reconciling that exact transfer. The server keeps
- * reporting a completion for a while after the fact, and repeating the work would clear local
- * caches and medals on every launch.
- */
 export function isVerificationQueueGuestProgressReconciled({
   transferId = null,
   guestPlayerId,
@@ -681,11 +594,6 @@ export function isVerificationQueueGuestProgressReconciled({
   });
 }
 
-/**
- * A finish before bootstrap answers is stamped with who this phone already is. This visit may attach
- * a first-time guest run to the named account. A later sign-in does not take another owner's run.
- * Leftover unnamed runs become this phone's guest id so they are never deleted.
- */
 export function claimVerificationEntriesForOwner(ownerPlayerId) {
   const activeOwnerId = typeof ownerPlayerId === "string" && ownerPlayerId.trim()
     ? ownerPlayerId.trim()
@@ -741,11 +649,6 @@ export function claimVerificationEntriesForOwner(ownerPlayerId) {
   return { claimed };
 }
 
-/**
- * Resolves queued local runs when a Reddit sign-in chooses which progress source survives.
- * Pending replays are never merged across owners: choosing guest replaces the account queue,
- * while choosing account removes the guest/current-session queue.
- */
 export function resolveVerificationQueueAfterGuestProgressSelection({
   transferId = null,
   completedAt = null,
@@ -766,9 +669,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     && candidate.guestPlayerId === guestPlayerId
     && candidate.accountPlayerId === accountPlayerId
     && candidate.choice === choice;
-  // A receipt written before the server named the transfer is filed under the guest-and-account
-  // fallback key. The same reconciliation now arrives carrying the server's id, so look under both
-  // rather than treat this browser's own receipt as missing and quarantine everything it holds.
   const fallbackKey = transferReceiptKey({ guestPlayerId, accountPlayerId });
   const receiptKey = normalizedTransferValue(transferId)
     ? transferReceiptKey({ transferId, guestPlayerId, accountPlayerId })
@@ -779,8 +679,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     const ambiguous = [];
     for (const bucket of QUEUE_BUCKETS) {
       for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
-        // A Guest choice replaced the account's progress, so both sides are in doubt. An Account
-        // choice discarded only guest data, so the account's own queued runs were never at risk.
         const inDoubt = entry?.ownerPlayerId === guestPlayerId
           || (choice === "guest" && entry?.ownerPlayerId === accountPlayerId);
         if (!inDoubt) continue;
@@ -790,10 +688,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
         }
       }
     }
-    // Another device, or a browser that lost its receipt. This browser cannot prove which entries
-    // the selection covered, so it invents no history: the ambiguous ones are quarantined, and the
-    // decision itself is written down. Once that decision is durable, results raced from here on
-    // save normally.
     quarantineEntries(queueState, ambiguous);
     queueState[TRANSFER_RECONCILIATIONS_KEY] ??= {};
     queueState[TRANSFER_RECONCILIATIONS_KEY][receiptKey] = {
@@ -852,12 +746,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
         ? queueState[snapshot.bucket][destinationKey]
         : null;
       if (occupant) {
-        // The account raced this one again between the receipt and the completion, so its entry no
-        // longer matched its snapshot and was kept rather than removed. Both runs now want the same
-        // slot and only one can have it. Keeping whichever happened to arrive first threw away the
-        // guest's run with no comparison at all, and a rotated guest id meant nothing could ever
-        // claim it back. The faster run wins, exactly as it would have had the two been raced in
-        // sequence on one identity.
         const isBetter = BUCKET_CANDIDATE_RULE[snapshot.bucket];
         if (!isBetter?.(entry, occupant)) {
           delete queueState[snapshot.bucket][snapshot.entryKey];
@@ -881,14 +769,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   }
 }
 
-/**
- * Moves a guest's unsent runs to the account the server joined that guest to.
- *
- * Only for a guest the server joined with nothing to transfer: no progress was replaced, so each
- * run simply belongs to the account now. Where the account already has a run for the same race,
- * the faster one stays, by the rule `enqueue` uses. A run held by an unfinished transfer, or set
- * aside for review, is left where it is.
- */
 export function moveVerificationEntriesToOwner(fromOwnerId, toOwnerId) {
   const from = normalizedTransferValue(fromOwnerId);
   const to = normalizedTransferValue(toOwnerId);
@@ -1015,7 +895,6 @@ export function clearDailyChallengeVerification(challengeId) {
 
 export const MAX_TRACK_PB_RETRY_ATTEMPTS = 3;
 
-/** The run is already accepted; only its ghost is missing, so the replay is kept for a bounded number of retries and then dropped. */
 function markTrackPbRetry(bucket, entryId, nextAttemptAt, extraFields = {}) {
   let exhausted = false;
   const { entry } = updateEntry(bucket, entryId, (previousEntry) => {
@@ -1099,11 +978,6 @@ export function getCampaignVerificationEntries() {
   return entries;
 }
 
-/**
- * Selection is shown while the active owner is deliberately cleared. Read the queue by its
- * stamped owner so a pending Campaign result can be described without making another owner's
- * result visible to the current session.
- */
 export function getCampaignVerificationEntriesForOwner(ownerPlayerId) {
   if (typeof ownerPlayerId !== 'string' || !ownerPlayerId.trim()) {
     return Object.create(null);
@@ -1123,12 +997,6 @@ export function getCampaignVerificationEntriesForOwner(ownerPlayerId) {
   return entries;
 }
 
-/**
- * Which run wins one queue slot, per bucket.
- *
- * `enqueue` already answers this whenever two runs compete for the same key, so a transfer that
- * moves a run onto an occupied key answers it the same way rather than inventing a second rule.
- */
 const BUCKET_CANDIDATE_RULE = {
   daily: isBetterDailyCandidate,
   campaign: isBetterCampaignCandidate,
@@ -1188,7 +1056,6 @@ export function markCampaignVerificationPending(
   return markPending("campaign", raceId, nextAttemptAt, options);
 }
 
-/** Campaign progress is already confirmed when this runs: the entry survives only to recover the ghost, so it must not read as unverified progress. */
 export function markCampaignTrackPbRetry(raceId, nextAttemptAt) {
   return markTrackPbRetry("campaign", raceId, nextAttemptAt, {
     progressConfirmed: true,

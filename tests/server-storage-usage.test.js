@@ -42,7 +42,6 @@ const mockRedis = {
 vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }));
 vi.mock('@devvit/web/server', () => ({
     redis: mockRedis,
-    // The walk is cached in production; standalone there is no request context to cache under.
     cache: vi.fn(async (source) => source()),
     context: {},
 }));
@@ -72,7 +71,6 @@ function putSortedSet(key, members) {
     sortedSets.set(key, new Map(Object.entries(members)));
 }
 
-/** The same arithmetic the report claims to do, run over the fixture rather than over Redis. */
 function seededBytes() {
     const stringBytes = [...strings].reduce(
         (bytes, [key, value]) => bytes + key.length + value.length,

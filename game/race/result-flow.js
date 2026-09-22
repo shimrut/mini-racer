@@ -129,11 +129,6 @@ function toPositiveRank(value) {
     return Number.isInteger(rank) && rank > 0 ? rank : null;
 }
 
-/**
- * Challenge finishes always show a rank row. The number updates only when this run is a personal
- * best and the submit returns a rank. Until then the row keeps the rank already held on that
- * board, or an empty mark. A Campaign stage the player has not unlocked reads as TRACK LOCKED.
- */
 export function buildChallengeRankSnapshot(bestUpdate, viewerBest) {
     if (viewerBest?.trackLocked) {
         return {
@@ -222,7 +217,6 @@ export function applyCombinedRankValue({
         rankValueEl.textContent = rankText;
     }
 
-    // `??` keeps a real 0 meaning "no racers" while still reading older payloads that only sent `totalCount`.
     const totalRaw = Number(
         scoreboardSnapshot?.leaderboardEntryCount ?? scoreboardSnapshot?.totalCount,
     );

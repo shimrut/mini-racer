@@ -51,7 +51,6 @@ export async function checkSubmissionRateLimit(
             retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
         };
     }
-    // Repair a counter left without a TTL by a gap between incr and expire, or this identity is locked out for good.
     await redis.expire(key, SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
     return { allowed: false, retryAfterSeconds: SUBMISSION_RATE_LIMIT_WINDOW_SECONDS };
 }
@@ -70,11 +69,6 @@ function resolveRateLimitIdentity(
         : playerId;
 }
 
-/**
- * A queued replay names the account it was raced under. If the browser has since switched accounts,
- * the trusted identity on this request is somebody else, and accepting the run would credit their
- * board with a race they never drove — so it is refused without touching the replay.
- */
 export function isMismatchedSubmissionOwner(
     playerId: string,
     submissionOwnerId: unknown,
@@ -263,9 +257,6 @@ export async function submitCompetitionRun(
         };
     }
 
-    // A submission may have passed the request-level identity check just before a
-    // guest transfer began. Recheck while holding the same per-race lock the
-    // transfer coordinator uses so it cannot write after the source was copied.
     if (await isProgressTransferPending(playerId)) {
         const pendingRelease = releaseRedisLock(submissionLock, redis).catch((error) => {
             console.error('Pending transfer submission lock cleanup failed:', error);
@@ -353,7 +344,6 @@ export async function submitCompetitionRun(
         ]);
     } finally {
         releaseLock = releaseRedisLock(submissionLock, redis).catch((error) => {
-            // Lock cleanup is best-effort; it must not replace a committed outcome.
             console.error('Competition submission lock cleanup failed:', error);
         });
     }

@@ -5,7 +5,6 @@ import {
     inflateTightBends,
 } from '../tools/mapmaker/ribbon-walls.js';
 
-/** Axis-aligned square centerline (CCW). */
 const SQUARE = [
     { x: 0, y: 0 },
     { x: 10, y: 0 },

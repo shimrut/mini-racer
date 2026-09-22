@@ -39,21 +39,11 @@ import { challengeCollectionKey } from './pb-ghost-store.js';
 import { readContextSubredditName } from './request-context.js';
 import { cacheSharedJson } from './shared-cache.js';
 
-/**
- * Devvit's Redis gives an app no server figure — there is no INFO, no DBSIZE, and no way to
- * list keys — so nothing here can report how full the hosted instance is. What it can do is
- * walk the keys this app knows how to name and add up what they hold. Row counts come from
- * hLen and zCard, which move no payload; row sizes come from a small sample of each family,
- * so a hash of ghost replays is never pulled down in full to be weighed.
- */
-
 const SAMPLED_KEYS_PER_GROUP = 5;
 const SAMPLED_ROWS_PER_KEY = 20;
 const SAMPLED_PLAYERS = 40;
 const READ_CONCURRENCY = 8;
-/** A sorted-set score is a double, whatever the member costs. */
 const SORTED_SET_SCORE_BYTES = 8;
-/** The walk costs hundreds of reads, so every moderator on the page shares one answer. */
 const STORAGE_USAGE_CACHE_TTL_SECONDS = 5 * 60;
 
 export type StorageUsageGroup = {
@@ -105,7 +95,6 @@ function addTallies(first: Tally, second: Tally): Tally {
     };
 }
 
-/** One slow key must not cost the whole report, so every read answers zero rather than throwing. */
 async function readCount(read: () => Promise<number>): Promise<number> {
     try {
         const value = await read();
@@ -134,7 +123,6 @@ async function mapWithLimit<Item, Result>(
     return results;
 }
 
-/** Spread the sample across the list: the newest and the oldest day should both be in it. */
 function pickSpread<Item>(items: readonly Item[], count: number): Item[] {
     if (items.length <= count) return [...items];
     const step = items.length / count;
@@ -185,10 +173,6 @@ async function sampleSortedSetRows(key: string): Promise<RowSample> {
     }
 }
 
-/**
- * Counted keys are exact and free of payload; the bytes per row are the average of a sample
- * drawn from a handful of the keys, because the whole family is far too big to read.
- */
 async function measureRowKeys(
     keys: readonly string[],
     countRows: (key: string) => Promise<number>,
@@ -255,11 +239,6 @@ const PLAYER_RECORDS_GROUP = {
     detail: 'Profile, Campaign progress and car unlocks, per signed-in player',
 } as const;
 
-/**
- * A player's profile, Campaign progress and car unlocks are filed under a hash of their ID,
- * so they can only be found by naming the player first. The analytics ledger is the one list
- * of signed-in players this app keeps, so it supplies both the sample and the population.
- */
 async function measurePlayerRecords(scope: string): Promise<StorageUsageGroup> {
     const empty: StorageUsageGroup = { ...PLAYER_RECORDS_GROUP, bytes: 0, keys: 0, rows: 0, estimated: false };
     const ledgerKey = firstSeenKey(scope);

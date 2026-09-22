@@ -1,10 +1,5 @@
 import { presentPlayerChoiceOverlay } from './player-choice-overlay.js';
 
-/**
- * `allowOffline` is false when this browser knows about an unfinished progress transfer. Racing on
- * without the server would build results on top of progress the transfer may still replace, so the
- * offline way out is not offered at all.
- */
 export async function requestServerSyncFailureChoice({ retry, allowOffline = true } = {}) {
     if (typeof document === 'undefined' || !document.body) {
         return { action: allowOffline ? 'offline' : 'retry' };

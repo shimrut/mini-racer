@@ -179,10 +179,6 @@ export function readHeadToHeadWin(challengeId, root = globalThis) {
 
 export { WON_CHALLENGE_KEY, WON_CHALLENGE_TTL_MS };
 
-/**
- * Every answer that leaves the comment on the post, whether the app posted it now or found it
- * already there, and including the one Reddit refused to confirm.
- */
 const CONCEDED_COMMENT_STATUSES = new Set([
     'commented',
     'already_commented',
@@ -191,12 +187,6 @@ const CONCEDED_COMMENT_STATUSES = new Set([
     'comment_unconfirmed',
 ]);
 
-/**
- * Whether this comment answer ends a concession, which restarts the count of starts before the
- * finish offers to concede again. A tie is not a concession: it says its own line and leaves the
- * count alone. An unconfirmed comment may be live, so it counts as posted — waiting five more
- * starts is the cheap mistake, a second concession on the post is not.
- */
 export function concedesHeadToHead(request, body) {
     if (request?.kind !== 'challenge-comment' || request?.outcome !== 'lost') return false;
     return CONCEDED_COMMENT_STATUSES.has(body?.status);

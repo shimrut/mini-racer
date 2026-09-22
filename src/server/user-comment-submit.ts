@@ -7,16 +7,13 @@ export type SubmittedUserComment = {
     authorName?: string;
 };
 
-// No link and no `postedAt` means the next attempt walks the thread.
 export type UserCommentRecord = {
     commentId?: string;
     commentUrl?: string;
     commentText: string;
     username: string;
     createdAt: string;
-    /** Set once Reddit has accepted the comment. `createdAt` is the claim, written before it. */
     postedAt?: string;
-    /** Who Reddit says wrote it. Empty when Reddit returned no name. */
     authorName?: string;
 };
 
@@ -27,14 +24,13 @@ export type UserCommentOutcome =
     | { status: 'unconfirmed' }
     | { status: 'lock_lost' };
 
-// A longer thread answers unknown, never absent.
 const COMMENT_WALK_LIMIT = 100;
 const COMMENT_WALK_PAGE_SIZE = 25;
 
 // Reddit reports comment times in whole seconds.
 const COMMENT_CLOCK_SLACK_MS = 1000;
 
-// Every other error may have posted the comment.
+// Other errors may have posted the comment.
 const REFUSAL_MESSAGES = [
     'this user account is not valid',
     'failed to mint',
@@ -84,7 +80,6 @@ function createdAtMs(comment: { createdAt?: unknown }): number {
     return NaN;
 }
 
-// A filled limit answers unknown, not absent.
 async function findPostedComment({
     postId,
     parentId,
@@ -132,20 +127,10 @@ function isUserCommentId(value: unknown): value is `t1_${string}` {
     return typeof value === 'string' && value.startsWith('t1_');
 }
 
-// The compare every caller uses.
 function sameAuthor(one: string, other: string): boolean {
     return one.trim().toLowerCase() === other.trim().toLowerCase();
 }
 
-/**
- * Writes the publication onto the claim.
- *
- * The claim's text, player and time stay. The parser needs the first two, and a later walk
- * searches from the third, so a comment posted before it would never be found.
- *
- * The comment ID is kept only for the player's own comment. Every path that reads a stored ID
- * reads it as the player's shared result, so an app-authored comment must not carry one.
- */
 async function recordPublication({
     key,
     ttlSeconds,
@@ -170,8 +155,6 @@ async function recordPublication({
         published.commentId = commentId;
         published.commentUrl = typeof comment?.url === 'string' ? comment.url : fallbackCommentUrl;
     }
-    // The comment is live, so a failed write must not turn it into an error. The caller answers
-    // from this copy, and the claim left behind still guards the result.
     await writeUserCommentRecord(key, ttlSeconds, published).catch((error: unknown) => {
         console.error('A posted comment could not be recorded:', error);
     });
@@ -184,7 +167,7 @@ function publicationOutcome(record: UserCommentRecord): UserCommentOutcome {
         : { status: 'posted_without_link', record };
 }
 
-// Reddit can post a comment and still throw.
+// Reddit may post and still throw.
 export async function submitUserComment({
     postId,
     parentId,
@@ -199,14 +182,11 @@ export async function submitUserComment({
     username: string;
     text: string;
     record: { key: string; ttlSeconds: number; stored: UserCommentRecord | null };
-    /** Used when Reddit returns a comment with no URL of its own. */
     fallbackCommentUrl?: string;
     confirmOwnership: () => Promise<boolean>;
 }): Promise<UserCommentOutcome> {
     const stored = record.stored;
     if (stored?.commentId) return { status: 'already', record: stored };
-    // Reddit accepted this comment. Only its link is missing, so nothing below may post again.
-    // This has to sit above the walk, because that walk reads an empty listing as absent.
     if (stored?.postedAt) {
         const live = await findPostedComment({
             postId,
@@ -252,7 +232,6 @@ export async function submitUserComment({
                 });
             return { status: 'already', record: live };
         }
-        // Start the record's time here, not earlier.
     }
     if (!await confirmOwnership()) return { status: 'lock_lost' };
     const claimedAt = new Date();
@@ -291,7 +270,6 @@ export async function submitUserComment({
         }));
     } catch (submitError) {
         if (refusedBeforePosting(submitError)) {
-            // Nothing was posted. The record costs a walk.
             await redis.del(record.key).catch((error: unknown) => {
                 console.error('A refused comment could not clear its record:', error);
             });

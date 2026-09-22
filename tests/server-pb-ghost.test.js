@@ -623,7 +623,6 @@ describe('PB ghost trace and storage', () => {
         const field = createHash('sha256').update('reddit:racing-cleanup', 'utf8').digest('base64url');
         redis.hashes.set(collectionKey, new Map([[field, '{not-json']]));
 
-        // The reader parses the corrupt value, then a fresh PB commits before the reader acts on it.
         redis.hGet.mockImplementationOnce(async () => {
             const raw = '{not-json';
             await upsertPlayerTrackPersonalBest({

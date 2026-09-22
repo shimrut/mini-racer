@@ -231,12 +231,6 @@ body {
     }
 }
 
-/* =========================================================================
-   About — a page, in the game's materials.
-   Night navy, Outfit italic names, mono clocks, the schematic as an object.
-   Not a lobby, not a modal, not type on a blurred track.
-   ========================================================================= */
-
 body.page-about {
     --text-muted: #64748b;
     --mono-font: "JetBrains Mono", ui-monospace, monospace;

@@ -329,10 +329,6 @@ describe('every Garage transfer path reports contention as retryable', () => {
 
     const RETRYABLE = { statusCode: 503, reason: 'progress_selection_retryable' };
 
-    /**
-     * Contention is ordinary and the browser's retry clears it. A path that lets the raw busy error
-     * out answers 500 with a stack trace instead, which reads as an unclassified fault.
-     */
     it('translates it when preparation freezes the account baseline', async () => {
         await client.set(promotionLockKey('reddit:driver'), 'account-writer');
         await expect(captureGuestTransferGarageBaseline(

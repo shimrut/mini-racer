@@ -1,8 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getCachedDailyChallengePlaylist } from '../game/daily-challenge/service.js';
 
-// Fresh module graph: playlist hydration runs once per module load.
-
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {

@@ -32,7 +32,6 @@ async function checkPrepareRateLimit(competitionId: string, identity: string) {
             retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
         };
     }
-    // Repair a counter left without a TTL, or this identity can never prepare a race again.
     await redis.expire(key, PREPARE_RATE_LIMIT_WINDOW_SECONDS);
     return { allowed: false as const, retryAfterSeconds: PREPARE_RATE_LIMIT_WINDOW_SECONDS };
 }

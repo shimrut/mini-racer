@@ -329,7 +329,6 @@ function buildMappedRingPath(outerPoints, innerPoints, mapPoint) {
         }
         path.closePath();
     }
-    // Reverse the inner ring so evenodd/nonzero ring clips stay reliable across backends.
     if (innerPoints.length >= 2) {
         const last = mapPoint(innerPoints[innerPoints.length - 1]);
         path.moveTo(last.x, last.y);
@@ -370,7 +369,7 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Avoid combined evenodd Path2D fills — they punch a false wedge hole on some backends (@napi-rs/canvas).
+    // Evenodd fills punch holes on @napi-rs/canvas.
     ctx.fillStyle = roadColor;
     ctx.fill(outerPath);
     ctx.save();

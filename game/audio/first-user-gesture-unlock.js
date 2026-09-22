@@ -6,7 +6,6 @@ function runRegisteredPrepares() {
         try {
             fn();
         } catch {
-            // Ignore; unlock should not break the page if one graph throws.
         }
     }
 }

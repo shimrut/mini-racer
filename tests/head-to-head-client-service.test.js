@@ -81,8 +81,6 @@ describe('head to head client service', () => {
             await previewHeadToHeadComment({
                 challengeId: 'challenge-1',
                 reportedTimeMs: 10_011,
-                // Which verdict this finish settled on is the client's own business: it decides
-                // whether a post restarts the concede count, and the server never sees it.
                 outcome: 'lost',
             });
             const previewBody = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
@@ -107,8 +105,6 @@ describe('head to head client service', () => {
 describe('concedesHeadToHead', () => {
     const lost = { kind: 'challenge-comment', outcome: 'lost' };
 
-    // Anything that leaves the comment on the post ends the concession, including the answer
-    // Reddit would not confirm: the comment may be live, and a second concession must not follow.
     it.each([
         'commented',
         'already_commented',

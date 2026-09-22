@@ -26,7 +26,7 @@ export function readCanvasDevicePixelRatio() {
   return window.devicePixelRatio || 1;
 }
 
-/** Measures canvas fill-rect throughput once at startup: 1 = low quality, 0 = high. */
+// 1 means low quality; 0 means high.
 export function detectDevicePerformance() {
   const testCanvas = document.createElement("canvas");
   testCanvas.width = 100;

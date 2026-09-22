@@ -1,12 +1,3 @@
-// Headless-driving hooks for local development: the `render_game_to_text` /
-// `advanceTime` browser-game test contract plus the PB ghost size reports.
-//
-// These live outside the engine class on purpose. A minifier cannot drop an
-// unreferenced class method, so anything defined on `RealTimeRacer` ships to
-// players no matter how it is gated at runtime. `vite.config.js` resolves this
-// module to `test-hooks.stub.js` for the shipped client build instead, which
-// removes the bodies below from the bundle entirely.
-
 import { getLargestPbGhostSizeReport } from "../ghost/pb-ghost-size-debug.js";
 
 export function renderGameToText(engine) {

@@ -8,7 +8,6 @@ import {
 export const CAMPAIGN_ID = 'numbered-v1';
 export const CAMPAIGN_RULES_REVISION = 1;
 
-/** Gate: 2n + floor(n / 2) total medals (clearable on Gold alone) plus a medal on the previous stage, so a total cannot fund skipping stages. */
 const STAGE_DEFINITIONS = [
     ['00', 'numberZero', 2, 0],
     ['01', 'numberOne', 2, 1],

@@ -7,7 +7,6 @@ import {
     GATE_WALL_OVERHANG,
 } from '../tools/mapmaker/lane-gate.js';
 
-/** Axis-aligned rectangular lane: outer 0..10, inner 2..8. */
 const OUTER = [
     { x: 0, y: 0 },
     { x: 10, y: 0 },

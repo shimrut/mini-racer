@@ -151,7 +151,6 @@ function getDirectionalDistance(from, to, direction) {
                 ? Math.max(0, from.top - to.bottom)
                 : Math.max(0, to.top - from.bottom);
 
-    // Overlapping edges count as aligned, so a wide button below a narrow right-aligned item stays a valid "down" target.
     if (primaryCenterDistance <= 0 || primaryCenterDistance < perpendicularGap) return null;
     return primaryEdgeGap + (perpendicularGap * 2) + (primaryCenterDistance * 0.01);
 }

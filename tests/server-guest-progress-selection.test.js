@@ -86,7 +86,6 @@ describe("guest progress selection", () => {
   it("reports exact current-playlist progress for a guest that owns runs", async () => {
     await seedSevenDayPlaylist();
     expect((await getServerDailyGpPlaylist()).length).toBe(7);
-    // Every accepted run records this event, so it is the cheap proof the guest owns progress.
     await recordCompletedRace("guest:cheap-evidence");
 
     countRedisCalls();
@@ -100,7 +99,6 @@ describe("guest progress selection", () => {
     expect(selection.guestHasProgress).toBe(true);
     expect(selection.guestSummary.dailySavedResults).toBe(0);
     expect(selection.guestSummary.dailyPlaylistSize).toBe(7);
-    // The summary reads the bounded seven-day playlist, not the retained history.
     expect(redisCalls).toBeLessThan(60);
   });
 
@@ -116,7 +114,6 @@ describe("guest progress selection", () => {
 
     expect(selection.required).toBe(false);
     expect(selection.guestHasProgress).toBe(false);
-    // Retiring the guest destroys its runs, so this answer is never given on cheap evidence alone.
     expect(redisCalls).toBeGreaterThan(14);
   });
 
@@ -151,7 +148,6 @@ describe("guest progress selection", () => {
   it("counts an account whose only record is a Daily result as having progress", async () => {
     await seedSevenDayPlaylist();
     const accountPlayerId = "reddit:selection-daily-only";
-    // No profile flag and no Garage reward: both background writes of that run failed.
     const [challenge] = await getServerDailyGpPlaylist();
     const competition = toDailyCompetition(challenge);
     await redis.hSet(competition.entryHashKey, {
@@ -563,10 +559,6 @@ describe("guest progress selection", () => {
   });
 });
 
-// Ceilings, not targets, with headroom over what this transfer measures today (343 calls, 270
-// sequential steps, a 19-call transaction window). Before this was cut, the same transfer took
-// 489 calls in 420 steps and held one transaction open across 68 of them. Raise these only with
-// a reason, and never quietly.
 const BUDGET_RPCS = 360;
 const BUDGET_SEQUENTIAL_STEPS = 300;
 const BUDGET_LARGEST_WINDOW = 24;
@@ -607,7 +599,6 @@ describe("guest transfer cost and recovery", () => {
     const [challenge] = await getServerDailyGpPlaylist();
     const competition = toDailyCompetition(challenge);
     const track = TRACKS[challenge.trackKey];
-    // A PB write and a leaderboard write succeed independently, so this shape is reachable.
     await upsertPlayerTrackPersonalBest({
       playerId: guestPlayerId,
       competition,
@@ -646,7 +637,6 @@ describe("guest transfer cost and recovery", () => {
       return realIncrBy.call(this, key, value);
     };
 
-    // The request dies on the first write after a stage has been cleared.
     let killed = false;
     redis.beforeExec = () => {
       if (bumped.length === 0 || killed) return;
@@ -659,7 +649,6 @@ describe("guest transfer cost and recovery", () => {
 
     const firstAttemptBumps = [...bumped];
     expect(firstAttemptBumps).toHaveLength(1);
-    // The progress record is deleted last, so the retry still knows the discard is unfinished.
     expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeTruthy();
 
     bumped.length = 0;
@@ -694,7 +683,6 @@ describe("guest transfer cost and recovery", () => {
       if (String(key).includes("standings-revision")) cleared += 1;
       return realIncrBy.call(this, key, value);
     };
-    // A successor takes one of the group's locks once the first stage is done.
     let stolenKey = null;
     redis.beforeExec = (keys) => {
       if (cleared === 0 || stolenKey) return;
@@ -706,9 +694,7 @@ describe("guest transfer cost and recovery", () => {
       .rejects.toMatchObject({ statusCode: 503, reason: "progress_selection_retryable" });
 
     redis.beforeExec = null;
-    // Cleanup must never delete a lock somebody else now owns.
     expect(redis.strings.get(stolenKey)).toBe("successor-owner");
-    // The unfinished discard is still visible to the retry.
     expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeTruthy();
     delete redis.incrBy;
   });
@@ -721,11 +707,8 @@ describe("guest transfer cost and recovery", () => {
     const pbOnly = campaignCompetitionFor(pbOnlyStage, guestPlayerId);
     const emptyField = campaignCompetitionFor(emptyStage, guestPlayerId);
 
-    // A ranking whose entry never landed.
     await redis.zAdd(rankOnly.leaderboardKey, { member: guestPlayerId, score: 31234 });
-    // An entry this build can no longer parse.
     await redis.hSet(unparseable.entryHashKey, { [guestPlayerId]: "{ not json" });
-    // A personal best from a superseded track revision.
     await redis.hSet(pbOnly.pbHashKey, {
       [dailyPbField(guestPlayerId)]: JSON.stringify({
         trackKey: pbOnlyStage.trackKey,
@@ -734,7 +717,6 @@ describe("guest transfer cost and recovery", () => {
         bestTimeMs: 31234,
       }),
     });
-    // A field that exists but stores nothing is still a row.
     await redis.hSet(emptyField.entryHashKey, { [guestPlayerId]: "" });
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
       campaignId: "numbered-v1",
@@ -745,7 +727,6 @@ describe("guest transfer cost and recovery", () => {
 
     await expect(discardGuestCampaignProgress({ guestPlayerId })).resolves.toBe(true);
 
-    // Nothing may outlive the progress record that would have prompted a retry.
     expect(await redis.zScore(rankOnly.leaderboardKey, guestPlayerId)).toBeFalsy();
     expect(await redis.hGet(emptyField.entryHashKey, guestPlayerId)).toBeUndefined();
     expect(await redis.hGet(unparseable.entryHashKey, guestPlayerId)).toBeFalsy();
@@ -771,21 +752,13 @@ describe("guest transfer cost and recovery", () => {
 
     await expect(discardGuestCampaignProgress({ guestPlayerId })).resolves.toBe(true);
 
-    // One raced stage, one bump: the other fifteen boards never changed.
     expect(bumped).toHaveLength(1);
     delete redis.incrBy;
   });
 
-  /**
-   * Every Devvit redis call is one round trip, including the commands queued inside a
-   * transaction. The double replays queued commands through the base client at exec(), so the
-   * replay is excluded to keep one call counted once.
-   */
   function measureRedis() {
     const measurement = { rpcs: 0, steps: 0, windows: [] };
     let inFlight = 0;
-    // The double answers mGet by delegating to get, and replays queued commands through the
-    // base client at exec(). Both are internal to the double; on Devvit each is one call.
     let delegating = false;
     let replaying = false;
     const baseWatch = RedisTestDouble.prototype.watch;
@@ -876,8 +849,6 @@ describe("guest transfer cost and recovery", () => {
     if (process.env.REPORT_TRANSFER_COST) {
       console.log("transfer cost", { ...measurement, windows: undefined, largestWindow });
     }
-    // A single transaction held open across a whole domain is what a slow store times out on,
-    // and the sequential steps are what elapsed time is actually made of.
     expect(largestWindow).toBeLessThanOrEqual(BUDGET_LARGEST_WINDOW);
     expect(measurement.steps).toBeLessThanOrEqual(BUDGET_SEQUENTIAL_STEPS);
     expect(measurement.rpcs).toBeLessThanOrEqual(BUDGET_RPCS);
@@ -887,7 +858,6 @@ describe("guest transfer cost and recovery", () => {
     await seedSevenDayPlaylist();
     await recordCompletedRace("guest:thrown-conflict");
     vi.spyOn(console, "error").mockImplementation(() => {});
-    // Reddit throws this instead of returning an empty EXEC.
     redis.throwTransactionConflictAt = 2;
 
     await expect(selectGuestProgress({

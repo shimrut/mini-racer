@@ -1,4 +1,4 @@
-// Matches the --dur-base fade the stylesheet gives #loading-screen.
+// Matches the --dur-base CSS fade.
 const LOADER_FADE_MS = 160;
 
 export class LoadingScreen {
@@ -25,10 +25,6 @@ export class LoadingScreen {
     this.setStatus(label);
   }
 
-  /**
-   * A failed essential leaves nothing to reveal, so the loader stays up and owns the
-   * retry rather than handing the player a lobby they cannot race from.
-   */
   showError(message, onRetry) {
     if (this.isComplete) return;
     this.setStatus(message);

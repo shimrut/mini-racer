@@ -208,7 +208,6 @@ describe('wave7 store parse helpers — direct coercion', () => {
         }))).toMatchObject({
             firstSeenAt: epoch,
         });
-        // Profiles stored before these two stamps were dropped still carry them. Parsing drops them.
         expect(parseStoredPlayerProfile(JSON.stringify({
             playerId: 'reddit:old-stamps',
             lastSeenAt: '2026-01-01T00:00:00.000Z',

@@ -279,7 +279,6 @@
     align-items: center;
 }
 
-/* One finish column for every mode. Head to Head only swaps the hero copy. */
 #modal-combined-view .pause-header {
     display: flex;
     flex-direction: column;

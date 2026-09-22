@@ -116,10 +116,6 @@ function writeStoredPlayerCarSkinAssetName(assetName) {
     }
 }
 
-/**
- * Only a snapshot the server confirmed may retire a stored selection. A cached or defaulted one can
- * disagree with the account's real entitlement, and resetting to stock on its word is not reversible.
- */
 export function setPlayerCarUnlockSnapshot(snapshot, { authoritative = true } = {}) {
     currentCarUnlockSnapshot = normalizeCarUnlockSnapshot(snapshot);
     const current = readStoredPlayerCarSkinAssetName();

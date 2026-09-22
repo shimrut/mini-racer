@@ -301,7 +301,6 @@ describe('daily GP result sharing', () => {
             String(key).endsWith(':lock') && seconds === 30
         ))).toBe(true);
 
-        // The result's lock holds while the first post runs, so nothing else posts it.
         const overlapping = await confirmDailyGpShare(
             { shareToken: preview.body.shareToken },
             requestContext,
@@ -338,8 +337,6 @@ describe('daily GP result sharing', () => {
             body: { status: 'shared' },
         });
         expect(userComment.delete).not.toHaveBeenCalled();
-        // The comment is live, so its record is written without the lock. Without it, the next
-        // Share posts the same result again.
         expect([...strings.keys()].some((key) => String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock'))).toBe(true);
         expect(strings.get(shareLockKey)).toBe('successor-token');
     });
@@ -1012,7 +1009,6 @@ describe('daily GP result sharing', () => {
         );
 
         expect(confirmed).toMatchObject({ status: 409, body: { status: 'posted_without_link' } });
-        // The comment is live. Without this mark the next Share walks the thread and posts again.
         const recordKey = [...strings.keys()].find((key) => (
             String(key).startsWith('dailygp:shared-result:') && !String(key).endsWith(':lock')
         ));

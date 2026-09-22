@@ -7,10 +7,10 @@ export function isStandardMedalTier(v) {
 }
 
 function normalizeMedalTimes(raw) {
-    const out = /** @type {Record<string, { gold: number, silver: number, bronze: number, author: number | null }>} */ ({});
+    const out = {};
     for (const [key, row] of Object.entries(raw)) {
         if (!row || typeof row !== 'object') continue;
-        const r = /** @type {Record<string, unknown>} */ (row);
+        const r = row;
         const gold = Number(r.gold);
         if (!Number.isFinite(gold)) continue;
         let silver = Number(r.silver);

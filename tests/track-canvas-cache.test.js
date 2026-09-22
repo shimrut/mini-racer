@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getTrackCanvasAsset } from '../game/track/assets.js';
 
-// game/track/assets.js keeps at most CANVAS_CACHE_LIMIT (7) painted tracks.
 const CANVAS_CACHE_LIMIT = 7;
 
 function createStubContext() {
@@ -51,10 +50,6 @@ describe('track canvas cache', () => {
     });
 
     it('leaves an evicted canvas usable for the race that still draws it', () => {
-        // The engine reads the cache once, when the track loads, and then holds the
-        // canvas itself for the whole race. The entry therefore ages to the oldest slot
-        // while the race runs, and the next painted track evicts it. Blanking the canvas
-        // on eviction blanked the track of the active race.
         const raced = getTrackCanvasAsset('raced-track', track, { presentation: { key: 'raced' } });
         const engineCanvas = raced.canvas;
         const racedWidth = engineCanvas.width;

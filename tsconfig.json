@@ -1,5 +1,4 @@
 {
-  "//": "Type checking only. Vite and esbuild strip the annotations without reading them, so nothing else checks this code. `npm test` runs it first through `pretest`, so a type error fails the suite. `strict` is off: narrow a union on a boolean field with `=== true` / `=== false`, because a bare truthiness check does not narrow without strictNullChecks.",
   "compilerOptions": {
     "noEmit": true,
     "strict": false,

@@ -1,8 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 
-// Fresh module graph for start-override storage reads.
-
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };
 }

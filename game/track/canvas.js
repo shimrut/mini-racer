@@ -373,7 +373,6 @@ function findCheckpointBoundaryPlacement(points, checkpointStart, checkpointEnd,
     return best || findClosestBoundaryPlacement(points, target);
 }
 
-// Decoration extents keep every painted effect inside the track bitmap.
 const CURB_OUTWARD_EXTENT = 3;
 const TIRE_BARRIER_OUTWARD_EXTENT = Math.hypot(12 + 7.5, 2 + 6) + 0.5;
 const DEBRIS_MAX_NORMAL_OFFSET = 72;
@@ -453,7 +452,6 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     canvas.width = Math.ceil((maxX - minX) + padding * 2);
     canvas.height = Math.ceil((maxY - minY) + padding * 2);
 
-    // Off-track stays transparent: the draw path repaints the background every frame, so baking it in here only stored megabytes of flat colour.
     const ctx = canvas.getContext('2d', { alpha: true });
     const offsetX = -origin.x;
     const offsetY = -origin.y;

@@ -475,7 +475,7 @@ function scheduleWinOverlayMedalEntranceWithSheetIntro(
         return;
     }
 
-    // Reveal on next paint. Embedded WebViews (Reddit app) often skip fadeIn / animationstart.
+    // Reddit WebViews can skip animationstart.
     requestAnimationFrame(reveal);
 }
 

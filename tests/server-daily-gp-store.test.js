@@ -1346,7 +1346,6 @@ describe('server daily gp store submissions', () => {
         });
 
         expect(payload.leaderboardIdentity).toBe('reddit');
-        // Nothing changed, so start-up leaves the stored profile as it is.
         expect(findWrittenPlayerProfile('reddit:pm-user')).toBeNull();
         expect(JSON.parse(storedStrings.get(playerProfileRedisKey('reddit:pm-user'))).leaderboardIdentity)
             .toBe('reddit');
@@ -1509,7 +1508,6 @@ describe('server daily gp store submissions', () => {
     it('opens no transaction when a stored profile would not change, however old it is', async () => {
         const { upsertPlayerProfile } = await import('../src/server/competition-identity.ts');
         const playerId = 'reddit:profile-skip';
-        // Written long ago, and still carrying the two stamps older builds stored.
         const stored = storedProfile(playerId, {
             lastSeenAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
@@ -1585,7 +1583,6 @@ describe('server daily gp store submissions', () => {
         });
         const set = mockRedis.set.getMockImplementation();
         mockRedis.set.mockImplementationOnce(async () => {
-            // The other request's create lands between this request's read and its create.
             seedStoredPlayerProfile(playerId, winner);
             return '';
         });
@@ -1606,7 +1603,6 @@ describe('server daily gp store submissions', () => {
         mockRedis.watch.mockImplementation(() => {
             watchCount += 1;
             if (watchCount > 1) return createMockTransaction();
-            // Another start-up's EXPIRE on this key aborts the first EXEC.
             return {
                 multi: vi.fn().mockResolvedValue(undefined),
                 set: vi.fn().mockResolvedValue(undefined),
@@ -4096,8 +4092,6 @@ describe('server daily gp store submissions', () => {
         mockRedis.zCard.mockResolvedValue(1);
         mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
         mockRedis.zRank.mockResolvedValue(undefined);
-        // The snapshot reads a page's entries and personal bests in bulk. Answer bulk reads from
-        // the same rows as single reads, so the two fakes cannot disagree about what is stored.
         mockRedis.hMGet.mockImplementation(async (key, fields) => (
             Promise.all(fields.map((field) => mockRedis.hGet(key, field)))
         ));
@@ -4201,8 +4195,6 @@ describe('server daily gp store submissions', () => {
         mockRedis.zCard.mockResolvedValue(1);
         mockRedis.zRange.mockResolvedValue([{ member: playerId, score: bestTimeMs }]);
         mockRedis.zRank.mockResolvedValue(undefined);
-        // The snapshot reads a page's entries and personal bests in bulk. Answer bulk reads from
-        // the same rows as single reads, so the two fakes cannot disagree about what is stored.
         mockRedis.hMGet.mockImplementation(async (key, fields) => (
             Promise.all(fields.map((field) => mockRedis.hGet(key, field)))
         ));

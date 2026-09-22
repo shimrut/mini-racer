@@ -297,7 +297,6 @@ export const scoreboardEngineMethods = {
       return;
     }
 
-    // The account changed under this queued run: keep the replay and wait for its owner to come back.
     if (result?.status === 409 && body?.reason === "submission_identity_changed") {
       markDailyChallengeVerificationPending(
         entry.challengeId,

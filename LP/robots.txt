@@ -1,10 +1,6 @@
-# Mini Racer — https://miniracer.club/
-# Everything here is public marketing copy: crawling and AI answer citation are welcome.
-
 User-agent: *
 Allow: /
 
-# Answer engines / AI crawlers, spelled out so nothing is blocked by accident.
 User-agent: GPTBot
 Allow: /
 

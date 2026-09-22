@@ -56,7 +56,7 @@ const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
 const FRAME_SYNC_INTERVAL_SEC = 0.1;
-// Suspend freezes the graph mid-echo, so outlast the 0.38-feedback delay line.
+// Outlast the echo before suspend.
 const IDLE_AUDIO_SUSPEND_MS = 1500;
 
 export function userGesturePrepareMusic() {
@@ -468,7 +468,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         const g = musicGain.gain;
         g.cancelScheduledValues(time);
         if (enabled) {
-            // Unity, not a mix level: every voice velocity is already tuned against it.
             const cur = Math.min(1, Math.max(0, g.value));
             g.setValueAtTime(cur, time);
             g.setTargetAtTime(1, time, 0.06);
@@ -535,12 +534,10 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         },
 
         prepareOnUserGesture() {
-            // Build only when music is actually on: constructing the context starts a
-            // real-time audio thread that nothing would later suspend.
             if (!enabledCache) return;
             buildGraph();
             if (!ctx) return;
-            // Resume on the gesture even before playback starts so iOS unlocks the context.
+            // iOS unlocks audio only on a gesture.
             if (ctx.state === 'suspended') {
                 void ctx.resume().then(() => {
                     ensureSchedulerRunning();

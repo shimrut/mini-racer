@@ -299,19 +299,6 @@ async function mutateProgress(
     }
 }
 
-/**
- * Makes sure a guest whose Campaign source is being kept for review will still be collected.
- *
- * Guests are enrolled in the expiry ledger only when a progress row is written. A guest holding
- * a personal best or a leaderboard row and no progress row was never enrolled, so preserving its
- * source for a reviewer would keep it for ever. Holding data for review is not a reason to hold
- * it without end.
- *
- * The deadline comes from the newest usable timestamp in the source plus the ordinary retention
- * period, never from today: data that has already outlived its retention gets no extension. An
- * existing ledger entry is left exactly as it is. A source with no usable timestamp is reported
- * and left alone, because choosing a deadline for it would be inventing one.
- */
 async function ensureGuestCampaignRetention(
     guestPlayerId: string,
     newestUpdatedAt: string | null,
@@ -334,7 +321,6 @@ async function ensureGuestCampaignRetention(
     const expiresAtMs = observedMs + CAMPAIGN_GUEST_TTL_SECONDS * 1000;
     await redis.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, {
         member: guestPlayerId,
-        // Data already past its retention is due for the next sweep, not given a fresh term.
         score: expiresAtMs <= nowMs ? nowMs : expiresAtMs,
     });
 }
@@ -388,7 +374,6 @@ export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<
         try {
             await transaction.discard();
         } catch (_discardError) {
-            // EXEC may already have closed the transaction.
         }
         throw error;
     }
@@ -413,8 +398,6 @@ export async function getCampaignProgressForSelection(
     { repairEmpty = true }: { repairEmpty?: boolean } = {},
 ): Promise<CampaignProgress> {
     const progress = await readProgress(playerId);
-    // Empty progress is common for a guest who only opened Campaign; avoid a full stage scan
-    // during the cheap selection evidence check when there is no stored result to repair.
     if (!repairEmpty && !progress.startedAt && !Object.keys(progress.resultsByRaceId).length) {
         return progress;
     }
@@ -753,7 +736,6 @@ export async function submitServerCampaignRun({
             },
         };
     }
-    // Checked before the stage lock, so a result queued under another account is never mistaken for a locked stage.
     if (isMismatchedSubmissionOwner(identity.canonicalPlayerId, submissionOwnerId)) {
         return SUBMISSION_IDENTITY_CHANGED_RESULT;
     }
@@ -829,8 +811,6 @@ export async function submitServerCampaignRun({
             };
         }
 
-        // The progress is saved, and it is the record the Keep Progress chooser reads. Neither job
-        // below can unsave it, so each settles on its own and only what failed is left out.
         const [carUnlocks, reward] = await Promise.allSettled([
             getCarUnlockSnapshot(
                 canonicalPlayerId,
@@ -852,8 +832,6 @@ export async function submitServerCampaignRun({
             body: {
                 ...outcome.body as Record<string, unknown>,
                 progress: publicProgress(savedProgress),
-                // This Garage counts the finish before the reward is stored. Without the reward,
-                // the next start-up could lock the car again, so the answer shows no Garage at all.
                 ...(carUnlocks.status === 'fulfilled' && reward.status === 'fulfilled'
                     ? { carUnlocks: carUnlocks.value }
                     : {}),
@@ -897,47 +875,24 @@ export async function getServerCampaignPbGhost({
 }
 
 type GuestCampaignStageSource = {
-    /** The three values the recorded inventory fingerprints, exactly as read. */
     rawEntry: string | null;
     rank: number | null;
     entry: DailyGpLeaderboardEntry | null;
     entryClass: StoredRecordClassification<unknown>;
     pb: PlayerTrackPbRecord | null;
     pbClass: StoredRecordClassification<PlayerTrackPbRecord>;
-    /**
-     * The personal best exactly as it was validated, before compression. The copy re-encodes this
-     * rather than reading the field again, so the bytes written are the bytes that were judged.
-     */
     rawPb: string | null;
 };
 
 type GuestCampaignSourceSnapshot = {
     progress: CampaignProgress;
     stages: Map<string, GuestCampaignStageSource>;
-    /** The progress row exactly as read, for the inventory check. */
     rawProgress: string | null;
-    /** Domain and reason for every row a person has to look at. Never carries player data. */
     malformed: string[];
-    /** Rows a supported campaign, track, or simulation change made unusable. */
     obsolete: string[];
-    /** Newest usable timestamp anywhere in the source. Retention for a held source derives from it. */
     newestUpdatedAt: string | null;
 };
 
-/**
- * Reads the guest's whole Campaign source once and classifies every row in it.
- *
- * Two reasons this is one pass, taken before the loop rather than inside it:
- *
- * 1. Every row must be judged before the first destination write. A malformed row found halfway
- *    through would otherwise stop a replacement that had already emptied earlier stages.
- * 2. The copy then runs from this snapshot. Re-reading the source after validating it would let
- *    a row that expired in between be copied as absent, which under `replace` deletes the
- *    account's row instead.
- *
- * The read count matches what the loop used to do on its own: one entry and one personal best
- * per stage, plus the progress row.
- */
 async function captureClassifiedGuestCampaignSource(
     guestPlayerId: string,
 ): Promise<GuestCampaignSourceSnapshot> {
@@ -952,8 +907,6 @@ async function captureClassifiedGuestCampaignSource(
     };
 
     const rawProgress = await redis.get(progressKey(guestPlayerId));
-    // Taken from the stored value itself, so a record that is damaged elsewhere still dates the
-    // source it belongs to. This is what a held source's retention deadline is derived from.
     observeTimestamp(readStoredUpdatedAt(rawProgress));
     const progressClass = classifyStoredCampaignProgress(rawProgress);
     if (progressClass.state === 'malformed') {
@@ -992,7 +945,6 @@ async function captureClassifiedGuestCampaignSource(
         stages.set(stage.raceId, {
             rawEntry: rawEntry ?? null,
             rank: rank ?? null,
-            // Parsed from the raw value already read, so this costs no extra round trip.
             entry: entryClass.state === 'valid'
                 ? parseStoredEntry(rawEntry, stage.trackKey)
                 : null,
@@ -1023,13 +975,6 @@ export async function mergeGuestCampaignProgress({
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
-    /**
-     * Called once the guest submission and progress locks are held, and before the first account
-     * write. A transfer uses it to prove the source still matches the inventory it recorded.
-     *
-     * A replacing merge hands over the exact rows it is about to copy, so the check and the copy
-     * cannot see different data. Anything else calls it with nothing and lets it read for itself.
-     */
     verifyGuestSource?: (observed?: {
         campaignProgress: string | null;
         campaignStages: Record<string, { entry: string | null; pb: string | null; rank: number | null }>;
@@ -1084,7 +1029,6 @@ export async function mergeGuestCampaignProgress({
         }
     };
     try {
-        // Match submission's lock order: stage writes finish before either progress record is claimed.
         await acquireAll(CAMPAIGN_STAGES.flatMap((stage) => {
             const competition = competitionFor(stage);
             return [
@@ -1103,20 +1047,10 @@ export async function mergeGuestCampaignProgress({
         );
         await confirmMergeOwnership();
 
-        // Read and judge the entire guest source before anything else. Everything below - the
-        // inventory check and the copy alike - works from this one snapshot, so the payload that
-        // is checked against the recorded inventory is the payload that gets written. Reading the
-        // source again between those two steps is what let an expiry in between be copied as
-        // absent, which under `replace` empties the account instead.
         const guestSource = replace
             ? await captureClassifiedGuestCampaignSource(guestPlayerId)
             : null;
-        // Damage is reported before the inventory check. The two stop the transfer for different
-        // reasons, and a damaged row that never moved would otherwise be reported as a changed
-        // source, which sends a reviewer looking for a change that did not happen.
         if (guestSource?.malformed.length) {
-            // The source stays for a reviewer, so it must still be enrolled for collection.
-            // A guest with rows but no progress row was never enrolled by ordinary play.
             await ensureGuestCampaignRetention(guestPlayerId, guestSource.newestUpdatedAt);
             throw new GuestProgressRecoveryRequiredError(
                 `Campaign guest source needs review: ${guestSource.malformed.join(', ')}`,
@@ -1154,8 +1088,6 @@ export async function mergeGuestCampaignProgress({
             await confirmMergeOwnership();
             const guestCompetition = competitionFor(stage);
             const redditCompetition = competitionFor(stage);
-            // Guest values come from the validated snapshot when one was taken. Only the account
-            // side is read here, so the source cannot change between its check and its copy.
             const stageSource = guestSource?.stages.get(stage.raceId);
             const [snapshotlessGuestEntry, redditEntry, snapshotlessGuestPb, redditPb, redditRankedScore] = await Promise.all([
                 guestSource
@@ -1246,9 +1178,6 @@ export async function mergeGuestCampaignProgress({
                 if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
                 let rawGuestPb: string | undefined;
                 if (guestCanSupplyWinningPb) {
-                    // From the validated snapshot when there is one, re-encoded the way the
-                    // compressing client would have. Reading the field again here would let a row
-                    // that expired since validation be copied as absent.
                     const validated = guestSource ? stageSource?.rawPb ?? null : null;
                     rawGuestPb = validated !== null
                         ? encodeRedisCompressedValue(validated)
@@ -1323,9 +1252,6 @@ export async function mergeGuestCampaignProgress({
             updatedAt: nowIso,
         }, redditProgressLock, transactionRunner ? runMutation : undefined);
 
-        // Keep the guest source until the transfer coordinator checkpoints the whole
-        // domain. A later retry must be able to reconstruct replacement progress if
-        // another domain or its checkpoint fails.
         return { merged: mergedRaceIds.length > 0, mergedRaceIds };
     } finally {
         if (lease) {
@@ -1353,8 +1279,6 @@ export async function cleanupGuestCampaignProgress({
             const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
             if (!lock) throw new CampaignProgressBusyError('Campaign cleanup is already in progress.');
             locks.push(lock);
-            // Start renewing as soon as the first lock is acquired. The array is
-            // intentionally shared so newly acquired locks join the lease.
             lease ??= startRedisLockGroupLeaseRenewal(
                 locks,
                 CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS,
@@ -1436,8 +1360,6 @@ export async function discardGuestCampaignProgress({
         if (!await renewRedisLockGroup(locks, redis)) {
             throw new CampaignProgressBusyError('Campaign discard ownership was lost.');
         }
-        // The lease is stopped for the writes below, so the group is refreshed on the same
-        // cadence it would have renewed on. On a fast store this never fires.
         let renewedAtMs = Date.now();
         const keepLocksFresh = async (): Promise<void> => {
             if (Date.now() - renewedAtMs < CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS) return;
@@ -1455,14 +1377,7 @@ export async function discardGuestCampaignProgress({
             }
         };
 
-        // One sweep decides which boards still hold this guest. A stage the guest never raced
-        // needs no transaction and no standings bump, and a stage a previous attempt already
-        // cleared reads empty — so a retry resumes here instead of repeating the whole campaign.
         const stagesToClear = (await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
-            // Raw presence, not a parsed record: this sweep decides what never gets deleted, and
-            // the progress record that would prompt a retry is removed once it finishes. An entry
-            // that no longer parses, a PB from a superseded track revision, and a ranking left
-            // without its entry are all still this guest's rows to take with them.
             const holdsRows = await competitionHoldsPlayerRows(
                 competitionFor(stage),
                 guestPlayerId,
@@ -1470,8 +1385,6 @@ export async function discardGuestCampaignProgress({
             return holdsRows ? stage : null;
         }))).filter((stage): stage is (typeof CAMPAIGN_STAGES)[number] => stage !== null);
 
-        // One stage per transaction. Queuing every stage into a single MULTI held it open
-        // across the whole campaign, and a store that timed that out failed all of it.
         for (const stage of stagesToClear) {
             await keepLocksFresh();
             const competition = competitionFor(stage);
@@ -1483,7 +1396,6 @@ export async function discardGuestCampaignProgress({
             });
         }
 
-        // Last, so the progress record still names an unfinished discard for any retry.
         await keepLocksFresh();
         await commit(async (transaction) => {
             await transaction.del(progressKey(guestPlayerId));

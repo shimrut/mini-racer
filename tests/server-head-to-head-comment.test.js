@@ -198,9 +198,6 @@ describe('head-to-head comments', () => {
         expect(posted.body).toMatchObject({ status: 'commented' });
         expect(reddit.submitComment).toHaveBeenCalledTimes(1);
 
-        // A tie is the target time to the millisecond, so a second tie is the same result. The
-        // preview says so instead of offering a confirmation that could only repeat the first
-        // comment and report it as new.
         const repeat = await previewHeadToHeadComment(
             { challengeId: challenge.challengeId, reportedTimeMs: 10_000 },
             context,
@@ -214,7 +211,6 @@ describe('head-to-head comments', () => {
         });
         expect(reddit.submitComment).toHaveBeenCalledTimes(1);
 
-        // A different finish is a different result, and still gets its own preview.
         const other = await previewHeadToHeadComment(
             { challengeId: challenge.challengeId, reportedTimeMs: 10_400 },
             context,

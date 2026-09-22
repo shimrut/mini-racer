@@ -51,7 +51,6 @@ export function readPlayerPreferences() {
         pausePlacement: getPausePlacement(),
         pauseOnTimerEnabled: getPausePlacement() === PAUSE_PLACEMENT_TIMER,
         hideHudEnabled: getHideHudEnabled(),
-        // Legacy wire field retained so stored player profiles remain compatible.
         crashAutoRestartEnabled: getCollisionAutoRestartEnabled(),
         crashRestartDelaySec: getCollisionRestartDelaySec(),
     };

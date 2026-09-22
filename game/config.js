@@ -34,7 +34,6 @@ export const CONFIG = {
     wallContactPadding: 0.001,
     resumeRelaunchDelay: 0.5,
 
-    // Capsule body: radius covers the width, the axis runs nose to rear so orientation matters.
     carRadius: 0.275,
     carCollisionHalfLength: 0.34,
 

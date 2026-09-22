@@ -261,7 +261,6 @@ const TRACK_GEOMETRY = {
     ravenRock,
 };
 
-// Compatibility registry for existing gameplay and server consumers.
 export const TRACKS = Object.fromEntries(
     Object.keys(TRACK_CATALOG).map((trackKey) => [
         trackKey,

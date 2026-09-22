@@ -634,16 +634,12 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 8.4 },
         );
         expect(lossShowModal).toHaveBeenCalledTimes(1);
-        // A first loss offers nothing: the locked Brag stays, exactly as it looks while a
-        // result is still confirming. Concede waits for the fifth start.
         expect(lossShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
             settledLap('lost', 0.4),
             pendingOptions,
         );
-        // The verdict is settled on screen without waiting, and the hero is left alone
-        // because this run earned no personal best to report.
         expect(lossUpdateHero).not.toHaveBeenCalled();
 
         const tieShowModal = vi.fn();
@@ -660,7 +656,6 @@ describe('Head to Head lobby and finish', () => {
             { lapTime: 8 },
         );
         expect(tieShowModal).toHaveBeenCalledTimes(1);
-        // A tie never waits. It has its own line and says it at once.
         expect(tieShowModal).toHaveBeenCalledWith(
             'Challenge complete',
             null,
@@ -669,8 +664,6 @@ describe('Head to Head lobby and finish', () => {
         );
         expect(tieUpdateHero).not.toHaveBeenCalled();
 
-        // A settled loss or tie is still sent: the run may be the player's best on the stage
-        // or Daily the challenge came from, and that best is theirs whatever the challenge said.
         expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(2);
     });
 
@@ -790,7 +783,6 @@ describe('Head to Head lobby and finish', () => {
             settings: { openSettings: vi.fn() },
         };
 
-        // 8.4s loses the challenge and is slower than the 8.2s already stored, so nothing is sent.
         await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
 
         expect(headToHeadServiceMocks.submitHeadToHeadRun).not.toHaveBeenCalled();
@@ -825,7 +817,6 @@ describe('Head to Head lobby and finish', () => {
             settings: { openSettings: vi.fn() },
         };
 
-        // 8.4s still loses the challenge, but it beats the 8.9s already stored.
         await headToHeadEngineMethods.handleHeadToHeadWin.call(context, { lapTime: 8.4 });
 
         await vi.waitFor(() => {
@@ -1038,8 +1029,6 @@ describe('Head to Head lobby and finish', () => {
                 differenceMs: 400,
             },
         });
-        // The server took the win away, so the button goes back to the locked Brag. This is the
-        // player's first loss, and Concede is not offered until the third.
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
                 phase: 'lost',
@@ -1168,15 +1157,11 @@ describe('Head to Head lobby and finish', () => {
                     expect.objectContaining({ phase: expectedPhase }),
                 );
             });
-            // 7.5 already beat 8.0 on the clock, so Daily/Campaign appear first, then
-            // Improve/Home return when the tape is refused.
             expect(setChallengeWinActions).toHaveBeenCalledTimes(1);
             expect(clearChallengeWinActions).toHaveBeenCalledWith({
                 restartAction: expect.any(Function),
             });
         } else {
-            // The verdict settled on screen without waiting, but the run still went out so a
-            // personal best could be claimed. With none reported, the hero is left as it was.
             expect(headToHeadServiceMocks.submitHeadToHeadRun).toHaveBeenCalledTimes(1);
             expect(updateChallengeFinishHero).not.toHaveBeenCalled();
             expect(setChallengeWinActions).not.toHaveBeenCalled();
@@ -1925,8 +1910,6 @@ describe('Head to Head poster after the duel is beaten', () => {
 });
 
 describe('Concede after five starts', () => {
-    // One engine for the whole visit: Improve restarts the race on the same object, so the
-    // count of starts lives across every retry until the post is closed.
     function visitContext(showModal) {
         return {
             activeHeadToHead: {
@@ -1979,12 +1962,10 @@ describe('Concede after five starts', () => {
             shareEnabled: true,
         });
 
-        // Declining costs nothing: the offer stays up until the player uses it.
         start(context);
         await finish(context, 8.6);
         expect(sheet(2).shareEnabled).toBe(true);
 
-        // A posted concession starts the five again.
         headToHeadEngineMethods.recordHeadToHeadConcede.call(context);
         for (let i = 0; i < 4; i += 1) {
             start(context);
@@ -2030,8 +2011,6 @@ describe('Concede after five starts', () => {
         const updateChallengeFinishHero = vi.fn();
         const context = visitContext(showModal);
         context.modal.updateChallengeFinishHero = updateChallengeFinishHero;
-        // A run faster than the target opens on pending and waits for the server, which then
-        // takes the win away. That is one loss, not two.
         headToHeadServiceMocks.submitHeadToHeadRun.mockResolvedValue({
             ok: false,
             body: {
@@ -2054,8 +2033,6 @@ describe('Concede after five starts', () => {
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledTimes(2);
         });
-        // Two starts. The server taking the win away must not count as another start, or this
-        // would be further along than two.
         for (const call of updateChallengeFinishHero.mock.calls) {
             expect(call[0].shareRequest).toEqual({ kind: 'challenge-brag', acceptToken: null });
         }

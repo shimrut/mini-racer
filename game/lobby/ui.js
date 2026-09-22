@@ -17,11 +17,6 @@ import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
-// Daily and Campaign share the same header, background track and pane layout, so
-// switching between them only needs the mode switch to slide and the pane to
-// swap. The full-overlay veil and the document view transition are for hand-offs
-// that reload the background track (anything through Home); here they blank or
-// cross-fade the whole lobby over content that barely changed.
 const TOGGLE_MODES = ['daily', 'campaign'];
 const BLOCKING_OVERLAY_IDS = [
     'modal',
@@ -38,8 +33,6 @@ function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
 }
 
-// The subhead bills the selected track over its lap count. Both lines live in
-// the one paragraph so the stack stays right-aligned against the rule.
 function setSubheadSelection(element, trackName, laps) {
     if (!element) return;
     const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
@@ -54,7 +47,6 @@ function setSubheadSelection(element, trackName, laps) {
         return;
     }
     trackElement.textContent = safeTrackName;
-    // Laps without a track name would read as a stray number, so they follow it.
     lapsElement.hidden = !safeTrackName || safeLaps === null;
     lapsElement.textContent = lapsElement.hidden ? '' : lapsLabel;
 }
@@ -262,12 +254,6 @@ export class LobbyUi {
             }
             if (document.body?.dataset) {
                 document.body.dataset.lobbyMode = mode;
-                // Stays on the body until the next swap replaces it — clearing it
-                // once the entrance finishes would re-apply the pane animation and
-                // replay it. Only a real swap writes one: the value decides whether
-                // `.lobby-pane` or `.track-carousel` carries the entrance, so
-                // rewriting it to repaint the mode already on screen moves the
-                // animation between them and restarts it.
                 if (previousMode !== mode) {
                     document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
                 }
@@ -310,8 +296,6 @@ export class LobbyUi {
         const toggle = document.querySelector('[data-lobby-mode-switch]');
         const switchDaily = document.getElementById('lobby-switch-daily-btn');
         const switchCampaign = document.getElementById('lobby-switch-campaign-btn');
-        // Home is where the wordmark already leads, so it is inert there rather
-        // than a button that tabs to nothing.
         const titleHome = document.getElementById('lobby-title-home-btn');
         if (titleHome) titleHome.disabled = mode === 'home';
         if (!label) return;
@@ -350,8 +334,6 @@ export class LobbyUi {
             track.hidden = true;
             track.textContent = '';
         }
-        // Daily and Campaign both bill the selected track here; the day label
-        // stays on the card, where it is what tells the days apart.
         const billingLabel = this.mode === 'daily'
             ? this._dailySelectedTrackName?.trim() || null
             : this.mode === 'campaign'
@@ -617,13 +599,6 @@ export class LobbyUi {
         this.renderDaily();
     }
 
-    /**
-     * Paints the reason a race could not start, above the primary button.
-     *
-     * The label alone can only say `Retry Start`, and the start overlay rewrites that label on
-     * every paint, so the reason needs a node of its own. This is the same line and the same class
-     * the challenge pane already uses for exactly this job.
-     */
     renderRaceStartMessage(elementId, message) {
         const node = document.getElementById(elementId);
         if (!node) return;
@@ -671,7 +646,6 @@ export class LobbyUi {
     }
 
     renderCampaign() {
-        // Painted before the early return, so the reason survives a pane with no primary button.
         this.renderRaceStartMessage('campaign-start-message', this._campaignStartError);
         if (!this.campaignPrimaryBtn) return;
         const stage = this._campaignSelectedStage;

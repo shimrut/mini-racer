@@ -275,7 +275,6 @@ describe('game stylesheet architecture', () => {
         expect(lobbyModeStyles).toMatch(
             /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*text-align:\s*right;[^}]*text-transform:\s*uppercase;/s,
         );
-        // Track over laps: the stack has to keep its right edge on the rule.
         expect(lobbyModeStyles).toMatch(
             /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
         );
@@ -289,7 +288,6 @@ describe('game stylesheet architecture', () => {
             new URL('../styles/lobby-and-garage.css', import.meta.url),
             'utf8',
         );
-        // The h1 stays untouchable so the hit area is the letters, not the header.
         expect(lobbyStyles).toMatch(/\.lobby-title\s*\{[^}]*pointer-events:\s*none;/s);
         const home = lobbyStyles.match(/\.lobby-title__home\s*\{[^}]*\}/s)?.[0];
         expect(home).toBeTruthy();
@@ -306,7 +304,6 @@ describe('game stylesheet architecture', () => {
         ]) {
             expect(home).toContain(declaration);
         }
-        // Home disables it, and the UA's disabled grey must not reach "MINI".
         expect(lobbyStyles).toMatch(
             /\.lobby-title__home:disabled\s*\{[^}]*color:\s*inherit;[^}]*opacity:\s*1;[^}]*pointer-events:\s*none;/s,
         );
@@ -534,16 +531,12 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__nav\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*2\.75rem;/s,
         );
-        // Schematic, then its place in the rail, then its record. Prev/Next
-        // leaves the stack entirely and flanks the schematic in row 1.
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.25rem 4rem;/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__navigation\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*display:\s*grid;/s,
         );
-        // Daily adds a row of its own above the counter for the expiry, and
-        // pushes the counter and the record down a row to make space.
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby:has\(\.track-carousel__expiry\)\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.1rem 1\.25rem 4rem;/s,
         );
@@ -578,7 +571,6 @@ describe('game stylesheet architecture', () => {
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__count\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*text-align:\s*center;/s,
         );
-        // Keyboard nav selects the whole carousel, so the counter carries the cue.
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel__count\s*\{[^}]*padding:\s*0\.2rem 0\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );

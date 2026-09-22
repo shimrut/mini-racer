@@ -64,7 +64,6 @@ describe('an open transfer stops every way into a race', () => {
 
         await expect(engine.startCampaignStage('numbered-v1-00')).resolves.toBe(null);
         expect(engine.lobbyUi.clearRaceStartError).not.toHaveBeenCalled();
-        // Silence is what left the player at a lobby whose buttons had simply stopped working.
         expect(engine.reportRaceBlockedByTransfer).toHaveBeenCalledWith('campaign');
     });
 
@@ -132,12 +131,9 @@ describe('an open transfer stops every way into a race', () => {
         expect(engine.beginPbGhostSizeRun).not.toHaveBeenCalled();
 
         clearVerificationQueueTransferBlock(ACCOUNT);
-        // The gate is the first thing startSequence does. Past it, this bare stub runs out of
-        // engine, which is exactly the proof that the gate no longer stopped it.
         try {
             engine.startSequence();
         } catch {
-            // Not the gate's doing.
         }
 
         expect(engine.beginPbGhostSizeRun).toHaveBeenCalled();
@@ -155,7 +151,6 @@ describe('an open transfer stops every way into a race', () => {
         try {
             engine.startSequence();
         } catch {
-            // Past the gate, and past what this stub can answer.
         }
 
         expect(engine.beginPbGhostSizeRun).toHaveBeenCalled();
@@ -176,7 +171,6 @@ describe('the lobby shows the reason a race was refused', () => {
         delete globalThis.document;
     });
 
-    /** The two panes' message nodes, as game.html ships them: present, empty and hidden. */
     function installLobbyPanes() {
         const dom = new JSDOM(`<body>
             <p id="daily-start-message" class="challenge-sign-in-message" hidden></p>
@@ -209,7 +203,6 @@ describe('the lobby shows the reason a race was refused', () => {
         const node = document.getElementById('campaign-start-message');
         expect(node.hidden).toBe(false);
         expect(node.textContent).toBe('Finishing your progress transfer.');
-        // The Daily pane is not this mode's to speak for.
         expect(document.getElementById('daily-start-message').hidden).toBe(true);
     });
 });

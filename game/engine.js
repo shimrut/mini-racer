@@ -95,9 +95,6 @@ import {
   previewHeadToHeadBrag,
 } from "./head-to-head/service.js";
 
-// The legacy Daily mixin remains available to unit tests that exercise the
-// prototype directly. Production loads it through runtime-loader.js so Daily
-// is not part of the first mode chunk for Campaign or Head-to-Head launches.
 const legacyDailyChallengeEngineMethods = import.meta.env.MODE === "test"
   ? (await import("./daily-challenge/engine-methods.js")).dailyChallengeEngineMethods
   : {};
@@ -116,10 +113,6 @@ export class RealTimeRacer {
     this.initialContractPromise = null;
     this.initialDailyChallengeRequestPromise = null;
     this.initialHeadToHeadRequestPromise = null;
-    // The track and the car share this one canvas, so nothing renders beneath it and
-    // the context can be opaque: the per-pixel blend a transparent canvas costs every
-    // frame would buy nothing. render() draws the track first, before it transforms
-    // for the world, which is what keeps the draw order right.
     this.ctx =
       this.canvas.getContext("2d", { alpha: false }) ||
       this.canvas.getContext("2d");
@@ -249,7 +242,6 @@ export class RealTimeRacer {
     this.routeTrace = new RingBuffer(480, () => ({ x: 0, y: 0 }));
     this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
     this.particles = [];
-    /** colour -> per-alpha-step particle lists, reused every frame to avoid render churn. */
     this._particleBuckets = new Map();
     this.trailTimer = 0;
 
@@ -355,9 +347,6 @@ export class RealTimeRacer {
         ) / CONFIG.gridSize,
       }),
     });
-    // The rail paints the rank it was given, so a day that takes a new snapshot --
-    // from the standings, from a verified run, from a swipe -- repaints here. The
-    // paint itself is dropped unless the Daily lobby is the visible screen.
     subscribeToDailyChallengeSnapshots(() => {
       if (this.activeRaceMode !== "daily") return;
       void this.invokeModeMethod("daily", "repaintDailyCarouselFromCache");
@@ -460,7 +449,6 @@ export class RealTimeRacer {
         }
         if (payload?.kind === "challenge-comment") {
           const response = await previewHeadToHeadComment(payload);
-          // Already posted settles this concession as surely as posting it now does.
           if (concedesHeadToHead(payload, response?.body)) this.recordHeadToHeadConcede?.();
           return response;
         }
@@ -477,7 +465,6 @@ export class RealTimeRacer {
         }
         if (request?.kind === "challenge-comment") {
           const response = await confirmHeadToHeadComment(shareToken);
-          // A posted concession restarts the count. A posted tie leaves it alone.
           if (concedesHeadToHead(request, response?.body)) this.recordHeadToHeadConcede?.();
           return response;
         }
@@ -624,8 +611,6 @@ export class RealTimeRacer {
           this.activeDailyChallenge?.id ||
           this.dailyChallengeUi?.getSummary?.()?.challengeId ||
           null;
-        // Standings move while the app sits in the background, so every saved
-        // snapshot needs the server again before it can stand in for a request.
         clearDailyChallengeSnapshotFreshness();
         void this.leaderboards?.refreshDailyChallengeAfterResume?.(challengeId);
         const visibleChallengeId =
@@ -650,7 +635,6 @@ export class RealTimeRacer {
     });
 
     this.resize();
-    // Both are no-op stubs in the shipped build; see `vite.config.js`.
     exposePbGhostSizeDebugHooks(this);
     if (shouldExposeDebugHooks()) {
       exposeTestHooks(this);
@@ -677,7 +661,6 @@ export class RealTimeRacer {
     } else if (mode === "campaign") {
       this.showCampaignLobby({ refresh: false });
     } else if (mode !== "challenge") {
-      // The Head to Head pane is already painted by the challenge load itself.
       this.showHomeLobby();
     }
     this.startOverlay.setReady(true);
@@ -704,8 +687,6 @@ export class RealTimeRacer {
       onError: ({ mode, error }) => {
         this._initialStartupFailed = true;
         console.error(`Error preparing initial ${mode} mode:`, error);
-        // Name the mode and the reason: "could not load" alone tells a player
-        // nothing about whether waiting, retrying, or coming back later helps.
         const reason = typeof error?.message === "string" && error.message.trim()
           ? error.message.trim()
           : "";
@@ -722,10 +703,6 @@ export class RealTimeRacer {
     return this.initialStartupPromise;
   }
 
-  /**
-   * The mode's contract names the track to draw, so both startup groups share one
-   * request: whichever asks first creates it.
-   */
   ensureInitialContract(mode) {
     this.initialContractPromise ??= Promise.resolve().then(() => {
       if (mode === "daily") {
@@ -737,7 +714,6 @@ export class RealTimeRacer {
         return this.dailyChallengePromise;
       }
       if (mode === "campaign") {
-        // Campaign progress decides the stage, so identity has to settle first.
         this.initialCampaignLaunchPromise = this.loadStartupPlayer()
           .then(() => this.prepareInitialCampaignLaunch({
             prepareTrack: false,
@@ -761,7 +737,6 @@ export class RealTimeRacer {
 
   async resolveInitialTrackKey(mode) {
     if (mode === "home") return DEFAULT_TRACK_KEY;
-    // Head to Head prepares its target track and opponent ghost inside its own load.
     if (mode === "challenge") return null;
     const contract = await this.ensureInitialContract(mode);
     const trackKey = mode === "daily" ? contract?.trackKey : contract?.stage?.trackKey;
@@ -769,11 +744,7 @@ export class RealTimeRacer {
     return trackKey;
   }
 
-  /** Track and fonts. The car starts here but does not hold the splash. */
   async loadStartupGraphics(mode, { onContractPhase, onTrackPhase } = {}) {
-    // The car is named by local preferences and the fonts are already in flight, so
-    // neither has to queue behind the round trips the track key waits on. A profile
-    // that names a different skin supersedes this load rather than racing it.
     this.carAssetPromise = this.syncCarSpriteAsset();
     const fontsReadyPromise = globalThis.document?.fonts?.ready;
 
@@ -794,7 +765,6 @@ export class RealTimeRacer {
     ]);
   }
 
-  /** Account plus the selected mode's contract. Ghosts start here; they do not hold the splash. */
   async loadStartupRaceData(mode, { retry = false } = {}) {
     const [result] = await Promise.all([
       this.ensureInitialContract(mode),
@@ -802,9 +772,6 @@ export class RealTimeRacer {
     ]);
     if (mode === "daily") {
       this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
-      // The rank of the day the player lands on, asked for while the track is still
-      // loading, so the first card carries a real number. The splash never waits on
-      // it: a late answer repaints the card through the snapshot subscription.
       if (result?.id) {
         void getDailyChallengeSnapshot({ challengeId: result.id }).catch((error) => {
           console.error("Error loading the opening daily challenge standings:", error);
@@ -816,7 +783,6 @@ export class RealTimeRacer {
     return result;
   }
 
-  /** Starts Daily/Head to Head and account requests while the selected mode file is still arriving. */
   startInitialModeFetches({ retry = false } = {}) {
     const mode = this.launchTarget?.mode;
     this.loadStartupPlayer({ retry });
@@ -883,7 +849,6 @@ export class RealTimeRacer {
   }
 
   applyCarUnlockSnapshot(snapshot, { authoritative = true } = {}) {
-    // A missing snapshot is a response that never carried unlocks, not a claim that everything is locked.
     if (!snapshot) return;
     setPlayerCarUnlockSnapshot(snapshot, { authoritative });
     this.garage?.refreshCarUnlocks?.();
@@ -903,14 +868,6 @@ export class RealTimeRacer {
     return this.showHomeLobby();
   }
 
-  /**
-   * Says why a race was refused, on the pane the player is looking at.
-   *
-   * Every race entry point returns silently when a transfer is unresolved. That is right as a
-   * gate and wrong as an experience: the buttons simply stop working with nothing on screen. The
-   * per-mode gates return before their own `clearRaceStartError`, so the reason is set here,
-   * at the refusal itself.
-   */
   reportRaceBlockedByTransfer(mode) {
     this.lobbyUi?.setRaceStartError?.(
       mode,

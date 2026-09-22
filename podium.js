@@ -181,7 +181,6 @@ export function reportPodiumAnalytics(action, root = globalThis) {
             keepalive: true,
         }).catch(() => {});
     } catch {
-        // A podium tap is not worth an exception.
     }
 }
 

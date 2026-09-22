@@ -618,7 +618,6 @@ describe('ui modal content helpers', () => {
 
         component.renderCombinedResults(container, {
             time: 16.174,
-            // The challenge target, which is the opponent's time and never the player's own best.
             bestLap: 16.839,
             challengeFinish: true,
             challengeConfirmPhase: 'pending',
@@ -641,7 +640,6 @@ describe('ui modal content helpers', () => {
         expect(container.querySelector('.rank-num').textContent).toBe('1');
         expect(container.querySelector('#combined-rank-total').textContent).toBe('');
 
-        // With no best of their own, the opponent's target is no stand-in for one.
         component.renderCombinedResults(container, {
             time: 16.174,
             bestLap: 16.839,

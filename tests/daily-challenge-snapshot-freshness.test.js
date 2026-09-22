@@ -7,9 +7,6 @@ import {
     subscribeToDailyChallengeSnapshots,
 } from '../game/daily-challenge/service.js';
 
-// Fresh module graph: the session ledger of answered days starts empty here, the
-// way it does when the player opens the game.
-
 const CHALLENGE_ID = 'freshness-challenge';
 
 function createMemoryLocalStorage(initial = {}) {
@@ -79,7 +76,6 @@ describe('daily-challenge snapshot freshness', () => {
     });
 
     it('paints the saved rank but asks the server for it once per session', async () => {
-        // The card paints from this before any request is made.
         expect(getCachedDailyChallengeSnapshot(CHALLENGE_ID).playerRankLabel).toBe('#12');
 
         const first = await getDailyChallengeSnapshot({ challengeId: CHALLENGE_ID });

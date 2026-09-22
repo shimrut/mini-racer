@@ -3,18 +3,10 @@ import { getIntersection } from '../game/track/geometry.js';
 
 const DT = 1 / 60;
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
-// Nudge inward-cast rays off the wall they start on so they do not hit it.
 const NORMAL_PROBE = 0.01;
-// How close to a wall corner a crossing has to be before it counts as the two
-// segments simply meeting there. Well under the car's 0.55 width, so a fold big
-// enough to drive into is still caught.
 const SEAM_TOLERANCE = 0.2;
-// Steps taken along an inward ray when looking for the roomiest spot on it.
 const GUIDE_RAY_STEPS = 16;
-// How hard a guide candidate is penalised for sitting away from the last pick.
 const CONTINUITY_WEIGHT = 0.6;
-// Cap on how far inward a guide point may sit, as a multiple of the track's
-// median wall-to-wall reach.
 const MAX_OFFSET_SLACK = 0.75;
 
 function clamp(value, min, max) {
@@ -256,10 +248,6 @@ function polygonsSelfIntersect(points) {
                 continue;
             }
             const hit = getIntersection(a1, a2, b1, b2);
-            // Only a crossing through the middle of both segments folds a wall.
-            // Two segments meeting at a corner also "intersect", and a polygon
-            // that repeats its first vertex as its last, or closes a hair away
-            // from it, puts such a corner outside the adjacency window above.
             if (hit && [a1, a2, b1, b2].every((end) => distance(hit, end) > SEAM_TOLERANCE)) {
                 return true;
             }
@@ -544,9 +532,6 @@ function nearestPointOnPolygon(point, polygon) {
     return best;
 }
 
-// Distance from a guide candidate to the nearest wall, or 0 when the candidate
-// left the drivable corridor — off-track points otherwise score a wide berth
-// from the middle of the infield.
 function guideClearance(walls, point) {
     const onTrack = pointInPolygon(point, walls.outer) && !pointInPolygon(point, walls.inner);
     return onTrack ? nearestWallDistance(walls, point).distance : 0;
@@ -567,10 +552,6 @@ function inwardNormalAt(outerFlow, index, outer, inner) {
     }) || null;
 }
 
-// Every spot the guide could sit for one outer wall sample: the midpoint to the
-// closest inner point, plus steps along the inward ray up to the first wall the
-// ray meets. `maxOffset` keeps a ray fired down a long straight from parking the
-// guide half a track away.
 function guideCandidates(outerFlow, index, walls, reach, maxOffset) {
     const point = outerFlow[index];
     const candidates = [midpoint(point, nearestPointOnPolygon(point, walls.inner).closest)];
@@ -603,15 +584,6 @@ function medianOf(values) {
     return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
-// Trace the drivable corridor once around the track. Walking the outer wall and
-// pairing each sample with its closest inner point is the cheap version of this,
-// but that pairing jumps to the far lobe wherever a track crosses or doubles
-// back on itself, so the guide teleports across a wall. Walk the samples in
-// order instead and, at each one, take the candidate with the most room around
-// it that also sits near the previous pick. (Matching the two resampled walls by
-// index — the original approach — is worse still: the walls have different
-// perimeters, so the pairing drifts out of phase and drags the guide straight
-// across the infield.)
 function buildCenterline(outer, inner, sampleCount) {
     if (outer.length < 3 || inner.length < 3) {
         return resampleClosedPolygon(outer.length >= 3 ? outer : inner, sampleCount);
@@ -623,8 +595,6 @@ function buildCenterline(outer, inner, sampleCount) {
     const maxOffset = medianOf(outerFlow.map((point) => nearestPointOnPolygon(point, inner).distance)) * MAX_OFFSET_SLACK;
     const candidates = outerFlow.map((point, index) => guideCandidates(outerFlow, index, walls, reach, maxOffset));
 
-    // Start where the corridor is widest, so the walk never anchors on an
-    // ambiguous first pick.
     const seedIndex = candidates.reduce((best, entry, index) => (
         entry[0].clearance > candidates[best][0].clearance ? index : best
     ), 0);
@@ -641,8 +611,6 @@ function buildCenterline(outer, inner, sampleCount) {
         previous = pick.point;
     }
 
-    // The samples are evenly spaced along the outer wall, not along the guide, so
-    // resample once more so every progress step covers the same distance.
     return resampleClosedPolygon(traced, sampleCount);
 }
 
@@ -685,9 +653,6 @@ function prepareTrack(track, requestedSamples) {
         inner: nearestPointOnPolygon(point, inner).distance
     }));
     const centerlineClearances = wallGaps.map((gap) => ({ x: Math.min(gap.outer, gap.inner), y: 0 }));
-    // Reach to one wall plus reach to the other, rather than twice the nearer
-    // one: a guide point is rarely dead centre, and doubling the short side
-    // reports a pinch that is not there.
     const widths = wallGaps.map((gap) => gap.outer + gap.inner);
 
     const checkpointPoints = (track.checkpoints || []).flatMap((checkpoint) => [checkpoint.p1, checkpoint.p2]);
@@ -1116,9 +1081,6 @@ function buildSummary(report) {
 }
 
 async function loadTracksFresh() {
-    // The timestamp pulls in edits made since the page loaded, so the lab picks
-    // up a track you just saved from the mapmaker. Vite refuses to pre-bundle an
-    // import it cannot read statically, hence the ignore comment.
     const module = await import(/* @vite-ignore */ `../game/track/tracks.js?v=${Date.now()}`);
     return module.TRACKS;
 }
@@ -1339,7 +1301,6 @@ class RunnerApp {
         const crashCount = report.simulation ? report.simulation.aggregate.crashes : 0;
         const scrapeCount = report.simulation ? report.simulation.aggregate.scrapes : 0;
 
-        // The clean-pass card is an info note, not a problem to count.
         const issueCount = report.issues.filter((issue) => issue.severity !== 'info').length;
         this.issueTotalPill.textContent = `${issueCount} issue${issueCount === 1 ? '' : 's'}`;
         this.issueTotalPill.className = 'pill';

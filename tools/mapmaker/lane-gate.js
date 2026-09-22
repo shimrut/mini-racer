@@ -1,7 +1,6 @@
 const SEGMENT_EPSILON = 1e-9;
 const MAX_GATE_LENGTH = 20;
 const CORNER_T = 0.08;
-/** Push gate ends past walls so wall-hugging cars still cross the segment. */
 export const GATE_WALL_OVERHANG = 0.75;
 
 function clonePoint(point) {
@@ -170,7 +169,6 @@ function castGateFromSegment(a, b, foot, toPolygon, towardPoint) {
     };
 }
 
-/** Keeps the foot at the cursor's closest wall point, so dragging through a corner cannot teleport the gate. */
 function gateCandidatesFromHit(hit, polygon, toPolygon, towardPoint) {
     const len = polygon.length;
     const candidates = [];
@@ -244,7 +242,6 @@ export function extendGatePastWalls(p1, p2, overhang = GATE_WALL_OVERHANG) {
     };
 }
 
-/** Casts perpendicular from the nearest wall into the opposite one, so both ends stay on the corridor. */
 export function buildPerpendicularLaneGate(seedPoint, outer, inner, options = {}) {
     if (!seedPoint || !outer || !inner || outer.length < 3 || inner.length < 3) {
         return null;

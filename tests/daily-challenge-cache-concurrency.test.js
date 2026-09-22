@@ -4,8 +4,6 @@ import {
     getDailyChallengeSnapshot
 } from '../game/daily-challenge/service.js';
 
-// Fresh module graph, so the playlist/snapshot caches start empty and the in-flight request dedup can be exercised on its own.
-
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };
 }

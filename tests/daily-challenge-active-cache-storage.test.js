@@ -2,8 +2,6 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as catalog from '../game/track/catalog.js';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 
-// Fresh module graph so active-cache hydration and fallback paths are isolated.
-
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };
 }

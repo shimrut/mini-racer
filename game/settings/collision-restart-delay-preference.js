@@ -1,4 +1,4 @@
-// Keep the existing storage key so the configured delay survives the setting rename.
+// Legacy key; renaming loses saved choices.
 export const COLLISION_RESTART_DELAY_STORAGE_KEY = 'VectorGpCrashRestartDelaySec';
 
 export const COLLISION_RESTART_DELAY_MIN = 0;

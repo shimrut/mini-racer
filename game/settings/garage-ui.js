@@ -64,10 +64,6 @@ export class GarageUi {
         this.tabTrails?.addEventListener('click', () => this.setGarageTab('trails'));
     }
 
-    /**
-     * Each option in these grids pulls its own image, so they are built the first time
-     * the Garage opens rather than competing at boot with the one car being raced.
-     */
     buildGarageGrids() {
         if (this._garageGridsBuilt) return;
         this._garageGridsBuilt = true;

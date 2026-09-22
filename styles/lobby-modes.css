@@ -1,11 +1,9 @@
-/* Every pane sits in the same single grid cell, so toggling `hidden` cannot change the shell's measured height. */
 .lobby-panes {
     display: grid;
     grid-template-rows: 1fr;
     grid-template-columns: 1fr;
     flex: 1 1 auto;
     min-height: 0;
-    /* Untrimmed travel counts as scrollable content and lifts the header while the entrance runs. */
     overflow: clip;
 }
 
@@ -32,9 +30,6 @@
     }
 }
 
-/* Daily and Campaign put a primary button in the same spot, so a pane-wide
-   entrance drags it through a fade it has no reason to run. On that swap the
-   entrance moves down to the track carousel, which is the part that changed. */
 body[data-lobby-pane-swap="toggle"] .lobby-pane {
     animation: none;
 }
@@ -255,7 +250,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection {
     white-space: nowrap;
 }
 
-/* The track is what the header is billing; the lap count is a detail under it. */
 .lobby-mode-selection__laps {
     color: var(--text-muted);
     font-size: 0.6rem;
@@ -329,8 +323,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     width: 100%;
 }
 
-/* The labels sit under the wordmark, so the row is pulled left by its own
-   padding to line the letters up with the "MINI" of the title. */
 .lobby-mode-action {
     position: relative;
     isolation: isolate;
@@ -366,9 +358,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     outline: none;
 }
 
-/* Keyboard nav selects the carousel as a whole, so the cue goes on the "x / y"
-   counter — the one part of it the arrow keys change — instead of ringing the
-   whole poster. */
 .track-carousel--lobby.is-menu-selected .track-carousel__count {
     color: var(--text-color);
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
@@ -602,7 +591,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 
-/* Scope View Transitions to panes only to prevent header blinking */
 html.is-lobby-view-transition {
     view-transition-name: none;
 }

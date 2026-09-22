@@ -52,7 +52,6 @@ const CORNER_RADIUS_PRESETS = [
 ];
 const CORNER_RADIUS_VALUES = CORNER_RADIUS_PRESETS.map((preset) => preset.value);
 
-// Match race collision capsule so authors can size lanes against the real car.
 const CAR_RADIUS = CONFIG.carRadius;
 const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
 const CAR_WIDTH = CAR_RADIUS * 2;
@@ -1801,14 +1800,14 @@ class MapmakerApp {
                 ? 120
                 : 1;
 
-        // Pinch-to-zoom (browsers synthesize ctrl+wheel for trackpad pinch).
+        // Trackpad pinch arrives as ctrl+wheel.
         if (event.ctrlKey) {
             const zoomFactor = Math.exp((-event.deltaY * deltaModeScale) * 0.01);
             this.setZoom(this.state.view.zoom * zoomFactor, canvasPoint, viewport);
             return;
         }
 
-        // Pixel-mode two-finger trackpad scrolls pan; mouse wheels report line/page mode and fall through to stepped zoom below.
+        // Pixel deltas mean a trackpad pan.
         if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL) {
             this.state.view.panX -= event.deltaX * deltaModeScale;
             this.state.view.panY -= event.deltaY * deltaModeScale;

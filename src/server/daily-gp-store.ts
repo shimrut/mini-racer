@@ -141,7 +141,6 @@ import {
     type RankedSubmitReuseOptions,
 } from './competition-submit.js';
 
-// Re-exported here so the paths callers and tests already import from keep resolving.
 export {
     normalizePlayerPreferences,
     parseStoredPlayerProfile,
@@ -161,7 +160,6 @@ type PlayerBootstrapPayload = {
     firstSeenAt: string | null;
     carUnlocks: CarUnlockSnapshot | null;
     retireGuestIdentity: boolean;
-    /** The retired guest joined this account with nothing to transfer, so its unsent runs are the account's. */
     guestJoinedAccount?: boolean;
     progressSelection?: GuestProgressSelection | null;
 };
@@ -221,11 +219,6 @@ function unavailableProgressSummary({
     };
 }
 
-/**
- * `preparing` permits no destination replacement, so preparation may repeat and may capture the
- * source inventory again. From `copying` onward the inventory is frozen: the transfer never
- * manufactures fresh evidence out of whatever happens to have survived.
- */
 type GuestTransferPhase = 'preparing' | 'copying' | 'cleaning' | 'completed' | 'recovery_required';
 
 type GuestProgressSelectionRecord = {
@@ -234,7 +227,6 @@ type GuestProgressSelectionRecord = {
     guestPlayerId: string;
     redditPlayerId: string;
     choice: 'guest' | 'account';
-    /** Kept beside `phase` so readers written against versions 2 and 3 stay correct. */
     status: 'pending' | 'completed' | 'recovery_required';
     phase?: GuestTransferPhase;
     updatedAt: string;
@@ -246,7 +238,6 @@ type GuestProgressSelectionRecord = {
     completedAt?: string;
 };
 
-/** What a finished transfer proves. Written once, and never expired. */
 type GuestTransferReceipt = {
     version: 4;
     transferId: string;
@@ -264,24 +255,11 @@ type GuestTransferDailyChallengeSpec = {
     objectiveType: 'single_lap_fastest' | 'multi_lap_total';
 };
 
-/**
- * Exact source evidence, captured before the first account replacement. Every value is a
- * fingerprint of the raw stored bytes, so an absent value, an empty value, and a malformed value
- * are three different answers. Campaign keeps one entry per stage and Daily one per frozen
- * challenge, so partial loss is visible even when the other rows survive.
- */
 type GuestTransferSourceInventory = {
     campaignProgress: string;
     campaignStages: Record<string, string>;
     daily: Record<string, string>;
     unlocks: string;
-    /**
-     * The guest's Garage field by field, recorded alongside the aggregate hash above.
-     *
-     * The hash alone cannot tell a lost field from an added one, so a guest who legitimately
-     * earned one more event during an open transfer could never finish it. Older records carry
-     * only the hash and keep exact-match checking.
-     */
     unlockFields?: Record<string, string>;
 };
 
@@ -317,7 +295,6 @@ function transferChallengeFromSpec(spec: GuestTransferDailyChallengeSpec): Daily
     } as unknown as DailyGpChallenge;
 }
 
-/** Fingerprints one guest's Campaign stage rows without parsing them. */
 async function captureCampaignStageEvidence(
     guestPlayerId: string,
 ): Promise<Record<string, string>> {
@@ -339,7 +316,6 @@ async function captureCampaignStageEvidence(
     return Object.fromEntries(rows);
 }
 
-/** Fingerprints one guest's rows for the frozen Daily window. */
 async function captureDailyEvidence(
     guestPlayerId: string,
     challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
@@ -381,18 +357,10 @@ async function captureGuestTransferSourceInventory(
     };
 }
 
-/**
- * Names the domains whose source no longer matches what preparation recorded. A domain with an
- * added, changed, or missing row is reported, so partial loss stops replacement just as total
- * loss does.
- */
 function changedInventoryDomains(
     expected: GuestTransferSourceInventory,
     observed: Partial<GuestTransferSourceInventory>,
 ): string[] {
-    // Compared row by row, over the rows preparation recorded. A row that changed or disappeared
-    // is loss and stops the copy. A row that only exists now — a Campaign stage added to the
-    // manifest since — holds nothing this guest could have raced, so it is not evidence of change.
     const rowsChanged = (
         expectedRows: Record<string, string>,
         observedRows: Record<string, string> | undefined,
@@ -417,20 +385,9 @@ function isValidSourceInventory(value: unknown): value is GuestTransferSourceInv
         && isRecordObject(value.campaignStages)
         && isRecordObject(value.daily)
         && typeof value.unlocks === 'string'
-        // Optional, so a record written before per-field evidence existed still reads.
         && (value.unlockFields === undefined || isRecordObject(value.unlockFields));
 }
 
-/**
- * Whether the guest's Garage moved in a way that stops the copy.
- *
- * Losing a recorded field, or seeing one of them change, is loss and stops it. Gaining a field is
- * not: a race or a post accepted just before the transfer opened can still land afterwards, and
- * that reward is the player's. An addition is only allowed when it is an ordinary Garage event.
- *
- * An older inventory carrying only the aggregate hash keeps exact-match checking. A changed legacy
- * hash must not be reinterpreted as a harmless addition, because nothing in it says which it was.
- */
 function unlocksChanged(
     expected: GuestTransferSourceInventory,
     observed: Partial<GuestTransferSourceInventory>,
@@ -449,15 +406,8 @@ function unlocksChanged(
     return observed.unlocks !== undefined && observed.unlocks !== expected.unlocks;
 }
 
-/** What a day with no entry, no personal best and no ranking fingerprints as. */
 const EMPTY_DAILY_ROW_FINGERPRINT = stableFingerprint({ entry: null, pb: null, rank: null });
 
-/**
- * The frozen days that actually held something.
- *
- * A day preparation recorded as empty holds nothing this guest could lose, so it stays skippable.
- * Every other recorded day has to be judged under its own locks.
- */
 function recordedDailyDays(
     inventory: GuestTransferSourceInventory | undefined,
 ): ReadonlySet<string> {
@@ -470,9 +420,7 @@ function recordedDailyDays(
 
 const TRANSFER_COMPLETION_DOMAINS = ['campaign', 'daily', 'unlocks'] as const;
 const TRANSFER_CLEANUP_DOMAINS = ['campaign', 'daily'] as const;
-/** An account transfers once in practice. The bound only stops an unbounded key from growing. */
 const ACCOUNT_TRANSFER_INDEX_LIMIT = 20;
-/** How long a completion stays worth volunteering to a browser that did not ask for it by id. */
 const TRANSFER_COMPLETION_NEWS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
@@ -487,14 +435,6 @@ function isOrderedDomainPrefix(
         && value.every((domain, index) => domain === domains[index]);
 }
 
-/**
- * A transfer that stopped for a reviewed repair.
- *
- * It is the pending record with its status changed, so it still carries the choice, the domain
- * checkpoints and the source inventory that a repair needs. Only its status says it may not
- * resume on its own. `isValidPendingSelectionRecord` demands `status: 'pending'`, so a reader
- * that does not also ask this question reports the case without the choice behind it.
- */
 function isValidRecoverySelectionRecord(
     value: unknown,
     guestPlayerId: string,
@@ -544,9 +484,6 @@ function isValidPendingSelectionRecord(
             return false;
         }
         if (!isValidTransferPhase(value.phase)) return false;
-        // A record with a replacement still to make must carry the inventory it will be checked
-        // against. An Account choice replaces nothing, and a Guest record whose copies are all
-        // checkpointed has only deletions left, so neither needs one.
         if (value.phase !== 'preparing'
             && hasReplacementRemaining(value as GuestProgressSelectionRecord)
             && !isValidSourceInventory(value.sourceInventory)) {
@@ -663,7 +600,6 @@ async function readPlayerStandingSummary(
     };
 }
 
-/** Stamps TTL on the Daily board keys and ghost hash. Challenge setup creates the standings-revision key; restamp does not. */
 async function stampDailyCompetitionExpiry(
     challenge: DailyGpChallenge,
     now = new Date(),
@@ -992,8 +928,6 @@ async function readFinalPodiumPositions(
         };
     });
 
-    // Written out rather than mapped: a podium is exactly three places, and `.map` over a tuple
-    // answers an array, which then needed a cast that agreed with nothing.
     const positionAt = (rank: 1 | 2 | 3) => rankedPositions[rank - 1] ?? {
         rank,
         displayName: 'No verified finish',
@@ -1008,8 +942,6 @@ async function releaseSubmissionLocksSafely(
     locks: readonly RedisLock[],
     context: string,
 ): Promise<void> {
-    // Cleanup must not replace the operation's result or its original failure, and a group of
-    // locks goes back in one fenced transaction instead of one apiece.
     await releaseRedisLockGroup(locks, context, redis);
 }
 
@@ -1046,7 +978,6 @@ function guestProgressRecoveryRequiredError(): GuestProgressRecoveryRequiredErro
 
 const GUEST_PROGRESS_TRANSFER_NOT_NEEDED_REASON = 'guest_progress_transfer_not_needed';
 
-/** A new transfer refused before anything was written, because the guest has nothing to carry. */
 function guestProgressTransferNotNeededError(): Error {
     return Object.assign(
         new Error('This guest has no progress to transfer. Reload to continue with your account.'),
@@ -1084,9 +1015,6 @@ async function readDailyMergeState(
     redditPlayerId: string,
     guestSource?: ClassifiedGuestDailySource | null,
 ) {
-    // With a snapshot in hand the guest side is not read again. Reading it a second time is what
-    // let a row that expired between the check and the copy be copied as absent, which under
-    // `replace` empties the account's row instead of replacing it.
     const [guestEntry, redditEntry, guestPb, redditPb, redditRankedScore] = await Promise.all([
         guestSource
             ? Promise.resolve(guestSource.entry)
@@ -1111,18 +1039,10 @@ async function readDailyMergeState(
     return { guestEntry, redditEntry, guestPb, redditPb, redditRankedScore };
 }
 
-/**
- * Everything a guest cleanup needs to know about one day: does this identity have a standing or
- * a PB here. The merge state answers far more than that, and asking it for a discard read the
- * same rows twice under both identities plus a rank the caller never looks at.
- */
 async function guestOwnsDailyDay(
     competition: ReturnType<typeof toDailyCompetition>,
     guestPlayerId: string,
 ): Promise<boolean> {
-    // A PB can exist with no leaderboard row and a row with no PB: those writes succeed
-    // independently, so either one alone is still this guest's data to remove. Presence is read
-    // raw, so a row this build can no longer parse is still taken away with the guest.
     return await competitionHoldsPlayerRows(competition, guestPlayerId);
 }
 
@@ -1217,7 +1137,6 @@ export async function getServerFinalDailyGpPodiumGhosts(
         } satisfies DailyPodiumReplayGhostSlot;
     }));
 
-    // Three places, written out, for the same reason as the podium positions above.
     const ghostAt = (rank: 1 | 2 | 3) => slots.find((slot) => slot.rank === rank) ?? { rank, ghost: null };
     const ghosts: FinalDailyGpPodiumGhostPack['ghosts'] = [ghostAt(1), ghostAt(2), ghostAt(3)];
 
@@ -1272,7 +1191,6 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     const challengeIds = Array.from({ length: DAILY_GP_PLAYLIST_DAYS }, (_unused, offset) => (
         createDailyChallengeId(getUtcDayStart(todayIndex - offset).toISOString().slice(0, 10))
     ));
-    // Every challenge lives in one history hash, so the whole window is one read instead of one per day.
     const storedIds = challengeIds.filter((challengeId) => challengeId !== activeChallenge.id);
     const storedRaw = storedIds.length > 0
         ? await redis.hMGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, storedIds)
@@ -1285,7 +1203,6 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     for (const challengeId of challengeIds) {
         const challenge = challengeId === activeChallenge.id
             ? activeChallenge
-            // A day missing from history is backfilled and persisted, exactly as the per-day read did.
             : storedById.get(challengeId) ?? await readStoredOrBackfilledDailyGpChallenge(challengeId);
         if (challenge && isDailyGpChallengePlayable(challenge, now)) {
             challenges.push(challenge);
@@ -1299,35 +1216,14 @@ function dailyPlayerField(playerId: string): string {
     return createHash('sha256').update(playerId, 'utf8').digest('base64url');
 }
 
-/**
- * One frozen Daily day's guest rows, judged before anything is written from them.
- *
- * `pb` carries the decoded personal best. The stored value may be gzipped, so the copy re-encodes
- * it for a transaction (which bypasses the compressing proxy) and hands the decoded value to the
- * proxy otherwise. Both write exactly what was judged here, so nothing re-reads the source between
- * its check and its copy.
- */
 type ClassifiedGuestDailySource = {
     entry: ReturnType<typeof parseStoredEntry>;
     pb: Awaited<ReturnType<typeof getPlayerTrackPbRecord>>;
     decodedPb: string | null;
-    /**
-     * Exactly what this read saw, in the shape preparation fingerprinted it in. The inventory
-     * check runs against these values rather than reading the source again.
-     */
     observed: { entry: string | null; pb: string | null; rank: number | null };
     malformed: string[];
 };
 
-/**
- * Reads and judges one day's guest rows under that day's locks, before its first account write.
- *
- * The ordinary readers answer `null` for absent, obsolete and damaged alike. A replacement cannot
- * treat those the same: copying "absent" onto an account row deletes that row, so a row this build
- * merely fails to parse would silently empty the account's day. Daily judges one day at a time
- * because its locks are per day; Campaign judges every stage at once because it holds every stage
- * lock at once.
- */
 async function captureClassifiedGuestDailySource(
     competition: ReturnType<typeof toDailyCompetition>,
     track: Record<string, any>,
@@ -1355,9 +1251,6 @@ async function captureClassifiedGuestDailySource(
         malformed.push(`daily:pb:${challenge.id}:${pbClass.reason}`);
     }
 
-    // An obsolete row is real but unreadable to every player-facing reader, so it is deliberately
-    // not copied. It stays under the guest and leaves on the ordinary Daily deadline with the rest
-    // of that day, exactly as it would have without a transfer.
     return {
         entry: entryClass.state === 'valid' ? parseStoredEntry(rawEntry, challenge.trackKey) : null,
         pb: pbClass.state === 'valid' ? pbClass.record : null,
@@ -1386,22 +1279,9 @@ export async function mergeGuestDailyProgress({
     replace?: boolean;
     challengeIds?: string[];
     challengeSpecs?: GuestTransferDailyChallengeSpec[];
-    /**
-     * Called under each challenge's locks, before its first account write. See the Campaign merge.
-     *
-     * A replacing merge hands over the exact day it is about to copy, so the check and the copy
-     * cannot see different data. Called with nothing it checks the whole frozen window instead, by
-     * reading for itself. The two are not interchangeable: the per-day form is the one that has no
-     * read between the check and the write.
-     */
     verifyGuestSource?: (observed?: {
         dailyDay: { challengeId: string; entry: string | null; pb: string | null; rank: number | null };
     }) => void | Promise<void>;
-    /**
-     * Days the frozen inventory recorded rows for. A day in this set is never skipped on presence:
-     * its rows are the player's, so their absence has to be judged under the locks rather than read
-     * as a day never raced.
-     */
     recordedDailyChallengeIds?: ReadonlySet<string>;
     transactionRunner?: RedisLockTransactionRunner;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
@@ -1413,17 +1293,11 @@ export async function mergeGuestDailyProgress({
     const mergedChallengeIds: string[] = [];
     let hasGuestEvidence = false;
 
-    // One sweep across every day the inventory recorded, before any of them is touched. A day
-    // whose rows have gone entirely is skipped by the presence check below, so this is the only
-    // place that loss is reported. The per-day check inside the locks makes each copy atomic;
-    // this one makes the set complete.
     await verifyGuestSource?.();
 
     for (const challenge of playlist) {
         const competition = toDailyCompetition(challenge);
         const track = TRACKS[challenge.trackKey];
-        // A frozen day whose track left the catalog cannot be copied, and skipping it would let
-        // the domain checkpoint claim work it never did.
         if (!track) {
             if (challengeSpecs?.some((spec) => spec.id === challenge.id)) {
                 throw guestProgressRecoveryRequiredError();
@@ -1431,20 +1305,10 @@ export async function mergeGuestDailyProgress({
             continue;
         }
 
-        // Presence, read raw, on both identities. The peek this replaces parsed both sides and
-        // skipped the day when nothing came back, so a row this build cannot parse looked exactly
-        // like a day the player never raced: the day was skipped, `hasGuestEvidence` stayed false,
-        // and the domain checkpoint went on to claim work it had not done. Raw presence separates
-        // absent from damaged, and only the locked read below decides what any of it means.
         const [guestHoldsRows, accountHoldsRows] = await Promise.all([
             competitionHoldsPlayerRows(competition, guestPlayerId),
             competitionHoldsPlayerRows(competition, redditPlayerId),
         ]);
-        // The sweep above checked the whole window once, before the loop and outside the locks. For
-        // a day late in the playlist the gap since then spans the processing of every earlier day.
-        // A day the inventory recorded rows for is therefore taken to its locks whatever this
-        // unlocked read says: skipping it would checkpoint the domain as copied while those rows
-        // went. The per-day check under the locks is what decides, and it reports a changed source.
         const wasRecorded = recordedDailyChallengeIds?.has(challenge.id) ?? false;
         if (!guestHoldsRows && !accountHoldsRows && !wasRecorded) continue;
         hasGuestEvidence ||= guestHoldsRows;
@@ -1455,10 +1319,6 @@ export async function mergeGuestDailyProgress({
             redditPlayerId,
         );
         try {
-            // A replacement judges this day's source before its first account write, then copies
-            // from exactly what it judged. Damage stops the copy right here: nothing is written,
-            // so no later checkpoint can claim this day was copied, and the guest rows stay where
-            // they are, on the ordinary Daily deadline.
             const guestSource = replace
                 ? await captureClassifiedGuestDailySource(
                     competition,
@@ -1467,16 +1327,9 @@ export async function mergeGuestDailyProgress({
                     guestPlayerId,
                 )
                 : null;
-            // Damage is reported before the inventory check, as the Campaign merge does. The two
-            // stop the transfer for different reasons, and a damaged row that never moved would
-            // otherwise be reported as a changed source, sending a reviewer to look for a change
-            // that did not happen.
             if (guestSource?.malformed.length) {
                 throw guestProgressRecoveryRequiredError();
             }
-            // Checked against the bytes just read, never against a second read. Reading the source
-            // again between the check and the copy is what let a row removed in between pass the
-            // check and then be copied as absent, which under `replace` empties the account's day.
             if (guestSource) {
                 await verifyGuestSource?.({
                     dailyDay: { challengeId: challenge.id, ...guestSource.observed },
@@ -1540,8 +1393,6 @@ export async function mergeGuestDailyProgress({
                 let rawGuestPb: string | undefined;
                 if (guestCanSupplyWinningPb) {
                     if (guestSource) {
-                        // A transaction bypasses the compressing proxy, so the decoded record from
-                        // the snapshot is re-encoded here the way that proxy would have stored it.
                         rawGuestPb = guestSource.decodedPb === null
                             ? undefined
                             : encodeRedisCompressedValue(guestSource.decodedPb);
@@ -1620,10 +1471,6 @@ export async function mergeGuestDailyProgress({
             if (guestWinsLeaderboard) {
                 mergedChallengeIds.push(challenge.id);
             }
-
-            // Keep the guest source until the transfer coordinator checkpoints the whole
-            // domain. A later retry must be able to reconstruct replacement progress if
-            // another domain or its checkpoint fails.
         } finally {
             await releaseSubmissionLocksSafely(locks, 'Daily guest merge');
         }
@@ -1740,7 +1587,6 @@ export async function discardGuestDailyProgress({
     return discarded;
 }
 
-/** Days this identity has a standing or a PB on. Every day is an independent key space, so they are read as one batch. */
 async function countDailyProgressResults(
     playerId: string,
     playlist: DailyGpChallenge[],
@@ -1758,12 +1604,6 @@ async function countDailyProgressResults(
     return perChallenge.filter(Boolean).length;
 }
 
-/**
- * Every accepted Daily, Campaign and Head to Head run writes a race-completed unlock event that
- * never expires, so an empty unlock record is proof no run was ever stored under this identity.
- * Daily counts are deliberately limited to the current playlist because that is the Daily set a
- * guest transfer copies and the only scope this prompt promises to describe.
- */
 async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChallenge[]) {
     const [initialCampaign, unlocks, profile] = await Promise.all([
         getCampaignProgressForSelection(playerId, { repairEmpty: false }),
@@ -1801,14 +1641,6 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
     };
 }
 
-/**
- * Whether a guest holds anything a transfer could carry.
- *
- * A Guest choice replaces the account with the guest, so a guest with nothing turns the choice into
- * a deletion of the account. Everything is read raw and read-only: a row this build cannot parse
- * still counts, and it takes the transfer to the check that stops it for review. Only a guest with
- * no trace at all answers false.
- */
 async function guestHoldsTransferableProgress(
     guestPlayerId: string,
     dailyPlaylist: readonly DailyGpChallenge[],
@@ -1889,10 +1721,6 @@ function pendingSelectionPayload({
     } as GuestProgressSelection;
 }
 
-/**
- * A receipt names its own account, so a transfer id that reaches the wrong account proves nothing.
- * The id identifies the record; the authenticated account authorizes reading it.
- */
 async function readGuestTransferReceipt(
     transferId: string,
     redditPlayerId: string,
@@ -1932,7 +1760,6 @@ async function readAccountTransferIndex(redditPlayerId: string): Promise<string[
     );
 }
 
-/** True when this record still has an account row left to replace. */
 function hasReplacementRemaining(record: GuestProgressSelectionRecord): boolean {
     return record.choice === 'guest'
         && !TRANSFER_COMPLETION_DOMAINS.every(
@@ -1940,18 +1767,9 @@ function hasReplacementRemaining(record: GuestProgressSelectionRecord): boolean 
         );
 }
 
-/**
- * Only a version-4 record carries the source evidence a Guest replacement must be checked against.
- * A record whose copies are all checkpointed has no replacement left to make: what remains is
- * deleting guest rows, which needs no inventory, so an older one may still finish that work.
- */
 function resumableRecordState(
     record: GuestProgressSelectionRecord,
 ): 'resume_required' | 'recovery_required' {
-    // A transfer that already stopped for review said so in the record. Deriving the answer from
-    // the record's shape alone cannot see that: a version-4 record with a valid inventory derives
-    // as resumable, so a case stopped for a changed source would be retried, fail the same way,
-    // and be offered as resumable again on every reload.
     if (record.phase === 'recovery_required') return 'recovery_required';
     if (!hasReplacementRemaining(record)) return 'resume_required';
     if (record.version !== 4 || !isValidSourceInventory(record.sourceInventory)) {
@@ -1960,11 +1778,6 @@ function resumableRecordState(
     return 'resume_required';
 }
 
-/**
- * The account's own view of its transfer, found without the original guest token. A `transferId`
- * asks about one specific transfer, so a browser holding an old local receipt still gets its own
- * answer after a later transfer has moved the account on.
- */
 export async function resolveAccountTransferState(
     redditPlayerId: string,
     { transferId }: { transferId?: string } = {},
@@ -1982,16 +1795,12 @@ export async function resolveAccountTransferState(
             });
         }
     }
-    // Every signed-in bootstrap asks this, and almost every one has neither. Both answers come
-    // back in one round trip so the common case costs one call, not two.
     const [pendingGuest, rawIndex] = await redis.mGet([
         guestProgressSelectionAccountPendingKey(redditPlayerId),
         guestProgressTransferIndexKey(redditPlayerId),
     ]);
     if (typeof pendingGuest === 'string' && pendingGuest.startsWith('guest:')) {
         const raw = await redis.get(guestProgressSelectionKey(pendingGuest, redditPlayerId));
-        // Transfer records do not expire, so a marker with no record means the chooser was shown
-        // and never answered. Nothing was replaced, and the player still owes only a choice.
         if (!raw) {
             return pendingSelectionPayload({
                 guestPlayerId: pendingGuest,
@@ -2002,7 +1811,6 @@ export async function resolveAccountTransferState(
         try {
             const record = JSON.parse(raw) as unknown;
             if (isValidCompletedSelectionRecord(record, pendingGuest, redditPlayerId)) {
-                // A completed record under a stale marker is a completion, not a repair case.
                 return pendingSelectionPayload({
                     guestPlayerId: pendingGuest,
                     redditPlayerId,
@@ -2028,7 +1836,6 @@ export async function resolveAccountTransferState(
                 });
             }
         } catch {
-            // A record that cannot be read is never guessed at.
         }
         return pendingSelectionPayload({
             guestPlayerId: pendingGuest,
@@ -2036,10 +1843,6 @@ export async function resolveAccountTransferState(
             state: 'recovery_required',
         });
     }
-    // Volunteering a completion is for a browser that may not have heard about it yet. After the
-    // reconciliation window it stops being news, and an account that transferred once should not
-    // be told about it on every sign-in for the rest of its life. A browser holding a receipt can
-    // still ask by transfer id above, and is answered whatever its age.
     const index = parseAccountTransferIndex(rawIndex);
     const oldestNewsAt = Date.now() - TRANSFER_COMPLETION_NEWS_MS;
     for (let position = index.length - 1; position >= 0; position -= 1) {
@@ -2077,18 +1880,11 @@ export type GuestTransferDiagnostic = {
     changedDomains: string[] | null;
     destinationEvidence: Record<string, unknown> | null;
     expiredDailyChallengeIds: string[];
-    /** The account's frozen Garage, if a transfer left one behind. A repair collects it. */
     garageBaseline: Record<string, string> | null;
-    /** Rewards accepted while the transfer was open. A leftover journal preserves too much. */
     garageJournalFields: string[];
     evidenceFingerprint: string | null;
 };
 
-/**
- * Read-only case evidence for a reviewed repair. It answers one account, and one transfer at a
- * time. Its caller is responsible for proving the reader is a moderator; this function never
- * returns anything for an account it was not asked about.
- */
 export async function getGuestProgressTransferDiagnostic({
     redditPlayerId,
     transferId,
@@ -2169,8 +1965,6 @@ export async function getGuestProgressTransferDiagnostic({
         }
     }
 
-    // A version-2 record has no specs, and those are exactly the records that reach a review. Fall
-    // back to its frozen ids so the diagnostic is not blind about Daily for the cases it exists for.
     const specs = Array.isArray(record?.dailyChallengeSpecs)
         ? record.dailyChallengeSpecs
         : Array.isArray(record?.dailyChallengeIds)
@@ -2180,8 +1974,6 @@ export async function getGuestProgressTransferDiagnostic({
     let survivingSource: GuestTransferSourceInventory | null = null;
     let destinationEvidence: Record<string, unknown> | null = null;
     const expiredDailyChallengeIds: string[] = [];
-    // Both survive a cleanup that did not finish, and both change what a later transfer keeps, so a
-    // reviewer has to be able to see them.
     const [garageBaseline, garageJournalFields] = await Promise.all([
         readGuestTransferGarageBaseline(accountId),
         readGuestTransferGarageJournalFields(accountId),
@@ -2302,8 +2094,6 @@ export async function getGuestProgressSelection({
             }
             throw new Error('Guest progress selection record is invalid.');
         } catch {
-            // A malformed transfer record is left unresolved; selection must not silently
-            // replace it and risk deleting an account's partial copy.
             return leaveSelectionPending(undefined, 'recovery_required');
         }
     }
@@ -2317,18 +2107,12 @@ export async function getGuestProgressSelection({
         ...toProgressSummary(guestEvidence),
         hasDailyResults: guestEvidence.hasDailyResults || (guestHasProgress && !guestEvidence.hasProgress),
     };
-    // Daily rows count for the account as they do for the guest. Without them, an account whose
-    // only record was a Daily result looked empty, Guest was preselected, and a Guest choice
-    // replaced that result.
     const accountHasProgress = accountEvidence.hasProgress || accountEvidence.dailySavedResults > 0;
     const accountSummary = {
         ...toProgressSummary(accountEvidence),
         hasDailyResults: accountEvidence.hasDailyResults || (accountHasProgress && !accountEvidence.hasProgress),
     };
     if (guestHasProgress) {
-        // Only the guest is marked here. The account marker gates its ranked play, and showing a
-        // chooser risks nothing yet, so it is claimed when a choice is recorded and not before. A
-        // player who dismisses the chooser must not be left unable to race.
         await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1');
     }
     return {
@@ -2395,8 +2179,6 @@ export async function selectGuestProgress({
         throw error;
     }
     let lease: RedisLockLease | null = null;
-    // One line per transfer, and a transfer happens once per player. Durations only: no
-    // identifier, no token, nothing about who this is.
     const startedAtMs = Date.now();
     const domainMs: Record<string, number> = {};
     const timed = async <T>(domain: string, run: () => Promise<T>): Promise<T> => {
@@ -2408,8 +2190,6 @@ export async function selectGuestProgress({
         }
     };
     let reportedPhase: GuestTransferPhase = 'preparing';
-    // Assigned once the record and its protected writer exist. The catch below uses it to make a
-    // reviewed case durable; until then there is no record to mark.
     let persistRecoveryPhase: (() => Promise<void>) | null = null;
     const reportTiming = (
         outcome: 'completed' | 'retryable' | 'recovery_required' | 'not_needed' | 'failed',
@@ -2470,7 +2250,6 @@ export async function selectGuestProgress({
                 try {
                     await transaction.discard();
                 } catch (_discardError) {
-                    // EXEC may already have closed the transaction.
                 }
                 throw error;
             }
@@ -2491,8 +2270,6 @@ export async function selectGuestProgress({
             await runTransferMutation([], async (transaction) => {
                 if (next) await transaction.set(key, JSON.stringify(next));
                 if (next?.status === 'completed') {
-                    // The record, its receipt, the account index, and the marker clears commit
-                    // together, so a completion is never visible without the proof of it.
                     const receipt: GuestTransferReceipt = {
                         version: 4,
                         transferId: derivedTransferId,
@@ -2544,20 +2321,14 @@ export async function selectGuestProgress({
         if (resume && transferId !== derivedTransferId) {
             throw guestProgressRecoveryRequiredError();
         }
-        // Only a new transfer is checked here. A retry and a repeated completion both have a
-        // record, written before anything was replaced, and they continue from it as before.
         let newTransferPlaylist: DailyGpChallenge[] | null = null;
         if (!currentRaw) {
-            // A guest joined to this account with no record was retired empty: nothing to carry.
-            // One joined to another account is the conflict the Garage copy reports, answered here
-            // before the Campaign and Daily copies can replace anything.
             const joinedTo = await readGuestPromotionTarget(guestPlayerId);
             if (joinedTo) {
                 throw joinedTo === redditPlayerId
                     ? guestProgressTransferNotNeededError()
                     : guestProgressRecoveryRequiredError();
             }
-            // With nothing to carry, a Guest choice would only empty the account.
             newTransferPlaylist = await getServerDailyGpPlaylist();
             if (!await guestHoldsTransferableProgress(guestPlayerId, newTransferPlaylist)) {
                 throw guestProgressTransferNotNeededError();
@@ -2585,8 +2356,6 @@ export async function selectGuestProgress({
                 if (!isValidCompletedSelectionRecord(parsedRecord, guestPlayerId, redditPlayerId)) {
                     throw guestProgressRecoveryRequiredError();
                 }
-                // Repeating a finished transfer answers with the completion it already has. A
-                // valid completed record may clear its own stale markers, and nothing else.
                 const completedAt = parsedRecord.completedAt || parsedRecord.updatedAt || new Date().toISOString();
                 reportedPhase = 'completed';
                 await saveRecord(
@@ -2622,8 +2391,6 @@ export async function selectGuestProgress({
         if (dailyChallengeSpecs.length !== dailyChallengeIds.length) {
             throw guestProgressRecoveryRequiredError();
         }
-        // Preparation permits no destination replacement, so it may repeat and may look at the
-        // source again. From `copying` onward the recorded inventory is the only evidence used.
         const inheritedPhase: GuestTransferPhase = currentRecord?.version === 4
             && isValidTransferPhase(currentRecord.phase)
             ? currentRecord.phase
@@ -2631,9 +2398,6 @@ export async function selectGuestProgress({
                 ? 'copying'
                 : 'preparing';
         const preparing = inheritedPhase === 'preparing';
-        // An Account choice replaces nothing, and a Guest record whose copies are all checkpointed
-        // has nothing left to replace either. Neither needs an inventory, and neither may invent
-        // one: capturing evidence now would be a fresh look at a source the copies already used.
         const replacementRemaining = choice === 'guest'
             && !TRANSFER_COMPLETION_DOMAINS.every(
                 (domain) => currentRecord?.completedDomains?.includes(domain),
@@ -2661,10 +2425,6 @@ export async function selectGuestProgress({
             dailyChallengeSpecs,
             ...(sourceInventory ? { sourceInventory } : {}),
         };
-        // `record` is mutated in place as domains are checkpointed, so this closure always sees
-        // the latest checkpoints. It writes through `saveRecord`, the same protected transaction
-        // every other record write uses, and marks the pair pending again so the markers that
-        // protect the case survive with it.
         persistRecoveryPhase = async (): Promise<void> => {
             await saveRecord(
                 {
@@ -2676,46 +2436,21 @@ export async function selectGuestProgress({
                 { markPending: true },
             );
         };
-        // A retry record freezes the exact Daily window that the transfer must use. Resolve it
-        // before the first account mutation so an expired or corrupted history entry cannot
-        // leave Campaign partially replaced before Daily reports recovery is required.
         if (!record.completedDomains.includes('daily')) {
             await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
         }
         if (record.phase === 'preparing') {
-            // Freeze the account's Garage, and only here. Preparation is the one moment the
-            // account still holds what the player chose to give up.
-            //
-            // This must never run for a record already past preparation. Such a record was
-            // written before baselines existed, or its own preparation is long finished, and the
-            // account has since gained rewards. Capturing now would name those rewards as the
-            // Garage to delete. The evidence is simply gone, and today's account cannot stand in
-            // for it: the replacement takes the conservative path instead and keeps everything.
-            //
-            // The capture itself is write-once, so a retry that re-enters preparation keeps the
-            // original. Only a Guest choice replaces the account Garage, so only it needs one.
             if (choice === 'guest') {
                 await captureGuestTransferGarageBaseline(redditPlayerId, derivedTransferId);
-                // The account's Garage is being given up, and a reward it is still owed would come
-                // back at the next start-up. The retired guest's list goes with it: after promotion
-                // nothing reads it. A failed delete leaves the behaviour this replaces.
                 await clearOwedRewards(redditPlayerId);
                 await clearOwedRewards(guestPlayerId);
             }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
         }
-        // Preparation is finished and recorded. Only now may a destination row be replaced.
-        //
-        // A transfer resumed in `cleaning` has already passed this point, and writing it back to
-        // `copying` moved the record backwards and made the `cleaning` guard below dead: the phase
-        // always differed, so it always wrote again. The phase only moves forward.
         if (record.phase !== 'cleaning') record.phase = 'copying';
         record.updatedAt = new Date().toISOString();
         reportedPhase = record.phase;
-        // Each domain calls this while it holds its own locks, and immediately before its first
-        // destination write. Holding those locks drains that domain's writes, so what is observed
-        // here is the payload the copy uses. There is no unverified read in between.
         type ObservedSource = {
             unlocks?: Record<string, string>;
             campaignProgress?: string | null;
@@ -2723,7 +2458,6 @@ export async function selectGuestProgress({
                 string,
                 { entry: string | null; pb: string | null; rank: number | null }
             >;
-            /** One frozen Daily day, as it was read under that day's own locks. */
             dailyDay?: {
                 challengeId: string;
                 entry: string | null;
@@ -2736,10 +2470,7 @@ export async function selectGuestProgress({
                 if (!record.sourceInventory) return;
                 let evidence: Partial<GuestTransferSourceInventory>;
                 if (raw?.dailyDay) {
-                    // One day, compared on its own. The whole-domain comparison walks every
-                    // recorded day and would read the days not handed over as missing.
                     const expectedRow = record.sourceInventory.daily[raw.dailyDay.challengeId];
-                    // A day preparation never recorded holds nothing this guest could have raced.
                     if (expectedRow !== undefined && stableFingerprint({
                         entry: raw.dailyDay.entry ?? null,
                         pb: raw.dailyDay.pb ?? null,
@@ -2750,15 +2481,11 @@ export async function selectGuestProgress({
                     return;
                 }
                 if (raw?.unlocks) {
-                    // Garage hands over the exact fields it is about to copy.
                     evidence = {
                         unlocks: stableFingerprint(raw.unlocks ?? null),
                         unlockFields: { ...(raw.unlocks ?? {}) },
                     };
                 } else if (raw?.campaignStages) {
-                    // Campaign hands over the exact rows it is about to copy, fingerprinted the
-                    // same way preparation recorded them. Nothing is read here, so the payload
-                    // checked and the payload written are the same one.
                     evidence = {
                         campaignProgress: stableFingerprint(raw.campaignProgress ?? null),
                         campaignStages: Object.fromEntries(
@@ -2840,7 +2567,6 @@ export async function selectGuestProgress({
                 record.completedDomains = [...record.completedDomains, 'unlocks'];
                 await saveRecord(record);
             }
-            // Every copy is checkpointed. Only now may the sources be deleted.
             await confirmSelectionOwnership();
             if (record.phase !== 'cleaning') {
                 record.phase = 'cleaning';
@@ -2888,8 +2614,6 @@ export async function selectGuestProgress({
         }
         const completedAt = new Date().toISOString();
         if (choice === 'guest') {
-            // The Garage hash is the last source to go, because its promotion pointer is the
-            // proof the copy committed. Deleting it earlier would remove that proof.
             await timed('unlockCleanupMs', () => cleanupGuestCarUnlockProgress({
                 guestPlayerId,
                 redditPlayerId,
@@ -2924,21 +2648,13 @@ export async function selectGuestProgress({
                     ? 'retryable'
                     : 'failed';
         reportTiming(outcome);
-        // Only a reviewed case is made durable. A retryable error is contention or a dropped
-        // connection, and a `failed` one is unclassified; writing either into the record would
-        // turn an outage that clears on its own into a case that waits for a person.
         if (outcome === 'recovery_required' && persistRecoveryPhase) {
             try {
                 await persistRecoveryPhase();
             } catch (persistError) {
-                // The phase is what carries the case across a reload. Losing this write leaves
-                // the record exactly as it was, which the readers still judge on its shape, so
-                // the case stays protected either way. It must not replace the real reason.
                 console.error('Guest progress recovery phase write failed:', persistError);
             }
         }
-        // Contention and reviewed recovery are already reported by the outcome line above. Only an
-        // unclassified failure carries a stack worth keeping.
         if (outcome === 'failed') {
             console.error('Guest progress selection failed:', error);
         }
@@ -2975,8 +2691,6 @@ export async function selectServerGuestProgress({
         }
         const redditPlayerId = `reddit:${safeUsername.toLowerCase()}`;
         const known = await resolveAccountTransferState(redditPlayerId, { transferId });
-        // A browser that lost the response to its own successful request asks again and is told
-        // the same thing it missed. A finished transfer is never reported as a repair case.
         if (known?.state === 'completed' && known.transferId === transferId) {
             const state = await getServerPlayerBootstrap({ redditUsername: safeUsername });
             return { ...state, progressSelection: known };
@@ -3068,7 +2782,6 @@ async function readOrSeedTrackPersonalBest({
         });
         return seeded.record;
     } catch (error) {
-        // Opportunistic backfill takes the same lock a live submission needs; losing that race must not fail the request.
         console.error('Challenge PB seed from a retained leaderboard entry failed:', error);
         return null;
     }
@@ -3233,11 +2946,8 @@ export async function getServerPlayerBootstrap({
     let profile: DailyGpPlayerProfile | null = null;
     let retireGuestIdentity = identity.guestStatus === 'guest_identity_retired';
     let progressSelection: GuestProgressSelection | null = null;
-    // The browser moves this guest's unsent runs to the account only on this word.
     let guestJoinedAccount = false;
 
-    // Claiming or adopting a retired guest id would resurrect a credential whose progress already moved to an account.
-    // That check already reads the transfer flag. Keep the answer: the flag has no expiry, so a later claim of the same id still needs it, and reading it again would repeat the call.
     const bareGuestId = !identity.canonicalPlayerId
         && !safeRequestRedditUsername
         && typeof playerId === 'string'
@@ -3250,7 +2960,6 @@ export async function getServerPlayerBootstrap({
     const retiredGuestId = bareGuestStatus?.status === 'guest_identity_retired';
     retireGuestIdentity ||= retiredGuestId;
 
-    // A player id with no token is either a first visit or a guest whose token was lost: claiming covers the first, adopting the second.
     if (!identity.canonicalPlayerId && !safeRequestRedditUsername && !suppliedGuestToken && !retiredGuestId) {
         const claimedGuest = await claimNewGuestPlayerProfile({
             playerId,
@@ -3293,20 +3002,13 @@ export async function getServerPlayerBootstrap({
         };
     }
 
-    // Read the stored profile before the transfer check, and apply it after. Reading proves
-    // nothing about the player yet; a blocked account still returns below without it.
     if (!profile) {
         previousProfile ??= await readPlayerProfile(identity.canonicalPlayerId);
     }
 
     let accountTransfer: GuestProgressSelection | null = null;
     if (identity.canonicalPlayerId.startsWith('reddit:')) {
-        // Checked before guest promotion, before guest retirement, and before any profile is
-        // applied, so an unresolved transfer cannot be overtaken by ordinary sign-in work.
         accountTransfer = await resolveAccountTransferState(identity.canonicalPlayerId);
-        // Only a recorded choice blocks sign-in. A marker with no record means the chooser was
-        // opened and never answered: nothing was replaced, so this visit still gets the ordinary
-        // chooser with its real summaries, exactly as it did before.
         const transferBlocksSignIn = accountTransfer?.state === 'resume_required'
             || accountTransfer?.state === 'recovery_required';
         if (transferBlocksSignIn) {
@@ -3327,16 +3029,11 @@ export async function getServerPlayerBootstrap({
         if (accountTransfer?.state === 'completed') {
             progressSelection = accountTransfer;
         }
-        // A finished transfer is news for the browser to reconcile against, never a reason to
-        // ignore the guest in front of us. A different guest signing in later still gets its own
-        // chooser, and a spent one is still retired.
         const guestPlayerId = await verifyGuestPlayerToken(guestToken);
         if (guestPlayerId) {
             const promotedTo = await readGuestPromotionTarget(`guest:${guestPlayerId}`);
             if (promotedTo) {
                 retireGuestIdentity = true;
-                // Joined here with no transfer record means an empty guest was retired into this
-                // account. A transfer, or a join into another account, keeps its own rules.
                 guestJoinedAccount = promotedTo === identity.canonicalPlayerId
                     && !await redis.get(guestProgressSelectionKey(
                         `guest:${guestPlayerId}`,
@@ -3388,14 +3085,6 @@ export async function getServerPlayerBootstrap({
     const isReturningPlayer = profile.hasSeenGame
         && Number.isFinite(firstSeenMs)
         && (Date.now() - firstSeenMs) > RETURNING_PLAYER_DELAY_MS;
-    // A transfer that is still open is midway through moving this identity's rewards. Backfilling
-    // here writes either onto a source the transfer is about to delete, losing the unlock, or onto
-    // one it already deleted, putting a row back under a guest that has been retired. The backfill
-    // is opportunistic, so it simply waits: the next bootstrap after the transfer finishes does it.
-    //
-    // The account side was resolved at sign-in above and costs nothing to reuse. `resume_required`
-    // and `recovery_required` already returned before this point, so the state this still catches
-    // is a marker whose chooser was never answered. Only a guest has to be asked.
     const backfillBlockedByTransfer = identity.canonicalPlayerId.startsWith('reddit:')
         ? Boolean(accountTransfer) && accountTransfer.state !== 'completed'
         : identity.guestSelectionPending ?? await isGuestProgressSelectionPending(
@@ -3407,9 +3096,6 @@ export async function getServerPlayerBootstrap({
     );
     if (!backfillBlockedByTransfer) {
         try {
-            // The snapshot counts a Campaign result as a finished race, so a player who has never
-            // raced Daily is repaired here too. The locked write costs a lock and a release
-            // transaction, so it is skipped when the field is already there.
             if (
                 carUnlocks?.progress?.completedRace
                 && !await hasRecordedCompletedRace(identity.canonicalPlayerId)
@@ -3419,8 +3105,6 @@ export async function getServerPlayerBootstrap({
         } catch (error) {
             console.error('Completed-race unlock backfill failed:', error);
         }
-        // Grant a reward whose write failed. It logs its own failures, and a reward it cannot grant
-        // stays owed for the next start-up.
         await settleOwedRewards(identity.canonicalPlayerId);
     }
     const playerPreferences = preferencesAllowedByCarUnlocks(profile.preferences, carUnlocks);
@@ -3592,8 +3276,6 @@ export async function getServerDailyGpSnapshot({
     });
     const normalizedPlayerId = identity.canonicalPlayerId;
     if (normalizedPlayerId) {
-        // Standings carry no name or settings to store. Stamping the profile here only made every
-        // parallel snapshot fetch collide on the one key.
         const loadedProfile = await ensurePlayerProfileExists({
             playerId: normalizedPlayerId,
             leaderboardIdentity,
@@ -3725,7 +3407,6 @@ export async function submitServerDailyGpRun({
         };
     }
 
-    // Checked before rate limiting and replay work: a run raced under another account is not this player's to spend.
     if (isMismatchedSubmissionOwner(identity.canonicalPlayerId, submissionOwnerId)) {
         return SUBMISSION_IDENTITY_CHANGED_RESULT;
     }
@@ -3744,8 +3425,6 @@ export async function submitServerDailyGpRun({
         return { status: outcome.status, body: outcome.body };
     }
 
-    // The run is saved. What follows cannot unsave it, so each job settles on its own and only
-    // what failed is left out of the answer.
     const normalizedPlayerId = identity.canonicalPlayerId;
     const [standing, carUnlocks, reward, profile] = await Promise.allSettled([
         readPlayerStandingSummary(competition, normalizedPlayerId),
@@ -3759,8 +3438,6 @@ export async function submitServerDailyGpRun({
         }),
     ]);
     await outcome.releaseLock;
-    // Either record tells the Keep Progress chooser this account has played. With neither, the
-    // account looks empty there and a Guest choice replaces this run, so the browser must retry.
     if (reward.status === 'rejected' && profile.status === 'rejected') {
         console.error('Daily run saved, but its profile write also failed:', profile.reason);
         throw reward.reason;
@@ -3785,8 +3462,6 @@ export async function submitServerDailyGpRun({
             playerRank: standing.status === 'fulfilled' ? standing.value.playerRank : null,
             playerRankLabel: standing.status === 'fulfilled' ? standing.value.playerRankLabel : null,
             leaderboardEntryCount: standing.status === 'fulfilled' ? standing.value.leaderboardEntryCount : null,
-            // This Garage counts the finish before the reward is stored. Without the reward, the
-            // next start-up could lock the car again, so the answer shows no Garage at all.
             ...(carUnlocks.status === 'fulfilled' && reward.status === 'fulfilled'
                 ? { carUnlocks: carUnlocks.value }
                 : {}),

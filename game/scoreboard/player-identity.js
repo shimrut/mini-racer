@@ -61,8 +61,6 @@ export function rotateGuestPlayerIdentity(logLabel = 'scoreboard') {
     return nextId;
 }
 
-// A guest id is retained for token recovery, then retired only after a successful Reddit promotion.
-
 export function getGuestPlayerToken() {
     if (hasEphemeralGuestPlayerToken) {
         return ephemeralGuestPlayerToken;

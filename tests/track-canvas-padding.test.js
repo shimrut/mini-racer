@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { drawOuterDebris, getTrackCanvasPadding } from '../game/track/canvas.js';
 import { CONFIG } from '../game/config.js';
 
-// The kettleRun desert event skin is the widest painted-padding case.
 const DESERT_DEBRIS_PRESENTATION = {
     key: 'event:daily-challenge:kettleRun:desert',
     showCurbs: false,

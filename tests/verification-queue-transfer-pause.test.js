@@ -9,7 +9,6 @@ let denyStorageProperty = false;
 function installBrowserStorage() {
   global.window = {
     get localStorage() {
-      // Browsers set to block site data throw on the property itself, before any method call.
       if (denyStorageProperty) throw new Error("access to storage is denied");
       return storageObject;
     },
@@ -55,8 +54,6 @@ describe("a known transfer keeps racing paused when browser storage fails", () =
       accountPlayerId: ACCOUNT,
     })).toBe(false);
 
-    // The transfer stays unresolved for the caller, and this browser stops racing for both
-    // identities it names, and for an identity it has not confirmed yet.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
     expect(queue.isVerificationQueueSubmissionBlocked(GUEST)).toBe(true);
     expect(queue.isVerificationQueueSubmissionBlocked(undefined)).toBe(true);
@@ -67,8 +64,6 @@ describe("a known transfer keeps racing paused when browser storage fails", () =
     queue.recordVerificationQueueTransferBlock({ guestPlayerId: GUEST, accountPlayerId: ACCOUNT });
     failWrites = false;
 
-    // Storage works now and holds nothing. It never held this block, so its silence is not
-    // evidence that the transfer was resolved.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
   });
 
@@ -109,7 +104,6 @@ describe("a known transfer keeps racing paused when browser storage fails", () =
     failWrites = true;
 
     expect(queue.clearVerificationQueueTransferBlock(ACCOUNT)).toBe(false);
-    // The durable record still names it, so the pause holds until a later start-up removes it.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
   });
 
@@ -122,8 +116,6 @@ describe("a known transfer keeps racing paused when browser storage fails", () =
     vi.resetModules();
     const reloaded = await import("../game/scoreboard/verification-queue.js");
 
-    // The documented boundary. Memory does not survive a reload, so a browser whose storage
-    // failed has to be told about the transfer by the server again before it can be safe.
     expect(reloaded.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(false);
   });
 });
@@ -143,7 +135,6 @@ describe("a block only ever read back from storage is still held", () => {
   });
 
   it("survives a storage failure after a cold load found it", async () => {
-    // A previous session wrote this. This one has only ever read it.
     store.set("VectorGpTransferBlocks", JSON.stringify({
       "reddit:paused": { accountPlayerId: "reddit:paused", guestPlayerId: GUEST, state: "resume_required" },
     }));
@@ -151,15 +142,12 @@ describe("a block only ever read back from storage is still held", () => {
 
     failReads = true;
 
-    // Reading fails now. The block was never written by this session, so without adopting it on
-    // read there would be nothing left to hold the pause.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
   });
 
   it("refuses offline play on a cold start when storage cannot be read", () => {
     failReads = true;
 
-    // Nothing is known and nothing is ruled out. The agreed answer is a server connection.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
     expect(queue.isVerificationQueueSubmissionBlocked(undefined)).toBe(true);
   });
@@ -201,7 +189,6 @@ describe("browser storage that denies access is handled, not thrown", () => {
     expect(() => queue.recordVerificationQueueTransferBlock({ accountPlayerId: ACCOUNT }))
       .not.toThrow();
     expect(queue.recordVerificationQueueTransferBlock({ accountPlayerId: ACCOUNT })).toBe(false);
-    // The pause is still held in memory even though nothing could be written down.
     expect(queue.isVerificationQueueSubmissionBlocked(ACCOUNT)).toBe(true);
   });
 });
@@ -229,7 +216,6 @@ describe("a cached block is refreshed, not just adopted once", () => {
     }));
     expect(queue.isVerificationQueueSubmissionBlocked(OLD_GUEST)).toBe(true);
 
-    // The same account is later named with a different guest.
     store.set("VectorGpTransferBlocks", JSON.stringify({
       [ACCOUNT]: { accountPlayerId: ACCOUNT, guestPlayerId: NEW_GUEST, state: "resume_required" },
     }));
@@ -237,7 +223,6 @@ describe("a cached block is refreshed, not just adopted once", () => {
 
     failReads = true;
 
-    // A stale cached copy would restore the old pairing here and let the newer guest race.
     expect(queue.isVerificationQueueSubmissionBlocked(NEW_GUEST)).toBe(true);
   });
 });

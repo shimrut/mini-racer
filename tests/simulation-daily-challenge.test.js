@@ -3,7 +3,6 @@ import { updateSimulation } from '../game/race/simulation.js';
 import { CONFIG } from '../game/config.js';
 import { createTestSimState, TEST_TRACK } from './helpers/sim-state.js';
 
-/** Vertical wall at x = 5; movement from left to right crosses it between 4.x and 5.x. */
 const WALL_X5 = [
     {
         start: { x: 5, y: -200 },

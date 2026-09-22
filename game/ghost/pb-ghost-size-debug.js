@@ -92,7 +92,6 @@ function lerpRawPoseAtTime(last, current, atTimeSec) {
   };
 }
 
-/** Local copy of the server's schema-v2 recorder; the server contract stays the single authority. */
 export function createLocalPbGhostTraceRecorder(initialPose) {
   const sampleIntervalSec = PB_GHOST_SAMPLE_INTERVAL_MS / 1000;
   const poses = [];
@@ -273,7 +272,6 @@ function normalizeLapCount(value) {
   return value === 2 || value === 3 ? value : 1;
 }
 
-/** The fingerprint placeholder matches the server's 43-character base64url length, so size measurements stay representative. */
 export function createLocalPbGhostStorageRecord({
   trace,
   trackKey = 'unknown',
@@ -598,8 +596,6 @@ export function shouldCapturePbGhostSize() {
   }
 }
 
-// Lives here rather than on the engine so the shipped build drops it with the
-// rest of this module: a minifier cannot remove an unreferenced class method.
 export function exposePbGhostSizeDebugHooks(engine) {
   window.__PB_GHOST_SIZE_DEBUG__ = Object.freeze({
     enabled: () => Boolean(engine.pbGhostSizeCapture),

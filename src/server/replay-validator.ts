@@ -270,7 +270,7 @@ export function validateDailyGpReplayDetailed({
             state.keys.left = segment.left;
             state.keys.right = segment.right;
             if (segment.relaunchDelay) {
-                // Exactly fixedDt so the step decrements it to 0; a residual freezes one extra frame and shifts every later input.
+                // Exactly fixedDt: the step then reaches 0.
                 state.relaunchDelayRemaining = fixedDt;
             }
 

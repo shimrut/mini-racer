@@ -34,7 +34,7 @@
 
     --modal-floating-back-height: 2.55rem;
     --modal-floating-back-offset: 0.85rem;
-    /* Replaced at runtime with visualViewport.height: Reddit's embedded browser leaves CSS viewport units taller than the visible area. */
+    /* JS sets this from visualViewport.height. */
     --app-visible-height: 100vh;
     --screen-height-cap: 1000px;
     --screen-fill-height: min(var(--app-visible-height), var(--screen-height-cap));
@@ -69,7 +69,6 @@ a:focus-visible,
     outline: none !important;
 }
 
-/* The webview paints its own grey box over a tapped control, which reads as a flicker on every press. */
 button,
 a,
 [role="button"] {

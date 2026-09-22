@@ -4,8 +4,6 @@ import {
     getCachedDailyChallengePlaylist
 } from '../game/daily-challenge/service.js';
 
-// Fresh module graph: the very first playlist-cache touch here decides what hydration reads, so keep this file to that one scenario.
-
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {

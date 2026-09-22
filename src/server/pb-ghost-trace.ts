@@ -202,10 +202,8 @@ export function createPbGhostTraceRecorder(initialPose: {
     return {
         sample(pose: RawPose): void {
             if (overflowed) return;
-            // Reject bad poses without moving lastPose so the next valid frame can still lerp.
             if (!isFiniteRawPose(pose)) return;
 
-            // Stamp the due grid time but lerp the pose from the previous 60Hz sample, or playback sits a physics frame ahead.
             while (pose.timeSec + Number.EPSILON >= nextSampleTimeSec) {
                 appendPose(lerpRawPoseAtTime(lastPose, pose, nextSampleTimeSec));
                 nextSampleTimeSec += sampleIntervalSec;

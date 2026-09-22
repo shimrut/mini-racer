@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Ensures reddit/devvit-docs is cloned locally and reasonably fresh.
- * Cross-platform (Windows, Linux, macOS) — Node.js built-ins + git only.
- */
-
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -215,7 +210,6 @@ function ensureRepo(layout, options) {
     return "cloned";
   }
 
-  // Reapply the canonical patterns so existing caches pick up additions.
   configureSparseDocs(layout.repoDir);
 
   if (!options.force && !isStale(layout.markerPath, options.ttlHours)) {

@@ -1027,7 +1027,6 @@ export const dailyChallengeEngineMethods = {
       console.error("Error loading playlist personal bests:", error);
     }
 
-    // The modal lists every day at once, so every rank on the list is asked for.
     const snapshotIdsToFetch = getDailyChallengeSnapshotIdsToFetch(
       loadedChallenges.map((challenge) => challenge?.id).filter(Boolean),
     );
@@ -1065,10 +1064,6 @@ export const dailyChallengeEngineMethods = {
         const fetched = await getDailyChallengePlaylist();
         if (isStale()) return;
         if (fetched.length) {
-          // Repaint from the cache rather than the response. The fetch has already
-          // been merged into it, and a response that fell back to a single
-          // challenge would otherwise replace a full rail with one card and drag
-          // the selection to it.
           challenges = getCachedDailyChallengePlaylist();
           this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId });
         }
@@ -1087,32 +1082,22 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (isStale()) return;
-    // Only the card on screen shows a rank, so only that day is asked for. A day
-    // the player never swipes to costs nothing, and the answer repaints the rail
-    // through the snapshot subscription rather than through this pass.
     await this.ensureDailyCarouselRank(
       carousel.getSelectedChallengeId?.() || preferredId,
     );
   },
 
-  /** The days the rail is built from: the loaded day first, else the saved list. */
   dailyCarouselChallenges() {
     return this.currentDailyChallenge
       ? cacheDailyChallengePlaylist([this.currentDailyChallenge])
       : getCachedDailyChallengePlaylist();
   },
 
-  /** Repaints the rail from the saved snapshots, without asking the server. */
   repaintDailyCarouselFromCache() {
     if (!this.dailyCarousel) return;
     this.paintDailyCarousel(this.dailyCarouselChallenges());
   },
 
-  /**
-   * Asks for one day's standings. The service answers from its own copy once the
-   * server has confirmed that day in this session, so every entry point -- first
-   * paint, a settled swipe, a resume -- can call this without counting requests.
-   */
   async ensureDailyCarouselRank(challengeId) {
     if (!challengeId) return null;
     try {

@@ -18,10 +18,6 @@ import {
 } from './user-comment-submit.js';
 
 export const HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS = 10 * 60;
-/**
- * The record that guards one brag or one comment. It must outlive any attempt that could follow it,
- * so it keeps the term the Daily share record keeps.
- */
 export const HEAD_TO_HEAD_SHARE_RECORD_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const HEAD_TO_HEAD_SHARE_LOCK_TTL_MS = 30_000;
 export const HEAD_TO_HEAD_SHARE_LOCK_RENEWAL_INTERVAL_MS = 10_000;
@@ -36,14 +32,9 @@ export type HeadToHeadSharePreview = {
     subredditName: string;
     postId: `t3_${string}`;
     commentText: string;
-    /** The result this preview posts about. Its record guards it, and its lock serialises it. */
     resultKey: string;
 };
 
-/**
- * One key per result, and the action is part of it: a brag and a comment on one challenge hold
- * different opinions of the same race, and must never share a record or a lock.
- */
 export function headToHeadShareResultKey({
     action,
     challengeId,
@@ -193,8 +184,6 @@ export async function submitHeadToHeadShareComment({
             error: `This ${action} is already being posted.`,
         },
     };
-    // The preview names the result, and the result names the lock. Two previews of one result
-    // therefore wait for each other, which is what lets a record left behind be treated as dead.
     const claimed = await readHeadToHeadSharePreview(tokenKey);
     if (!claimed) return expiredResult;
     const lock = await acquireRedisLock(
@@ -219,8 +208,6 @@ export async function submitHeadToHeadShareComment({
         },
     });
     try {
-        // Read again inside the lock: the copy above was read before it, and another confirmation
-        // may have finished in between.
         const preview = await readHeadToHeadSharePreview(tokenKey);
         if (!preview) return expiredResult;
         if (
@@ -235,7 +222,6 @@ export async function submitHeadToHeadShareComment({
                 },
             };
         }
-        // A record with a comment answers from Redis alone, so a repeat asks Reddit nothing.
         const stored = await readUserCommentRecord(preview.resultKey);
         if (stored?.commentId) {
             await redis.del(tokenKey);
@@ -275,8 +261,6 @@ export async function submitHeadToHeadShareComment({
             await redis.del(tokenKey);
             return postedBody(outcome.record, postUrl);
         }
-        // The helper recorded the publication. Both answers below describe a live comment, so
-        // nothing here deletes it.
         const published = outcome.record;
         if (
             normalizeHeadToHeadName(published.authorName || '')
@@ -304,7 +288,6 @@ export async function submitHeadToHeadShareComment({
         });
         return postedBody(published, postUrl);
     } finally {
-        // The comment may already be live, so cleanup must not replace the result.
         await lease.stop();
         await releaseRedisLocksSafely([lock], 'Head to Head share', redis);
     }

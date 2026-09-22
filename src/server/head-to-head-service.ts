@@ -92,12 +92,10 @@ export type HeadToHeadReplayResult = {
 };
 
 export type HeadToHeadBestContext = {
-    /** Forwarded to the mode's own submit exactly as the request carried it, so identity resolves the same way twice. */
     playerId?: string | null;
     username?: string | null;
     guestToken?: string | null;
     requestRateLimitIdentity?: string | null;
-    /** Already resolved by the challenge submit; used only to read back the rank. */
     canonicalPlayerId?: string | null;
     verifiedRun?: ReplayValidationResult;
     judgedContract?: JudgedCompetitionContract;
@@ -131,19 +129,11 @@ export type HeadToHeadServiceDependencies = {
         challenge: HeadToHeadRecord,
         replay: unknown,
     ): Promise<HeadToHeadReplayResult> | HeadToHeadReplayResult;
-    /**
-     * Sends a verified run to the mode it was minted from, so it earns the board entry, the
-     * personal best and the progress a normal run earns. Returns null when the mode refuses it.
-     */
     recordBest?(
         challenge: HeadToHeadRecord,
         replay: unknown,
         context: HeadToHeadBestContext,
     ): Promise<HeadToHeadBestUpdate | null> | HeadToHeadBestUpdate | null;
-    /**
-     * What the viewer already holds on the stage or Daily behind the challenge, so the finish can
-     * tell an improvement from a run not worth sending.
-     */
     readViewerBest?(
         challenge: HeadToHeadRecord,
         playerId: string | null,
@@ -196,12 +186,6 @@ type ChallengeViewer = {
     displayName: string;
     signedIn: boolean;
     progressSelectionPending: boolean;
-    /**
-     * True while this identity has an open guest transfer, guest or account alike.
-     * `progressSelectionPending` only ever sees the guest side: `resolveGuestIdentityStatus`
-     * answers `active` for a signed-in account, so without this a pending account could post a
-     * challenge and score runs against data a transfer was midway through replacing.
-     */
     transferPending: boolean;
 };
 
@@ -226,11 +210,6 @@ async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promis
     };
 }
 
-/**
- * The same answer a Daily or Campaign submission gets while a transfer is open, so a Head to Head
- * joins the retry path the browser already has instead of needing one of its own. See the pending
- * recheck in `competition-submit.ts`.
- */
 function transferPendingResult(): HeadToHeadServiceResult {
     return {
         status: 503,
@@ -275,7 +254,6 @@ async function checkHeadToHeadSubmissionRateLimit(
             retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
         };
     }
-    // Repair a counter left without a TTL, or this identity stays rate-limited permanently.
     await redis.expire(key, HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
     return {
         allowed: false,
@@ -325,7 +303,6 @@ async function resolveChallengeRecord(
     context: HeadToHeadRequestContext,
 ): Promise<{ record: HeadToHeadRecord | null; reason?: string; diff?: Record<string, unknown> }> {
     const result = await resolveHeadToHeadRecordResult(challengeId, context);
-    // `=== true`, not truthiness: with strictNullChecks off, only the literal comparison narrows the union.
     if (result.ok === true) return { record: result.record };
     const { diff } = result;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
@@ -582,13 +559,11 @@ async function recoverPost(
         pageSize: 100,
     });
     const posts = typeof listing?.all === 'function' ? await listing.all() : [];
-    // Reddit dates the post to the second, so the preview's own second still counts as newer.
+    // Reddit dates posts to the second.
     const previewMs = Date.parse(preview.createdAt);
     const cutoffMs = Number.isFinite(previewMs) ? Math.floor(previewMs / 1000) * 1000 : NaN;
     for (const post of posts) {
         if (normalizeName(post?.subredditName || '') !== normalizeName(preview.subredditName)) continue;
-        // Only a post made from this preview can carry its challenge id, so nothing older than the
-        // preview can match. The listing already carries the date; reading the post data does not.
         const createdMs = new Date(post?.createdAt ?? NaN).getTime();
         if (Number.isFinite(cutoffMs) && Number.isFinite(createdMs) && createdMs < cutoffMs) continue;
         try {
@@ -708,9 +683,6 @@ export function createHeadToHeadService(
                 },
             };
         }
-        // Before the preview is spent and before any post exists. Creating a challenge posts to
-        // the subreddit and awards a Garage unlock, and neither can be taken back if the transfer
-        // this account is waiting on then replaces the result the challenge was built from.
         if (await isProgressTransferPending(playerIdForUsername(request.username))) {
             return transferPendingResult();
         }
@@ -874,15 +846,12 @@ export function createHeadToHeadService(
             ) {
                 throw new Error('Reddit did not return the head-to-head post identity.');
             }
-            // Reddit has accepted a valid user-authored post. Keep the quota slot even if
-            // a later identity or unlock write fails; recovery will find this exact post.
             reservedAt = null;
             const saved = await savePost(record, {
                 postId: post.id as `t3_${string}`,
                 postUrl: post.url,
             });
-            // Reddit drops the flair from a post that the player makes. The app is a moderator, so
-            // it sets the flair. The post is live either way, so a failure is only logged.
+            // Reddit drops flair on posts players make.
             try {
                 await reddit.setPostFlair({
                     subredditName: request.subredditName,
@@ -979,7 +948,6 @@ export function createHeadToHeadService(
         };
     }
 
-    /** Decoration on the challenge screen: a failed read must not keep the challenge from loading. */
     async function readViewerBest(
         challenge: HeadToHeadRecord,
         playerId: string | null,
@@ -993,10 +961,6 @@ export function createHeadToHeadService(
         }
     }
 
-    /**
-     * The challenge result never depends on this. A refusal from the mode is the rule working —
-     * a locked stage, a Daily that has closed — and a failure is a lost personal best, not a lost race.
-     */
     async function recordVerifiedBest(
         challenge: HeadToHeadRecord,
         replay: unknown,
@@ -1046,9 +1010,6 @@ export function createHeadToHeadService(
                 },
             };
         }
-        // A signed-in account reaches here with `progressSelectionPending` false, so this is the
-        // only check that stops it. It sits ahead of the rate limit so a retried submission does
-        // not burn its own attempts while it waits.
         if (viewer.transferPending) {
             return transferPendingResult();
         }
@@ -1092,8 +1053,6 @@ export function createHeadToHeadService(
         });
         recordAnalyticsRaceBestEffort('challenge', 'finish', viewer.playerId);
 
-        // Every finish is verified now, win or lose: a run that misses the target can still be the
-        // player's best on the stage or Daily this challenge was minted from, and that best is theirs to keep.
         const verified = await dependencies.validateReplay(challenge, input.replay);
         if (
             !verified.ok
@@ -1120,8 +1079,6 @@ export function createHeadToHeadService(
             };
         }
 
-        // Brag, Head to Head unlocks, and the origin personal-best / place share this body so the
-        // finish sheet can replace RANK. Public Daily/Campaign HTTP still cannot take this tape.
         const acceptPromise = challenge.postId
             ? (async () => {
                 const acceptToken = createId();
@@ -1137,18 +1094,10 @@ export function createHeadToHeadService(
                 return acceptToken;
             })()
             : Promise.resolve(null);
-        // After the origin save, never beside it. That save records the same completed race for the
-        // same player, so the two fought over one Garage lock, and every day the loser failed either
-        // the win or the rank in its own mode. The origin save never rejects.
-        // The win goes first. Both writes take the same Garage lock, and a failed first write
-        // would skip the second: only the win has no repair of its own beyond what it records.
         const unlockWrites = originSave.then(async () => {
             await recordHeadToHeadWin(viewer.playerId, challengeId);
             await recordCompletedRace(viewer.playerId);
         });
-        // The win is verified and its origin best is saved. Nothing below can undo that, so each job
-        // settles on its own: a failed brag record leaves no brag button, and a failed Garage read
-        // leaves the Garage out. Before, any one of them turned a won race into a 500.
         const [accept, unlocks] = await Promise.allSettled([acceptPromise, unlockWrites]);
         const bestUpdate = await originSave;
         if (accept.status === 'rejected') {

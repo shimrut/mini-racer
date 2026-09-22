@@ -431,7 +431,6 @@ describe('server replay validator', () => {
 
         expect(outcome.ok).toBe(false);
         expect(outcome.failure.reason).toBe('no_finish');
-        // 5 frozen frames + 10 physics frames => currentTime == 10 * (1/60).
         const expected = Math.round((physicsFrames / 60) * 1000) / 1000;
         expect(outcome.failure.simulatedTimeSec).toBe(expected);
     });

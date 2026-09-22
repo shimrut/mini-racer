@@ -5,7 +5,6 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
-/** Tracks strictly under this author time can publish 1 or 2 laps; at or above, always 1 lap. */
 export const DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS = 10;
 
 export type DailyGpLapCount = 1 | 2 | 3;
@@ -22,7 +21,6 @@ export type DailyGpRaceContract = Pick<
 export const DAILY_GP_NEARBY_RADIUS = 2;
 export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 365 * 24 * 60 * 60;
-/** Matches `CAMPAIGN_GUEST_TTL_SECONDS`: a profile must outlive the progress it names. `tests/reddit-daily-gp-model.test.js` holds the two together. */
 export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
 export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_REDIS_TTL_SECONDS;
@@ -46,7 +44,6 @@ export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 3;
 }
 
-/** Revision 0 predates the race contract and is always one lap; revision 1 is strict so a malformed record cannot become a different competition. */
 export function normalizeDailyGpRaceContract(value: unknown): DailyGpRaceContract | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const record = value as Record<string, unknown>;
@@ -120,7 +117,6 @@ export type DailyGpLeaderboardEntry = {
     checkpointTimesSec: number[] | null;
     validationMethod?: 'strict-replay';
     strictReplayFailureReason?: string | null;
-    /** Absent on rows saved before this field existed. */
     opponentRaceReady?: boolean;
 };
 
@@ -176,7 +172,6 @@ function deterministicSeedIndex(seed: string, length: number): number {
     return (hash >>> 0) % length;
 }
 
-/** New Daily publication: under 10s author time is 1 or 2 laps; 10s+ is 1 lap. Validator stays 1-3 for history and Campaign. */
 export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
     const authorTime = getAuthorMedalSeconds(trackKey);
     if (!Number.isFinite(authorTime) || authorTime >= DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS) {
@@ -267,5 +262,4 @@ export function createRedisChallengeStandingsRevisionKey(challengeId: string): s
     return `${createRedisChallengeLeaderboardKey(challengeId)}:standings-revision`;
 }
 
-/** The one hash that names every live challenge, so a walk of Daily storage can start from it. */
 export const DAILY_GP_CHALLENGE_HISTORY_HASH_KEY = 'dailygp:challenges';

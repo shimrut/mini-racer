@@ -349,7 +349,6 @@ describe('exported simulation helpers — scrape and collision hash', () => {
             bodyOffset: { x: 0, y: 1 },
         }]);
         expect(state.velocity.x).toBeGreaterThanOrEqual(0);
-        // rotationalNormalVelocity = -3 * (0*0 - 1*1) = -3 * -1 = +3 > 0, so angular is kept.
         const spinning = {
             velocity: { x: 0, y: 0 },
             angularVelocity: 2,
@@ -359,7 +358,6 @@ describe('exported simulation helpers — scrape and collision hash', () => {
             normal: { x: 1, y: 0 },
             bodyOffset: { x: 0, y: 1 },
         }]);
-        // rotationalNormalVelocity = 2 * (0*0 - 1*1) = -2 < 0 → cleared
         expect(spinning.angularVelocity).toBe(0);
     });
 

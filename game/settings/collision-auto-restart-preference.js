@@ -1,6 +1,6 @@
 import { createBooleanPreference } from './parse-stored-boolean-toggle.js';
 
-// Storage key predates the rename; keep it so an explicit choice survives.
+// Legacy key; renaming loses saved choices.
 export const COLLISION_AUTO_RESTART_STORAGE_KEY = 'VectorGpAutoRestartAfterCrash';
 
 const collisionAutoRestartPreference = createBooleanPreference(

@@ -127,9 +127,6 @@ export async function previewHeadToHeadComment(
         username: request.username,
         timeMs: reportedTimeMs,
     });
-    // A tie is always the target time to the millisecond, so a second tie is the same result as
-    // the first. Say so here, as the Daily share does, instead of asking the player to confirm a
-    // post that the confirmation would only answer from the record.
     const posted = await readUserCommentRecord(resultKey);
     if (posted?.commentId) {
         return {

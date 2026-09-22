@@ -97,7 +97,6 @@ describe('mergeGuestDailyProgress', () => {
         ownedLocks.clear();
         storedStrings.clear();
         mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? storedStrings.get(key) ?? null);
-        // Delegate so the batched read the lock layer uses sees the same keys get() does.
         mockRedis.mGet.mockImplementation(
             async (keys) => await Promise.all(keys.map((key) => mockRedis.get(key))),
         );

@@ -15,7 +15,6 @@ function response(status, payload) {
     return { ok: status >= 200 && status < 300, status, json: vi.fn(async () => payload) };
 }
 
-/** What bootstrap returns to a browser whose transfer finished while it was not looking. */
 function completedBootstrap() {
     return {
         hasAnyData: true,
@@ -63,8 +62,6 @@ describe('a completed transfer reported at startup', () => {
         const { getPlayerProgressState } = await import('../game/storage.js');
         const state = await getPlayerProgressState();
 
-        // The account must survive the completed path. Nulling it here is what silently skipped
-        // reconciliation, stranded the block, and left the player with no profile.
         expect(state.leaderboardPlayerId).toBe(ACCOUNT);
         expect(state.authoritative).toBe(true);
         expect(dom.window.localStorage.getItem(BLOCKS_KEY) || '{}').not.toContain(ACCOUNT);
@@ -82,7 +79,6 @@ describe('a completed transfer reported at startup', () => {
         const { getPlayerProgressState } = await import('../game/storage.js');
         await getPlayerProgressState();
 
-        // The player races again. The server keeps reporting the same completion.
         dom.window.localStorage.setItem(DAILY_DATA_KEY, JSON.stringify({ kept: true }));
         await getPlayerProgressState();
 

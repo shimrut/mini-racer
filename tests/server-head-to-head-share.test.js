@@ -148,7 +148,6 @@ describe.each([
         expect(await confirm(input, context)).toMatchObject({
             status: 409, body: { status: 'comment_unconfirmed' },
         });
-        // The record is there without a link, so the result is guarded by the thread, not the term.
         expect(JSON.parse(strings.get(resultKey(action)))).toMatchObject({
             commentText: 'Approved text', username: 'Racer',
         });
@@ -281,7 +280,6 @@ describe.each([
         expect((await confirm(input, context)).body.status).toBe(successStatus);
         const stored = JSON.parse(strings.get(resultKey(action)));
         expect(stored).toMatchObject({ commentText: 'Approved text', username: 'Racer' });
-        // The walk searches from createdAt, so it must stay the claim, not the time of the post.
         expect(Date.parse(stored.createdAt)).toBeLessThanOrEqual(Date.parse(stored.postedAt));
         expect(Date.parse(stored.createdAt)).toBeGreaterThanOrEqual(claimedBefore - 1000);
     });
@@ -349,8 +347,6 @@ describe.each([
     });
 
     it('recovers a claim receipt that predates authorName, and calls it posted', async () => {
-        // Receipts already in the wild carry no authorName. The walk matches only the player, so
-        // the id it finds is the player's, and the author check must not run on that answer.
         strings.set(resultKey(action), JSON.stringify({
             commentText: 'Approved text',
             username: 'Racer',

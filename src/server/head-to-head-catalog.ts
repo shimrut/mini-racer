@@ -16,7 +16,7 @@ const SWEEP_PAGE_SIZE = 100;
 const SWEEP_MONTH_MS = 31 * 24 * 60 * 60 * 1000;
 const SWEEP_BUDGET_MS = 20_000;
 const SWEEP_LOCK_TTL_MS = 60_000;
-/** One sorted-set read. Devvit caps a score-range read at 1000. */
+// Devvit caps a score-range read at 1000.
 const BAND_READ_LIMIT = 1000;
 const UPVOTE_CLAMP = 500_000;
 const ENGAGEMENT_BANDS = ['author', 'gold', 'silver', 'bronze'] as const;
@@ -42,7 +42,6 @@ export type HeadToHeadCatalogSweepResult = {
     scanned: number;
     saved: number;
     skipped: number;
-    /** locked: another collect is running. partial: click again. done: the month is covered. */
     status: 'locked' | 'partial' | 'done';
 };
 

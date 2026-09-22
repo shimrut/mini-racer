@@ -116,7 +116,6 @@ export function toSnapshotRow(
     };
 }
 
-/** The leaderboard row and the PB record are written concurrently, so an exact best-time match on both is what pins a ghost to a row. */
 export function isCompleteOpponentRecord(
     entry: DailyGpLeaderboardEntry,
     record: {
@@ -152,11 +151,6 @@ export function withOpponentRaceReady(
     };
 }
 
-/**
- * Does this identity still hold anything on this board: a stored entry, a ranking, or a stored
- * personal best. Presence is read raw and unparsed on purpose — a cleanup has to remove a row it
- * cannot parse just as surely as one it can, and a ranking can outlive the entry it came from.
- */
 export async function competitionHoldsPlayerRows(
     competition: Competition,
     playerId: string,
@@ -171,8 +165,6 @@ export async function competitionHoldsPlayerRows(
             ? redis.zScore(competition.leaderboardKey, playerId)
             : Promise.resolve(undefined),
     ]);
-    // Presence, not truthiness: hGet answers undefined for a field that is not there, so an
-    // empty stored value is a row that exists and still has to go.
     const isStored = (value: unknown): boolean => value !== undefined && value !== null;
     const isRanked = isStored(score) && Number.isFinite(Number(score));
     return isStored(rawEntry) || isStored(rawPb) || isRanked;
@@ -261,7 +253,7 @@ export async function markStoredEntryOpponentRaceReady(
 ): Promise<DailyGpLeaderboardEntry> {
     if (entry.opponentRaceReady === true) return entry;
     const nextEntry = { ...entry, opponentRaceReady: true };
-    // Entries hash is uncompressed Redis. Do not mix redisCompressed onto this key.
+    // Uncompressed key; do not use redisCompressed.
     await redis.hSet(competition.entryHashKey, {
         [playerId]: JSON.stringify(nextEntry),
     });
@@ -287,7 +279,6 @@ export async function writeEntry(
         member: playerId,
         score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
     });
-    // Deliberately in the ranked write's transaction: no snapshot can use a pre-write cache generation once this succeeds.
     await transaction.incrBy(competition.standingsRevisionKey, 1);
     if (
         playerId.startsWith('guest:')
@@ -450,7 +441,6 @@ export async function readSnapshot({
     playerId: string | null;
     limit: number;
     offset: number;
-    /** Set when this request already loaded the viewer's profile. Omit it to read the name here. */
     loadedProfile?: LoadedPlayerProfile;
 }): Promise<SnapshotPayload> {
     const sharedPage = await readSharedStandingsPage(competition, offset, limit);

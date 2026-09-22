@@ -3,11 +3,6 @@ import { normalizeCarUnlockSnapshot } from '../car/car-unlock-policy.js';
 const PLAYER_PROFILE_CACHE_STORAGE_KEY = 'VectorGpPlayerProfileCache';
 const MAX_CACHED_OWNERS = 3;
 
-/**
- * The last confirmed profile for each recent owner, so a bootstrap outage can present what the
- * server last said instead of the all-locked default. Never holds a guest token: a cache that can
- * authorize a request is a credential, and this one is only ever used for presentation.
- */
 function readCacheState() {
     if (typeof window === 'undefined' || !window.localStorage) {
         return { lastOwnerId: null, owners: {} };
@@ -65,7 +60,6 @@ function normalizeCachedProfile(cached) {
     };
 }
 
-/** The owner of the last authoritative bootstrap on this browser — the only owner a fallback may present. */
 export function readLastConfirmedProfileOwnerId() {
     return readCacheState().lastOwnerId;
 }

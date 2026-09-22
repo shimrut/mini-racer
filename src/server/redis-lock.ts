@@ -20,17 +20,13 @@ function ttlSeconds(ttlMs: number): number {
     return Math.max(1, Math.ceil(ttlMs / 1000));
 }
 
-// One at a time. The 2026-08-12 hosted audit recorded Reddit answering this very path with
-// "exceeded max concurrency limit on redis transactions", and this fallback only runs when a
-// group release already failed — the moment the store is least able to take a burst. The batched
-// group release is what makes cleanup cheap; this is only the safety net behind it.
+// Reddit caps concurrent Redis transactions.
 const RELEASE_CONCURRENCY = 1;
 
 async function safelyUnwatch(transaction: TxClientLike): Promise<void> {
     try {
         await transaction.unwatch();
     } catch (_error) {
-        // The TTL remains the cleanup path if Redis cannot unwatch.
     }
 }
 
@@ -38,15 +34,9 @@ async function safelyDiscard(transaction: TxClientLike): Promise<void> {
     try {
         await transaction.discard();
     } catch (_discardError) {
-        // EXEC may already have closed the transaction.
     }
 }
 
-/**
- * One read for a whole group. Ownership is still proven token by token; only the round trips
- * collapse. `mGet` is read through the base client so a WATCH stays armed, and mocks that
- * predate it fall back to the per-key reads they already answer.
- */
 async function readLockValues(
     locks: readonly RedisLock[],
     client: RedisClient,
@@ -58,11 +48,6 @@ async function readLockValues(
     return await Promise.all(locks.map(async (lock) => await client.get(lock.key)));
 }
 
-/**
- * Callers pass the live array a coordinated operation is still adding locks to, so the group is
- * snapshotted first: reading keys from one list and pairing tokens against a longer one would
- * call a valid lock lost.
- */
 async function ownsEveryLock(
     locks: readonly RedisLock[],
     client: RedisClient,
@@ -119,7 +104,7 @@ export async function beginOwnedRedisLockTransaction(
 ): Promise<TxClientLike | null> {
     const transaction = await client.watch(lock.key);
     try {
-        // @devvit/redis 0.13 queues transaction-client reads, so read through the base client after WATCH and let EXEC catch any change.
+        // Transaction-client reads queue; read the base client.
         if (!await isRedisLockOwned(lock, client)) {
             await safelyUnwatch(transaction);
             return null;
@@ -132,11 +117,6 @@ export async function beginOwnedRedisLockTransaction(
     }
 }
 
-/**
- * Begin a transaction fenced by every lock in a coordinated operation. The
- * caller must not renew any of these locks between this WATCH and EXEC: an
- * EXPIRE on a watched key intentionally aborts the transaction.
- */
 export async function beginOwnedRedisLockGroupTransaction(
     locks: readonly RedisLock[],
     client: RedisClient = redis,
@@ -153,13 +133,11 @@ export async function beginOwnedRedisLockGroupTransaction(
         return transaction;
     } catch (error) {
         await safelyUnwatch(transaction);
-        // A lost race is the same answer as a lost lock: this caller may not write.
         if (isRedisTransactionConflict(error)) return null;
         throw error;
     }
 }
 
-/** Refresh a group before it is watched for a fenced transaction. */
 export async function renewRedisLockGroup(
     locks: readonly RedisLock[],
     client: RedisClient = redis,
@@ -180,8 +158,6 @@ export async function renewRedisLockGroup(
         return Array.isArray(results) && results.length > 0;
     } catch (error) {
         await safelyDiscard(transaction);
-        // Reddit throws on a lost race where the local double returns nothing. Both mean the
-        // same thing here: this group is no longer provably ours to extend.
         if (isRedisTransactionConflict(error)) return false;
         throw error;
     }
@@ -201,8 +177,6 @@ async function mutateOwnedRedisLock(
             if (Array.isArray(results) && results.length > 0) return true;
         } catch (error) {
             await safelyDiscard(transaction);
-            // Until this was caught, a lost race threw straight past the attempt loop this
-            // function has always had. Retry it, then report the failure as a lost lock.
             if (!isRedisTransactionConflict(error)) throw error;
         }
     }
@@ -236,10 +210,6 @@ export async function releaseRedisLock(
     );
 }
 
-/**
- * Cleanup must not replace the operation's result or its original failure. The TTL remains the
- * recovery path if Redis is unavailable.
- */
 export async function releaseRedisLocksSafely(
     locks: readonly (RedisLock | null)[],
     context: string,
@@ -254,11 +224,6 @@ export async function releaseRedisLocksSafely(
     });
 }
 
-/**
- * Drop a whole group in one fenced transaction instead of one five-call transaction per key.
- * Only keys this caller still owns are deleted, so the compare-and-delete a past incident
- * required is kept; anything the group cannot commit falls back to the per-lock path.
- */
 export async function releaseRedisLockGroup(
     locks: readonly RedisLock[],
     context: string,
@@ -274,8 +239,6 @@ export async function releaseRedisLockGroup(
     try {
         transaction = await client.watch(...fenced.map((lock) => lock.key));
         const values = await readLockValues(fenced, client);
-        // A short read cannot prove anything about the keys it did not answer for, so it must
-        // not be read as "owns nothing" — that would skip cleanup and leave the group up.
         if (values.length !== fenced.length) {
             await safelyUnwatch(transaction);
             await releaseRedisLocksSafely(fenced, context, client);
@@ -301,11 +264,6 @@ export async function releaseRedisLockGroup(
     await releaseRedisLocksSafely(fenced, context, client);
 }
 
-/**
- * Commit a fenced transaction and say whether it landed. Reddit throws on a lost race where the
- * local double returns nothing; both mean the write did not happen, and every caller already
- * has a retryable answer for that.
- */
 export async function commitOwnedRedisLockTransaction(
     transaction: TxClientLike,
 ): Promise<boolean> {
@@ -380,8 +338,6 @@ export function startRedisLockGroupLeaseRenewal(
         renewal = renewal.then(async () => {
             if (stopped || ownershipLost) return;
             try {
-                // One transaction for the group. Renewing key by key cost five calls each, on a
-                // timer, while the work this lease protects was already the slow part.
                 if (!await renewRedisLockGroup(locks, client)) ownershipLost = true;
             } catch (_error) {
                 ownershipLost = true;

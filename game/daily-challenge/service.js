@@ -61,9 +61,6 @@ let dailyPlaylistCache = {
 };
 const dailySnapshotCache = new Map();
 const dailySnapshotInflight = new Map();
-// Challenge ids the server has answered in this session. A saved snapshot paints
-// at once, but standings keep moving while the app is closed, so it only stands
-// in for a request once the server has confirmed it here.
 const dailySnapshotAnsweredIds = new Set();
 const dailySnapshotListeners = new Set();
 let dailyPlaylistStorageHydrated = false;
@@ -630,17 +627,12 @@ function notifyDailySnapshotListeners(challengeId) {
     }
 }
 
-/**
- * Tells the caller which challenge just took a new snapshot, so a screen that
- * shows a rank repaints instead of holding the copy it painted earlier.
- */
 export function subscribeToDailyChallengeSnapshots(listener) {
     if (typeof listener !== 'function') return () => {};
     dailySnapshotListeners.add(listener);
     return () => dailySnapshotListeners.delete(listener);
 }
 
-/** Marks every saved snapshot as needing the server again, without dropping it. */
 export function clearDailyChallengeSnapshotFreshness() {
     dailySnapshotAnsweredIds.clear();
 }
@@ -932,8 +924,6 @@ export async function getDailyChallengeSnapshot({
     const isFirstPage = safeOffset === 0;
 
     if (!forceRefresh && isFirstPage) {
-        // A snapshot the server has already answered for in this session stands in for
-        // the request. One the app started with does not: it can be a day old.
         if (canReuseDailySnapshot(challengeId)) {
             return readCachedDailySnapshot(challengeId);
         }
@@ -1013,7 +1003,6 @@ export async function submitDailyChallengeBestTime({
     return postDailyJson(config.dailySubmitUrl, {
         playerId: getOrCreatePlayerId('daily challenge'),
         guestToken: getGuestPlayerToken(),
-        // The account this run was raced under. The server rejects the submission if it no longer matches.
         submissionOwnerId,
         challengeId,
         trackKey,

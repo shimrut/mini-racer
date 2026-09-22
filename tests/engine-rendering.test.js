@@ -200,7 +200,6 @@ describe("RealTimeRacer track layer renderer", () => {
       trackCanvasOrigin: { x: 0, y: 0 },
       presentation: {},
       container: { clientWidth: 0, clientHeight: 0 },
-      // The engine sized its canvas at dpr 2, so the CSS viewport is half of it.
       fallbackWidth: 780,
       fallbackHeight: 1688,
     });
@@ -219,10 +218,6 @@ describe("RealTimeRacer track layer renderer", () => {
   });
 
   it("never reaches for a worker or an OffscreenCanvas", () => {
-    // Devvit's Android WebView exposes the worker APIs but does not reliably present
-    // a canvas whose control was transferred to one, which showed the car over a
-    // blank white background. There is one main-thread canvas now, so the renderer
-    // must not touch either API even when the browser advertises them.
     const originalWorker = global.Worker;
     const originalCreateImageBitmap = global.createImageBitmap;
     const workerCtor = vi.fn();

@@ -1,8 +1,5 @@
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
-// Track definitions are deliberately loaded one at a time on the client.  The
-// server and mapmaker still use the eager TRACKS registry, but the game only
-// downloads geometry for the track that its launch target needs first.
 const DEFINITION_MODULES = import.meta.glob('./definitions/*.js');
 const loadedTracks = new Map();
 const pendingLoads = new Map();

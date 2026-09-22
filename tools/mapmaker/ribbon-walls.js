@@ -1,5 +1,3 @@
-// Constant-width walls from a centerline: tight bends inflate first so the inner offset cannot loop through itself, corners fillet (halfWidth, or a per-corner radius), then every sample offsets by ±halfWidth.
-
 const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
 const MIN_ARC_STEPS = 2;
@@ -325,7 +323,6 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadi
         const turningInward =
             (loopCcw && frame.turnAngle > 0) || (!loopCcw && frame.turnAngle < 0);
 
-        // A bend tighter than the lane half-width would loop the inward offset through itself; snap to the bend center.
         if (turningInward && bendRadius <= halfWidth * 1.05) {
             const center = circumcenter(prev.point, curr.point, next.point);
             pushUnique(inner, center || add(curr.point, scale(towardInner, halfWidth)));

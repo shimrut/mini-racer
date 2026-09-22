@@ -5,8 +5,6 @@ import {
     resolveDailyPlaylistCacheExpiresAt,
 } from '../game/daily-challenge/service.js';
 
-// Fresh module graph for playlist/snapshot expiry-at boundary checks.
-
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {

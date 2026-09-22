@@ -40,7 +40,6 @@ export type HeadToHeadResolution = {
     ok: false;
     reason: HeadToHeadResolutionFailureReason;
     diff?: Record<string, unknown>;
-    /** Which check failed, for the log. Field names and value types only, never a player's name. */
     detail?: string;
 };
 
@@ -56,15 +55,8 @@ function validPostUrl(value: unknown): value is string {
     return typeof value === 'string' && Boolean(value);
 }
 
-/** Fields whose values are game settings, not player data, so the log may show them. */
 const LOGGABLE_POST_DATA_VALUES = new Set(['postType', 'lapCount', 'medal', 'rulesRevision']);
 
-/**
- * The first check a post's data fails, or null when it passes.
- *
- * About thirty live challenge posts fail here for everyone who opens them, and the log said only
- * `post_data_invalid`. Naming the field is what tells a stale shape from a bad write.
- */
 function postDataProblem(value: unknown, challengeId: string): string | null {
     if (value === undefined || value === null) return 'missing';
     if (!isRecord(value)) return 'not_an_object';
@@ -272,7 +264,6 @@ export async function resolveHeadToHeadRecordResult(
             ? { ok: true, record }
             : { ok: false, reason: 'post_identity_invalid' as const };
     }
-    // The post body is the only source of the frozen replay, so a post that cannot produce one is unusable.
     return {
         ok: false,
         reason: fallbackTexts.length > 0
@@ -287,7 +278,6 @@ export async function resolveHeadToHeadRecord(
     context: HeadToHeadPostContext = {},
 ): Promise<HeadToHeadRecord | null> {
     const result = await resolveHeadToHeadRecordResult(challengeId, context);
-    // `=== true`, not truthiness: with strictNullChecks off, only the literal comparison narrows the union.
     if (result.ok === true) return result.record;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
         console.warn('Head to Head resolution failed.', {

@@ -760,7 +760,6 @@ describe('head-to-head service', () => {
             authorName: 'racefan',
             subredditName: 'MiniRacer',
             removed: false,
-            // Reddit dates a post to the second, so it can read as earlier than the preview.
             createdAt: new Date('2026-07-23T12:00:00.000Z'),
             getPostData: vi.fn(async () => ({
                 postType: 'head-to-head',
@@ -897,8 +896,6 @@ describe('head-to-head service', () => {
             { ...context, username: 'ChallengerAce' },
         );
 
-        // The claimed time no longer short-circuits: a losing run still has a time worth ranking,
-        // so the replay is always read and the replay decides.
         expect(validateReplay).toHaveBeenCalledTimes(1);
         expect(accepted).toMatchObject({
             status: 200,
@@ -1447,7 +1444,6 @@ describe('head-to-head waits for an open transfer', () => {
             reason: 'progress_transfer_pending',
             retryAfterSeconds: 1,
         });
-        // The post is the side effect that cannot be taken back.
         expect(activePosts.size).toBe(0);
     });
 
@@ -1469,7 +1465,6 @@ describe('head-to-head waits for an open transfer', () => {
             status: 'progress_transfer_pending',
             reason: 'progress_transfer_pending',
         });
-        // A submission that is told to retry must not burn the attempts it will need.
         expect(redis.incrBy).not.toHaveBeenCalledWith(
             'miniracer:head-to-head:submit-rate-limit:reddit%3Achallengerace',
             1,

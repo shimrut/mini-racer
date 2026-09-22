@@ -80,7 +80,6 @@ function createPersonalBestIcon() {
     const icon = document.createElementNS(SVG_NS, 'svg');
     icon.classList.add('track-carousel__spec-icon');
     icon.setAttribute('viewBox', '0 0 448 512');
-    // Intrinsic dimensions as a fallback: with a stale stylesheet this flex item can collapse to 0x0.
     icon.setAttribute('width', '16');
     icon.setAttribute('height', '16');
     icon.setAttribute('role', 'img');
@@ -326,8 +325,6 @@ export class TrackCarousel {
         selectedChallengeId = this.getSelectedChallengeId(),
         loading = false,
     } = {}) {
-        // Warm every card's geometry up front so swiping never lands on a blank preview.
-        // The registry dedupes, so the card that paints first pays nothing twice.
         for (const card of cards) {
             if (card?.trackKey && !getLoadedClientTrack(card.trackKey)) {
                 void loadClientTrack(card.trackKey).catch(() => {});
@@ -337,7 +334,6 @@ export class TrackCarousel {
         const rail = this.rail;
         if (!rail) return;
 
-        // Card width must be set before cards exist, or the first one paints once at the wrong width.
         this.syncCardWidth();
 
         const previousCards = this._cards;
@@ -370,11 +366,6 @@ export class TrackCarousel {
             rail.replaceChildren(this.edgeSpacer('lead'), ...this._elements, this.edgeSpacer('tail'));
         }
 
-        // Refreshes arrive in stages, and an early one can be missing the card it
-        // was asked to select — a cached page that has not caught up, or a day that
-        // rolled off mid-session. Reaching for card 0 there scrolls the rail off the
-        // player's track and reports it as their choice, only for the next stage to
-        // scroll back. Hold what they are on, and fall back only once that is gone.
         const requestedIndex = findCarouselIndex(cards, selectedChallengeId);
         const heldIndex = requestedIndex >= 0
             ? requestedIndex
@@ -384,7 +375,6 @@ export class TrackCarousel {
         this._selectedIndex = nextIndex;
         this.applySelectionClasses();
         this.syncNavButtons();
-        // Never animated: scrollLeft is clamped to 0 while the overlay is hidden, so animating glided across the whole rail.
         this.scrollToSelected({ animate: false });
         if (typeof requestAnimationFrame === 'function') {
             requestAnimationFrame(() => this.fitPreviews());
@@ -392,7 +382,7 @@ export class TrackCarousel {
         if (changed || !sameRun) this.emitSelection();
     }
 
-    /** Spacer giving the first/last card room to reach viewport centre. A real element, not rail padding — some WebKit builds drop a scroll container's trailing padding, so a flex item is used instead. */
+    // WebKit can drop a scroller's trailing padding.
     edgeSpacer(side) {
         const key = side === 'lead' ? '_edgeLead' : '_edgeTail';
         if (!this[key]) {
@@ -526,9 +516,6 @@ export class TrackCarousel {
         if (renderPreview) this.renderPreview(parts.canvas, card);
     }
 
-    // Only Daily resolves an expiry; the campaign carousel passes no resolver
-    // and has no element for it, so this is a no-op there. The repaint the
-    // resolver asks for replaces itself, so at most one timer is ever pending.
     paintExpiry(card) {
         if (this._expiryTimer) {
             clearTimeout(this._expiryTimer);
@@ -783,7 +770,6 @@ export class TrackCarousel {
         const measurable = width > 0 && measurements.some(({ width: cardWidth }) => cardWidth > 0);
         const center = measurable ? viewport.scrollLeft + (width / 2) : 0;
 
-        // Every layout read happens before any style write, or each card forces a fresh layout per scroll frame.
         const proximities = measurements.map(({ left, width: cardWidth }, index) => {
             if (!measurable || !(cardWidth > 0)) {
                 return index === this._selectedIndex ? 1 : 0;
@@ -831,7 +817,6 @@ export class TrackCarousel {
         if (!viewport || !element) return;
 
         const apply = () => {
-            // Hidden panes report zero geometry in retained mobile WebViews; that is not a real selection change.
             if (!(viewport.clientWidth > 0) || !(element.offsetWidth > 0)) return;
             this.syncEdgeSpacing(element);
             const left = element.offsetLeft
@@ -870,7 +855,6 @@ export class TrackCarousel {
         return true;
     }
 
-    /** Measured (not percentage) edge spacers — percentage sizing inside an intrinsic flex rail is inconsistent in embedded WebViews and can strand the last card short of centre. */
     syncEdgeSpacing(element = this._elements[this._selectedIndex]) {
         const viewport = this.viewport;
         const rail = this.rail;
@@ -885,7 +869,6 @@ export class TrackCarousel {
         return true;
     }
 
-    /** Tops up the tail spacer by however short the rail's actual scroll range falls of centring the last card — covers rounding and any engine that measures the rail short. Reads its own prior top-up so it settles instead of oscillating. */
     syncTailShortfall() {
         const viewport = this.viewport;
         const rail = this.rail;

@@ -3,24 +3,6 @@ import {
     getCampaignStage,
 } from '../../game/campaign/manifest.js';
 
-/**
- * How one stored record stands against what this build can use.
- *
- * The ordinary gameplay readers answer `null` for four different situations, and every caller
- * treats that `null` as "absent". A transfer cannot. It is about to replace an account from this
- * record and then delete it, so it must tell the four apart:
- *
- * - `absent`     Nothing is stored. This is normal, and it is not evidence of loss.
- * - `valid`      The record parses and matches this build. Copy it.
- * - `obsolete`   The record is well formed, but a supported track, campaign, or simulation change
- *                made it unusable. The player already cannot see it. It needs no person to look
- *                at it, and it must not be copied into ranked data.
- * - `malformed`  The record is damaged, or it names another player. This is the only kind that
- *                needs a reviewed repair, so its source is kept.
- *
- * `updatedAt` rides along on `obsolete` because the retention a preserved record inherits is
- * derived from it. It is `null` when the stored value carried no usable timestamp.
- */
 export type StoredRecordClassification<T> =
     | { state: 'absent' }
     | { state: 'valid'; record: T }
@@ -45,13 +27,6 @@ export type MalformedReason =
     | 'wrong_campaign'
     | 'wrong_player';
 
-/**
- * Three outcomes, told apart by a string rather than by `true | false | null`.
- *
- * A `null` arm cannot be narrowed away when `strictNullChecks` is off, so every read of `value` or
- * `reason` below was unchecked in a build that never type-checked this file. The names also say
- * what each arm means at the call site.
- */
 type ReadJsonResult =
     | { ok: 'parsed'; value: Record<string, unknown> }
     | { ok: 'damaged'; reason: MalformedReason }
@@ -77,14 +52,6 @@ function readTimestamp(value: unknown): string | null {
         : null;
 }
 
-/**
- * Pulls a usable `updatedAt` out of a stored value without judging the rest of it.
- *
- * Retention for a source held for review is derived from when that data was last touched, and a
- * record can be damaged in one field while still saying honestly when it was written. Reading the
- * timestamp only from records that classified as usable throws away the very evidence a damaged
- * record was kept for, and leaves it with no deadline at all.
- */
 export function readStoredUpdatedAt(raw: string | null | undefined): string | null {
     const json = readJson(raw);
     if (json.ok !== 'parsed') return null;
@@ -103,19 +70,10 @@ export type CampaignProgressRow = {
 export type ClassifiedCampaignProgress = {
     startedAt: string | null;
     updatedAt: string | null;
-    /** Rows this build can use, keyed by race id. */
     rows: Record<string, CampaignProgressRow>;
-    /** Rows a supported campaign change made unusable. Kept so a copy can report them. */
     obsoleteRaceIds: string[];
 };
 
-/**
- * Classifies one stored Campaign progress row.
- *
- * `parseCampaignProgress` answers an empty progress for damaged JSON and silently drops a result
- * it cannot read. Under a replacing transfer that empty answer overwrites the account. This
- * separates a campaign that legitimately changed under the player's feet from a row that broke.
- */
 export function classifyStoredCampaignProgress(
     raw: string | null | undefined,
 ): StoredRecordClassification<ClassifiedCampaignProgress> {
@@ -124,7 +82,6 @@ export function classifyStoredCampaignProgress(
     if (json.ok === 'damaged') return { state: 'malformed', reason: json.reason };
 
     const value = json.value;
-    // Another campaign's progress under this player's key is not this transfer's to interpret.
     if (value.campaignId !== CAMPAIGN_ID) {
         return { state: 'malformed', reason: 'wrong_campaign' };
     }
@@ -158,17 +115,10 @@ export function classifyStoredCampaignProgress(
     };
 }
 
-/**
- * One result inside a Campaign progress row. A race the manifest no longer names, or a stage it
- * redefined, is a supported change. A row whose time or timestamp is unusable is damage.
- */
 function classifyCampaignResultRow(
     raceId: string,
     candidate: unknown,
 ): StoredRecordClassification<CampaignProgressRow> {
-    // The key exists, so something was written under it. A null or undefined value there is a
-    // row that was lost, not a row that was never there, and it must not read as absent: under a
-    // replacing transfer "absent" is what empties the account.
     if (candidate === null || candidate === undefined) {
         return { state: 'malformed', reason: 'missing_fields' };
     }
@@ -178,7 +128,6 @@ function classifyCampaignResultRow(
     const row = candidate as Record<string, unknown>;
     const updatedAt = readTimestamp(row.updatedAt);
 
-    // Damage is checked before the manifest, so a broken row is never excused as a retired stage.
     if (
         !Number.isSafeInteger(row.bestTimeMs)
         || Number(row.bestTimeMs) <= 0
@@ -187,8 +136,6 @@ function classifyCampaignResultRow(
     ) {
         return { state: 'malformed', reason: 'missing_fields' };
     }
-    // Types before values. A field of the wrong type cannot be compared against the manifest, so
-    // treating a mismatch as a supported change would call damage an obsolete stage.
     if (
         typeof row.trackKey !== 'string'
         || !row.trackKey
@@ -199,7 +146,6 @@ function classifyCampaignResultRow(
     ) {
         return { state: 'malformed', reason: 'missing_fields' };
     }
-    // The key and the row must agree on which race this is, or neither can be trusted to name it.
     if (typeof row.raceId !== 'string' || row.raceId !== raceId) {
         return { state: 'malformed', reason: 'key_mismatch' };
     }
@@ -236,12 +182,6 @@ export type ClassifiedLeaderboardEntry = {
     updatedAt: string;
 };
 
-/**
- * Classifies one stored leaderboard entry.
- *
- * An entry naming another player is the one case here that is never a supported change: it means
- * two identities were crossed, and no automatic repair may guess which one owns the time.
- */
 export function classifyStoredLeaderboardEntry(
     raw: string | null | undefined,
     expectedPlayerId: string,
@@ -266,9 +206,6 @@ export function classifyStoredLeaderboardEntry(
     }
 
     const updatedAt = readTimestamp(value.updatedAt);
-    // Types before values, the same as the progress and personal-best classifiers. A field of the
-    // wrong type differs from what the stage expects, and reading that difference as a supported
-    // change is how damage gets called obsolete and then quietly dropped.
     if (value.trackKey !== undefined && (typeof value.trackKey !== 'string' || !value.trackKey)) {
         return { state: 'malformed', reason: 'missing_fields' };
     }
@@ -291,8 +228,6 @@ export function classifyStoredLeaderboardEntry(
             return { state: 'obsolete', reason: 'stage_redefined', updatedAt };
         }
     }
-    // A run accepted under an earlier validation policy is a supported legacy representation.
-    // It stays readable for the player, but a transfer must not promote it into ranked data.
     if (value.validationMethod !== undefined && value.validationMethod !== 'strict-replay') {
         return { state: 'obsolete', reason: 'validation_method', updatedAt };
     }

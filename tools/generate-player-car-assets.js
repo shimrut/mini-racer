@@ -1,4 +1,3 @@
-// Scans `public/assets/cars/` and writes `game/car/generated-player-selectable-car-assets.js`. Run: `npm run generate:car-assets`
 import { readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,7 +25,7 @@ const ordered = paths.includes(STOCK_PATH)
   : paths;
 
 const body = [
-  "// Auto-generated from `public/assets/cars/`; run `npm run generate:car-assets` instead of editing.",
+  "// Generated file. Run npm run generate:car-assets.",
   "",
   "export const GENERATED_PLAYER_SELECTABLE_CAR_ASSETS = Object.freeze([",
   ...ordered.map((p) => `  ${JSON.stringify(p)},`),

@@ -13,7 +13,6 @@ function response(status, payload) {
     return { ok: status >= 200 && status < 300, status, json: vi.fn(async () => payload) };
 }
 
-/** Bootstrap for a signed-in account whose guest still owes a choice. */
 function chooserBootstrap() {
     return {
         hasAnyData: true,
@@ -31,20 +30,12 @@ function chooserBootstrap() {
             sourceGuestPlayerId: GUEST,
             guestHasProgress: true,
             accountHasProgress: true,
-            // What the server sends. Without numbers the chooser picks nothing for the player.
             guestSummary: { campaignUnlockedTracks: 2, campaignTotalStages: 16 },
             accountSummary: { campaignUnlockedTracks: 5, campaignTotalStages: 16 },
         },
     };
 }
 
-/**
- * A storage that can refuse one key while accepting another.
- *
- * The transfer writes two independent keys: the block (small) and the queue receipt (large, it
- * carries replays). Storage that is wholly unavailable fails on the first and never opens the
- * chooser at all, so only a per-key refusal reproduces the case this test is about.
- */
 function installDom({ failWriteKeys = new Set() } = {}) {
     const dom = new JSDOM('<body></body>', { url: 'https://example.devvit.net/game.html' });
     const store = new Map([[PLAYER_ID_KEY, 'chooser'], [GUEST_TOKEN_KEY, 'guest-token']]);
@@ -83,22 +74,18 @@ describe('the Keep Progress chooser when the queue receipt cannot be saved', () 
         await vi.waitFor(() => {
             expect(dom.window.document.querySelector('.guest-progress-selection')).not.toBeNull();
         });
-        // The small write landed, which is why the chooser opened at all.
         expect(store.has(BLOCKS_KEY)).toBe(true);
 
         const continueButton = [...dom.window.document.querySelectorAll('.guest-progress-selection__button')]
             .find((button) => /CONTINUE/.test(button.textContent));
         continueButton.click();
 
-        // The receipt cannot be written, so this choice can never be made safely on this device.
-        // Startup must be told, rather than left waiting on a promise that never settles.
         await vi.waitFor(() => {
             expect(dom.window.document.querySelector('.server-sync-failure')).not.toBeNull();
         });
         const actions = [...dom.window.document.querySelectorAll('.server-sync-failure .guest-progress-selection__button')];
         expect(actions).toHaveLength(1);
         expect(actions[0].textContent).toContain('RETRY SYNC');
-        // Racing stays paused: the block survives and no offline way out is offered.
         expect(store.has(BLOCKS_KEY)).toBe(true);
     });
 
@@ -111,7 +98,6 @@ describe('the Keep Progress chooser when the queue receipt cannot be saved', () 
         const statePromise = getPlayerProgressState();
         statePromise.catch(() => {});
 
-        // This browser cannot hold the pause, so it never offers the choice in the first place.
         await vi.waitFor(() => {
             expect(dom.window.document.querySelector('.server-sync-failure')).not.toBeNull();
         });

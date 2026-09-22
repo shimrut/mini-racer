@@ -15,16 +15,12 @@ export type AnalyticsRouteDependencies = {
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
 
-// Campaign start stamps /api/campaign/start for progress only. Analytics starts
-// are counted here so Retry matches Daily and Head to Head.
 const CLIENT_REPORTED_START_MODES = new Set(['daily', 'campaign', 'challenge']);
 
 export function registerAnalyticsRoutes(
     app: Application,
     dependencies: AnalyticsRouteDependencies,
 ): void {
-    // A race start has no other server call to hang off for Daily and Challenge, so the
-    // client reports it here. It is fire-and-forget: analytics must never block a race.
     app.post('/api/analytics/race-start', async (req, res) => {
         const { mode, playerId, guestToken } = req.body ?? {};
         if (!CLIENT_REPORTED_START_MODES.has(mode)) {
@@ -44,8 +40,6 @@ export function registerAnalyticsRoutes(
         }
     });
 
-    // Play Now and View Replays live on the podium post, so there is no race
-    // submit to hang this off. Fire-and-forget: analytics must never block the post.
     app.post('/api/analytics/podium', async (req, res) => {
         const { action } = req.body ?? {};
         if (!PODIUM_ANALYTICS_ACTIONS.has(action)) {
@@ -80,11 +74,6 @@ export function registerAnalyticsRoutes(
         }
     });
 
-    /**
-     * Read-only case evidence for one account's guest progress transfer, for a reviewed repair.
-     * It changes nothing. Its answer carries guest ids and stored evidence, so it is returned only
-     * to a verified moderator and never written to an ordinary log.
-     */
     app.get('/api/analytics/guest-transfer', async (req, res: Response) => {
         try {
             const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
@@ -107,7 +96,6 @@ export function registerAnalyticsRoutes(
                 transferId,
             }));
         } catch (error) {
-            // The message may name the moderator check, never the case evidence.
             const message = error instanceof Error && error.message
                 ? error.message
                 : 'Guest transfer diagnostic failed';

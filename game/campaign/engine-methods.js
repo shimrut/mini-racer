@@ -233,7 +233,6 @@ function decorateCampaignState(bootstrap) {
     };
 }
 
-/** Only a mismatched entry blocks — a missing one leaves nothing to destroy. */
 function isSupersededCampaignVerificationEntry(entry) {
     const current = entry?.raceId ? getCampaignVerificationEntry(entry.raceId) : null;
     if (!current) return false;
@@ -267,7 +266,6 @@ function buildDisplayedCampaignBootstrap(bootstrap) {
     for (const stage of CAMPAIGN_STAGES) {
         const entry = entries[stage.raceId];
         if (!entry) continue;
-        // A ghost-recovery entry is queued behind confirmed server progress: it is neither provisional nor an error.
         if (entry.progressConfirmed) continue;
         if (entry.verificationState === 'pending') {
             const provisional = campaignResultFromVerificationEntry(stage, entry);
@@ -482,9 +480,6 @@ export const campaignEngineMethods = {
             throw new Error('Campaign progress is not authoritative.');
         }
         const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-        // A lobby stage carries its race id as `id`, and everything downstream of the
-        // launch reads `raceId` off the manifest stage, so resolve it the way starting
-        // a stage from the lobby does.
         const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState)?.id);
         if (!stage?.trackKey || !stage?.raceId) return null;
 
@@ -629,7 +624,6 @@ export const campaignEngineMethods = {
         const deadline = Date.now() + timeoutMs;
         for (;;) {
             const entry = getCampaignVerificationEntry(raceId);
-            // A ghost-recovery entry has already had its progress confirmed, so the next stage must not wait on it.
             if (!entry || entry.progressConfirmed) return true;
             if (entry.verificationState !== 'pending') return false;
             if (Date.now() >= deadline) return false;
@@ -1018,7 +1012,6 @@ export const campaignEngineMethods = {
         );
 
         const replay = this.scoreboardReplay.getPayload(stage.lapCount);
-        // A challenge posts this run, as a Daily challenge does.
         const shareRequest = { kind: 'head-to-head', source: 'campaign', raceId: stage.raceId, replay };
 
         if (!isCampaignBest) {
@@ -1105,11 +1098,6 @@ export const campaignEngineMethods = {
         }
     },
 
-    /**
-     * Progress is confirmed by the time this runs, so the result, medal and unlock are already safe.
-     * The finish-sheet Next action is turned on after this accept path updates verified progress.
-     * Only the ghost is missing: keep the replay for a bounded number of retries, then stop asking for it.
-     */
     settleCampaignGhostPersistence(raceId, response) {
         const trackPbStatus = response.body?.trackPbPersistenceStatus;
         if (trackPbStatus === 'unavailable') {
@@ -1172,7 +1160,6 @@ export const campaignEngineMethods = {
             statusText: entry.progressConfirmed ? entry.statusText : null,
             preserveUpdatedAt: true,
         }) || entry;
-        // A ghost-recovery attempt must not drag a settled result screen back to "Verifying...".
         if (!entry.progressConfirmed) {
             this.updateCampaignFinishSnapshot(
                 raceId,
@@ -1201,7 +1188,6 @@ export const campaignEngineMethods = {
 
         if (isSupersededCampaignVerificationEntry(inFlight)) return;
 
-        // The account changed under this queued run. It keeps its replay and its retries, and waits for its owner.
         if (response.status === 409 && response.body?.reason === 'submission_identity_changed') {
             markCampaignVerificationPending(
                 raceId,
@@ -1252,7 +1238,6 @@ export const campaignEngineMethods = {
             return;
         }
 
-        // A confirmed result is never re-opened by a failed ghost recovery, whatever the server says about this attempt.
         if (entry.progressConfirmed) {
             this.retryCampaignGhostRecoveryLater(raceId);
             return;
@@ -1313,7 +1298,6 @@ export const campaignEngineMethods = {
         }
 
         if (ghost === 'install') {
-            // The submission already returned the canonical record; asking for it again can only lose it.
             this.campaignPbGhostByRaceId ??= Object.create(null);
             this.campaignPbGhostByRaceId[stage.raceId] = personalBest;
             this.applyCampaignPersonalBest(stage, personalBest);

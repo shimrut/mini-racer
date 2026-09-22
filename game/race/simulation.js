@@ -643,7 +643,6 @@ export function updateSimulation(
             state.velocity.x = (headingX * forwardSpeed) + (sideX * lateralSpeed);
             state.velocity.y = (headingY * forwardSpeed) + (sideY * lateralSpeed);
 
-            // The configured max speed is the only cap: slip already costs speed through the grip model above.
             state.cachedSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
             const allowedSpeed = safeMaxSpeed;
             if (state.cachedSpeed > allowedSpeed) {

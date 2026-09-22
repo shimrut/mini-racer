@@ -223,7 +223,6 @@ async function checkRateLimit(username: string): Promise<number | null> {
     if (Number.isFinite(expiresAt) && expiresAt > 0) {
         return Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
     }
-    // Scoped to the username alone, so a missing TTL would wedge this counter above the limit forever — repair the window.
     await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
     return SHARE_RATE_LIMIT_SECONDS;
 }
@@ -426,7 +425,6 @@ async function readActiveSharedResult(record: SharePreviewRecord): Promise<Share
         const comment = await reddit.getCommentById(shared.commentId);
         if (!(comment as any)?.removed) return shared;
     } catch (_error) {
-        // A failed call proves nothing.
         return shared;
     }
     await redis.del(key);
@@ -565,8 +563,6 @@ export async function confirmDailyGpShare(
     });
     try {
         if (!await stillOwnLock(lease)) return ownershipLost();
-        // The preview above was read before the lock. Another confirmation may have finished in
-        // between, so the copy this one works from is read again inside the lock.
         const locked = parseSharePreviewRecord(await redis.get(tokenKey));
         if (!locked) {
             return { status: 409, body: { status: 'preview_expired', error: 'This share preview expired. Try again.' } };
@@ -577,9 +573,6 @@ export async function confirmDailyGpShare(
         ) {
             return { status: 403, body: { status: 'share_forbidden', error: 'This share preview belongs to another Reddit account.' } };
         }
-        // A record with a comment answers here, from Redis alone: no score thread to resolve, and
-        // no second lock. The check that asks Reddit whether that comment still exists belongs to
-        // the preview, which is where a player who deleted it asks to share again.
         const recordKey = createSharedResultKey(locked);
         const stored = await readUserCommentRecord(recordKey);
         if (stored?.commentId) {
@@ -624,9 +617,6 @@ export async function confirmDailyGpShare(
                 },
             };
         }
-        // The helper recorded the publication. Both answers below describe a live comment, so
-        // nothing here deletes it: Reddit lets only the author delete a comment, and on an
-        // approved app the author is the player, not the app.
         const published = outcome.record;
         if (normalizeName(published.authorName || '') !== normalizeName(locked.username)) {
             return {

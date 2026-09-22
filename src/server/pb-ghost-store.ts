@@ -40,7 +40,6 @@ const PB_LOCK_ACQUIRE_ATTEMPTS = 5;
 const PB_LOCK_ACQUIRE_RETRY_MS = 20;
 const PB_READ_BATCH_SIZE = 10;
 
-/** Losing this lock costs the player their ghost permanently — the browser drops the replay once the run is accepted — so contention is waited out. */
 async function acquirePersonalBestLock(lockKey: string): Promise<RedisLock | null> {
     for (let attempt = 0; attempt < PB_LOCK_ACQUIRE_ATTEMPTS; attempt += 1) {
         const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
@@ -143,17 +142,6 @@ function readCompatibleRecordValue(
     return record;
 }
 
-/**
- * Classifies one stored personal best for a transfer.
- *
- * `parseRecord` cannot answer this. It folds a schema or simulation revision change into the same
- * `null` it gives damaged JSON, and it *coerces* `rulesRevision` and `lapCount` instead of
- * rejecting them, so its output does not faithfully describe what is stored. This reads the raw
- * value and compares the stored fields as they are.
- *
- * Order matters. Damage is checked first, so a broken record is never excused as a supported
- * revision change.
- */
 export function classifyStoredPbRecordValue(
     raw: string | null | undefined,
     competition: Competition,
@@ -173,8 +161,6 @@ export function classifyStoredPbRecordValue(
     }
 
     const value = parsed as Record<string, unknown>;
-    // The fields every revision of this record has carried. Without them nothing can be salvaged,
-    // and no retention can be derived, so this is damage rather than an obsolete record.
     if (
         typeof value.trackKey !== 'string'
         || !value.trackKey
@@ -191,8 +177,6 @@ export function classifyStoredPbRecordValue(
         { state: 'obsolete', reason, updatedAt }
     );
 
-    // Types before values. A revision field of the wrong type is damage, and comparing it against
-    // this build's revision would answer "different" and call it a supported change instead.
     if (
         typeof value.schemaVersion !== 'number'
         || typeof value.simulationRevision !== 'number'
@@ -210,8 +194,6 @@ export function classifyStoredPbRecordValue(
     }
     if (value.trackKey !== competition.trackKey) return obsolete('track_retired');
     if (value.trackFingerprint !== trackFingerprint) return obsolete('track_fingerprint');
-    // Compared as stored. `parseRecord` would map an unexpected value onto a supported one here,
-    // which can make a record that does not belong to this race look like one that does.
     if (
         value.rulesRevision !== raceIdentity.rulesRevision
         || value.lapCount !== raceIdentity.lapCount
@@ -224,7 +206,6 @@ export function classifyStoredPbRecordValue(
     return { state: 'valid', record };
 }
 
-/** Classifies an already-read personal best, deriving the track and race identity from `track`. */
 export function classifyStoredPbRecordFor(
     raw: string | null | undefined,
     competition: Competition,
@@ -238,11 +219,6 @@ export function classifyStoredPbRecordFor(
     );
 }
 
-/**
- * Discarding an unusable record is cleanup, not correctness: every caller treats it as absent either way.
- * Only the writer, holding this player's PB lock, may delete it — a lock-free reader would otherwise delete
- * a fresh record committed between its own read and its delete, costing the player a ghost permanently.
- */
 async function readCompatibleRecord({
     playerId,
     competition,
@@ -275,10 +251,6 @@ export async function getPlayerTrackPbRecord(input: {
     return readCompatibleRecord(input);
 }
 
-/**
- * Read compatible personal-best records for a page in bounded hash batches. This is read-only:
- * malformed or incompatible records remain available for the writer-owned cleanup path.
- */
 export async function getPlayerTrackPbRecords({
     playerIds,
     competition,
@@ -346,7 +318,6 @@ export async function upsertPlayerTrackPersonalBest({
     updatedAt?: string;
 }): Promise<{ record: PlayerTrackPbRecord; improved: boolean }> {
     const trackKey = competition.trackKey;
-    // A time-boxed competition still has a deadline: writing a PB no reader would accept is worse than failing.
     const ttlSeconds = competition.ttlSeconds;
     if (ttlSeconds != null && ttlSeconds <= 0) {
         throw new Error('Personal best retention deadline has passed.');
@@ -436,7 +407,6 @@ export async function upsertPlayerTrackPersonalBest({
         try {
             await releaseRedisLock(lock, redis);
         } catch (error) {
-            // Lock cleanup is best-effort; it must not replace a committed outcome.
             console.error('Challenge PB lock cleanup failed:', error);
         }
     }

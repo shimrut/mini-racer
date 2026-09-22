@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 
-/** Shared in-memory Redis stand-in for the transfer, lock, and recovery suites. */
 export class RedisTestDouble {
   constructor() {
     this.reset();
@@ -14,13 +13,10 @@ export class RedisTestDouble {
     this.versions = new Map();
     this.beforeExec = null;
     this.failLockRelease = false;
-    // Reddit answers a lost WATCH race by throwing, where this double returns nothing. Tests
-    // that need production's shape turn this on.
     this.throwTransactionConflictAt = null;
     this.execCount = 0;
     this.failTransferRecordWriteAt = null;
     this.transferRecordWriteCount = 0;
-    // Substrings of keys whose `del` must throw, for cleanup paths that swallow the failure.
     this.failDelKeys = new Set();
   }
 
@@ -81,7 +77,6 @@ export class RedisTestDouble {
   }
 
   async del(key) {
-    // Refused before the mutation: the key survives, which is what a failed delete means.
     for (const fragment of this.failDelKeys) {
       if (key.includes(fragment)) throw new Error(`simulated del failure: ${fragment}`);
     }
@@ -235,7 +230,6 @@ export class RedisTestDouble {
         return a[1] - b[1];
       });
     if (options?.by === "score") {
-      // Devvit keeps start as the low bound under reverse; only the answer's order turns around.
       const lo = Number(start);
       const hi = Number(stop);
       let rows = lo > hi

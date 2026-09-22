@@ -10,14 +10,11 @@ import {
 export const ANALYTICS_RETENTION_DAYS = Math.round(DAILY_GP_REDIS_TTL_SECONDS / (24 * 60 * 60));
 export const ANALYTICS_RETENTION_MONTHS = 13;
 
-// Months outlive the daily keys: a month-over-month comparison is worthless if the
-// history evaporates after a year.
 const MONTH_TTL_SECONDS = 400 * 24 * 60 * 60;
 
 export const ANALYTICS_MODES = ['daily', 'campaign', 'challenge'] as const;
 export type AnalyticsMode = (typeof ANALYTICS_MODES)[number];
 
-/** Every mode reports the same two events, so the modes can be compared to each other. */
 export const ANALYTICS_ACTIONS = ['start', 'finish'] as const;
 export type AnalyticsAction = (typeof ANALYTICS_ACTIONS)[number];
 
@@ -80,9 +77,6 @@ export type AnalyticsCohort = {
     d30: AnalyticsCohortRetention;
 };
 
-// A signed-in account is the only identity that survives a new device, a cleared
-// browser, or a partitioned webview, so it is the only one allowed to be "a player".
-// Signed-out visitors are counted separately and never folded into the total.
 const PLAYER_NEW = 'n';
 const PLAYER_RETURNING = 'r';
 const PLAYER_GUEST = 'g';
@@ -100,8 +94,6 @@ type LoadedBucket = {
     modes: AnalyticsModeCounts[];
 };
 
-// Reading the request context throws outside a request. A default parameter would evaluate
-// before the try block and take the caller down with it, so the lookup is guarded here.
 function readScopeFromContext(): string | null {
     try {
         return readContextSubredditName();
@@ -164,8 +156,6 @@ const SUMMARY_READY = 'ready';
 const SUMMARY_LOCK_MS = 3 * 60 * 1000;
 const SUMMARY_WRITE_BATCH = 200;
 
-// Once per process per UTC day, and only after the command succeeds. A new
-// process refreshes the timers again, so a missed expire is retried.
 const retentionMemory = new Set<string>();
 
 export function clearAnalyticsMaintenanceMemory(): void {
@@ -244,10 +234,6 @@ function normalizePodiumAction(action: unknown): PodiumAnalyticsAction | null {
         : null;
 }
 
-/**
- * Only a canonical id is usable here. A raw uuid from browser storage is not an
- * identity, and folding one into the player count is what made the old number junk.
- */
 function classifyPlayerId(playerId: unknown): { id: string; isGuest: boolean } | null {
     if (typeof playerId !== 'string') return null;
     const trimmed = playerId.trim().slice(0, 120);
@@ -295,14 +281,6 @@ export function emptyAnalyticsDay(date: string): AnalyticsDay {
     return { date, ...emptyBucket() };
 }
 
-/**
- * The ledger is the authority on new vs returning, not the player profile: a profile is
- * recreated when a guest signs in, which booked month-old players as brand new. But an
- * empty ledger would report every established player as new on the day it ships, so the
- * first claim backfills itself from the account's own first-seen date.
- *
- * Returns true only for a player with no earlier history anywhere.
- */
 async function claimFirstSeen(scope: string, playerId: string, date: string): Promise<boolean> {
     if (!(await redis.hSetNX(firstSeenKey(scope), playerId, date))) return false;
 
@@ -312,7 +290,6 @@ async function claimFirstSeen(scope: string, playerId: string, date: string): Pr
         const seen = typeof profile?.firstSeenAt === 'string' ? profile.firstSeenAt.slice(0, 10) : '';
         knownSince = /^\d{4}-\d{2}-\d{2}$/.test(seen) ? seen : null;
     } catch (error) {
-        // An unreadable profile only costs this player a "new" label, never their race.
         logAnalyticsFailure('first-seen backfill', error);
     }
 
@@ -321,10 +298,6 @@ async function claimFirstSeen(scope: string, playerId: string, date: string): Pr
     return false;
 }
 
-/**
- * A player is marked once per bucket. The mark itself carries the new/returning verdict,
- * so every figure on the page derives from one hash and the totals cannot drift apart.
- */
 function daySummaryPrefix(date: string): string {
     return `d:${date}:`;
 }
@@ -402,8 +375,6 @@ async function markPlayerPresence(
     await incrementSummary(scope, fields);
 }
 
-// Cohorts need the first date observed by analytics, not the profile's historical
-// firstSeenAt. The latter is deliberately backfilled for the new/returning label.
 async function markCohortStart(
     scope: string,
     date: string,
@@ -413,7 +384,6 @@ async function markCohortStart(
     try {
         await redis.hSetNX(cohortStartsKey(scope), player.id, date);
     } catch (error) {
-        // Cohort tracking is supplementary and must never block the race analytics write.
         logAnalyticsFailure('cohort start', error);
     }
 }
@@ -458,8 +428,6 @@ async function refreshRollingLedgers(scope: string, date: string): Promise<void>
     await Promise.all(keys.map(async (key) => {
         const token = `${date}:${key}`;
         if (retentionMemory.has(token)) return;
-        // Missing keys are not remembered. Remembering one would skip the timer
-        // on the later event that actually creates the ledger.
         if (!await redis.exists(key)) return;
         await redis.expire(key, MONTH_TTL_SECONDS);
         retentionMemory.add(token);
@@ -516,7 +484,6 @@ export async function recordAnalyticsRace({
         const scope = sanitizeScope(subredditName ?? readScopeFromContext());
         const date = formatUtcChallengeDate(now);
 
-        // A finish also marks presence: it proves the player raced even if the start write was lost.
         await markCohortStart(scope, date, player);
         await markPlayerPresence(scope, date, normalizedMode, player);
         await bumpCounter(scope, date, countField(normalizedMode, normalizedAction));

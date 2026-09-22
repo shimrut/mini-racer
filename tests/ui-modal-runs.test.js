@@ -86,7 +86,6 @@ describe('a challenge finish that has spent its comment', () => {
         `);
     }
 
-    // A posted concession offers Change Track. A spent tie still goes back to the locked Brag.
     it.each([
         ['posted', 'lost', 'brag'],
         ['unconfirmed', 'lost', 'brag'],
@@ -1814,7 +1813,6 @@ describe('Daily finish share chooser', () => {
         return { shell, panel, triggerButton };
     }
 
-    // A comment Reddit has already taken must never be offered a second post.
     it.each([
         [
             'posted_without_link',
@@ -1871,7 +1869,6 @@ describe('Daily finish share chooser', () => {
         const error = 'Reddit user-attributed posting is not available for this app version.';
 
         try {
-            // That answer describes a post Reddit gave the app, not a live comment.
             const { panel } = await confirmWith(
                 dom,
                 { status: 'user_action_unavailable', error },

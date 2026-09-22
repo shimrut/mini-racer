@@ -551,8 +551,7 @@ export async function ensureDailyMiniRacerPodiumPostForSubreddit(
             record.createdAt,
         );
         await deleteDailyGpPodiumPendingSnapshot(subredditName, finalPodium.challengeId);
-        // Reddit drops the flair passed at create time. The app is a moderator, so
-        // it sets the flair. The post is live either way, so a failure is only logged.
+        // Reddit drops flair set at create time.
         try {
             await reddit.setPostFlair({
                 subredditName,

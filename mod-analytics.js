@@ -71,7 +71,6 @@ function cardHeading(doc, title) {
     return header;
 }
 
-// A bar whose data-end is rounded and whose baseline end stays square.
 function barPath(x, y, width, height, radius) {
     const r = Math.max(0, Math.min(radius, width / 2, height));
     return [
@@ -92,7 +91,6 @@ function niceStep(rough) {
     return step * magnitude;
 }
 
-// Four bands of a round number, so every tick label reads clean.
 function axisScale(rawMax) {
     const step = niceStep(Math.max(rawMax, 1) / 4);
     return { step, max: step * 4 };
@@ -226,10 +224,8 @@ function renderPlayersChart(doc, days) {
         const returning = toCount(day?.returningPlayers);
         const fresh = toCount(day?.newPlayers);
         const x = pad.left + index * band + (band - barWidth) / 2;
-        // A one-player day still needs a visible segment, so every drawn bar has a floor.
         const returningHeight = returning > 0 ? Math.max(scale(returning), 2) : 0;
         const newHeight = fresh > 0 ? Math.max(scale(fresh), 2) : 0;
-        // A 2px surface gap does the separating, so no stroke is drawn around a segment.
         const gap = returning > 0 && fresh > 0 ? 2 : 0;
 
         if (returning > 0) {
@@ -249,7 +245,6 @@ function renderPlayersChart(doc, days) {
     const labelEvery = Math.max(1, Math.ceil(days.length / 6));
     const lastIndex = days.length - 1;
     days.forEach((day, index) => {
-        // Always label the newest day; drop any earlier tick that would crowd it.
         if (index !== lastIndex && (index % labelEvery !== 0 || lastIndex - index < labelEvery)) return;
         const text = shape(doc, 'text', {
             class: 'analytics-chart__label',
@@ -284,7 +279,6 @@ function renderPlayersChart(doc, days) {
             const center = percent(pad.left + index * band + band / 2, width);
             tip.hidden = false;
             tip.style.left = `${center}%`;
-            // Anchor the near edge at the ends so the readout never leaves the card.
             tip.dataset.align = center < 12 ? 'start' : center > 88 ? 'end' : 'middle';
             hover.setAttribute('x', String(pad.left + index * band));
             hover.setAttribute('opacity', '1');
@@ -330,8 +324,6 @@ function modeRow(doc, mode) {
     return row;
 }
 
-// Every mode reports the same two events over the same day, which is the only way
-// one mode's number means anything next to another's.
 function renderModes(doc, days) {
     const today = days[days.length - 1] ?? {};
     const modes = Array.isArray(today.modes) ? today.modes : [];

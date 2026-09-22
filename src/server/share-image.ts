@@ -18,7 +18,6 @@ export function resolveDailyShareImageUrl(trackKey: string): string | null {
         if (/^https?:\/\//i.test(url)) {
             return url;
         }
-        // Asset map may store a media id; Media Service URLs use i.redd.it.
         return `https://i.redd.it/${url}`;
     } catch {
         return null;

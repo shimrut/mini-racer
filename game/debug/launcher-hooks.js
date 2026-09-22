@@ -1,7 +1,3 @@
-// Headless-driving hooks for the launcher posts, which have no engine of their
-// own. The payload shapes are built here rather than at the call sites so the
-// shipped build drops them with this module; see `vite.config.js`.
-
 function expose(getState) {
   globalThis.render_game_to_text = () => JSON.stringify(getState());
   globalThis.advanceTime = () => {};

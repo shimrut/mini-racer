@@ -42,7 +42,6 @@ function progressWith(results) {
   });
 }
 
-/** An account with Campaign progress and a Daily row today, which a Guest choice would replace. */
 async function seedVeteranAccount(redditPlayerId) {
   await recordCompletedRace(redditPlayerId);
   await redis.set(campaignProgressKey(redditPlayerId), progressWith({ "numbered-v1-00": CAMPAIGN_RESULT }));
@@ -74,7 +73,6 @@ describe("a new transfer from a guest with nothing to carry is refused", () => {
     const guestPlayerId = "guest:retired-empty";
     const redditPlayerId = "reddit:retired-empty";
     const competition = await seedVeteranAccount(redditPlayerId);
-    // What sign-in does for a guest with no saved progress.
     expect((await getGuestProgressSelection({ guestPlayerId, redditPlayerId })).required).toBe(false);
     await retireEmptyGuestIdentity({ guestPlayerId, redditPlayerId });
 
@@ -90,7 +88,6 @@ describe("a new transfer from a guest with nothing to carry is refused", () => {
       const guestPlayerId = `guest:never-retired-${choice}`;
       const redditPlayerId = `reddit:never-retired-${choice}`;
       const competition = await seedVeteranAccount(redditPlayerId);
-      // A progress record with no start and no result is what opening Campaign leaves behind.
       await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
         campaignId: "numbered-v1", startedAt: null, resultsByRaceId: {}, updatedAt: null,
       }));
@@ -139,7 +136,6 @@ describe("a new transfer from a guest with nothing to carry is refused", () => {
     await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
     const first = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
 
-    // The guest now holds nothing and is joined to the account, as any empty guest would be.
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .resolves.toMatchObject({ status: "completed", transferId: first.transferId });
     await expect(selectGuestProgress({

@@ -1,8 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 
-// Fresh module graph for active-cache boundary checks.
-
 function createMemoryLocalStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {

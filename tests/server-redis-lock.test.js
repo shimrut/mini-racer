@@ -209,7 +209,6 @@ describe('owned Redis locks', () => {
     it('does not call a valid group lost when a lock is added during its ownership read', async () => {
         const client = createVersionedRedis();
         const first = await acquireRedisLock('first', 2_500, client);
-        // Campaign keeps acquiring into the very array its lease is renewing.
         const group = [first];
         const read = client.get.bind(client);
         let grown = false;

@@ -6,10 +6,6 @@ import { recoverPlayerIdentity as chasePlayerIdentity } from './identity-recover
 const PROFILE_RECOVERY_DELAYS_MS = [0, 30_000, 120_000];
 
 export const playerProfileEngineMethods = {
-    /**
-     * A bootstrap that never answered is not an answer: it may not lock cars, rewrite the selected
-     * car, or push a preference the player never chose. Cached state stands in for presentation only.
-     */
     async applyPlayerProgressState({
         hasAnyData,
         isReturningPlayer,
@@ -39,10 +35,6 @@ export const playerProfileEngineMethods = {
         };
     },
 
-    /**
-     * First-time guest finishes from this visit attach to this visit's bootstrap. Runs already
-     * stamped with who this phone was keep that owner. Claiming starts the sender.
-     */
     claimQueuedResultsForOwner() {
         const { claimed } = claimVerificationEntriesForOwner(getActivePlayerOwnerId());
         for (const { bucket, entryId } of claimed) {
@@ -64,7 +56,6 @@ export const playerProfileEngineMethods = {
         return chasePlayerIdentity(this);
     },
 
-    /** Fallback state is temporary by definition, so the real profile is chased until it answers. */
     schedulePlayerProfileRecovery() {
         if (this._playerProfileRecovery) return null;
 
@@ -75,7 +66,6 @@ export const playerProfileEngineMethods = {
             if (this._playerProfileRecovery !== recovery) return;
             const delayMs = PROFILE_RECOVERY_DELAYS_MS[recovery.attempt];
             recovery.attempt += 1;
-            // Past the timed attempts, only a reconnect or a return to the foreground earns another request.
             if (delayMs === undefined) return;
             recovery.timer = setTimeout(() => {
                 recovery.timer = null;

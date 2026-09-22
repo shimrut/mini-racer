@@ -1,7 +1,3 @@
-/**
- * Blocking choice overlay used by guest progress selection and server sync failure.
- * Sits above the loading screen. Same chrome as `.guest-progress-selection`.
- */
 export function presentPlayerChoiceOverlay({
     titleId,
     title,

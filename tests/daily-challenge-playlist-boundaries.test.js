@@ -4,8 +4,6 @@ import {
     getCachedDailyChallengePlaylist,
 } from '../game/daily-challenge/service.js';
 
-// Fresh module graph for playlist cache boundary checks.
-
 function buildChallenge(overrides = {}) {
     return {
         id: 'mutation-survivor-challenge',

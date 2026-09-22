@@ -1,4 +1,4 @@
-// Auto-generated from `public/assets/cars/`; run `npm run generate:car-assets` instead of editing.
+// Generated file. Run npm run generate:car-assets.
 
 export const GENERATED_PLAYER_SELECTABLE_CAR_ASSETS = Object.freeze([
   "assets/cars/mr_mr_red.webp",

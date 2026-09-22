@@ -30,9 +30,7 @@ const CAMERA_DT_MIN_S = 1 / 120;
 const CAMERA_DT_MAX_S = 1 / 45;
 const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const COMPARISON_TIE_EPSILON_SEC = 0.005;
-// The car catches up this much of a hitch. The rest is dropped from the car and the clock.
 export const MAX_SIMULATED_FRAME_DT = 0.1;
-// A normal phone stutter is shorter than this. Longer means the game stopped.
 export const RANKED_RUN_STALL_FRAME_MS = 250;
 export const RANKED_RUN_STALL_MESSAGE = "Rank disabled due to frame stalls";
 
@@ -114,7 +112,6 @@ function lerpAngle(a, b, t) {
   return a + delta * t;
 }
 
-/** Particle alpha is quantised to this many steps so same-colour particles batch into one fill. */
 const PARTICLE_ALPHA_STEPS = 12;
 
 function getSkidMarkStartIndex(skidMarks, frameSkip) {
@@ -999,8 +996,6 @@ export const raceEngineMethods = {
     }
 
     if (this.particles.length > 0) {
-      // Buckets persist across frames and are emptied by resetting length, so a
-      // race no longer churns a Map plus one string key per particle per frame.
       const buckets = this._particleBuckets;
       for (let i = 0; i < this.particles.length; i++) {
         const particle = this.particles[i];

@@ -22,7 +22,6 @@ describe('track carousel geometry warm-up', () => {
             { challengeId: 'd' },
         ]);
 
-        // Every card that is not already in the registry, and nothing else.
         expect(loadClientTrack.mock.calls.map(([key]) => key))
             .toEqual(['albertGardens', 'alloyRing']);
     });

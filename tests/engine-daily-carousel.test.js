@@ -27,7 +27,6 @@ vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
         }),
         getCachedDailyChallengePlaylist: vi.fn(() => playlistState.cached),
         getDailyChallengePlaylist: vi.fn(async () => {
-            // The real service merges the response into the cache before it resolves.
             const byId = new Map(playlistState.cached.map((entry) => [entry.id, entry]));
             for (const entry of playlistState.fetched) byId.set(entry.id, entry);
             playlistState.cached = [...byId.values()];
@@ -72,7 +71,6 @@ const CHALLENGES = DAY_TRACKS.map((trackKey, index) => challenge(
 ));
 
 function createEngine(overrides = {}) {
-    // The real rail holds the card it is on, and falls back to the first one.
     const carousel = { selectedChallengeId: null };
     const render = vi.fn((cards = [], options = {}) => {
         if (options.selectedChallengeId) {

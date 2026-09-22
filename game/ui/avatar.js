@@ -7,7 +7,7 @@ const SILHOUETTE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 
 export const AVATAR_PLACEHOLDER_SRC = `data:image/svg+xml,${SILHOUETTE}`;
 
-// The same three media hosts the server admits in `src/server/daily-podium-service.ts` — not reddit.com.
+// Same hosts as daily-podium-service.ts.
 const REDDIT_AVATAR_HOSTS = [
     'redd.it',
     'redditmedia.com',
@@ -47,7 +47,6 @@ export function applyAvatar(img, url, { alt = '', genericClass = '', hidden = fa
 
     img.onerror = () => {
         step += 1;
-        // The last rung is a data URI and always paints, so nothing can loop here.
         if (step >= ladder.length - 1) img.onerror = null;
         if (step < ladder.length) seat();
     };

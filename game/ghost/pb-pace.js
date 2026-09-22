@@ -66,7 +66,6 @@ export function deriveLapCompletionTimesSecFromGhost(record, track, lapCount) {
     nextCheckpointIndex = 0;
   }
 
-  // The trace stores the exact finish timestamp, but quantization can drop its last sample beside the line.
   const lastFoundBoundarySec = boundaries[boundaries.length - 1];
   const maxIntermediateBoundarySec = finishTimeSec * (expectedLaps - 0.5) / expectedLaps;
   if (

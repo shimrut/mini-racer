@@ -554,11 +554,6 @@ export class ModalShell {
         btn.onclick = typeof action === 'function' ? action : null;
     }
 
-    /**
-     * The middle button of a challenge finish when the share on it is a comment. A tie says its
-     * own line at once; a loss that has earned the offer concedes. A posted concession offers
-     * another challenge. Any other spent comment falls back to the locked Brag.
-     */
     _challengeCommentButtonText(phase, spent = null) {
         if (spent && phase === 'lost') {
             return { label: 'Change Track', aria: 'Open a different challenge' };
@@ -901,7 +896,6 @@ export class ModalShell {
         noteText = '',
     } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
-        // The server made no new post: this race and time already has a live one.
         const isChallengeRepeat = (isChallengeCreate && result?.status === 'already_created')
             || result?.status === 'already_commented';
         panel.replaceChildren();
@@ -929,8 +923,6 @@ export class ModalShell {
         actions.appendChild(done);
         panel.append(title, copy, actions);
         triggerButton.disabled = !keepShareAvailable;
-        // A posted concession trades the spent comment for another challenge. A spent tie still
-        // goes back to the locked Brag.
         if (this._isPostedConcede()) {
             void this._offerPostedConcedeNextChallenge(triggerButton);
             resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
@@ -1148,8 +1140,6 @@ export class ModalShell {
                     const shareToken = isChallenge ? body.challengeToken : body.shareToken;
                     const confirmed = await this.confirmShare(shareToken, request);
                     if (confirmed?.body?.status === 'comment_unconfirmed') {
-                        // The comment may be live: offer no second post from this finish, and
-                        // record that, or the next repaint offers the button again.
                         markCommentSpent('unconfirmed');
                         confirm.remove();
                         cancelReady.disabled = false;
@@ -1532,8 +1522,6 @@ export class ModalShell {
 
         const heroMedalEl = this.modalCombinedView.querySelector('#combined-hero-medal');
         const lapData = this._combinedResultsLapData;
-        // Only a new phase or a server-corrected margin earns a repaint; otherwise the hero replays
-        // its entrance for nothing.
         const phaseUnchanged = phase === undefined || phase === this._challengeFinishPhase;
         const marginUnchanged = verdict === undefined
             || verdict?.deltaSec === lapData?.challengeVerdict?.deltaSec;
@@ -1559,7 +1547,6 @@ export class ModalShell {
             }
             this.content.applyChallengeOpponentStat(this.modalCombinedView, nextVerdict);
         }
-        // The rank the run earned belongs to the stat row under the hero, so it lands there on its own.
         if (!bestUnchanged) {
             const nextBestUpdate = bestUpdate ?? null;
             this.content.applyChallengeRankStat(
@@ -1568,8 +1555,6 @@ export class ModalShell {
                 lapData?.challengeViewerBest,
             );
             if (lapData) lapData.challengeBestUpdate = nextBestUpdate;
-            // A run that did not beat the origin best still returns that held time. RANK can
-            // land from it; VS. YOUR PB must too, or a miss on the first GET stays "No lap times yet".
             const heldBestSec = nextBestUpdate?.improved === true
                 ? null
                 : Number(nextBestUpdate?.bestTimeMs) / 1000;
@@ -1598,8 +1583,6 @@ export class ModalShell {
         const isChallengeBrag = challengeShareRequest?.kind === 'challenge-brag';
         const isChallengeComment = challengeShareRequest?.kind === 'challenge-comment';
         const finishPhase = phase ?? this._challengeFinishPhase;
-        // This finish may have spent its comment already. A repaint that recomputed the button from
-        // the phase alone offered it again, and a late rank answer is exactly such a repaint.
         const spent = this._challengeFinishCommentSpent;
         const shareEnabled = !spent && Boolean(challengeShareRequest) && (
             isChallengeBrag
@@ -1902,9 +1885,6 @@ export class ModalShell {
             return this.modalResumeBtn;
         }
         if (this._modalKind === 'win') {
-            // Improve is hidden on a Head to Head win. The split-time control is
-            // also tabbable, so without a fallback the trap focuses that number
-            // and the browser paints its default outline on it.
             const winFocusCandidates = [
                 this.combinedRestartBtn,
                 this.combinedPlaylistBtn,

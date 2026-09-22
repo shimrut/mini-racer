@@ -50,7 +50,6 @@ function campaignProgress(result, overrides = {}) {
   });
 }
 
-/** An account that already earned something, so a wrong replacement is visible. */
 async function seedAccountWithEarnedResult(redditPlayerId) {
   await redis.set(campaignProgressKey(redditPlayerId), campaignProgress(EARNED_RESULT));
 }
@@ -84,12 +83,9 @@ describe("a malformed Campaign source cannot replace an account", () => {
       await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
         .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
 
-      // The account keeps the result it earned.
       const account = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
       expect(account.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000 });
-      // The evidence a reviewer needs is still there.
       expect(await redis.get(campaignProgressKey(guestPlayerId))).toBe(rawProgress);
-      // Nothing claims the domain was copied.
       const record = JSON.parse(await redis.get(selectionKey(guestPlayerId, redditPlayerId)));
       expect(record.completedDomains).not.toContain("campaign");
     });
@@ -188,8 +184,6 @@ describe("a source held for review is still enrolled for collection", () => {
     const comp = toCampaignCompetition("numbered-v1", stage, { playerId: g });
     const field = createHash("sha256").update(g, "utf8").digest("base64url");
     await recordCompletedRace(g);
-    // A damaged PB alongside a readable row that dates the source. No progress write ever
-    // enrolled this guest, because the row was seeded directly.
     await redis.hSet(comp.pbHashKey, { [field]: "{ not json" });
     await redis.set(campaignProgressKey(g), JSON.stringify({
       campaignId: "numbered-v1", startedAt: "2026-09-01T09:00:00.000Z",
@@ -199,9 +193,7 @@ describe("a source held for review is still enrolled for collection", () => {
     await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" }))
       .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
 
-    // The source is kept for review...
     expect(await redis.hGet(comp.pbHashKey, field)).toBe("{ not json");
-    // ...and it is now on the ledger, so it does not live for ever.
     const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, g);
     expect(Number.isFinite(Number(score))).toBe(true);
     const collected = await cleanupExpiredCampaignGuests(Date.now() + 2 * 365 * 86400000);
@@ -221,7 +213,6 @@ describe("a source held for review is still enrolled for collection", () => {
     await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" }))
       .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
 
-    // Choosing a deadline here would be inventing one, so it is reported instead.
     const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, g);
     expect(Number.isFinite(Number(score))).toBe(false);
     expect(console.error).toHaveBeenCalledWith(
@@ -299,8 +290,6 @@ describe("a damaged leaderboard entry is damage, not obsolescence", () => {
     const field = createHash("sha256").update(guestPlayerId, "utf8").digest("base64url");
 
     await recordCompletedRace(guestPlayerId);
-    // Damaged in its revision field, honest about its timestamp, and the only thing this guest
-    // has. Nothing else can date the source.
     await redis.hSet(competition.pbHashKey, {
       [field]: JSON.stringify({
         schemaVersion: 2,
@@ -320,7 +309,6 @@ describe("a damaged leaderboard entry is damage, not obsolescence", () => {
 
     const score = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, guestPlayerId);
     expect(Number.isFinite(Number(score))).toBe(true);
-    // One retention period after the record said it was written, not a fresh term from today.
     expect(Number(score)).toBe(Date.parse("2026-09-01T09:30:00.000Z") + 365 * 24 * 60 * 60 * 1000);
   });
 });

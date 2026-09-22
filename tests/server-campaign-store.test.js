@@ -22,7 +22,6 @@ const mockRedis = {
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
     hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
-    // Delegate so a test that overrides get() also steers the batched read the lock layer uses.
     mGet: vi.fn(async (keys) => await Promise.all(keys.map((key) => mockRedis.get(key)))),
     hDel: vi.fn(async (key, fields) => {
         const hash = hashes.get(key);

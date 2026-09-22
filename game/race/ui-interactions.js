@@ -39,7 +39,7 @@ export class InteractionsUi {
         }
     }
 
-    /** Mobile/WebKit can leave :focus on the first-tapped action, so blur siblings on pointerdown. */
+    // WebKit keeps :focus on the tapped button.
     bindModalActionRowPointerFocus() {
         const row = document.getElementById('modal')?.querySelector(".modal-action-row");
         if (!row) return;

@@ -49,7 +49,6 @@ async function seedSevenDayPlaylist() {
   vi.useRealTimers();
 }
 
-/** Puts a guest in front of an account with progress worth transferring. */
 async function seedTransferableGuest(guestPlayerId, redditPlayerId) {
   await recordCompletedRace(guestPlayerId);
   await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
@@ -116,7 +115,6 @@ describe("guest transfer record contract", () => {
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
     await redis.set(accountKey, JSON.stringify({ campaignId: "numbered-v1", resultsByRaceId: {} }));
 
-    // Fail the write that follows preparation, so the transfer stops the moment it would copy.
     redis.failTransferRecordWriteAt = 2;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(selectGuestProgress({
@@ -129,7 +127,6 @@ describe("guest transfer record contract", () => {
     expect(record.phase).toBe("preparing");
     expect(record.completedDomains).toEqual([]);
     expect(record.sourceInventory).toBeTruthy();
-    // Preparation may repeat, so the account is untouched.
     expect(JSON.parse(await redis.get(accountKey)).resultsByRaceId).toEqual({});
   });
 
@@ -167,7 +164,6 @@ describe("guest transfer completion is answered, not re-run", () => {
 
     const first = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "account" });
 
-    // The browser never saw that answer, so it asks the server to finish the transfer again.
     const retried = await selectServerGuestProgress({
       redditUsername: "lost-response",
       action: "resume",
@@ -214,10 +210,8 @@ describe("guest transfer completion is answered, not re-run", () => {
     });
     expect(second.transferId).not.toBe(first.transferId);
 
-    // The newest transfer is what an unqualified question returns.
     await expect(resolveAccountTransferState(redditPlayerId))
       .resolves.toMatchObject({ transferId: second.transferId, state: "completed" });
-    // The first device still gets its own answer.
     await expect(resolveAccountTransferState(redditPlayerId, { transferId: first.transferId }))
       .resolves.toMatchObject({ transferId: first.transferId, state: "completed" });
   });
@@ -264,7 +258,6 @@ describe("guest transfer source integrity", () => {
     const guestPlayerId = "guest:changed-unlocks";
     const redditPlayerId = "reddit:changed-unlocks";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
-    // Prepare, then stop before copying.
     redis.failTransferRecordWriteAt = 2;
     await expect(selectGuestProgress({
       guestPlayerId,
@@ -273,7 +266,6 @@ describe("guest transfer source integrity", () => {
     })).rejects.toThrow();
     expect((await readRecord(guestPlayerId, redditPlayerId)).phase).toBe("preparing");
 
-    // A record already past preparation must not re-read its evidence.
     const record = await readRecord(guestPlayerId, redditPlayerId);
     await redis.set(selectionKey(guestPlayerId, redditPlayerId), JSON.stringify({
       ...record,
@@ -314,7 +306,6 @@ describe("guest transfer source integrity", () => {
       phase: "copying",
     }));
 
-    // The guest's saved Campaign progress expired between preparation and the copy.
     await redis.del(campaignProgressKey(guestPlayerId));
 
     await expect(selectGuestProgress({
@@ -322,7 +313,6 @@ describe("guest transfer source integrity", () => {
       redditPlayerId,
       choice: "guest",
     })).rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
-    // The account keeps what it had.
     expect(JSON.parse(await redis.get(accountKey)).startedAt).toBe("2026-09-01T08:00:00.000Z");
   });
 
@@ -439,7 +429,6 @@ describe("bootstrap reports the account's transfer before anything else", () => 
     const guestPlayerId = "guest:other-device";
     const redditPlayerId = "reddit:other-device";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
-    // The choice was recorded on the first device, then the request was cut off mid-copy.
     redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({
       guestPlayerId,
@@ -464,8 +453,6 @@ describe("bootstrap reports the account's transfer before anything else", () => 
     const redditPlayerId = "reddit:never-chose";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
 
-    // Showing the chooser risks nothing, so the account is not marked and its ranked play is
-    // not gated. A player who dismisses the chooser must not be left unable to race.
     expect(await redis.get(guestProgressSelectionAccountPendingKey(redditPlayerId)))
       .toBeUndefined();
     await expect(resolveAccountTransferState(redditPlayerId)).resolves.toBeNull();
@@ -532,8 +519,6 @@ describe("guest transfer resumes from any interrupted checkpoint", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  // Every write of the transfer record is a checkpoint. Failing each one in turn covers the gap
-  // before and after each destination write, each cleanup step, and the final completion.
   for (const failAt of [1, 2, 3, 4, 5, 6, 7]) {
     for (const choice of ["guest", "account"]) {
       it(`finishes a ${choice} choice after checkpoint ${failAt} was interrupted`, async () => {
@@ -550,7 +535,6 @@ describe("guest transfer resumes from any interrupted checkpoint", () => {
         }
         redis.failTransferRecordWriteAt = null;
 
-        // Whether or not this checkpoint existed, the retry must reach the same end state.
         const result = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
         expect(result.status).toBe("completed");
         expect(result.choice).toBe(choice);
@@ -558,9 +542,7 @@ describe("guest transfer resumes from any interrupted checkpoint", () => {
         const record = await readRecord(guestPlayerId, redditPlayerId);
         expect(record.status).toBe("completed");
         expect(record.phase).toBe("completed");
-        // The guest's own progress is gone under either choice.
         expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeUndefined();
-        // A receipt exists exactly once, whatever happened on the way.
         const receipt = JSON.parse(await redis.get(guestProgressTransferReceiptKey(result.transferId)));
         expect(receipt.choice).toBe(choice);
         expect(JSON.parse(await redis.get(guestProgressTransferIndexKey(redditPlayerId))))
@@ -670,7 +652,6 @@ describe("guest transfer does not strand the account or the next guest", () => {
       choice: "account",
     });
 
-    // A different guest on a different device now signs into the same account.
     await seedTransferableGuest("guest:second-guest", redditPlayerId);
     const selection = await getGuestProgressSelection({
       guestPlayerId: "guest:second-guest",
@@ -695,7 +676,6 @@ describe("guest transfer does not strand the account or the next guest", () => {
     await expect(resolveAccountTransferState(redditPlayerId))
       .resolves.toMatchObject({ state: "completed" });
 
-    // Age the receipt past the window a browser could still be waiting to hear about it.
     const receiptKey = guestProgressTransferReceiptKey(done.transferId);
     const receipt = JSON.parse(await redis.get(receiptKey));
     await redis.set(receiptKey, JSON.stringify({
@@ -704,7 +684,6 @@ describe("guest transfer does not strand the account or the next guest", () => {
     }));
 
     await expect(resolveAccountTransferState(redditPlayerId)).resolves.toBeNull();
-    // A browser holding that receipt is still answered, whatever its age.
     await expect(resolveAccountTransferState(redditPlayerId, { transferId: done.transferId }))
       .resolves.toMatchObject({ state: "completed" });
   });
@@ -714,8 +693,6 @@ describe("guest transfer does not strand the account or the next guest", () => {
     const redditPlayerId = "reddit:proven-cleanup";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
     const challenge = await getServerDailyGpChallenge();
-    // A version-2 record from before this change, with every copy already checkpointed. All that
-    // is left is deleting guest rows, which needs no source inventory.
     await redis.set(selectionKey(guestPlayerId, redditPlayerId), JSON.stringify({
       version: 2,
       guestPlayerId,
@@ -742,8 +719,6 @@ describe("guest transfer does not strand the account or the next guest", () => {
       .rejects.toThrow();
     const record = await readRecord(guestPlayerId, redditPlayerId);
 
-    // A deploy adds a stage: the recorded inventory has no row for it, and the guest never raced
-    // it. That is not evidence the source changed.
     const trimmed = { ...record.sourceInventory.campaignStages };
     const [firstStage] = Object.keys(trimmed);
     delete trimmed[firstStage];

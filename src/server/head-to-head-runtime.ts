@@ -32,7 +32,6 @@ import type {
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { validateDailyGpReplayDetailed } from './replay-validator.js';
 
-/** A challenge posts the run the player just finished, in Campaign and Daily alike. */
 export async function resolveHeadToHeadSource(
     input: Record<string, unknown>,
 ): Promise<HeadToHeadSource | null> {
@@ -40,7 +39,6 @@ export async function resolveHeadToHeadSource(
     const daily = input.source === 'daily' && typeof input.challengeId === 'string'
         ? await getServerDailyGpPlayableChallenge(input.challengeId)
         : null;
-    // A Head to Head is only ever issued from a Campaign stage or a Daily run: nothing about one outlives its post.
     const race = stage
         ? {
             competition: toCampaignCompetition(CAMPAIGN_ID, stage),
@@ -147,13 +145,11 @@ async function readBestEffortRank(
     try {
         return await readPlayerRank(competition, playerId);
     } catch (error) {
-        // The rank is decoration on a result that is already stored.
         console.error('Head to Head rank read failed:', error);
         return null;
     }
 }
 
-/** Only an accepted run with a real stored time is worth reporting back to the challenge screen. */
 function acceptedBest(
     outcome: { status: number; body: unknown },
 ): { improved: boolean; bestTimeMs: number } | null {
@@ -164,12 +160,6 @@ function acceptedBest(
     return { improved: body.improved === true, bestTimeMs };
 }
 
-/**
- * A verified challenge run is a verified run on the stage or Daily it was minted from: same track,
- * same laps, same rules, same validator. So it earns the board entry, the personal best and the
- * progress a normal run earns. Whatever the mode refuses — a locked stage, a Daily that has closed —
- * stays unwritten, because the refusal is the rule.
- */
 export async function recordHeadToHeadBest(
     challenge: HeadToHeadRecord,
     replay: unknown,
@@ -238,7 +228,6 @@ export async function recordHeadToHeadBest(
     };
 }
 
-/** The board entry is the number the submit compares against, so it is the number worth showing. */
 async function challengeCompetition(
     challenge: HeadToHeadRecord,
 ): Promise<{ competition: Competition; trackKey: string; lapCount: number } | null> {
@@ -268,12 +257,6 @@ function toViewerRank(rank: number | null): number | null {
     return Number.isInteger(rank) && Number(rank) > 0 ? Number(rank) : null;
 }
 
-/**
- * What this player already holds on the stage or Daily behind the challenge. Null when they hold
- * nothing there, or when the Daily has closed and no run could be written to it anyway.
- * Campaign stages the player has not unlocked still return a payload so the finish can say the
- * track is locked instead of pretending they have a rank.
- */
 export async function readHeadToHeadViewerBest(
     challenge: HeadToHeadRecord,
     playerId: string | null,
@@ -295,7 +278,6 @@ export async function readHeadToHeadViewerBest(
             const storedMs = Number(progress.resultsByRaceId?.[origin.raceId]?.bestTimeMs);
             if (Number.isFinite(storedMs) && storedMs > 0) progressBestTimeMs = Math.round(storedMs);
         } catch {
-            // A progress miss must not hide a real board rank; fall through and read the entry.
         }
     }
     const target = await challengeCompetition(challenge);
@@ -304,7 +286,6 @@ export async function readHeadToHeadViewerBest(
         try {
             await repairCampaignStandingsFromEntries(playerId);
         } catch (error) {
-            // Rank is decoration on a time that is already stored.
             console.error('Head to Head campaign standings repair failed:', error);
         }
     }

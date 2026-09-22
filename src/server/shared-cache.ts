@@ -18,7 +18,6 @@ function hasServerRequestContext(): boolean {
     try {
         return Boolean(context?.subredditId);
     } catch (_error) {
-        // Devvit's context proxy throws in standalone tests and local tools instead of returning undefined.
         return false;
     }
 }

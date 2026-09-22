@@ -242,7 +242,7 @@ describe('medals', () => {
         'win overlay: PB hero only after creator already unlocked and lap beats saved PB',
         () => {
             const tk = 'circuit';
-            const a = /** @type {number} */ (getAuthorMedalSeconds(tk));
+            const a = getAuthorMedalSeconds(tk);
             const lap = a - 0.1;
             const pbOpts = { previousPersonalBestSec: a + 0.5 };
 
@@ -265,7 +265,7 @@ describe('medals', () => {
 
     it.skipIf(getAuthorMedalSeconds('circuit') == null)('shouldShowPersonalBestMedalHero matches PB layout gate', () => {
         const tk = 'circuit';
-        const a = /** @type {number} */ (getAuthorMedalSeconds(tk));
+        const a = getAuthorMedalSeconds(tk);
         const lap = a - 0.1;
         const opts = { previousPersonalBestSec: a + 0.5 };
         expect(shouldShowPersonalBestMedalHero(tk, lap, { ...opts, previousTrackMedal: 'gold' })).toBe(false);

@@ -6,7 +6,6 @@ export { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
 export const PLAYER_SELECTABLE_CAR_ASSETS = GENERATED_PLAYER_SELECTABLE_CAR_ASSETS;
 
-/** Paths relative to `game.html` — Vite emits `public/assets/cars/*` as `dist/client/assets/cars/*` (no `public/` prefix). */
 const CAR_ASSET_URLS = Object.freeze(
   Object.fromEntries(PLAYER_SELECTABLE_CAR_ASSETS.map((p) => [p, p]))
 );

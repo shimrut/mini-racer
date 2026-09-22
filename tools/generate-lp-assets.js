@@ -1,4 +1,3 @@
-// Builds the LP page track background with preview.js's schematic renderer. Run: `npm run generate:lp-assets [--track=circuit]`
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

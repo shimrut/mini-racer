@@ -39,7 +39,6 @@ body:not(.loading-active) #loading-screen {
     background: var(--accent-color);
     transform: scaleX(0);
     transform-origin: left center;
-    /* Starting values: 1.8s glide to 88%, then 12s crawl to 96%. */
     animation:
         loaderBarCrawl 1.8s var(--ease-glide) forwards,
         loaderBarCreep 12s 1.8s linear forwards;

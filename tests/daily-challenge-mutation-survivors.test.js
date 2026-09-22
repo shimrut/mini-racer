@@ -442,7 +442,6 @@ describe('daily-challenge mutation survivors', () => {
     });
 
     it('caches post-bound challenges into the playlist before returning them', async () => {
-        // Pinned: the fixture's `availableUntil` is fixed, so a real clock would prune it before the assertion.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
         const postChallenge = buildChallenge({ id: 'post-bound-playlist-cache' });

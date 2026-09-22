@@ -101,14 +101,8 @@ async function postProgressSelection(body, controller = null) {
     return payload;
 }
 
-/**
- * Asks the server whether this transfer already finished. Used before a retry, so a lost response
- * is told apart from a request that never arrived.
- */
 async function readCompletedTransfer(transferId) {
     if (typeof transferId !== 'string' || !transferId) return null;
-    // This runs between a failed attempt and its retry. Without its own deadline a hung request
-    // would strand the retry loop with its button disabled and no way forward.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     const timeoutId = controller
         ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
@@ -135,8 +129,6 @@ function requestInterruptedTransfer(selection, { onBeforeSubmit = null } = {}) {
     }
     const promise = new Promise((resolve, reject) => {
         if (selection?.state === 'recovery_required') {
-            // The overlay stays up to say why. The promise still settles, so nothing that waits
-            // on identity recovery is left hanging behind it.
             presentPlayerChoiceOverlay({
                 titleId: 'guest-progress-selection-title',
                 title: 'Transfer Needs Repair',
@@ -203,13 +195,10 @@ function requestInterruptedTransfer(selection, { onBeforeSubmit = null } = {}) {
                     stop(error);
                     return;
                 }
-                // A changed sign-in is not this transfer's problem to retry.
                 if (error?.status === 401 || error?.status === 403) {
                     stop(error);
                     return;
                 }
-                // The answer may have been lost rather than never sent. Ask before retrying, so a
-                // transfer that already finished is not attempted a second time.
                 const settled = await readCompletedTransfer(selection?.transferId);
                 if (settled) {
                     succeed(settled);
@@ -289,8 +278,6 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
 
         const choiceInputs = [guestOption.input, accountOption.input];
         const continueButton = overlay.buttons[0];
-        // A Guest choice replaces the account. Guest is offered as the default only when the player
-        // can see what each side holds. Otherwise the player picks, and nothing is picked for them.
         const guestShowsProgress = summaryMetrics(selection?.guestSummary).length > 0;
         const accountShowsProgress = !selection?.accountHasProgress
             || summaryMetrics(selection?.accountSummary).length > 0;
@@ -350,10 +337,6 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                     playerState: body,
                 });
             } catch (error) {
-                // A terminal error can never succeed by pressing the button again, so it settles the
-                // promise instead of leaving startup waiting behind a dialog with no way forward.
-                // The resume path does the same, for the same reason. Everything else -- an
-                // ordinary network failure, a timeout -- stays retryable in place.
                 if (error?.transferRecovery
                     || error?.reason === 'guest_progress_recovery_required'
                     || error?.status === 401

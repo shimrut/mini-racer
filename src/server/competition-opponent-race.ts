@@ -195,8 +195,7 @@ async function prepareNextFasterOpponentRace({
     let fullWindows = 0;
 
     for (let window = 0; window < OPPONENT_WINDOW_LIMIT; window += 1) {
-        // Devvit keeps start as the low bound and stop as the high bound.
-        // reverse only turns the answer around. High-then-low returns nothing.
+        // Devvit keeps start low, even with reverse.
         const ranked = await redis.zRange(
             competition.leaderboardKey,
             0,
