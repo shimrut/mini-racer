@@ -591,10 +591,8 @@ describe('game stylesheet architecture', () => {
         expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-toolbar__action svg\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
         );
-        expect(lobbyModeStyles).toMatch(
-            /\.lobby-mode-toolbar__back svg\s*\{[^}]*width:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);[^}]*height:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);/s,
-        );
         expect(lobbyModeStyles).not.toContain('.lobby-mode-toolbar__label');
+        expect(lobbyModeStyles).not.toContain('.lobby-mode-toolbar__back');
         expect(trackCarouselStyles).not.toMatch(
             /@media \(max-height:\s*500px\)\s*\{[\s\S]*\.track-carousel \.daily-playlist-hero-medal\s*\{[^}]*display:\s*none;/s,
         );

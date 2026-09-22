@@ -203,8 +203,7 @@ select:focus {
 }
 
 .button-row,
-.tool-grid,
-.chip-row {
+.tool-grid {
     display: grid;
     gap: 0.65rem;
     margin-top: 0.9rem;
@@ -272,21 +271,6 @@ select:focus {
 .stage-tool-grid .legend-swatch {
     width: 0.7rem;
     height: 0.7rem;
-}
-
-.chip-row {
-    grid-template-columns: repeat(auto-fit, minmax(5.8rem, 1fr));
-}
-
-.chip-row button {
-    padding: 0.65rem 0.45rem;
-    font-size: 0.78rem;
-    line-height: 1.25;
-}
-
-.chip-row button[data-active="true"] {
-    background: linear-gradient(180deg, rgba(56, 189, 248, 0.9), rgba(14, 116, 144, 0.9));
-    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .panel-note {
@@ -379,10 +363,6 @@ select:focus {
     background: var(--maker-blue);
 }
 
-.legend-line {
-    background: var(--maker-green);
-}
-
 .shortcut-list {
     margin: 0.9rem 0 0;
     padding-left: 1rem;
@@ -438,9 +418,5 @@ kbd {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         justify-content: stretch;
         width: 100%;
-    }
-
-    .chip-row {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }

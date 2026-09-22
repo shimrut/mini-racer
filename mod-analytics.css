@@ -413,32 +413,6 @@ h1 {
     color: var(--ink);
 }
 
-/* Shared bar rows */
-
-.analytics-bar {
-    position: relative;
-    height: 0.4rem;
-    border-radius: 999px;
-    background: var(--raised);
-}
-
-.analytics-bar__fill {
-    height: 100%;
-    border-radius: 999px;
-    background: var(--accent);
-}
-
-.analytics-bar__marker {
-    position: absolute;
-    top: -0.15rem;
-    bottom: -0.15rem;
-    width: 2px;
-    margin-left: -1px;
-    border-radius: 1px;
-    background: var(--ink);
-    opacity: 0.55;
-}
-
 .analytics-storage-total {
     margin: 0 0 0.85rem;
     font-family: var(--mono);

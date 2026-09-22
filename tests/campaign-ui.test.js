@@ -1219,9 +1219,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-mode-toolbar__action svg\s*\{[^}]*width:\s*100%;[^}]*height:\s*100%;/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-toolbar__back svg\s*\{[^}]*width:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);[^}]*height:\s*clamp\(1\.5rem,\s*5vw,\s*1\.9rem\);/s,
-        );
-        expect(css).toMatch(
             /\.lobby-panes\s*\{[^}]*display:\s*grid;/s,
         );
         expect(css).toMatch(

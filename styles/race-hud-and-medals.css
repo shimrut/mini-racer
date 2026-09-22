@@ -228,25 +228,6 @@
     stroke: rgba(148, 163, 184, 0.55);
 }
 
-.medal-svg--combined {
-    width: 1.75rem;
-    height: 1.75rem;
-}
-
-.medal-svg--combined-stack {
-    width: 1.45rem;
-    height: 1.45rem;
-    flex-shrink: 0;
-}
-
-.medal-svg--playlist {
-    width: 1rem;
-    height: 1rem;
-    margin-right: 0.25rem;
-    align-self: center;
-    flex-shrink: 0;
-}
-
 @keyframes medal-entrance-pop {
     0% {
         opacity: 0;
@@ -457,44 +438,8 @@
     color: #fecdd3;
 }
 
-.combined-medal-challenge-label--pending {
-    color: var(--text-muted, #94a3b8);
-}
-
-.combined-medal-challenge-label--outcome {
-    color: var(--text-muted, #94a3b8);
-}
-
-.combined-medal-challenge-label--error {
-    color: #fca5a5;
-    text-transform: none;
-    letter-spacing: 0.04em;
-    max-width: 16rem;
-    margin-left: auto;
-    margin-right: auto;
-}
-
 .combined-medal-challenge-label--won {
     color: #fecdd3;
-}
-
-.combined-medal-challenge-margin {
-    margin: 0.15rem 0 0;
-    text-align: center;
-    font-family: var(--mono-font);
-    font-size: 1.5rem;
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-dim);
-}
-
-.combined-medal-challenge-margin.is-gain {
-    color: var(--success-bright);
-}
-
-.combined-medal-challenge-margin.is-loss {
-    color: #f87171;
 }
 
 .combined-hero-medal .medal-svg--hero.medal-svg--placeholder {

@@ -792,8 +792,4 @@ body[data-lobby-mode="campaign"] #start-overlay {
     .track-carousel__rank .track-carousel__spec-value {
         transition: none;
     }
-
-    .track-carousel__unlock-medal-progress {
-        transition: none;
-    }
 }

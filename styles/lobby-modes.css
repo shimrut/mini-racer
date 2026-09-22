@@ -306,15 +306,6 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     fill: currentColor;
 }
 
-.lobby-mode-toolbar__back {
-    padding: 0.45rem 0.6rem 0.45rem 0;
-}
-
-.lobby-mode-toolbar__back svg {
-    width: clamp(1.5rem, 5vw, 1.9rem);
-    height: clamp(1.5rem, 5vw, 1.9rem);
-}
-
 .lobby-mode-toolbar__action:focus-visible,
 .lobby-mode-toolbar__action.is-menu-selected {
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);

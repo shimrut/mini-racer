@@ -20,6 +20,12 @@ The removals run on branch `chore/dead-code-removal`, one commit per phase, in o
   `DAILY_GP_MIN_TIME_SECONDS` and `DAILY_GP_MAX_TIME_SECONDS` constants went too, because
   `isValidDailyGpTime` was their only reader. The avatar test for the `hidden` option now
   calls `applyAvatar` directly, so that coverage stays.
+- **Phase 3 — done.** The 15 product CSS rules and the Mapmaker rules (§6). `306e003`
+  (2026-08-18) had removed the JavaScript that drew the analytics bars. The toolbar test in
+  `tests/styles-architecture.test.js` now asserts that `.lobby-mode-toolbar__back` stays
+  gone. `npm run analyze:css` reports 3 unused classes, down from 8. The 3 are the known
+  false positives in §10. The built CSS holds none of the removed selectors. The lobby and
+  the Campaign toolbar and carousel look unchanged.
 
 The last full audit ran on 2026-08-01. That audit found no dead module files. This audit
 repeats the file check and adds five more checks: exported names, engine methods, CSS
