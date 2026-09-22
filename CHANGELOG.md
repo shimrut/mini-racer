@@ -1,3 +1,5 @@
+- A mid-margin Head to Head Brag now says “I had a good pace”, not “page”.
+
 - Next rival was asking the board for times in the wrong order, so the finish button stayed on Improve after a win. It now asks from the slower time up to the player's time, and the button can switch to Next rival.
 
 - Three tracks join the Daily rotation: **Slate Circuit**, **Black Water**, and **Raven Rock**.

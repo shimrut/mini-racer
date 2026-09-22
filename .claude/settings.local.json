@@ -160,7 +160,22 @@
       "Bash(curl -sSL \"https://api.github.com/repos/reddit/devvit-docs/git/trees/main?recursive=1\" -o tree.json)",
       "Bash(curl -sSL -o cache-helper.md https://raw.githubusercontent.com/reddit/devvit-docs/main/versioned_docs/version-0.14/capabilities/server/cache-helper.md)",
       "Bash(curl -sSL -o server-overview.md https://raw.githubusercontent.com/reddit/devvit-docs/main/versioned_docs/version-0.14/capabilities/server/overview.md)",
-      "Bash(node -e \"import\\('./game/campaign/manifest.js'\\).then\\(m=>console.log\\('stages:', \\(m.CAMPAIGN_STAGES||m.default?.CAMPAIGN_STAGES||[]\\).length\\)\\)\")"
+      "Bash(node -e \"import\\('./game/campaign/manifest.js'\\).then\\(m=>console.log\\('stages:', \\(m.CAMPAIGN_STAGES||m.default?.CAMPAIGN_STAGES||[]\\).length\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(timeout 90 npx devvit logs mini_racer_dev --json)",
+      "Bash(npx devvit *)",
+      "Bash(lsof -nP -iTCP:5678 -sTCP:LISTEN)",
+      "Bash(kill 41238 41213 42986 42965)",
+      "Bash(pkill -f \"devvit logs mini_racer_dev\")",
+      "Bash(pkill -f \"script -q /dev/null npx devvit\")",
+      "Bash(grep -v '^$')",
+      "Bash(node /private/tmp/claude-501/-Users-bpopa-Documents-DailyGP/d542eaf0-5b01-42b1-a863-99111290ec11/scratchpad/graph.mjs)",
+      "Bash(node -e \"const r=require\\('./unused-css-report.json'\\); for\\(const [k,v] of Object.entries\\(r\\)\\){ console.log\\('###',k\\); console.log\\('unusedClasses:', JSON.stringify\\(v.unusedClasses??v.unused??null\\)\\); console.log\\('unusedIds:', JSON.stringify\\(v.unusedIds??null\\)\\); console.log\\('dynamic:', JSON.stringify\\(v.dynamicClasses??null\\)\\); }\")",
+      "Bash(node -e \"const r=JSON.parse\\(require\\('fs'\\).readFileSync\\('unused-css-report.json','utf8'\\)\\); for\\(const [k,v] of Object.entries\\(r\\)\\){ console.log\\('###',k, Object.keys\\(v\\)\\); console.log\\(JSON.stringify\\(v,null,1\\).slice\\(0,1500\\)\\); }\")",
+      "Bash(node -e \"const r=JSON.parse\\(require\\('fs'\\).readFileSync\\('unused-css-report.json','utf8'\\)\\); console.log\\('styles.css unused classes:'\\); console.log\\(r['styles.css'].classes.unused.join\\('\\\\n'\\)\\); console.log\\('\\\\nstyles.css unused ids:', JSON.stringify\\(r['styles.css'].ids.unused\\)\\); console.log\\('\\\\ndynamic:', JSON.stringify\\(r['styles.css'].classes.dynamic\\)\\);\")",
+      "Bash(node /private/tmp/claude-501/-Users-bpopa-Documents-DailyGP/d542eaf0-5b01-42b1-a863-99111290ec11/scratchpad/css.mjs)",
+      "Bash(node -e *)",
+      "Bash(sort -t: -k3 -u)"
     ]
   }
 }
