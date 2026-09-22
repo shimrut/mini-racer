@@ -141,10 +141,11 @@ export function sanitizeDailyGpPodiumForPost(
         challengeDate: podium.challengeDate,
         trackName: podium.trackName,
         lapCount,
-        positions: positions.map((position) => ({
-            ...position,
-            avatarUrl: null,
-        })) as DailyGpPodiumPostData['positions'],
+        positions: [
+            { ...positions[0], avatarUrl: null },
+            { ...positions[1], avatarUrl: null },
+            { ...positions[2], avatarUrl: null },
+        ],
     };
 }
 

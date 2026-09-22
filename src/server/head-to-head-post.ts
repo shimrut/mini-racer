@@ -287,7 +287,8 @@ export async function resolveHeadToHeadRecord(
     context: HeadToHeadPostContext = {},
 ): Promise<HeadToHeadRecord | null> {
     const result = await resolveHeadToHeadRecordResult(challengeId, context);
-    if (result.ok) return result.record;
+    // `=== true`, not truthiness: with strictNullChecks off, only the literal comparison narrows the union.
+    if (result.ok === true) return result.record;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
         console.warn('Head to Head resolution failed.', {
             challengeId: challengeId || null,

@@ -211,7 +211,8 @@ export function validateDailyGpReplayDetailed({
         ? 0
         : replayPayload.rulesRevision;
     if (
-        !Number.isInteger(replayRulesRevision)
+        typeof replayRulesRevision !== 'number'
+        || !Number.isInteger(replayRulesRevision)
         || replayRulesRevision < 0
         || replayRulesRevision !== challengeRulesRevision
     ) {

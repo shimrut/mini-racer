@@ -15,7 +15,7 @@
     "login": "devvit login",
     "mapmaker": "vite --config vite.mapmaker.config.js --host 127.0.0.1",
     "predev": "npm run --silent kill:watchers && npm run generate:car-assets && npm run generate:share-images",
-    "pretest": "npm run generate:car-assets && npm run generate:share-images",
+    "pretest": "npm run typecheck && npm run generate:car-assets && npm run generate:share-images",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "test:watch": "vitest",

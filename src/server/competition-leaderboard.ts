@@ -349,7 +349,8 @@ type SharedStandingsPage = {
 function isSharedStandingsPage(value: unknown): value is SharedStandingsPage {
     if (!value || typeof value !== 'object') return false;
     const page = value as { leaderboardEntryCount?: unknown; rows?: unknown };
-    if (!Number.isInteger(page.leaderboardEntryCount) || page.leaderboardEntryCount! < 0) {
+    const count = page.leaderboardEntryCount;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
         return false;
     }
     return Array.isArray(page.rows) && page.rows.every((entry) => {

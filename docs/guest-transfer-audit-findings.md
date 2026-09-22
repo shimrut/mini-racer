@@ -406,6 +406,10 @@ Deferred, unchanged, and none of them in the transfer path:
 
 Clear those 23, then add `typecheck` to `pretest`.
 
+**Done 2026-09-22.** None of the 23 was a runtime bug. One went with the dead crash branch in
+`replay-validator.ts`. The other 22 were cleared with type-only edits, and `pretest` now runs
+`typecheck` first.
+
 ---
 
 # Downgraded — not a confirmed product bug

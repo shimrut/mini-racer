@@ -12,6 +12,7 @@ import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
+    type RedisLock,
 } from './redis-lock.js';
 import { encodeRedisCompressedValue } from './redis-compressed-value.js';
 import { normalizeLapCompletionTimesSec } from '../../game/shared/lap-completion-times.js';

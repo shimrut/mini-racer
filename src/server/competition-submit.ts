@@ -184,7 +184,7 @@ export async function submitCompetitionRun(
             competition,
             resolveRateLimitIdentity(playerId, redditUsername, requestRateLimitIdentity),
         );
-        if (!rateLimitResult.allowed) {
+        if (rateLimitResult.allowed === false) {
             return {
                 status: 429,
                 body: {
@@ -375,11 +375,12 @@ export async function submitCompetitionRun(
     }
 
     const storedEntry = boardPersistence!.value.entry;
-    const trackPbAvailable = trackPbPersistence!.status === 'fulfilled';
-    if (!trackPbAvailable) {
-        console.error('Challenge PB persistence failed after a valid run:', trackPbPersistence!.reason);
+    const trackPbSettled = trackPbPersistence!;
+    const trackPbAvailable = trackPbSettled.status === 'fulfilled';
+    if (trackPbSettled.status === 'rejected') {
+        console.error('Challenge PB persistence failed after a valid run:', trackPbSettled.reason);
     }
-    const trackPbResult = trackPbAvailable ? trackPbPersistence!.value : null;
+    const trackPbResult = trackPbSettled.status === 'fulfilled' ? trackPbSettled.value : null;
     if (
         trackPbResult?.record
         && isCompleteOpponentRecord(storedEntry, trackPbResult.record, competition)

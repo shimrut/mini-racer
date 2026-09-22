@@ -325,8 +325,9 @@ async function resolveChallengeRecord(
     context: HeadToHeadRequestContext,
 ): Promise<{ record: HeadToHeadRecord | null; reason?: string; diff?: Record<string, unknown> }> {
     const result = await resolveHeadToHeadRecordResult(challengeId, context);
-    if (result.ok) return { record: result.record };
-    const diff = !result.ok ? result.diff : undefined;
+    // `=== true`, not truthiness: with strictNullChecks off, only the literal comparison narrows the union.
+    if (result.ok === true) return { record: result.record };
+    const { diff } = result;
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
         console.warn('Head to Head resolution failed.', {
             challengeId: challengeId || null,
@@ -1054,7 +1055,7 @@ export function createHeadToHeadService(
         const rateLimit = await checkHeadToHeadSubmissionRateLimit(
             submissionRateLimitIdentity(viewer, context),
         );
-        if (!rateLimit.allowed) {
+        if (rateLimit.allowed === false) {
             return {
                 status: 429,
                 body: {

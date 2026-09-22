@@ -43,7 +43,7 @@ export type DailyGpChallenge = {
 };
 
 export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
-    return Number.isInteger(value) && value >= 1 && value <= 3;
+    return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 3;
 }
 
 /** Revision 0 predates the race contract and is always one lap; revision 1 is strict so a malformed record cannot become a different competition. */

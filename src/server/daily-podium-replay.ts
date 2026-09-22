@@ -236,9 +236,8 @@ export function resolveDailyPodiumReplayFromPost(
 ): DailyPodiumReplayEnvelope | null {
     const challengeId = typeof postData?.challengeId === 'string' ? postData.challengeId : '';
     if (!challengeId) return null;
-    const lapCount = postData?.podium?.lapCount === 2 || postData?.podium?.lapCount === 3
-        ? postData.podium.lapCount
-        : 1;
+    const storedLapCount = postData?.podium?.lapCount;
+    const lapCount: 1 | 2 | 3 = storedLapCount === 2 || storedLapCount === 3 ? storedLapCount : 1;
     const replayDataHash = typeof postData?.replayDataHash === 'string'
         ? postData.replayDataHash
         : undefined;
