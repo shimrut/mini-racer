@@ -618,8 +618,8 @@ describe('Campaign server store', () => {
         mockRedis.zCard.mockResolvedValue(ranked.length);
         mockRedis.zRange.mockImplementation(async (_key, start, stop, options) => {
             if (options?.by !== 'score') return ranked.slice(start, stop + 1);
-            const lo = options.reverse ? Number(stop) : Number(start);
-            const hi = options.reverse ? Number(start) : Number(stop);
+            const lo = Number(start);
+            const hi = Number(stop);
             if (lo > hi) return [];
             let rows = ranked.filter((row) => row.score >= lo && row.score <= hi)
                 .sort((a, b) => a.score - b.score || a.member.localeCompare(b.member));

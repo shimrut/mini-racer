@@ -1,3 +1,5 @@
+- Next rival was asking the board for times in the wrong order, so the finish button stayed on Improve after a win. It now asks from the slower time up to the player's time, and the button can switch to Next rival.
+
 - Three tracks join the Daily rotation: **Slate Circuit**, **Black Water**, and **Raven Rock**.
 
 - Upgraded the Devvit toolchain from 0.14.1 to 0.14.5. The releases in between are documentation, a fallback-text option this app does not use, CLI log fixes, and settings help-text line breaks. No game behavior changes.

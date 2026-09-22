@@ -195,11 +195,12 @@ async function prepareNextFasterOpponentRace({
     let fullWindows = 0;
 
     for (let window = 0; window < OPPONENT_WINDOW_LIMIT; window += 1) {
-        // BYSCORE REV: start is the inclusive maximum, stop is the inclusive minimum.
+        // Devvit keeps start as the low bound and stop as the high bound.
+        // reverse only turns the answer around. High-then-low returns nothing.
         const ranked = await redis.zRange(
             competition.leaderboardKey,
-            benchmarkTimeMs - 1,
             0,
+            benchmarkTimeMs - 1,
             {
                 by: 'score',
                 reverse: true,

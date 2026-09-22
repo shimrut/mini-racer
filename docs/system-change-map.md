@@ -522,7 +522,10 @@ flowchart LR
   raceable faster rival, whose rank and name ride in the accessible name. A
   failed lookup leaves the action alone. Next rival asks the board for the
   ten times just faster than the player's stored best, closest first, in at
-  most six windows of ten, then looks up that one rival's name and rank. A
+  most six windows of ten, then looks up that one rival's name and rank. The
+  time range is sent low then high. Devvit does not swap those bounds when
+  the answer is reversed; high-then-low comes back empty and the button stays
+  Improve. A
   standings row pick stays a single-row resolve and is not part of that walk.
 - An installed opponent survives the track load and reset a standings start
   performs on the way to its race, because that start almost always arrives

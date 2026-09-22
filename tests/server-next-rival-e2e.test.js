@@ -11,8 +11,8 @@ vi.mock('@devvit/redis', async () => {
     redis.zRangeCalls = [];
     const rawZRange = redis.zRange.bind(redis);
     redis.zRange = async (key, start, stop, options) => {
-        if (options?.by === 'score' && options?.reverse && Number(start) < Number(stop)) {
-            throw new Error(`REV BYSCORE bounds inverted (${start} then ${stop})`);
+        if (options?.by === 'score' && Number(start) > Number(stop)) {
+            throw new Error(`BYSCORE bounds inverted (${start} then ${stop}); Devvit answers nothing.`);
         }
         redis.zRangeCalls.push({
             key,
@@ -186,9 +186,9 @@ describe('next-rival finish-panel to Redis', () => {
         const windows = scoreWindows();
         expect(windows).toHaveLength(3);
         expect(windows.map((call) => [call.start, call.stop, call.offset])).toEqual([
-            [4999, 0, 0],
-            [4999, 0, 10],
-            [4999, 0, 20],
+            [0, 4999, 0],
+            [0, 4999, 10],
+            [0, 4999, 20],
         ]);
         expect(primaryActions.at(-1)).toMatchObject({
             label: 'Next rival',
@@ -215,7 +215,7 @@ describe('next-rival finish-panel to Redis', () => {
 
         const windows = scoreWindows();
         expect(windows).toHaveLength(6);
-        expect(windows.at(-1)).toMatchObject({ start: 4999, stop: 0, offset: 50 });
+        expect(windows.at(-1)).toMatchObject({ start: 0, stop: 4999, offset: 50 });
         expect(primaryActions.at(-1)).toMatchObject({ label: 'Improve' });
         expect(infoSpy.mock.calls.some((call) => String(call[0]).includes('60-rival cap'))).toBe(true);
     });
@@ -279,9 +279,9 @@ describe('next-rival finish-panel to Redis', () => {
             call.key === daily.competition.leaderboardKey
         ));
         expect(windows.map((call) => [call.start, call.stop, call.offset])).toEqual([
-            [4999, 0, 0],
-            [4999, 0, 10],
-            [4999, 0, 20],
+            [0, 4999, 0],
+            [0, 4999, 10],
+            [0, 4999, 20],
         ]);
         expect(primaryActions.at(-1)).toMatchObject({
             label: 'Next rival',
