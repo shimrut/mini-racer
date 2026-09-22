@@ -5,15 +5,11 @@ import {
     buildModalRunsPayload,
     buildModalRunsViewOptions,
     buildModalDeltaDisplay,
-    buildModalStatsPlan,
     buildScoreboardRankDisplay,
     createModalActions,
-    formatCombinedRankOutOf,
-    getCombinedRankNumber,
     buildLapRecord,
     isNewBestResult,
     pushRecentLap,
-    scheduleModalScoreboardRefresh
 } from '../game/race/result-flow.js';
 
 describe('result-flow helpers', () => {
@@ -421,159 +417,6 @@ describe('result-flow helpers', () => {
         });
     });
 
-    it('formats combined rank as "x out of y" when snapshot has rank and total', () => {
-        expect(formatCombinedRankOutOf(null)).toBe('--');
-        expect(formatCombinedRankOutOf('bad')).toBe('--');
-        expect(formatCombinedRankOutOf({ isLoading: true, playerRank: 2, totalCount: 10 })).toBe('--');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 3,
-            totalCount: 120
-        })).toBe('3 out of 120');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            currentPlayerRow: { rank: 5 },
-            totalCount: 99
-        })).toBe('5 out of 99');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 2,
-            totalCount: 0,
-            playerRankLabel: '#2'
-        })).toBe('#2');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 2,
-            totalCount: -3,
-            playerRankLabel: '  #2  '
-        })).toBe('#2');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 4,
-            totalCount: Number.NaN
-        })).toBe('#4');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: null,
-            totalCount: 10,
-            playerRankLabel: '  Top 10%  '
-        })).toBe('Top 10%');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 0,
-            totalCount: 10,
-            playerRankLabel: '   '
-        })).toBe('--');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 1,
-            totalCount: 1.9
-        })).toBe('1 out of 1');
-    });
-
-    it('extracts numeric combined rank from labels and rejects non-positive ranks', () => {
-        expect(getCombinedRankNumber(null)).toBe(null);
-        expect(getCombinedRankNumber('x')).toBe(null);
-        expect(getCombinedRankNumber({ isLoading: true, playerRank: 2 })).toBe(null);
-        expect(getCombinedRankNumber({ isLoading: false, playerRank: 0 })).toBe(null);
-        expect(getCombinedRankNumber({ isLoading: false, playerRank: -2 })).toBe(null);
-        expect(getCombinedRankNumber({ isLoading: false, playerRank: 3.9 })).toBe(3);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            currentPlayerRow: { rank: 5.2 }
-        })).toBe(5);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            currentPlayerRow: { rank: 0 }
-        })).toBe(null);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '12'
-        })).toBe(12);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '  #9  '
-        })).toBe(9);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: 'n/a'
-        })).toBe(null);
-    });
-
-    it('builds modal stats plans for pause and win summaries', () => {
-        expect(buildModalStatsPlan(null)).toBe(null);
-        expect(buildModalStatsPlan('bad')).toBe(null);
-        expect(buildModalStatsPlan({
-            variant: 'daily-pause',
-            lapTime: 50.1,
-            bestTime: 48.35,
-            deltaToBest: 1.75,
-            primaryStatLabel: 'Race Time'
-        })).toEqual({
-            kind: 'hide',
-            display: 'none',
-            hasRuns: null,
-            args: [],
-            rankSnapshot: null
-        });
-
-        expect(buildModalStatsPlan({
-            hideStats: true,
-            lapTime: 50
-        })).toEqual({
-            kind: 'hide',
-            display: 'none',
-            hasRuns: null,
-            args: []
-        });
-
-        expect(buildModalStatsPlan({
-            lapTime: 48.35,
-            bestTime: null,
-            isNewBest: true,
-            primaryStatLabel: 'Race Time',
-            scoreboardSnapshot: { isLoading: true },
-            lapTimesArray: [48.35],
-            lapMedal: 'gold'
-        })).toEqual({
-            kind: 'win',
-            display: 'grid',
-            hasRuns: 'true',
-            args: [48.35, null, 'Race Time'],
-            rankSnapshot: { isLoading: true },
-            showDelta: false,
-            lapMedal: 'gold'
-        });
-
-        expect(buildModalStatsPlan({
-            isNewBest: true,
-            bestTime: 40,
-            lapTimesArray: null
-        })).toEqual({
-            kind: 'win',
-            display: 'grid',
-            hasRuns: '',
-            args: [40, null, 'Lap Time'],
-            rankSnapshot: null,
-            showDelta: false,
-            lapMedal: null
-        });
-
-        expect(buildModalStatsPlan({
-            lapTime: 50.2,
-            bestTime: 48.35,
-            lapTimesArray: []
-        })).toEqual({
-            kind: 'win',
-            display: 'grid',
-            hasRuns: '',
-            args: [50.2, 1.8500000000000014, 'Lap Time'],
-            rankSnapshot: null,
-            showDelta: true,
-            lapMedal: null
-        });
-    });
-
     it('normalizes modal runs payloads from lap data and explicit runs data', () => {
         expect(buildModalRunsPayload(null, { currentTrackKey: 'circuit' })).toBe(null);
 
@@ -708,61 +551,6 @@ describe('result-flow helpers', () => {
         });
     });
 
-    it('waits for pending work before refreshing modal scoreboard data', async () => {
-        const order = [];
-        let resolvePending;
-        const pendingPromise = new Promise((resolve) => {
-            resolvePending = () => {
-                order.push('pending');
-                resolve();
-            };
-        });
-        const applySnapshot = vi.fn((snapshot) => {
-            order.push(snapshot.label);
-        });
-
-        const refreshPromise = scheduleModalScoreboardRefresh({
-            pendingPromise,
-            loadSnapshot: async () => {
-                order.push('load');
-                return { label: 'snapshot' };
-            },
-            isStillCurrent: () => true,
-            applySnapshot,
-            logError: 'refresh failed'
-        });
-
-        resolvePending();
-        await refreshPromise;
-
-        expect(order).toEqual(['pending', 'load', 'snapshot']);
-        expect(applySnapshot).toHaveBeenCalledWith({ label: 'snapshot' });
-    });
-
-    it('returns snapshots without applying when refresh is stale or has no applier', async () => {
-        const applySnapshot = vi.fn();
-
-        await expect(scheduleModalScoreboardRefresh({
-            loadSnapshot: async () => ({ label: 'default-current' }),
-            applySnapshot
-        })).resolves.toEqual({ label: 'default-current' });
-
-        expect(applySnapshot).toHaveBeenCalledWith({ label: 'default-current' });
-        applySnapshot.mockClear();
-
-        await expect(scheduleModalScoreboardRefresh({
-            loadSnapshot: async () => ({ label: 'stale' }),
-            isStillCurrent: () => false,
-            applySnapshot
-        })).resolves.toEqual({ label: 'stale' });
-
-        expect(applySnapshot).not.toHaveBeenCalled();
-
-        await expect(scheduleModalScoreboardRefresh({
-            loadSnapshot: async () => ({ label: 'no-applier' })
-        })).resolves.toEqual({ label: 'no-applier' });
-    });
-
     it('builds modal action bundles and exact delta thresholds', () => {
         const restart = () => {};
         const primary = () => {};
@@ -801,7 +589,7 @@ describe('result-flow helpers', () => {
         });
     });
 
-    it('covers remaining rank-display branches and combined rank fallbacks', () => {
+    it('covers remaining rank-display branches', () => {
         expect(buildScoreboardRankDisplay({
             playerRankLabel: '#4',
             verificationState: 'pending',
@@ -822,63 +610,6 @@ describe('result-flow helpers', () => {
         expect(buildScoreboardRankDisplay({
             statusText: '  Verifying...  '
         }).labelText).toBe('Verifying rank');
-
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 6,
-            totalCount: null,
-            playerRankLabel: ''
-        })).toBe('#6');
-
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '#15'
-        })).toBe(15);
-    });
-
-    it('uses lap-time fallback for new-best stats and empty lap arrays', () => {
-        expect(buildModalStatsPlan({
-            isNewBest: true,
-            bestTime: 41.2,
-            lapTimesArray: [],
-            primaryStatLabel: 'Race Time'
-        })).toMatchObject({
-            hasRuns: '',
-            args: [41.2, null, 'Race Time']
-        });
-
-        expect(buildModalStatsPlan({
-            isNewBest: true,
-            lapTime: 39.8,
-            bestTime: 41.2,
-            lapTimesArray: [39.8],
-            scoreboardSnapshot: { playerRank: 1 }
-        })).toMatchObject({
-            hasRuns: 'true',
-            args: [39.8, null, 'Lap Time'],
-            showDelta: false
-        });
-    });
-
-    it('marks non-new-best wins without lap history as having no runs', () => {
-        const plan = buildModalStatsPlan({
-            lapTime: 42.5,
-            bestTime: 40.1,
-            lapTimesArray: [],
-            primaryStatLabel: 'Lap Time',
-        });
-
-        expect(plan).toMatchObject({
-            kind: 'win',
-            display: 'grid',
-            hasRuns: '',
-            rankSnapshot: null,
-            showDelta: true,
-            lapMedal: null,
-        });
-        expect(plan.args[0]).toBe(42.5);
-        expect(plan.args[1]).toBeCloseTo(2.4, 5);
-        expect(plan.args[2]).toBe('Lap Time');
     });
 
     it('preserves leaderboard callbacks and day selectors in modal payloads', () => {
@@ -967,56 +698,6 @@ describe('result-flow helpers', () => {
             submissionStage: ' VERIFYING ',
             statusText: 'Verifying...',
         }).labelText).toBe('Verifying rank');
-    });
-
-    it('returns null when no loader is configured and logs refresh errors', async () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        await expect(scheduleModalScoreboardRefresh()).resolves.toBe(null);
-        expect(consoleError).not.toHaveBeenCalled();
-
-        const error = new Error('network failed');
-        await expect(scheduleModalScoreboardRefresh({
-            loadSnapshot: async () => {
-                throw error;
-            },
-            logError: 'custom refresh failure'
-        })).resolves.toBe(null);
-
-        expect(consoleError).toHaveBeenCalledWith('custom refresh failure', error);
-
-        const defaultError = new Error('default failure');
-        await expect(scheduleModalScoreboardRefresh({
-            loadSnapshot: async () => {
-                throw defaultError;
-            }
-        })).resolves.toBe(null);
-
-        expect(consoleError).toHaveBeenCalledWith('Error refreshing modal scoreboard data', defaultError);
-    });
-
-    it('formats combined rank with total count and falls back to labels without totals', () => {
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 3,
-            totalCount: 120,
-        })).toBe('3 out of 120');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 0,
-            totalCount: 10,
-        })).toBe('--');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 4,
-            totalCount: 0,
-            playerRankLabel: '  #4  ',
-        })).toBe('#4');
-        expect(formatCombinedRankOutOf({
-            isLoading: true,
-            playerRank: 2,
-            totalCount: 10,
-        })).toBe('--');
     });
 
     it('treats hasOwnValue as false for null update sources', () => {

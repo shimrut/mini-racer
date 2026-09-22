@@ -26,6 +26,12 @@ The removals run on branch `chore/dead-code-removal`, one commit per phase, in o
   gone. `npm run analyze:css` reports 3 unused classes, down from 8. The 3 are the known
   false positives in §10. The built CSS holds none of the removed selectors. The lobby and
   the Campaign toolbar and carousel look unchanged.
+- **Phase 4 — done.** `formatCombinedRankOutOf`, `buildModalStatsPlan`, and
+  `scheduleModalScoreboardRefresh` (§12), plus `getCombinedRankNumber`. Its only production
+  caller was `formatCombinedRankOutOf`, so the "used inside its own file" check had hidden
+  it. The live modal reads `playerRankLabel` directly, and the `ui-modal-*` tests cover it.
+  18 test blocks that only exercised these functions went. One mixed block keeps its
+  `buildScoreboardRankDisplay` checks.
 
 The last full audit ran on 2026-08-01. That audit found no dead module files. This audit
 repeats the file check and adds five more checks: exported names, engine methods, CSS

@@ -3,10 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     buildModalRunsPayload,
     buildScoreboardRankDisplay,
-    formatCombinedRankOutOf,
-    getCombinedRankNumber,
     pushRecentLap,
-    scheduleModalScoreboardRefresh,
 } from '../game/race/result-flow.js';
 import {
     clearDailyChallengeBestTime,
@@ -112,30 +109,6 @@ describe('mutation soft spots wave 6', () => {
             });
         });
 
-        it('formats combined rank from currentPlayerRow and trims custom labels without totals', () => {
-            expect(getCombinedRankNumber({
-                isLoading: false,
-                currentPlayerRow: { rank: 8 },
-            })).toBe(8);
-            expect(formatCombinedRankOutOf({
-                isLoading: false,
-                currentPlayerRow: { rank: 8 },
-                totalCount: 200,
-            })).toBe('8 out of 200');
-            expect(formatCombinedRankOutOf({
-                isLoading: false,
-                playerRank: 5,
-                totalCount: Number.NaN,
-                playerRankLabel: '  #5  ',
-            })).toBe('#5');
-            expect(formatCombinedRankOutOf({
-                isLoading: false,
-                playerRank: 5,
-                totalCount: -10,
-                playerRankLabel: '',
-            })).toBe('#5');
-        });
-
         it('keeps recent laps at the max boundary and ignores invalid update objects', () => {
             const laps = [{ lapNumber: 1 }, { lapNumber: 2 }, { lapNumber: 3 }];
             pushRecentLap(laps, { lapNumber: 4 }, 4);
@@ -168,25 +141,6 @@ describe('mutation soft spots wave 6', () => {
             });
         });
 
-        it('loads modal scoreboard snapshots without awaiting a missing pending promise', async () => {
-            const order = [];
-            const snapshot = await scheduleModalScoreboardRefresh({
-                pendingPromise: null,
-                loadSnapshot: async () => {
-                    order.push('load');
-                    return { playerRank: 2 };
-                },
-                isStillCurrent: () => {
-                    order.push('current');
-                    return true;
-                },
-                applySnapshot: () => {
-                    order.push('apply');
-                },
-            });
-            expect(order).toEqual(['load', 'current', 'apply']);
-            expect(snapshot).toEqual({ playerRank: 2 });
-        });
     });
 
     describe('verification-queue', () => {

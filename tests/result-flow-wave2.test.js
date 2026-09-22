@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     buildModalDeltaDisplay,
-    buildModalStatsPlan,
     buildScoreboardRankDisplay,
-    getCombinedRankNumber,
     isNewBestResult,
 } from '../game/race/result-flow.js';
 
@@ -33,25 +31,6 @@ describe('result-flow wave 2', () => {
         });
     });
 
-    it('parses combined rank numbers from labels and current player rows', () => {
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRank: 4,
-        })).toBe(4);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            currentPlayerRow: { rank: 7 },
-        })).toBe(7);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '#12',
-        })).toBe(12);
-        expect(getCombinedRankNumber({
-            isLoading: true,
-            playerRank: 2,
-        })).toBeNull();
-    });
-
     it('labels pending, retrying, and submitting verification stages distinctly', () => {
         expect(buildScoreboardRankDisplay({
             playerRankLabel: '#3',
@@ -65,17 +44,6 @@ describe('result-flow wave 2', () => {
             playerRankLabel: '#3',
             submissionStage: 'submitting',
         }).labelText).toBe('Submitting rank');
-    });
-
-    it('hides daily-pause stats and empty-run plans', () => {
-        expect(buildModalStatsPlan({ variant: 'daily-pause' })).toEqual({
-            kind: 'hide',
-            display: 'none',
-            hasRuns: null,
-            args: [],
-            rankSnapshot: null,
-        });
-        expect(buildModalStatsPlan(null)).toBeNull();
     });
 
     it('rejects equal-time bests and non-finite candidate times', () => {

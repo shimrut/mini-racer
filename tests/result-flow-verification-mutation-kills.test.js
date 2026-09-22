@@ -3,13 +3,9 @@ import {
     buildLapRecord,
     buildModalDeltaDisplay,
     buildModalRunsPayload,
-    buildModalStatsPlan,
     buildScoreboardRankDisplay,
-    formatCombinedRankOutOf,
-    getCombinedRankNumber,
     isNewBestResult,
     pushRecentLap,
-    scheduleModalScoreboardRefresh,
 } from '../game/race/result-flow.js';
 import {
     clearDailyChallengeVerification,
@@ -133,80 +129,6 @@ describe('result-flow mutation kills', () => {
         }).labelText).toBe('Rank pending');
     });
 
-    it('parses rank labels only when the full label matches the anchored pattern', () => {
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '#12',
-        })).toBe(12);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '12',
-        })).toBe(12);
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: '#12th',
-        })).toBeNull();
-        expect(getCombinedRankNumber({
-            isLoading: false,
-            playerRankLabel: 'rank #12',
-        })).toBeNull();
-    });
-
-    it('formats combined rank only when both rank and total are strictly positive', () => {
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 3,
-            totalCount: 120,
-        })).toBe('3 out of 120');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 1,
-            totalCount: 1,
-        })).toBe('1 out of 1');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 0,
-            totalCount: 10,
-        })).toBe('--');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: 4,
-            totalCount: 0,
-            playerRankLabel: '',
-        })).toBe('#4');
-        expect(formatCombinedRankOutOf({
-            isLoading: false,
-            playerRank: null,
-            totalCount: 10,
-            playerRankLabel: '  ',
-        })).toBe('--');
-    });
-
-    it('guards non-object snapshots and loading state for combined rank formatting', () => {
-        expect(formatCombinedRankOutOf(undefined)).toBe('--');
-        expect(formatCombinedRankOutOf({ isLoading: true, playerRank: 2, totalCount: 5 })).toBe('--');
-        expect(getCombinedRankNumber(undefined)).toBeNull();
-        expect(getCombinedRankNumber({ isLoading: true, playerRank: 2 })).toBeNull();
-    });
-
-    it('marks non-new-best wins without lap history as having no runs', () => {
-        const withoutArray = buildModalStatsPlan({
-            lapTime: 41,
-            bestTime: 40,
-            isNewBest: false,
-        });
-        expect(withoutArray.hasRuns).toBe('');
-        expect(withoutArray.showDelta).toBe(true);
-
-        const withEmptyArray = buildModalStatsPlan({
-            lapTime: 41,
-            bestTime: 40,
-            lapTimesArray: [],
-            isNewBest: false,
-        });
-        expect(withEmptyArray.hasRuns).toBe('');
-    });
-
     it('rejects null sources and only applies own update properties', () => {
         expect(buildModalRunsPayload(null)).toBeNull();
         expect(buildModalRunsPayload('bad')).toBeNull();
@@ -246,34 +168,6 @@ describe('result-flow mutation kills', () => {
             scoreboardSnapshot: null,
             bestTime: 20,
         });
-    });
-
-    it('awaits a pending promise before loading modal scoreboard snapshots', async () => {
-        const order = [];
-        let resolvePending;
-        const pendingPromise = new Promise((resolve) => {
-            resolvePending = () => {
-                order.push('pending');
-                resolve();
-            };
-        });
-
-        const refreshPromise = scheduleModalScoreboardRefresh({
-            pendingPromise,
-            loadSnapshot: async () => {
-                order.push('load');
-                return { label: 'snapshot' };
-            },
-            isStillCurrent: () => true,
-            applySnapshot: () => {
-                order.push('apply');
-            },
-        });
-
-        expect(order).toEqual([]);
-        resolvePending();
-        await refreshPromise;
-        expect(order).toEqual(['pending', 'load', 'apply']);
     });
 
     it('rejects equal-time bests and missing policy or candidate objects', () => {
