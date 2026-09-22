@@ -117,8 +117,6 @@ describe('updateSimulation — daily challenge wall impacts', () => {
 
         const events = updateSimulation(state, 1 / 60, CONFIG, TEST_TRACK, WALL_X5);
         expect(events.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
-        expect(events.challengeFailed).toBe(false);
-        expect(events.challengeFailureReason).toBeNull();
         expect(state.status).toBe('playing');
     });
 

@@ -399,7 +399,7 @@ describe('server replay validator', () => {
         expect(scraped.run.bestTimeSec).toBeGreaterThan(clean.run.bestTimeSec);
     });
 
-    it('does not classify a replay with a 150+ KPH wall impact as crashed', () => {
+    it('keeps racing through a 150+ KPH wall impact until the replay runs out', () => {
         const outcome = validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: HEAD_ON_WALL_TRACK,
@@ -409,7 +409,7 @@ describe('server replay validator', () => {
         });
 
         expect(outcome.ok).toBe(false);
-        expect(outcome.failure.reason).not.toBe('crashed');
+        expect(outcome.failure.reason).toBe('no_finish');
         expect(outcome.failure.status).toBe('playing');
     });
 

@@ -1241,7 +1241,7 @@ describe('server daily gp store submissions', () => {
         const challenge = await getServerDailyGpChallenge();
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: false,
-            failure: { reason: 'crashed' },
+            failure: { reason: 'no_finish' },
         });
 
         const result = await submitServerDailyGpRun({
@@ -1264,8 +1264,8 @@ describe('server daily gp store submissions', () => {
             body: {
                 accepted: false,
                 error: 'Submission replay validation failed.',
-                reason: 'crashed',
-                strictReplayFailureReason: 'crashed',
+                reason: 'no_finish',
+                strictReplayFailureReason: 'no_finish',
             },
         });
     });

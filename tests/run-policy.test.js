@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     createRunPolicy,
-    handleFinishCrossing,
-    handleHardCrash
+    handleFinishCrossing
 } from '../game/race/run-policy.js';
 import { raceEngineMethods } from '../game/race/engine-methods.js';
 
@@ -24,37 +23,14 @@ function createDailyState(overrides = {}) {
 }
 
 describe('run-policy daily challenge parity', () => {
-    it('preserves a completed daily challenge win when a crash happens in the same frame', () => {
+    it('marks a completed daily challenge as won', () => {
         const state = createDailyState();
         const policy = createRunPolicy({ challengeRun: state.currentChallengeRun });
 
         const finishResult = handleFinishCrossing(state, policy, 0);
-        const crashResult = handleHardCrash(state, policy, 0);
 
         expect(finishResult.winTriggered).toBe(true);
         expect(state.status).toBe('won');
-        expect(crashResult).toEqual({});
-    });
-
-    it('still fails unfinished daily challenges on hard crash', () => {
-        const state = createDailyState({
-            currentChallengeRun: {
-                objectiveType: 'multi_lap_total',
-                requiredLaps: 3,
-                completedLaps: 1,
-                lastLapAt: 4
-            }
-        });
-        const policy = createRunPolicy({ challengeRun: state.currentChallengeRun });
-
-        const crashResult = handleHardCrash(state, policy, 0);
-
-        expect(state.status).toBe('crashed');
-        expect(crashResult).toEqual({
-            challengeFailed: true,
-            challengeFailureReason: 'Crash ended the challenge',
-            crashEndedRun: true
-        });
     });
 
     it('records the finish time on the first lap only after a collision restart', () => {

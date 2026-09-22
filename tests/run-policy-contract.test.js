@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     createRunPolicy,
     handleFinishCrossing,
-    handleHardCrash,
     resolveRunPolicy
 } from '../game/race/run-policy.js';
 
@@ -148,7 +147,7 @@ describe('run-policy contracts', () => {
         expect(state.status).toBe('won');
     });
 
-    it('requires both daily policy and active challenge state for daily handling', () => {
+    it('finishes a one-lap challenge on its first crossing', () => {
         const challengeRun = {
             objectiveType: 'single_lap_fastest',
             requiredLaps: 1,
@@ -163,26 +162,5 @@ describe('run-policy contracts', () => {
         const regularFinish = handleFinishCrossing(stateWithChallenge, regularPolicy, 4);
         expect(regularFinish.winTriggered).toBe(true);
         expect(regularFinish.winData.completedLaps).toBe(1);
-
-        const crashState = createPolicyState({
-            currentChallengeRun: challengeRun,
-            currentTime: 6
-        });
-        expect(handleHardCrash(crashState, regularPolicy, 4)).toEqual({
-            challengeFailed: true,
-            challengeFailureReason: 'Crash ended the challenge',
-            crashEndedRun: true
-        });
-        expect(crashState.status).toBe('crashed');
-
-        const dailyPolicy = createRunPolicy({ challengeRun });
-        const stateWithoutChallenge = createPolicyState({
-            currentChallengeRun: null,
-            currentTime: 6
-        });
-        expect(handleHardCrash(stateWithoutChallenge, dailyPolicy, 4)).toEqual({
-            crashEndedRun: true
-        });
-        expect(stateWithoutChallenge.status).toBe('crashed');
     });
 });

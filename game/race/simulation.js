@@ -24,11 +24,7 @@ const _events = {
     challengeProgressLaps: 0,
     challengeRequiredLaps: 0,
     challengeIsFinalLap: false,
-    challengeFailed: false,
-    challengeFailureReason: null,
     wallImpact: null,
-    crashImpact: null,
-    crashEndedRun: false,
     checkpointPassed: null
 };
 
@@ -41,11 +37,7 @@ function resetEvents() {
     _events.challengeProgressLaps = 0;
     _events.challengeRequiredLaps = 0;
     _events.challengeIsFinalLap = false;
-    _events.challengeFailed = false;
-    _events.challengeFailureReason = null;
     _events.wallImpact = null;
-    _events.crashImpact = null;
-    _events.crashEndedRun = false;
     _events.checkpointPassed = null;
 }
 

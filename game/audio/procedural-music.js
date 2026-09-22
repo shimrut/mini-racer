@@ -482,8 +482,6 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         let cutoff = 15000;
         if (status === 'paused') {
             cutoff = 360;
-        } else if (status === 'crashed') {
-            cutoff = 260;
         } else if (status === 'starting') {
             cutoff = 600;
         } else if (status === 'ready') {

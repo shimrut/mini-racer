@@ -286,12 +286,6 @@ export function validateDailyGpReplayDetailed({
                 angle: state.angle,
             });
 
-            if (events.crashEndedRun || state.status === 'crashed') {
-                return {
-                    ok: false,
-                    failure: getStateFailureDetails('crashed', state, frameCount),
-                };
-            }
             if (
                 events.challengeLapCompleted
                 && Number.isFinite(events.challengeElapsedTime)

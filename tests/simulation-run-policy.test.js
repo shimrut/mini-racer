@@ -46,7 +46,6 @@ describe('updateSimulation — regular runs', () => {
 
         const events = updateSimulation(state, 1 / 60, CONFIG, TEST_TRACK, WALL_X5);
         expect(events.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
-        expect(events.crashEndedRun).toBe(false);
         expect(state.status).toBe('playing');
     });
 
@@ -67,7 +66,6 @@ describe('updateSimulation — regular runs', () => {
             WALL_X5
         );
 
-        expect(events.crashEndedRun).toBe(false);
         expect(state.status).toBe('playing');
         expect(state.pos.x).toBeLessThan(5);
         expect(state.velocity.x).toBeLessThan(0);

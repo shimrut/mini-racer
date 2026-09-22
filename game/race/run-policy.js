@@ -63,18 +63,3 @@ export function handleFinishCrossing(state, policy, checkpointCount, crossingTim
     return result;
 
 }
-
-export function handleHardCrash(state, policy, checkpointCount) {
-    const challengeRun = state.currentChallengeRun || null;
-
-    if (state.status === 'won') {
-        return {};
-    }
-    state.status = 'crashed';
-    const result = { crashEndedRun: true };
-    if (challengeRun) {
-        result.challengeFailed = true;
-        result.challengeFailureReason = 'Crash ended the challenge';
-    }
-    return result;
-}

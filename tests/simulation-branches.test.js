@@ -783,11 +783,7 @@ describe('updateSimulation — event snapshot and config fallbacks', () => {
         expect(idleEvents.challengeLapCompleted).toBe(false);
         expect(idleEvents.challengeCompletedLapTime).toBeNull();
         expect(idleEvents.challengeProgressLaps).toBe(0);
-        expect(idleEvents.challengeFailed).toBe(false);
-        expect(idleEvents.challengeFailureReason).toBeNull();
         expect(idleEvents.wallImpact).toBeNull();
-        expect(idleEvents.crashImpact).toBeNull();
-        expect(idleEvents.crashEndedRun).toBe(false);
         expect(idleEvents.checkpointPassed).toBeNull();
     });
 
@@ -1726,11 +1722,7 @@ describe('updateSimulation — mutation-survivor precision', () => {
         expect(idleEvents.challengeLapCompleted).toBe(false);
         expect(idleEvents.challengeCompletedLapTime).toBeNull();
         expect(idleEvents.challengeProgressLaps).toBe(0);
-        expect(idleEvents.challengeFailed).toBe(false);
-        expect(idleEvents.challengeFailureReason).toBeNull();
         expect(idleEvents.wallImpact).toBeNull();
-        expect(idleEvents.crashImpact).toBeNull();
-        expect(idleEvents.crashEndedRun).toBe(false);
         expect(idleEvents.checkpointPassed).toBeNull();
     });
 });
@@ -2041,11 +2033,7 @@ describe('updateSimulation — collision-hash and lifecycle precision', () => {
             challengeProgressLaps: active.challengeProgressLaps,
             challengeRequiredLaps: active.challengeRequiredLaps,
             challengeIsFinalLap: active.challengeIsFinalLap,
-            challengeFailed: active.challengeFailed,
-            challengeFailureReason: active.challengeFailureReason,
             wallImpact: active.wallImpact,
-            crashImpact: active.crashImpact,
-            crashEndedRun: active.crashEndedRun,
             checkpointPassed: active.checkpointPassed
         };
 
@@ -2065,11 +2053,7 @@ describe('updateSimulation — collision-hash and lifecycle precision', () => {
             challengeProgressLaps: 0,
             challengeRequiredLaps: 0,
             challengeIsFinalLap: false,
-            challengeFailed: false,
-            challengeFailureReason: null,
             wallImpact: null,
-            crashImpact: null,
-            crashEndedRun: false,
             checkpointPassed: null
         });
     });

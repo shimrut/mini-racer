@@ -61,14 +61,14 @@ describe('server replay validator branch coverage', () => {
         mockUpdateSimulation.mockReset();
     });
 
-    it('rejects crashed simulations with rounded failure details', () => {
+    it('rejects a run that stops early with rounded failure details', () => {
         mockUpdateSimulation.mockImplementation((state) => {
-            state.status = 'crashed';
+            state.status = 'paused';
             state.currentTime = 1.23456;
             state.nextCheckpointIndex = 2.9;
             state.pos = { x: 1.23456, y: -9.87654 };
             state.cachedSpeed = 12.3456;
-            return { crashEndedRun: true, winTriggered: false };
+            return { winTriggered: false };
         });
 
         const outcome = validateDailyGpReplayDetailed({
@@ -82,11 +82,11 @@ describe('server replay validator branch coverage', () => {
         expect(outcome).toEqual({
             ok: false,
             failure: {
-                reason: 'crashed',
+                reason: 'ended_before_replay_finished',
                 frameCount: 3,
                 simulatedTimeSec: 1.235,
                 checkpointIndex: 2,
-                status: 'crashed',
+                status: 'paused',
                 position: { x: 1.235, y: -9.877 },
                 speed: 12.346,
             },
@@ -119,50 +119,6 @@ describe('server replay validator branch coverage', () => {
         expect(history.last()).toBe(null);
     });
 
-    it('treats crashEndedRun alone as a crash even when status is still playing', () => {
-        mockUpdateSimulation.mockImplementation((state) => {
-            state.status = 'playing';
-            state.currentTime = 0.5;
-            state.pos = { x: 1, y: 2 };
-            state.cachedSpeed = 3;
-            return { crashEndedRun: true, winTriggered: false };
-        });
-
-        const outcome = validateDailyGpReplayDetailed({
-            challenge: CHALLENGE,
-            track: TRACK,
-            replay: {
-                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
-            },
-        });
-
-        expect(outcome.ok).toBe(false);
-        expect(outcome.failure.reason).toBe('crashed');
-        expect(outcome.failure.status).toBe('playing');
-    });
-
-    it('treats status crashed alone as a crash even when crashEndedRun is false', () => {
-        mockUpdateSimulation.mockImplementation((state) => {
-            state.status = 'crashed';
-            state.currentTime = 0.5;
-            state.pos = { x: 1, y: 2 };
-            state.cachedSpeed = 3;
-            return { crashEndedRun: false, winTriggered: false };
-        });
-
-        const outcome = validateDailyGpReplayDetailed({
-            challenge: CHALLENGE,
-            track: TRACK,
-            replay: {
-                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
-            },
-        });
-
-        expect(outcome.ok).toBe(false);
-        expect(outcome.failure.reason).toBe('crashed');
-        expect(outcome.failure.status).toBe('crashed');
-    });
-
     it('omits non-finite failure details instead of inventing values', () => {
         mockUpdateSimulation.mockImplementation((state) => {
             state.status = 99;
@@ -170,22 +126,22 @@ describe('server replay validator branch coverage', () => {
             state.nextCheckpointIndex = Number.NaN;
             state.pos = { x: Number.NaN, y: 5.5 };
             state.cachedSpeed = Number.POSITIVE_INFINITY;
-            return { crashEndedRun: true, winTriggered: false };
+            return { winTriggered: false };
         });
 
         const outcome = validateDailyGpReplayDetailed({
             challenge: CHALLENGE,
             track: TRACK,
             replay: {
-                inputs: [{ frames: 1, left: false, right: false, relaunchDelay: false }],
+                inputs: [{ frames: 2, left: false, right: false, relaunchDelay: false }],
             },
         });
 
         expect(outcome).toEqual({
             ok: false,
             failure: {
-                reason: 'crashed',
-                frameCount: 1,
+                reason: 'ended_before_replay_finished',
+                frameCount: 2,
             },
         });
     });
@@ -196,7 +152,7 @@ describe('server replay validator branch coverage', () => {
             state.currentTime = 0.05;
             state.pos = { x: 5, y: -34 };
             state.cachedSpeed = 0;
-            return { crashEndedRun: false, winTriggered: false };
+            return { winTriggered: false };
         });
 
         const outcome = validateDailyGpReplayDetailed({
@@ -219,7 +175,6 @@ describe('server replay validator branch coverage', () => {
             state.currentTime = 2;
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
                 winData: { lapTime: Number.NaN, completedLaps: 1 },
             };
@@ -243,7 +198,6 @@ describe('server replay validator branch coverage', () => {
             state.currentTime = 2;
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
             };
         });
@@ -268,7 +222,6 @@ describe('server replay validator branch coverage', () => {
             state.lapCheckpointTimesSec = [1.25, 2.5];
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
                 winData: { lapTime: 3.4567, completedLaps: 1.9 },
             };
@@ -305,7 +258,6 @@ describe('server replay validator branch coverage', () => {
             state.angle = 1.5;
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
                 winData: { lapTime: dt, completedLaps: 1 },
             };
@@ -330,7 +282,6 @@ describe('server replay validator branch coverage', () => {
             state.lapCheckpointTimesSec = [];
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
                 winData: { lapTime: 2.5, completedLaps: 1 },
             };
@@ -354,7 +305,6 @@ describe('server replay validator branch coverage', () => {
             state.currentTime = 2.5;
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 winTriggered: true,
                 winData: { lapTime: 2.5 },
             };
@@ -384,7 +334,6 @@ describe('server replay validator branch coverage', () => {
             state.currentChallengeRun.lastLapAt = state.currentTime;
             if (frame < lapCount) {
                 return {
-                    crashEndedRun: false,
                     challengeLapCompleted: true,
                     challengeElapsedTime: state.currentTime,
                     winTriggered: false,
@@ -392,7 +341,6 @@ describe('server replay validator branch coverage', () => {
             }
             state.status = 'won';
             return {
-                crashEndedRun: false,
                 challengeLapCompleted: true,
                 challengeElapsedTime: state.currentTime,
                 winTriggered: true,

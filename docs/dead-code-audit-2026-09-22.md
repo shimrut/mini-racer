@@ -36,6 +36,17 @@ The removals run on branch `chore/dead-code-removal`, one commit per phase, in o
   113 scheduled tracks one for one. `tools/generate-share-images.js` creates none of them
   again, because it works from the Daily schedule. It recreates an image if a track returns
   to Daily.
+- **Phase 6 — done.** The whole hard-crash path (§13): `handleHardCrash`, the four event
+  fields, the server crash branch, and the music branch. Two validator tests that also
+  checked failure-detail rounding and omission now reach those details through the live
+  "ended early" path. Tests that pinned a live failure reason now use `no_finish` in place
+  of `'crashed'`. The wall-hit auto-restart tests in `tests/simulation-run-policy.test.js`
+  run the real engine and simulation, and they pass with the setting on and off. The
+  TypeScript "no overlap" diagnostic at `replay-validator.ts:289` is gone, so the other
+  diagnostics fell from 23 to 22.
+
+After phase 6 the suite has 236 files and 3,011 tests, and all pass. That is 23 tests fewer
+than the 3,034 at the start, and each removed test exercised only removed code.
 
 The last full audit ran on 2026-08-01. That audit found no dead module files. This audit
 repeats the file check and adds five more checks: exported names, engine methods, CSS

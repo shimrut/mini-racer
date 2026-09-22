@@ -360,11 +360,7 @@ describe('simulation survivor kills wave3 — event reset and collision early ex
             challengeProgressLaps: 0,
             challengeRequiredLaps: 0,
             challengeIsFinalLap: false,
-            challengeFailed: false,
-            challengeFailureReason: null,
             wallImpact: null,
-            crashImpact: null,
-            crashEndedRun: false,
             checkpointPassed: null,
         });
     });

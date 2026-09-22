@@ -95,10 +95,8 @@ function captureOutcome(state, events) {
         skidMarks: state.skidMarks.length,
         events: {
             wallImpact: events.wallImpact,
-            crashEndedRun: events.crashEndedRun,
             winTriggered: events.winTriggered,
             challengeLapCompleted: events.challengeLapCompleted,
-            crashImpact: events.crashImpact
         }
     };
 }

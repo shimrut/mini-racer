@@ -107,7 +107,6 @@ describe('updateSimulation mechanics', () => {
         const events = updateSimulation(state, 0.1, CONFIG, OPEN_TRACK, []);
 
         expect(events.winTriggered).toBe(false);
-        expect(events.crashEndedRun).toBe(false);
         expect(state.currentTime).toBe(12);
         expect(state.pos).toEqual({ x: 3, y: 4 });
     });
@@ -329,7 +328,6 @@ describe('updateSimulation mechanics', () => {
         );
 
         expect(events.wallImpact).toMatchObject({ kind: 'scrape' });
-        expect(events.crashImpact).toBeNull();
         expect(Math.hypot(state.pos.x, state.pos.y)).toBeCloseTo(
             0.5 + CONFIG.carCollisionHalfLength + CONFIG.wallContactPadding
         );
@@ -504,8 +502,6 @@ describe('updateSimulation mechanics', () => {
             }
         ]);
 
-        expect(events.crashEndedRun).toBe(false);
-        expect(events.crashImpact).toBeNull();
         expect(events.wallImpact).toMatchObject({ kind: 'scrape', impactKph: 60 });
         expect(state.status).toBe('playing');
         expect(state.velocity.x).toBeLessThan(0);
@@ -531,8 +527,6 @@ describe('updateSimulation mechanics', () => {
         ]);
 
         expect(events.wallImpact).toEqual({ kind: 'scrape', impactKph: 150, severity: 1 });
-        expect(events.crashImpact).toBeNull();
-        expect(events.crashEndedRun).toBe(false);
         expect(state.status).toBe('playing');
     });
 
@@ -607,9 +601,7 @@ describe('updateSimulation mechanics', () => {
         );
 
         expect(events.winTriggered).toBe(true);
-        expect(events.crashEndedRun).toBe(false);
         expect(events.wallImpact).toBeNull();
-        expect(events.crashImpact).toBeNull();
         expect(state.particles).toHaveLength(0);
         expect(state.status).toBe('won');
     });
@@ -731,8 +723,6 @@ describe('updateSimulation mechanics', () => {
 
         expect(events.wallImpact).toMatchObject({ kind: 'scrape', impactKph: 159 });
         expect(events.wallImpact.severity).toBeGreaterThan(0.8);
-        expect(events.crashImpact).toBeNull();
-        expect(events.crashEndedRun).toBe(false);
         expect(severeScrapeState.status).toBe('playing');
         expect(severeScrapeState.particles).toHaveLength(10);
     });
@@ -748,7 +738,6 @@ describe('updateSimulation mechanics', () => {
 
         const scrapeEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, ENDPOINT_WALL);
         expect(scrapeEvents.wallImpact).toMatchObject({ kind: 'scrape', severity: 1 });
-        expect(scrapeEvents.crashEndedRun).toBe(false);
         expect(state.status).toBe('playing');
 
         state.pos = { x: 20, y: 20 };
@@ -756,7 +745,6 @@ describe('updateSimulation mechanics', () => {
         const clearEvents = updateSimulation(state, 0.1, { ...CONFIG, accel: 0, carRadius: 0.5 }, OPEN_TRACK, []);
 
         expect(clearEvents.wallImpact).toBeNull();
-        expect(clearEvents.crashEndedRun).toBe(false);
     });
 
     it('keeps only the newest live particles up to the frame-skip particle cap', () => {
