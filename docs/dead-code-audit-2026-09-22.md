@@ -32,6 +32,10 @@ The removals run on branch `chore/dead-code-removal`, one commit per phase, in o
   it. The live modal reads `playerRankLabel` directly, and the `ui-modal-*` tests cover it.
   18 test blocks that only exercised these functions went. One mixed block keeps its
   `buildScoreboardRankDisplay` checks.
+- **Phase 5 — done.** The 13 Campaign share images (§9). The 113 remaining images match the
+  113 scheduled tracks one for one. `tools/generate-share-images.js` creates none of them
+  again, because it works from the Daily schedule. It recreates an image if a track returns
+  to Daily.
 
 The last full audit ran on 2026-08-01. That audit found no dead module files. This audit
 repeats the file check and adds five more checks: exported names, engine methods, CSS
