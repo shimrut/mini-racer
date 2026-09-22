@@ -1,4 +1,4 @@
-function smoothPoly(points, radius) {
+export function smoothPoly(points, radius) {
     const uniquePoints = points.filter((p, i) => {
         const next = points[(i + 1) % points.length];
         return !(Math.abs(p.x - next.x) < 0.01 && Math.abs(p.y - next.y) < 0.01);

@@ -1,5 +1,6 @@
 import { CONFIG } from '../game/config.js';
 import { getIntersection } from '../game/track/geometry.js';
+import { smoothPoly } from '../game/track/runtime.js';
 import { clamp, distance, distanceSq, lerp, midpoint } from './geometry.js';
 
 const DT = 1 / 60;
@@ -100,54 +101,6 @@ function resampleClosedPolygon(points, sampleCount) {
         }
     }
     return result;
-}
-
-function smoothPoly(points, radius) {
-    const uniquePoints = points.filter((point, index) => {
-        const next = points[(index + 1) % points.length];
-        return !(Math.abs(point.x - next.x) < 0.01 && Math.abs(point.y - next.y) < 0.01);
-    });
-
-    if (uniquePoints.length < 3) {
-        return uniquePoints.map((point) => ({ ...point }));
-    }
-
-    const smoothed = [];
-    const steps = 5;
-
-    for (let i = 0; i < uniquePoints.length; i++) {
-        const prev = uniquePoints[(i - 1 + uniquePoints.length) % uniquePoints.length];
-        const current = uniquePoints[i];
-        const next = uniquePoints[(i + 1) % uniquePoints.length];
-        const v1 = { x: current.x - prev.x, y: current.y - prev.y };
-        const v2 = { x: next.x - current.x, y: next.y - current.y };
-        const len1 = Math.hypot(v1.x, v1.y);
-        const len2 = Math.hypot(v2.x, v2.y);
-
-        if (len1 < 0.001 || len2 < 0.001) {
-            smoothed.push({ ...current });
-            continue;
-        }
-
-        const curveRadius = Math.min(radius, len1 / 2.5, len2 / 2.5);
-        const n1 = { x: v1.x / len1, y: v1.y / len1 };
-        const n2 = { x: v2.x / len2, y: v2.y / len2 };
-        const start = { x: current.x - n1.x * curveRadius, y: current.y - n1.y * curveRadius };
-        const end = { x: current.x + n2.x * curveRadius, y: current.y + n2.y * curveRadius };
-
-        for (let step = 0; step <= steps; step++) {
-            const t = step / steps;
-            const a = (1 - t) * (1 - t);
-            const b = 2 * (1 - t) * t;
-            const c = t * t;
-            smoothed.push({
-                x: a * start.x + b * current.x + c * end.x,
-                y: a * start.y + b * current.y + c * end.y
-            });
-        }
-    }
-
-    return smoothed;
 }
 
 function directionBetween(a, b) {
