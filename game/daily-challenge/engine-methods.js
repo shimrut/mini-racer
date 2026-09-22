@@ -827,7 +827,6 @@ export const dailyChallengeEngineMethods = {
   },
 
   clearDailyChallengeRun() {
-    const hadChallengeRun = Boolean(this.currentChallengeRun);
     this.trackMedalBeforeLastLapWrite = null;
     this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = null;
@@ -1336,7 +1335,6 @@ export const dailyChallengeEngineMethods = {
     const isNewBest = !Number.isFinite(previousTrackBest?.bestTime)
       || finalTime < previousTrackBest.bestTime;
     const runBestBeforeLastLap = this.currentChallengeRun.bestLapSecBeforeLastLap;
-    const trackKey = challenge.trackKey;
     const raceCacheKey = challenge.id;
     const lastRunLap = this.currentChallengeRun.recentLaps?.length
       ? this.currentChallengeRun.recentLaps[this.currentChallengeRun.recentLaps.length - 1]

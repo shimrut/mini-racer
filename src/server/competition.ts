@@ -90,7 +90,6 @@ export const CAMPAIGN_GUEST_TTL_SECONDS = 365 * 24 * 60 * 60;
 export function toCampaignCompetition(
     campaignId: string,
     stage: CampaignStageLike,
-    { playerId = null }: { playerId?: string | null } = {},
 ): Competition {
     const lapCount = normalizeLapCount(stage.lapCount);
     return {

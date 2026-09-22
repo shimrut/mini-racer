@@ -40,9 +40,7 @@ export class GarageUi {
 
     get panel() { return document.getElementById('garage-panel'); }
     get garageModal() { return document.getElementById('garage-modal'); }
-    get garageButton() { return document.getElementById('menu-btn-garage'); }
     get garageToggleButtons() { return document.querySelectorAll('[aria-controls="garage-modal"]'); }
-    get closeButton() { return document.getElementById('garage-close-btn'); }
     get tabSkin() { return document.getElementById('garage-tab-skin'); }
     get tabTrails() { return document.getElementById('garage-tab-trails'); }
     get panelSkin() { return document.getElementById('garage-panel-skin'); }

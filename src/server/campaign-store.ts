@@ -125,8 +125,8 @@ function guestExpiresAt(): Date {
     return new Date(Date.now() + CAMPAIGN_GUEST_TTL_SECONDS * 1000);
 }
 
-function competitionFor(stage: { raceId: string; trackKey: string; lapCount: number; rulesRevision: number }, playerId: string | null): Competition {
-    return toCampaignCompetition(CAMPAIGN_ID, stage, { playerId });
+function competitionFor(stage: { raceId: string; trackKey: string; lapCount: number; rulesRevision: number }): Competition {
+    return toCampaignCompetition(CAMPAIGN_ID, stage);
 }
 
 function emptyProgress(): CampaignProgress {
@@ -238,11 +238,6 @@ export function parseCampaignProgress(raw: string | null | undefined): CampaignP
 
 async function readProgress(playerId: string): Promise<CampaignProgress> {
     return parseCampaignProgress(await redis.get(progressKey(playerId)));
-}
-
-/** Campaign progress left under a promoted guest means its migration never finished, so that guest is still needed. */
-export async function hasStoredCampaignProgress(playerId: string): Promise<boolean> {
-    return Boolean(await redis.get(progressKey(playerId)));
 }
 
 class CampaignProgressBusyError extends GuestProgressSelectionRetryableError {}
@@ -379,7 +374,7 @@ export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<
         }
         await transaction.multi();
         for (const stage of CAMPAIGN_STAGES) {
-            const competition = competitionFor(stage, null);
+            const competition = competitionFor(stage);
             await transaction.zRem(competition.leaderboardKey, expired);
             await transaction.hDel(competition.entryHashKey, expired);
             await transaction.hDel(competition.pbHashKey, expired.map(playerField));
@@ -458,7 +453,7 @@ function identityRequired() {
 
 async function readCampaignStandingsByRaceId(playerId: string | null) {
     const entries = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
-        const competition = competitionFor(stage, playerId);
+        const competition = competitionFor(stage);
         const [totalCount, rank] = await Promise.all([
             redis.zCard(competition.leaderboardKey),
             readPlayerRank(competition, playerId),
@@ -479,7 +474,7 @@ async function repairCampaignProgressFromLeaderboard(
 
     const recovered = await Promise.all(missingStages.map(async (stage) => {
         const entry = await readEntryByPlayerId(
-            competitionFor(stage, playerId),
+            competitionFor(stage),
             playerId,
         );
         return campaignResultFromEntry(stage, entry, playerId);
@@ -510,7 +505,7 @@ async function repairCampaignProgressFromLeaderboard(
 
 export async function repairCampaignStandingsFromEntries(playerId: string): Promise<void> {
     for (const stage of CAMPAIGN_STAGES) {
-        const competition = competitionFor(stage, playerId);
+        const competition = competitionFor(stage);
         const [entry, rankedScore] = await Promise.all([
             readEntryByPlayerId(competition, playerId),
             redis.zScore(competition.leaderboardKey, playerId),
@@ -679,7 +674,7 @@ export async function getServerCampaignSnapshot({
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     await cleanupExpiredCampaignGuestsBestEffort();
     const snapshot = await readSnapshot({
-        competition: competitionFor(stage, identity.canonicalPlayerId),
+        competition: competitionFor(stage),
         playerId: identity.canonicalPlayerId,
         limit: normalizeLimit(limit),
         offset: normalizeOffset(offset),
@@ -711,7 +706,7 @@ export async function prepareServerCampaignLeaderboardRace({
         }
     }
     return prepareCompetitionOpponentRace({
-        competition: competitionFor(stage, identity.canonicalPlayerId),
+        competition: competitionFor(stage),
         playerId: identity.canonicalPlayerId,
         race: stage,
         selection,
@@ -771,7 +766,7 @@ export async function submitServerCampaignRun({
         return { status: 403, body: { accepted: false, error: 'Campaign race is locked.' } };
     }
 
-    const competition = competitionFor(stage, canonicalPlayerId);
+    const competition = competitionFor(stage);
     const outcome = await submitCompetitionRun({
         competition,
         playerId: canonicalPlayerId,
@@ -887,7 +882,7 @@ export async function getServerCampaignPbGhost({
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
     const personalBest = await getPlayerTrackPbRecord({
         playerId: identity.canonicalPlayerId,
-        competition: competitionFor(stage, identity.canonicalPlayerId),
+        competition: competitionFor(stage),
         track: TRACKS[stage.trackKey],
     });
     return {
@@ -972,7 +967,7 @@ async function captureClassifiedGuestCampaignSource(
 
     const stages = new Map<string, GuestCampaignStageSource>();
     for (const stage of CAMPAIGN_STAGES) {
-        const competition = competitionFor(stage, guestPlayerId);
+        const competition = competitionFor(stage);
         const [rawEntry, rawPb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
             redisCompressed.hGet(competition.pbHashKey, playerField(guestPlayerId)),
@@ -1091,7 +1086,7 @@ export async function mergeGuestCampaignProgress({
     try {
         // Match submission's lock order: stage writes finish before either progress record is claimed.
         await acquireAll(CAMPAIGN_STAGES.flatMap((stage) => {
-            const competition = competitionFor(stage, null);
+            const competition = competitionFor(stage);
             return [
                 competitionSubmissionLockKey(competition, guestPlayerId),
                 competitionSubmissionLockKey(competition, redditPlayerId),
@@ -1142,7 +1137,6 @@ export async function mergeGuestCampaignProgress({
             await verifyGuestSource?.();
         }
 
-        const guestProgressLock = locks.find((lock) => lock.key === progressLockKey(guestPlayerId))!;
         const redditProgressLock = locks.find((lock) => lock.key === progressLockKey(redditPlayerId))!;
         const [guestProgress, redditProgress] = await Promise.all([
             guestSource ? Promise.resolve(guestSource.progress) : readProgress(guestPlayerId),
@@ -1158,8 +1152,8 @@ export async function mergeGuestCampaignProgress({
         );
         for (const stage of CAMPAIGN_STAGES) {
             await confirmMergeOwnership();
-            const guestCompetition = competitionFor(stage, guestPlayerId);
-            const redditCompetition = competitionFor(stage, redditPlayerId);
+            const guestCompetition = competitionFor(stage);
+            const redditCompetition = competitionFor(stage);
             // Guest values come from the validated snapshot when one was taken. Only the account
             // side is read here, so the source cannot change between its check and its copy.
             const stageSource = guestSource?.stages.get(stage.raceId);
@@ -1353,7 +1347,7 @@ export async function cleanupGuestCampaignProgress({
     let lease: RedisLockLease | null = null;
     try {
         for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
-            const competition = competitionFor(stage, null);
+            const competition = competitionFor(stage);
             return [competitionSubmissionLockKey(competition, guestPlayerId)];
         }).concat(progressLockKey(guestPlayerId)).sort()) {
             const lock = await acquireRedisLock(key, SUBMISSION_LOCK_TTL_MS, redis);
@@ -1383,7 +1377,7 @@ export async function cleanupGuestCampaignProgress({
         const transaction = await beginOwnedRedisLockGroupTransaction(locks, redis);
         if (!transaction) throw new CampaignProgressBusyError('Campaign cleanup lock was lost.');
         for (const stage of CAMPAIGN_STAGES) {
-            const competition = competitionFor(stage, guestPlayerId);
+            const competition = competitionFor(stage);
             await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
             await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
             await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
@@ -1415,7 +1409,7 @@ export async function discardGuestCampaignProgress({
     let lease: RedisLockLease | null = null;
     try {
         for (const key of CAMPAIGN_STAGES.flatMap((stage) => {
-            const competition = competitionFor(stage, null);
+            const competition = competitionFor(stage);
             return [
                 competitionSubmissionLockKey(competition, guestPlayerId),
             ];
@@ -1470,7 +1464,7 @@ export async function discardGuestCampaignProgress({
             // that no longer parses, a PB from a superseded track revision, and a ranking left
             // without its entry are all still this guest's rows to take with them.
             const holdsRows = await competitionHoldsPlayerRows(
-                competitionFor(stage, guestPlayerId),
+                competitionFor(stage),
                 guestPlayerId,
             );
             return holdsRows ? stage : null;
@@ -1480,7 +1474,7 @@ export async function discardGuestCampaignProgress({
         // across the whole campaign, and a store that timed that out failed all of it.
         for (const stage of stagesToClear) {
             await keepLocksFresh();
-            const competition = competitionFor(stage, guestPlayerId);
+            const competition = competitionFor(stage);
             await commit(async (transaction) => {
                 await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
                 await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);

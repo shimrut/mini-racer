@@ -15,12 +15,10 @@ export const CONFIG = {
     tireColor: '#171717',
 
     skidColor: 'rgba(0, 0, 0, 0.4)',
-    smokeColor: 'rgba(200,200,200,0.4)',
     sparkColor: '#fcd34d',
 
     finishLineColor: '#fff',
     finishLineDarkColor: '#020617',
-    finishLineBorderColor: 'rgba(248, 250, 252, 0.45)',
 
     fixedDt: 1 / 60,
     ...DEFAULT_PHYSICS_TUNING,
@@ -35,8 +33,6 @@ export const CONFIG = {
     wallContactReleaseSec: 0.12,
     wallContactPadding: 0.001,
     resumeRelaunchDelay: 0.5,
-    crashRelaunchDelay: 0.5,
-    minLapTime: 2.0,
 
     // Capsule body: radius covers the width, the axis runs nose to rear so orientation matters.
     carRadius: 0.275,

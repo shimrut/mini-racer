@@ -148,10 +148,6 @@ export async function readHeadToHeadAccept(
     return parseJson<HeadToHeadAcceptRecord>(await redis.get(acceptKey(token)));
 }
 
-export async function deleteHeadToHeadAccept(token: string): Promise<void> {
-    await redis.del(acceptKey(token));
-}
-
 export async function acquireHeadToHeadCreationLock(
     subredditName: string,
     username: string,

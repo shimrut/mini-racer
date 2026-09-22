@@ -51,10 +51,6 @@ function sha256(value: string): string {
     return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
-function emptySlot(rank: 1 | 2 | 3): DailyPodiumReplayGhostSlot {
-    return { rank, ghost: null };
-}
-
 export function sanitizePodiumReplayGhosts(
     slots: readonly DailyPodiumReplayGhostSlot[] | null | undefined,
 ): DailyPodiumReplayEnvelope['ghosts'] {

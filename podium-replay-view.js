@@ -542,7 +542,6 @@ export function createPodiumReplayController({
         get timeMs() { return state.timeMs; },
         get showTrail() { return state.showTrail; },
         hasGhosts() { return state.records.size > 0; },
-        hasGhost(rank) { return state.records.has(Number(rank)); },
         async prepare(payload, trackName) {
             const normalized = normalizePodiumReplayGhosts(payload);
             state.records = normalized.records;

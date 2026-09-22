@@ -80,12 +80,9 @@ export class SettingsUi {
     }
 
     get settingsModal() { return document.getElementById('settings-modal'); }
-    get settingsBtn() { return document.getElementById('menu-btn-settings'); }
     get settingsToggleButtons() {
         return document.querySelectorAll?.('[aria-controls="settings-modal"]') || [];
     }
-    get settingsView() { return document.getElementById('modal-settings-view'); }
-    get settingsBackBtn() { return document.getElementById('settings-back-btn'); }
     get redditIdentitySwitch() { return document.getElementById('settings-reddit-identity-switch'); }
     get redditHeading() { return document.getElementById('settings-reddit-heading'); }
     get identityDesc() { return document.getElementById('settings-identity-desc'); }

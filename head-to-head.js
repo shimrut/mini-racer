@@ -6,7 +6,6 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from './game/track/presentation.js';
-import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
 import { getMedalForRaceTime } from './game/medals/medal-timing.js';
@@ -190,26 +189,6 @@ function renderChallengeTrack(documentRef, trackKey, carImage = null, carTravel 
         hideSchematicStartArrow: true,
         runHistory: [],
     });
-}
-
-export async function openCampaignAsRedirect(event) {
-    try {
-        requestGameLaunchTarget('campaign');
-        const { requestExpandedMode } = await import('@devvit/web/client');
-        await requestExpandedMode(event, 'game');
-    } catch (error) {
-        console.error('Failed to open Mini Racer Campaign:', error);
-    }
-}
-
-export async function openDailyAsRedirect(event) {
-    try {
-        requestGameLaunchTarget('daily');
-        const { requestExpandedMode } = await import('@devvit/web/client');
-        await requestExpandedMode(event, 'game');
-    } catch (error) {
-        console.error('Failed to open Mini Racer Daily:', error);
-    }
 }
 
 let lastPosterAvatars = null;

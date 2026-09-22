@@ -88,7 +88,3 @@ export async function resolveGuestIdentityStatus(
         selectionPending,
     };
 }
-
-export async function isRetiredGuestPlayerId(canonicalGuestPlayerId: string): Promise<boolean> {
-    return (await resolveGuestIdentityStatus(canonicalGuestPlayerId)).status === 'guest_identity_retired';
-}

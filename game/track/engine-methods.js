@@ -2,11 +2,7 @@ import {
   getTrackCanvasAsset,
   getTrackRuntimeAsset,
 } from "./assets.js";
-import {
-  getLoadedClientTrack,
-  loadClientTrack,
-  prefetchClientTracks,
-} from "./client-registry.js";
+import { loadClientTrack } from "./client-registry.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -185,14 +181,6 @@ export const trackEngineMethods = {
     ) {
       document.activeElement.blur();
     }
-  },
-
-  getLoadedTrack(trackKey = this.currentTrackKey) {
-    return getLoadedClientTrack(trackKey);
-  },
-
-  async prefetchTracks(trackKeys = []) {
-    return prefetchClientTracks(trackKeys);
   },
 
   drawVisibleTrackCanvas() {

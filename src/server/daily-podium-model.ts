@@ -35,10 +35,3 @@ export type DailyGpPodiumPostData = {
         DailyGpPodiumPostPosition,
     ];
 };
-
-export type DailyGpPodiumCustomPostData = {
-    postType: 'daily-podium';
-    challengeId: string;
-    podium: DailyGpPodiumPostData;
-    replayDataHash?: string;
-};

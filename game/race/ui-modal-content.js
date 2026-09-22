@@ -510,7 +510,6 @@ export class ModalContentUi {
     lapTimesArray.forEach((time, index) => {
         const isBest = index === 0;
         const isCurrent = Math.abs(time - currentTime) < 0.001;
-        const delta = time - bestTime;
 
         const item = document.createElement('div');
         item.className = `combined-row${isCurrent ? ' is-player' : ''}`;
@@ -580,9 +579,6 @@ export class ModalContentUi {
                 displayName: 'You',
             }
             : null);
-    const objectiveType = typeof scoreboardSnapshot?.objectiveType === 'string'
-        ? scoreboardSnapshot.objectiveType
-        : null;
     // Only racers with a posted time are listed; `totalCount` is a fallback for older payloads, never a row count.
     const rawEntry = scoreboardSnapshot?.leaderboardEntryCount;
     const leaderboardEntryCount = rawEntry != null && Number.isFinite(Number(rawEntry))

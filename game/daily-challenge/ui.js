@@ -130,7 +130,6 @@ export class DailyChallengeUi {
     get tracksTabCampaign() { return document.getElementById('tracks-tab-campaign'); }
     get tracksPanelDaily() { return this.dailyChallengePlaylistList; }
     get tracksPanelCampaign() { return this.campaignChallengePlaylistList; }
-    get dailyChallengePlaylistCloseBtn() { return document.getElementById('daily-playlist-close-btn'); }
     get dailyChallengeHudInline() { return document.getElementById('daily-challenge-hud-inline'); }
 
     focus() {

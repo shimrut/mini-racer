@@ -45,24 +45,6 @@ export type MalformedReason =
     | 'wrong_campaign'
     | 'wrong_player';
 
-/** True when a classification must stop the transfer and wait for a person. */
-export function requiresReviewedRecovery(
-    classification: StoredRecordClassification<unknown>,
-): boolean {
-    return classification.state === 'malformed';
-}
-
-/**
- * True when a classification carries data worth copying. `obsolete` is deliberately excluded:
- * the record is real, but no reader accepts it, so copying it would move dead weight into the
- * account's ranked rows.
- */
-export function carriesCopyableData(
-    classification: StoredRecordClassification<unknown>,
-): boolean {
-    return classification.state === 'valid';
-}
-
 /**
  * Three outcomes, told apart by a string rather than by `true | false | null`.
  *

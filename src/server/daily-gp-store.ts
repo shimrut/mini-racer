@@ -73,7 +73,6 @@ import {
     beginOwnedRedisLockGroupTransaction,
     beginOwnedRedisLockTransaction,
     commitOwnedRedisLockTransaction,
-    releaseRedisLock,
     releaseRedisLockGroup,
     renewRedisLockGroup,
     startRedisLockGroupLeaseRenewal,
@@ -324,7 +323,7 @@ async function captureCampaignStageEvidence(
 ): Promise<Record<string, string>> {
     const playerField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
     const rows = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
-        const competition = toCampaignCompetition(CAMPAIGN_ID, stage, { playerId: guestPlayerId });
+        const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
         const [entry, pb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
             redisCompressed.hGet(competition.pbHashKey, playerField),
@@ -1004,10 +1003,6 @@ async function readFinalPodiumPositions(
     return [positionAt(1), positionAt(2), positionAt(3)];
 }
 
-
-async function releaseSubmissionLock(lock: RedisLock | null): Promise<void> {
-    await releaseRedisLock(lock, redis);
-}
 
 async function releaseSubmissionLocksSafely(
     locks: readonly RedisLock[],
@@ -1836,7 +1831,7 @@ async function guestHoldsTransferableProgress(
     if (await hasCarUnlockProgress(guestPlayerId)) return true;
     if ((await readPlayerProfile(guestPlayerId))?.hasAnyData) return true;
     const competitions = [
-        ...CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage, { playerId: guestPlayerId })),
+        ...CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage)),
         ...dailyPlaylist.map((challenge) => toDailyCompetition(challenge)),
     ];
     const holds = await Promise.all(competitions.map((competition) => (
@@ -3027,7 +3022,7 @@ export async function selectServerGuestProgress({
         (error as Error & { statusCode?: number }).statusCode = 401;
         throw error;
     }
-    const result = await selectGuestProgress({
+    await selectGuestProgress({
         guestPlayerId: `guest:${verifiedGuestPlayerId}`,
         redditPlayerId: `reddit:${safeUsername.toLowerCase()}`,
         choice,

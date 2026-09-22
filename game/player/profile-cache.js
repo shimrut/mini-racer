@@ -95,7 +95,3 @@ export function writeCachedPlayerProfile(ownerId, state) {
     });
     return cached;
 }
-
-export function clearCachedPlayerProfiles() {
-    writeCacheState({ lastOwnerId: null, owners: {} });
-}

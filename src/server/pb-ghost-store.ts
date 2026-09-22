@@ -237,25 +237,6 @@ export function classifyStoredPbRecordFor(
     );
 }
 
-/** Reads and classifies one stored personal best. Never deletes: see `readCompatibleRecord`. */
-export async function classifyStoredPbRecord({
-    playerId,
-    competition,
-    track,
-}: {
-    playerId: string;
-    competition: Competition;
-    track: Record<string, any>;
-}): Promise<StoredRecordClassification<PlayerTrackPbRecord>> {
-    const raw = await redis.hGet(competition.pbHashKey, playerField(playerId));
-    return classifyStoredPbRecordValue(
-        raw,
-        competition,
-        createTrackFingerprint(track),
-        getCompetitionRaceIdentity(competition),
-    );
-}
-
 /**
  * Discarding an unusable record is cleanup, not correctness: every caller treats it as absent either way.
  * Only the writer, holding this player's PB lock, may delete it — a lock-free reader would otherwise delete

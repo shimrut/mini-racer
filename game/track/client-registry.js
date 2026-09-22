@@ -48,10 +48,6 @@ export function getLoadedClientTrack(trackKey) {
     return loadedTracks.get(trackKey) || null;
 }
 
-export function isClientTrackLoaded(trackKey) {
-    return loadedTracks.has(trackKey);
-}
-
 export async function loadClientTrack(trackKey) {
     if (!Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey)) return null;
     const existing = loadedTracks.get(trackKey);
@@ -76,14 +72,6 @@ export async function loadClientTrack(trackKey) {
         });
     pendingLoads.set(trackKey, promise);
     return promise;
-}
-
-export async function prefetchClientTracks(trackKeys = []) {
-    const uniqueKeys = [...new Set(
-        (Array.isArray(trackKeys) ? trackKeys : [])
-            .filter((trackKey) => typeof trackKey === 'string'),
-    )];
-    return Promise.all(uniqueKeys.map((trackKey) => loadClientTrack(trackKey)));
 }
 
 export function clearClientTrackRegistryForTests() {

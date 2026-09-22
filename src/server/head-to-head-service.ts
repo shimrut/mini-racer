@@ -49,7 +49,6 @@ import {
     recordHeadToHeadWin,
 } from './car-unlock-store.js';
 import { getCampaignResultsForCarUnlocks } from './campaign-store.js';
-import { releaseRedisLock } from './redis-lock.js';
 import {
     isRedditAvatarUrl,
     resolveRedditAvatarUrl,

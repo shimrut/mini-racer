@@ -25,7 +25,6 @@ const MEDAL_MAIN_TEXT_Y = '300';
 const MEDAL_CAPTION_Y = '398';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const HEX_CENTER = '320 320';
 const medalIconTemplateCache = new Map();
 const MEDAL_ICON_TEMPLATE_CACHE_LIMIT = 80;
 let medalIconCloneId = 0;
