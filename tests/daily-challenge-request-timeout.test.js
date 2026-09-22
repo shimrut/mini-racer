@@ -5,15 +5,7 @@ import {
     getDailyChallengePlaylist,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
-
-function createMemoryLocalStorage() {
-    const data = new Map();
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); },
-    };
-}
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 function createStalledFetch() {
     return vi.fn((_url, options) => new Promise((_resolve, reject) => {

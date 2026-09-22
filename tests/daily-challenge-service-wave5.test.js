@@ -9,18 +9,10 @@ import {
     requestFeaturedDailyChallengeStart,
     resolveDailyPlaylistCacheExpiresAt,
 } from '../game/daily-challenge/service.js';
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAILY_START_OVERRIDE_KEY = 'VectorGpDailyStartOverride';
-
-function createMemoryLocalStorage(initial = {}) {
-    const data = new Map(Object.entries(initial));
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); },
-    };
-}
 
 function buildChallenge(overrides = {}) {
     return {

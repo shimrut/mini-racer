@@ -16,18 +16,10 @@ import {
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
 import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const MINIMAL_REPLAY = { inputs: [] };
-
-function createMemoryLocalStorage(initial = {}) {
-    const data = new Map(Object.entries(initial));
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); },
-    };
-}
 
 function createJsonResponse(body, { ok = true, status = 200 } = {}) {
     return { ok, status, json: async () => body };

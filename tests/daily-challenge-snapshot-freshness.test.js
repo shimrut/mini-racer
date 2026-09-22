@@ -6,17 +6,9 @@ import {
     getDailyChallengeSnapshotIdsToFetch,
     subscribeToDailyChallengeSnapshots,
 } from '../game/daily-challenge/service.js';
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 const CHALLENGE_ID = 'freshness-challenge';
-
-function createMemoryLocalStorage(initial = {}) {
-    const data = new Map(Object.entries(initial));
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); },
-    };
-}
 
 function savedSnapshotStorage(rankLabel, { expiresAt = Date.now() + 60_000 } = {}) {
     return JSON.stringify({

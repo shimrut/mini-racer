@@ -1,17 +1,9 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };
-}
-
-function createMemoryLocalStorage(initial = {}) {
-    const data = new Map(Object.entries(initial));
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); },
-    };
 }
 
 describe('daily-challenge start override boundaries', () => {

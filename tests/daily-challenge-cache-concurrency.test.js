@@ -3,18 +3,10 @@ import {
     getDailyChallengePlaylist,
     getDailyChallengeSnapshot
 } from '../game/daily-challenge/service.js';
+import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 function createJsonResponse(body) {
     return { ok: true, status: 200, json: async () => body };
-}
-
-function createMemoryLocalStorage() {
-    const data = new Map();
-    return {
-        getItem: (k) => (data.has(k) ? data.get(k) : null),
-        setItem: (k, v) => { data.set(k, v); },
-        removeItem: (k) => { data.delete(k); }
-    };
 }
 
 describe('daily-challenge service cache concurrency', () => {
