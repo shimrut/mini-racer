@@ -1,9 +1,7 @@
+import { formatRaceClock } from '../../game/shared/race-time-text.js';
+
 export function formatRaceTime(bestTimeMs: number): string {
-    const totalMilliseconds = Math.max(0, Math.round(bestTimeMs));
-    const minutes = Math.floor(totalMilliseconds / 60_000);
-    const seconds = Math.floor((totalMilliseconds % 60_000) / 1000);
-    const milliseconds = totalMilliseconds % 1000;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+    return formatRaceClock(bestTimeMs);
 }
 
 export function formatHeadToHeadTime(timeMs: number): string {

@@ -1,5 +1,6 @@
 import { getCampaignStageMedalCount } from '../campaign/manifest.js';
 import { STANDARD_MEDAL_TIER_RANK } from '../medals/medal-timing.js';
+import { formatRaceClock } from '../shared/race-time-text.js';
 
 const NUMBER_WORDS = [
     'Zero',
@@ -25,11 +26,7 @@ function toFiniteNumber(value) {
 export function formatLobbyTime(milliseconds) {
     const safeMilliseconds = toFiniteNumber(milliseconds);
     if (safeMilliseconds === null || safeMilliseconds < 0) return '--:--.---';
-    const rounded = Math.round(safeMilliseconds);
-    const minutes = Math.floor(rounded / 60000);
-    const seconds = Math.floor((rounded % 60000) / 1000);
-    const remainder = rounded % 1000;
-    return `${minutes}:${String(seconds).padStart(2, '0')}.${String(remainder).padStart(3, '0')}`;
+    return formatRaceClock(safeMilliseconds);
 }
 
 export function formatLobbyGap(milliseconds) {

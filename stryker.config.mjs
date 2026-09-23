@@ -34,6 +34,7 @@ export default {
         'game/shared/pb-ghost-format.js',
         'game/shared/reddit-avatar.js',
         'game/shared/utc-day.js',
+        'game/shared/race-time-text.js',
 
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',
