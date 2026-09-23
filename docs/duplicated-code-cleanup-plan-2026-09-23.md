@@ -64,6 +64,17 @@ passes: 236 files, 3,011 tests. Differences from the plan:
 
 ## Phase 2 — Exact copies of small functions (player risk: low)
 
+**Done on 2026-09-23 (`ba98328`..`d3b5e4b`).** The suite passes: 237 files, 3,016 tests.
+The play-checks wait for the build watcher, which was not running. Differences from the plan:
+
+- New shared files: `src/server/value-guards.ts`, `game/shared/values.js`, and
+  `game/ui/dom.js`. The first two joined the Stryker list, because they hold code from
+  mutated files.
+- 2.3 shares all three preview car callbacks, not only the size.
+- 2.4 and 2.5: `tests/stored-name-keys.test.js` pins the post, podium, launcher, and
+  Head to Head keys. It passed before each merge. The store tests already pinned the hashed
+  player fields. Two more inline copies of the field hash also moved to `playerFieldHash`.
+
 The copies have the same text. They hold no stored data and no posted text.
 
 | Step | Change | Size | Check |
