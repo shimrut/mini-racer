@@ -24,6 +24,13 @@ import {
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
 
+function showDailyVerificationState(engine, challengeId, snapshotFields) {
+  engine.dailyChallengeUi.refreshDailyChallengeVerificationState(challengeId);
+  if (engine.modal.matchesModalScoreboardContext({ challengeId })) {
+    engine.modal.updateModalScoreboardSnapshot(createVerificationSnapshot(snapshotFields));
+  }
+}
+
 function scoreboardSnapshotFromSubmitRank(body, cachedSnapshot) {
   const playerRank = Number.isInteger(body?.playerRank) && body.playerRank > 0
     ? body.playerRank
@@ -164,19 +171,12 @@ export const scoreboardEngineMethods = {
 
     if (isDailyChallengeVerificationExpired(entry)) {
       clearDailyChallengeVerification(entry.challengeId);
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "error",
-            isLoading: false,
-            submissionStage: "error",
-            statusText: "Leaderboard submission expired.",
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "error",
+        isLoading: false,
+        submissionStage: "error",
+        statusText: "Leaderboard submission expired.",
+      });
       return;
     }
 
@@ -190,19 +190,12 @@ export const scoreboardEngineMethods = {
         id: entry.challengeId,
         trackKey: entry.trackKey,
       });
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "error",
-            isLoading: false,
-            submissionStage: "error",
-            statusText: "Submission replay is missing. Finish another run to rank it.",
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "error",
+        isLoading: false,
+        submissionStage: "error",
+        statusText: "Submission replay is missing. Finish another run to rank it.",
+      });
       return;
     }
 
@@ -243,20 +236,11 @@ export const scoreboardEngineMethods = {
           preserveUpdatedAt: true,
         },
       );
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({
-          challengeId: entry.challengeId,
-        })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "pending",
-            isLoading: true,
-            submissionStage: "retrying",
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "pending",
+        isLoading: true,
+        submissionStage: "retrying",
+      });
     }
   },
 
@@ -280,20 +264,11 @@ export const scoreboardEngineMethods = {
           preserveUpdatedAt: true,
         },
       );
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({
-          challengeId: entry.challengeId,
-        })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "pending",
-            isLoading: true,
-            submissionStage: "retrying",
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "pending",
+        isLoading: true,
+        submissionStage: "retrying",
+      });
       return;
     }
 
@@ -441,21 +416,12 @@ export const scoreboardEngineMethods = {
           preserveUpdatedAt: true,
         },
       );
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({
-          challengeId: entry.challengeId,
-        })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "pending",
-            isLoading: true,
-            submissionStage: "retrying",
-            statusText: typeof body?.error === "string" ? body.error : null,
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "pending",
+        isLoading: true,
+        submissionStage: "retrying",
+        statusText: typeof body?.error === "string" ? body.error : null,
+      });
       return;
     }
 
@@ -469,22 +435,13 @@ export const scoreboardEngineMethods = {
         typeof body?.error === "string" ? body.error : "Submission failed",
       );
       rollbackLocalBestForFailedVerificationEntry(this, entry);
-      this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-      if (
-        this.modal.matchesModalScoreboardContext({
-          challengeId: entry.challengeId,
-        })
-      ) {
-        this.modal.updateModalScoreboardSnapshot(
-          createVerificationSnapshot({
-            verificationState: "error",
-            isLoading: false,
-            submissionStage: "error",
-            statusText:
-              typeof body?.error === "string" ? body.error : "Submission failed",
-          }),
-        );
-      }
+      showDailyVerificationState(this, entry.challengeId, {
+        verificationState: "error",
+        isLoading: false,
+        submissionStage: "error",
+        statusText:
+          typeof body?.error === "string" ? body.error : "Submission failed",
+      });
       return;
     }
 
@@ -497,17 +454,12 @@ export const scoreboardEngineMethods = {
       "Submission unavailable",
     );
     rollbackLocalBestForFailedVerificationEntry(this, entry);
-    this.dailyChallengeUi.refreshDailyChallengeVerificationState(entry.challengeId);
-    if (this.modal.matchesModalScoreboardContext({ challengeId: entry.challengeId })) {
-      this.modal.updateModalScoreboardSnapshot(
-        createVerificationSnapshot({
-          verificationState: "error",
-          isLoading: false,
-          submissionStage: "error",
-          statusText: "Submission unavailable",
-        }),
-      );
-    }
+    showDailyVerificationState(this, entry.challengeId, {
+      verificationState: "error",
+      isLoading: false,
+      submissionStage: "error",
+      statusText: "Submission unavailable",
+    });
   },
 
   enqueueDailyChallengeVerificationSubmission({
