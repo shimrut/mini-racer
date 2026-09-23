@@ -141,6 +141,7 @@ import {
     type RankedSubmitReuseOptions,
 } from './competition-submit.js';
 import { playerFieldHash } from './value-guards.js';
+import { progressTransferPendingReply } from './progress-transfer-reply.js';
 
 export {
     normalizePlayerPreferences,
@@ -3385,17 +3386,7 @@ export async function submitServerDailyGpRun({
     const progressTransferPending = identity.guestStatus === 'guest_promotion_pending'
         || (identity.canonicalPlayerId.startsWith('reddit:')
             && await isPlayerProgressSelectionPending(identity.canonicalPlayerId));
-    if (progressTransferPending) {
-        return {
-            status: 503,
-            body: {
-                accepted: false,
-                error: 'A progress transfer is in progress. Retrying automatically.',
-                reason: 'progress_transfer_pending',
-                retryAfterSeconds: 1,
-            },
-        };
-    }
+    if (progressTransferPending) return progressTransferPendingReply();
 
     if (isMismatchedSubmissionOwner(identity.canonicalPlayerId, submissionOwnerId)) {
         return SUBMISSION_IDENTITY_CHANGED_RESULT;

@@ -60,6 +60,7 @@ import type { ReplayValidationResult } from './replay-validator.js';
 import { formatHeadToHeadTime } from './format-race-time.js';
 import { isRecord, normalizeName } from './value-guards.js';
 import { checkFixedWindowRateLimit, type RateLimitResult } from './rate-limit.js';
+import { progressTransferPendingReply } from './progress-transfer-reply.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -210,15 +211,10 @@ async function resolveChallengeViewer(context: HeadToHeadRequestContext): Promis
 }
 
 function transferPendingResult(): HeadToHeadServiceResult {
+    const reply = progressTransferPendingReply();
     return {
-        status: 503,
-        body: {
-            accepted: false,
-            status: 'progress_transfer_pending',
-            reason: 'progress_transfer_pending',
-            error: 'A progress transfer is in progress. Retrying automatically.',
-            retryAfterSeconds: 1,
-        },
+        status: reply.status,
+        body: { ...reply.body, status: 'progress_transfer_pending' },
     };
 }
 

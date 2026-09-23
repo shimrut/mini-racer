@@ -20,6 +20,7 @@ import { TRACKS } from '../../game/track/tracks.js';
 import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
 import { isProgressTransferPending } from './guest-retirement.js';
 import { checkFixedWindowRateLimit, type RateLimitResult } from './rate-limit.js';
+import { progressTransferPendingReply } from './progress-transfer-reply.js';
 
 export const SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 export const SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
@@ -250,16 +251,7 @@ export async function submitCompetitionRun(
         const pendingRelease = releaseRedisLock(submissionLock, redis).catch((error) => {
             console.error('Pending transfer submission lock cleanup failed:', error);
         });
-        return {
-            status: 503,
-            body: {
-                accepted: false,
-                error: 'A progress transfer is in progress. Retrying automatically.',
-                reason: 'progress_transfer_pending',
-                retryAfterSeconds: 1,
-            },
-            releaseLock: pendingRelease,
-        };
+        return { ...progressTransferPendingReply(), releaseLock: pendingRelease };
     }
 
     const nextEntry: DailyGpLeaderboardEntry = withOpponentRaceReady(
