@@ -95,8 +95,11 @@ import {
   previewHeadToHeadBrag,
 } from "./head-to-head/service.js";
 
-const legacyDailyChallengeEngineMethods = import.meta.env.MODE === "test"
-  ? (await import("./daily-challenge/engine-methods.js")).dailyChallengeEngineMethods
+const testDailyRuntimeEngineMethods = import.meta.env.MODE === "test"
+  ? {
+    ...(await import("./challenge-run/engine-methods.js")).challengeRunEngineMethods,
+    ...(await import("./daily-challenge/engine-methods.js")).dailyChallengeEngineMethods,
+  }
   : {};
 
 export class RealTimeRacer {
@@ -969,7 +972,7 @@ Object.assign(
   RealTimeRacer.prototype,
   trackEngineMethods,
   raceEngineMethods,
-  legacyDailyChallengeEngineMethods,
+  testDailyRuntimeEngineMethods,
   scoreboardEngineMethods,
   opponentRaceEngineMethods,
   modeRouterEngineMethods,

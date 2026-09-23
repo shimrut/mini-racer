@@ -268,11 +268,6 @@ export const dailyChallengeEngineMethods = {
     return true;
   },
 
-  resolveTrackPersonalBestGhostPending(challengeId) {
-    if (!challengeId) return false;
-    return getPendingPbGhostCandidates(this).delete(challengeId);
-  },
-
   markTrackPersonalBestGhostUnavailable(challenge) {
     if (!challenge?.id) return false;
     bumpPbGhostPrepareGeneration(this, challenge.id);
@@ -343,21 +338,6 @@ export const dailyChallengeEngineMethods = {
       this.preparedPbGhostChallengeId = challenge.id;
     }
     return personalBest;
-  },
-
-  beginPersonalBestGhostRunAtGo() {
-    const challenge = this.activeDailyChallenge;
-    const ghostActive = this.pbGhost?.beginRun?.() === true;
-    this.activePersonalBestPaceBaseline = this.raceComparisonTarget
-      ? null
-      : (this.personalBestPaceBaselineByRaceId?.[challenge?.id] ?? null);
-    const trackPersonalBest = getTrackPersonalBestForChallenge(this, challenge);
-    const ghostExpected = this.pbGhost?.enabled === true
-      && Number.isFinite(trackPersonalBest?.bestTime);
-    const noticeNeeded = ghostExpected
-      && !ghostActive
-      && typeof this.hud?.showGhostUnavailableNotice === 'function';
-    return { ghostActive, ghostExpected, noticeNeeded };
   },
 
   async loadInitialPersonalBestGhostAsset() {
@@ -460,23 +440,6 @@ export const dailyChallengeEngineMethods = {
     void prewarmNext();
   },
 
-  syncTrackMedalFromChallengeBest(challenge, bestTime) {
-    if (
-      !challenge?.trackKey ||
-      !Number.isFinite(bestTime)
-    ) {
-      return null;
-    }
-
-    const medal = getMedalForRaceTime(
-      challenge.trackKey,
-      Number(bestTime),
-      getDailyChallengeRequiredLaps(challenge),
-    );
-    writeTrackLastLapMedal(challenge.trackKey, medal);
-    return medal;
-  },
-
   async syncReadyBackgroundTrack(challenge = this.activeDailyChallenge) {
     const targetTrackKey =
       typeof challenge?.trackKey === "string" && challenge.trackKey
@@ -497,44 +460,6 @@ export const dailyChallengeEngineMethods = {
     }
 
     await this.loadTrack(targetTrackKey, { loadPlayerProgress: false });
-  },
-
-  syncChallengeHudPrimaryStats() {
-    const copyLabels = getDailyChallengeCopyLabels(this.activeDailyChallenge);
-    this.hud.setHudPrimaryMetric({
-      label: copyLabels.hudPrimaryLabel,
-      useTimer: true,
-      visible: true,
-    });
-    const comparisonTarget = this.raceComparisonTarget;
-    if (comparisonTarget) {
-      this.hud.setComparisonTarget?.(comparisonTarget);
-    } else {
-      this.hud.setBestTime(this.bestLapTime, { persistToTrackCard: false });
-    }
-  },
-
-  getDailyChallengeProgressText() {
-    if (!this.currentChallengeRun) return "";
-
-    const requiredLaps = this.currentChallengeRun.requiredLaps || 1;
-    if (requiredLaps > 1) {
-      return `${Math.min(this.currentChallengeRun.completedLaps + 1, requiredLaps)} / ${requiredLaps}`;
-    }
-    return "1 / 1";
-  },
-
-  updateDailyChallengeHud() {
-    if (!this.currentChallengeRun) {
-      this.dailyChallengeUi.setDailyChallengeHud(null);
-      return;
-    }
-
-    this.syncChallengeHudPrimaryStats();
-    this.dailyChallengeUi.setDailyChallengeHud({
-      visible: true,
-      progressText: this.getDailyChallengeProgressText(),
-    });
   },
 
   setDailyChallengeLobbySummary(challenge) {
@@ -686,21 +611,6 @@ export const dailyChallengeEngineMethods = {
       endsAt: challenge.endsAt,
     });
     return snapshot;
-  },
-
-  createDailyChallengeRun(challenge) {
-    return {
-      challengeId: challenge.id,
-      trackKey: challenge.trackKey,
-      objectiveType: challenge.objectiveType,
-      rulesRevision: Number.isInteger(challenge.rulesRevision) ? challenge.rulesRevision : 0,
-      requiredLaps: getDailyChallengeRequiredLaps(challenge),
-      completedLaps: 0,
-      lastLapAt: 0,
-      bestLap: null,
-      bestLapSecBeforeLastLap: null,
-      recentLaps: [],
-    };
   },
 
   applyDailyChallenge(challenge) {
