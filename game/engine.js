@@ -328,12 +328,7 @@ export class RealTimeRacer {
       dailyChallengeUi: this.dailyChallengeUi,
     });
     this.selectedDailyChallengeId = null;
-    this.dailyCarousel = new TrackCarousel({
-      idPrefix: "daily-carousel",
-      onSelect: (challenge, card) => this.handleDailyCarouselSelect(challenge, card),
-      onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
-      onSettle: (card) => this.handleDailyCarouselSettled(card),
-      resolveExpiry: (card) => getDailyChallengeExpiry(card?.challenge),
+    const previewCarOptions = {
       getPreviewCarImage: () => (
         this.carSpriteAssetKey ? this.carSprite : null
       ),
@@ -346,6 +341,14 @@ export class RealTimeRacer {
           this.carSpriteDrawHeight * (CONFIG.carSpriteRenderScale ?? 1)
         ) / CONFIG.gridSize,
       }),
+    };
+    this.dailyCarousel = new TrackCarousel({
+      idPrefix: "daily-carousel",
+      onSelect: (challenge, card) => this.handleDailyCarouselSelect(challenge, card),
+      onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
+      onSettle: (card) => this.handleDailyCarouselSettled(card),
+      resolveExpiry: (card) => getDailyChallengeExpiry(card?.challenge),
+      ...previewCarOptions,
     });
     subscribeToDailyChallengeSnapshots(() => {
       if (this.activeRaceMode !== "daily") return;
@@ -358,18 +361,7 @@ export class RealTimeRacer {
         returnMode: "close",
       }),
       onSettle: (card) => this.handleCampaignCarouselSettled(card),
-      getPreviewCarImage: () => (
-        this.carSpriteAssetKey ? this.carSprite : null
-      ),
-      getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
-      getPreviewCarWorldSize: () => ({
-        width: (
-          this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
-        ) / CONFIG.gridSize,
-        height: (
-          this.carSpriteDrawHeight * (CONFIG.carSpriteRenderScale ?? 1)
-        ) / CONFIG.gridSize,
-      }),
+      ...previewCarOptions,
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => void this.activateMode("daily"),
