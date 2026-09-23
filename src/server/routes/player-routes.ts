@@ -1,4 +1,5 @@
 import type { Application, Response } from 'express';
+import { hasText } from '../value-guards.js';
 
 type PlayerPayload = {
     playerId: string | null;
@@ -14,15 +15,11 @@ export type PlayerRouteDependencies = {
     updateServerPlayerPreferences(input: Record<string, unknown>): Promise<PlayerPayload>;
 };
 
-function hasPlayerCredential(value: unknown): boolean {
-    return typeof value === 'string' && Boolean(value.trim());
-}
-
 function sendPlayerAuthorizationFailure(
     res: Response,
     { playerId, guestToken }: { playerId?: unknown; guestToken?: unknown },
 ): void {
-    if (hasPlayerCredential(playerId) || hasPlayerCredential(guestToken)) {
+    if (hasText(playerId) || hasText(guestToken)) {
         res.status(401).json({ error: 'Guest token is required for this player.' });
         return;
     }

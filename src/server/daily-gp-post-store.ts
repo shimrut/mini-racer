@@ -1,5 +1,5 @@
 import { redis, type RedisClient, type TxClientLike } from '@devvit/redis';
-import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
+import { createDailyGpRecordExpiration, DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
 
 export const DAILY_GP_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
@@ -15,10 +15,6 @@ export type DailyGpPostRecord = {
 };
 
 type DailyGpPostCreationLock = RedisLock;
-
-function createPostRecordExpiration(): Date {
-    return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
-}
 
 function normalizeSubredditName(subredditName: string): string {
     return subredditName.trim().toLowerCase();
@@ -83,7 +79,7 @@ export async function writeDailyGpPostRecordIfAbsent(record: DailyGpPostRecord):
     const key = createPostRecordKey(record.subredditName, record.challengeId);
     const result = await redis.set(key, JSON.stringify(record), {
         nx: true,
-        expiration: createPostRecordExpiration(),
+        expiration: createDailyGpRecordExpiration(),
     });
     return Boolean(result);
 }

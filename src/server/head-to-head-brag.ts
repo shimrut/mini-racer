@@ -15,6 +15,7 @@ import {
     submitHeadToHeadShareComment,
     writeHeadToHeadSharePreview,
 } from './head-to-head-share.js';
+import { formatChallengeResultTime } from './format-race-time.js';
 
 const PREFIX = 'miniracer:head-to-head:brag';
 
@@ -56,10 +57,6 @@ function challengeBragLines(
                 `Got a great time on ${trackName} - ${myTime}.`,
             ];
     }
-}
-
-function formatChallengeResultTime(timeMs: number): string {
-    return `${(timeMs / 1000).toFixed(3)}s`;
 }
 
 type ChallengeBragTier =

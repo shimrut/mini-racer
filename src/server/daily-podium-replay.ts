@@ -1,7 +1,7 @@
 import { reddit } from '@devvit/web/server';
-import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { isValidPbGhostTrace, type PbGhostTrace } from './pb-ghost-trace.js';
+import { isRecord, sha256Hex } from './value-guards.js';
 
 export const DAILY_PODIUM_REPLAY_MARKER = 'Podium replay data:';
 export const DAILY_PODIUM_REPLAY_FORMAT = 'MINIRACER-PODIUM-REPLAY-V1';
@@ -35,20 +35,12 @@ export type EncodedDailyPodiumReplay = {
     hash: string;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function isLapCount(value: unknown): value is 1 | 2 | 3 {
     return value === 1 || value === 2 || value === 3;
 }
 
 function isRank(value: unknown): value is 1 | 2 | 3 {
     return value === 1 || value === 2 || value === 3;
-}
-
-function sha256(value: string): string {
-    return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 export function sanitizePodiumReplayGhosts(
@@ -125,7 +117,7 @@ export function encodeDailyPodiumReplay(input: {
     if (token.length > MAX_PAYLOAD_CHARS) {
         throw new Error('Podium replay exceeds the Reddit text fallback limit.');
     }
-    return { envelope, token, hash: sha256(token) };
+    return { envelope, token, hash: sha256Hex(token) };
 }
 
 function extractToken(text: string): string | null {
@@ -148,7 +140,7 @@ export function decodeDailyPodiumReplay(
     if (!token || token.length > MAX_PAYLOAD_CHARS) {
         return { decoded: null, reason: 'replay_token_not_found' };
     }
-    if (expected?.replayDataHash && expected.replayDataHash !== sha256(token)) {
+    if (expected?.replayDataHash && expected.replayDataHash !== sha256Hex(token)) {
         return { decoded: null, reason: 'replay_hash_mismatch' };
     }
     const encodedLine = token.split('\n')[1] || '';
@@ -171,7 +163,7 @@ export function decodeDailyPodiumReplay(
         if (expected?.lapCount && envelope.lapCount !== expected.lapCount) {
             return { decoded: null, reason: 'replay_contract_mismatch' };
         }
-        return { decoded: { envelope, token, hash: sha256(token) } };
+        return { decoded: { envelope, token, hash: sha256Hex(token) } };
     } catch {
         return { decoded: null, reason: 'replay_decompress_failed' };
     }

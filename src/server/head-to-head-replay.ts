@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { getTrackName } from '../../game/track/catalog.js';
 import {
@@ -8,6 +7,8 @@ import {
     type HeadToHeadPostData,
     type HeadToHeadOrigin,
 } from './head-to-head-model.js';
+import { isRecord, sha256Hex } from './value-guards.js';
+import { formatHeadToHeadTime } from './format-race-time.js';
 
 export const HEAD_TO_HEAD_REPLAY_MARKER = 'Challenge replay data:';
 export const HEAD_TO_HEAD_REPLAY_FORMAT = 'MINIRACER-HEAD-TO-HEAD-REPLAY-V1';
@@ -41,10 +42,6 @@ export type EncodedHeadToHeadReplay = {
 
 export type DecodedHeadToHeadReplay = EncodedHeadToHeadReplay;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function isMedal(value: unknown): value is HeadToHeadPostData['medal'] {
     return value === null
         || value === 'author'
@@ -55,10 +52,6 @@ function isMedal(value: unknown): value is HeadToHeadPostData['medal'] {
 
 function isLapCount(value: unknown): value is 1 | 2 | 3 {
     return value === 1 || value === 2 || value === 3;
-}
-
-function sha256(value: string): string {
-    return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 function createEnvelope(
@@ -100,7 +93,7 @@ export function encodeHeadToHeadReplay(
     if (token.length > MAX_PAYLOAD_CHARS) {
         throw new Error('Head to Head replay exceeds the Reddit text fallback limit.');
     }
-    return { envelope, token, hash: sha256(token) };
+    return { envelope, token, hash: sha256Hex(token) };
 }
 
 export function isHeadToHeadReplayEnvelope(
@@ -199,7 +192,7 @@ export function decodeHeadToHeadReplay(
     if (!token || token.length > MAX_PAYLOAD_CHARS) return { decoded: null, reason: 'replay_token_not_found' };
     if (
         expectedPostData?.replayDataHash
-        && expectedPostData.replayDataHash !== sha256(token)
+        && expectedPostData.replayDataHash !== sha256Hex(token)
     ) return { decoded: null, reason: 'replay_hash_mismatch' };
     const encodedLine = token.split('\n')[1] || '';
     const encoded = encodedLine.slice(COMPRESSED_PREFIX.length);
@@ -217,7 +210,7 @@ export function decodeHeadToHeadReplay(
             decoded: {
                 envelope: parsed,
                 token,
-                hash: sha256(token),
+                hash: sha256Hex(token),
             },
         };
     } catch {
@@ -251,10 +244,4 @@ export function formatHeadToHeadTextFallback(
         throw new Error('Head to Head text fallback exceeds the Reddit limit.');
     }
     return text;
-}
-
-function formatHeadToHeadTime(timeMs: number): string {
-    const seconds = Math.floor(timeMs / 1000);
-    const milliseconds = timeMs % 1000;
-    return `${seconds}.${String(milliseconds).padStart(3, '0')}`;
 }

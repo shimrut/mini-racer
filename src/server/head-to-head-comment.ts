@@ -14,6 +14,7 @@ import {
     writeHeadToHeadSharePreview,
 } from './head-to-head-share.js';
 import { readUserCommentRecord } from './user-comment-submit.js';
+import { formatChallengeResultTime } from './format-race-time.js';
 
 const COMMENT_PREFIX = 'miniracer:head-to-head:comment';
 
@@ -76,10 +77,6 @@ function challengeCommentLines(
                 `Need more practice on ${trackName} - ${myTime} 🏎️`,
             ];
     }
-}
-
-function formatChallengeResultTime(timeMs: number): string {
-    return `${(timeMs / 1000).toFixed(3)}s`;
 }
 
 export async function previewHeadToHeadComment(

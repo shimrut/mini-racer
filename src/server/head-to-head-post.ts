@@ -10,6 +10,7 @@ import {
     type HeadToHeadRecord,
 } from './head-to-head-model.js';
 import { decodeHeadToHeadReplay } from './head-to-head-replay.js';
+import { isRecord, isRedditPostId } from './value-guards.js';
 
 export type HeadToHeadPostContext = {
     postId?: string | null;
@@ -42,14 +43,6 @@ export type HeadToHeadResolution = {
     diff?: Record<string, unknown>;
     detail?: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function validPostId(value: unknown): value is `t3_${string}` {
-    return typeof value === 'string' && value.startsWith('t3_');
-}
 
 function validPostUrl(value: unknown): value is string {
     return typeof value === 'string' && Boolean(value);
@@ -188,9 +181,9 @@ function toChallengeRecord(
     contextPostId: string | null | undefined,
 ): HeadToHeadRecord | null {
     const postObject = isRecord(post) ? post : {};
-    const postId = validPostId(contextPostId)
+    const postId = isRedditPostId(contextPostId)
         ? contextPostId
-        : validPostId(postObject.id) ? postObject.id : null;
+        : isRedditPostId(postObject.id) ? postObject.id : null;
     const postUrl = validPostUrl(postObject.url) ? postObject.url : null;
     const subredditName = typeof postObject.subredditName === 'string'
         ? postObject.subredditName
@@ -213,7 +206,7 @@ export async function resolveHeadToHeadRecordResult(
     context: HeadToHeadPostContext = {},
 ): Promise<HeadToHeadResolution> {
     if (!challengeId) return { ok: false, reason: 'challenge_id_missing' };
-    if (!validPostId(context.postId)) return { ok: false, reason: 'post_id_missing' };
+    if (!isRedditPostId(context.postId)) return { ok: false, reason: 'post_id_missing' };
     let post: unknown;
     try {
         post = await reddit.getPostById(context.postId);
@@ -282,7 +275,7 @@ export async function resolveHeadToHeadRecord(
     if (result.reason !== 'challenge_id_missing' && result.reason !== 'post_id_missing') {
         console.warn('Head to Head resolution failed.', {
             challengeId: challengeId || null,
-            postId: validPostId(context.postId) ? context.postId : null,
+            postId: isRedditPostId(context.postId) ? context.postId : null,
             reason: result.reason,
             ...('detail' in result && result.detail ? { detail: result.detail } : {}),
         });

@@ -57,6 +57,8 @@ import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
 import { isProgressTransferPending } from './guest-retirement.js';
 import type { JudgedCompetitionContract } from './competition-submit.js';
 import type { ReplayValidationResult } from './replay-validator.js';
+import { isRecord } from './value-guards.js';
+import { formatHeadToHeadTime } from './format-race-time.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -369,12 +371,6 @@ function originContract(source: HeadToHeadSource): {
         : { originMode: origin.mode, originId: origin.challengeId };
 }
 
-export function formatHeadToHeadTime(timeMs: number): string {
-    const seconds = Math.floor(timeMs / 1000);
-    const milliseconds = timeMs % 1000;
-    return `${seconds}.${String(milliseconds).padStart(3, '0')}`;
-}
-
 export function formatHeadToHeadTitle(
     timeMs: number,
     trackKey: string,
@@ -474,10 +470,6 @@ function parsePreview(raw: string | null): PreviewTokenRecord | null {
     } catch {
         return null;
     }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function buildRecord(

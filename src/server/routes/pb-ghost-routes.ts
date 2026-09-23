@@ -1,4 +1,5 @@
 import type { Application, Response } from 'express';
+import { hasText } from '../value-guards.js';
 
 type TrackPbPayload = {
     playerId: string | null;
@@ -18,15 +19,11 @@ export type PbGhostRouteDependencies = {
     getServerPlayerPbGhost(input: Record<string, unknown>): Promise<PbGhostPayload>;
 };
 
-function hasCredential(value: unknown): boolean {
-    return typeof value === 'string' && Boolean(value.trim());
-}
-
 function sendAuthorizationFailure(
     res: Response,
     { playerId, guestToken }: { playerId?: unknown; guestToken?: unknown },
 ): void {
-    if (hasCredential(playerId) || hasCredential(guestToken)) {
+    if (hasText(playerId) || hasText(guestToken)) {
         res.status(401).json({ error: 'Guest token is required for this player.' });
         return;
     }

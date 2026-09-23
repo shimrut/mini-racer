@@ -1,5 +1,5 @@
 import { redis } from '@devvit/redis';
-import { DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
+import { createDailyGpRecordExpiration } from './daily-gp-model.js';
 import type { DailyGpPodiumPostData } from './daily-podium-model.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
 
@@ -14,10 +14,6 @@ export type DailyGpPodiumPostRecord = {
 };
 
 type DailyGpPodiumPostCreationLock = RedisLock;
-
-function createPodiumPostRecordExpiration(): Date {
-    return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
-}
 
 export type DailyGpPodiumPendingSnapshot = {
     subredditName: string;
@@ -138,7 +134,7 @@ export async function writeDailyGpPodiumPostRecordIfAbsent(
     const key = createPodiumPostRecordKey(record.subredditName, record.challengeId);
     const result = await redis.set(key, JSON.stringify(record), {
         nx: true,
-        expiration: createPodiumPostRecordExpiration(),
+        expiration: createDailyGpRecordExpiration(),
     });
     return Boolean(result);
 }

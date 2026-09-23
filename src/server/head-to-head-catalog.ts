@@ -10,6 +10,7 @@ import {
 } from './head-to-head-model.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { acquireRedisLock, releaseRedisLock } from './redis-lock.js';
+import { isRedditPostId } from './value-guards.js';
 
 const PREFIX = 'miniracer:head-to-head:catalog';
 const SWEEP_PAGE_SIZE = 100;
@@ -95,10 +96,6 @@ function sweepLockKey(subredditName: string): string {
     return `${PREFIX}:${keyPart(subredditName)}:sweep-lock`;
 }
 
-function validPostId(value: unknown): value is `t3_${string}` {
-    return typeof value === 'string' && value.startsWith('t3_');
-}
-
 function isStoredCount(value: unknown, allowNegative: boolean): boolean {
     if (value == null) return true;
     return Number.isSafeInteger(value) && (allowNegative || Number(value) >= 0);
@@ -147,7 +144,7 @@ function parseCard(raw: string | null): HeadToHeadCatalogCard | null {
         if (
             typeof parsed.challengeId !== 'string'
             || !parsed.challengeId
-            || !validPostId(parsed.postId)
+            || !isRedditPostId(parsed.postId)
             || typeof parsed.postUrl !== 'string'
             || !parsed.postUrl
             || typeof parsed.subredditName !== 'string'
@@ -492,7 +489,7 @@ export async function sweepHeadToHeadCatalog(
                 }
                 after = typeof post.id === 'string' ? post.id : after;
                 scanned += 1;
-                if (post?.removed === true || !validPostId(post?.id) || typeof post?.url !== 'string' || !post.url) {
+                if (post?.removed === true || !isRedditPostId(post?.id) || typeof post?.url !== 'string' || !post.url) {
                     skipped += 1;
                     continue;
                 }

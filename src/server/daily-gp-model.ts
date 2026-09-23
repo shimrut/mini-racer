@@ -40,6 +40,10 @@ export type DailyGpChallenge = {
     skin: 'default';
 };
 
+export function createDailyGpRecordExpiration(): Date {
+    return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
+}
+
 export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 3;
 }
