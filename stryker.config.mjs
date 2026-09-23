@@ -62,6 +62,7 @@ export default {
         'src/server/daily-post-service.ts',
         'src/server/daily-autopost-store.ts',
         'src/server/daily-podium-autopost-store.ts',
+        'src/server/autopost-subscription-store.ts',
         'src/server/daily-gp-history-backfill.ts'
     ],
     ignorePatterns: [
