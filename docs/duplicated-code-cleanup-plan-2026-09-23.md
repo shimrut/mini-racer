@@ -65,7 +65,8 @@ passes: 236 files, 3,011 tests. Differences from the plan:
 ## Phase 2 — Exact copies of small functions (player risk: low)
 
 **Done on 2026-09-23 (`ba98328`..`d3b5e4b`).** The suite passes: 237 files, 3,016 tests.
-The play-checks wait for the build watcher, which was not running. Differences from the plan:
+The local play-check (carousels, podium, replay view, analytics) and the playtest on
+r/mini_racer_dev (finish times, Head to Head, sharing) found no problem. Differences from the plan:
 
 - New shared files: `src/server/value-guards.ts`, `game/shared/values.js`, and
   `game/ui/dom.js`. The first two joined the Stryker list, because they hold code from
