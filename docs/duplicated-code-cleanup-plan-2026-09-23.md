@@ -121,6 +121,28 @@ suite passes: 237 files, 3,016 tests. Notes:
 The server already imports plain JavaScript from `game/shared/`. The shared files must stay
 plain JavaScript.
 
+**Compatibility check (2026-09-23).** Phase 4 does not touch the race simulation or the
+replay validator. Findings that change the steps:
+
+- The server makes every ghost. The client sends only its inputs, and
+  `src/server/replay-validator.ts` records the ghost while it replays them. The client decoder
+  only reads ghosts that the server made. The shared check must keep the server's rules and
+  must not become looser.
+- 4.2: the server measures the ghost size in UTF-8 bytes with `Buffer`, which the browser does
+  not have. The client counts characters. Both give the same number for a real ghost, which is
+  ASCII only. The shared check must use `TextEncoder`, which gives bytes on both sides. The
+  shared file must not import `node:crypto` or use `Buffer`.
+- 4.4: the game uses `getUtcDayIndex` only for a fallback cache expiry. The server alone
+  decides the live day. The lap count in `preview.js` and `reddit-post-title.ts` reads
+  `objectiveParams.lapCount` without the objective type, but the validator uses
+  `getDailyChallengeRequiredLaps`. `normalizeDailyGpRaceContract` rejects any challenge where
+  the two differ, so they agree today. Use `getDailyChallengeRequiredLaps` in both places, and
+  do not make a third copy.
+- 4.5: `formatRaceTime` writes the time into the podium post text. Its output must stay
+  the same, byte for byte.
+- No step adds a network call. Offline play, the verification queue, and "Continue Offline"
+  are not touched.
+
 | Step | Change | Size | Check |
 |---|---|---|---|
 | 4.1 | Put the ghost format constants in one file in `game/shared/`: schema version, sample interval, the two scales, and the compression prefix (§2). The server, the client decoder, and the debug tool import them. The logic does not change. | S | Ghost tests (12 files) |
