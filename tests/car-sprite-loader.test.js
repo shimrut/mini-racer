@@ -87,7 +87,7 @@ describe("CarSpriteLoader selection settlement", () => {
     const resultPromise = load(loader, "assets/cars/selected.webp");
 
     images[0].listeners.error();
-    expect(images[0].src).toBe("public/assets/cars/selected.webp");
+    expect(images[0].src).toBe("/public/assets/cars/selected.webp");
     images[0].listeners.load();
 
     await expect(resultPromise).resolves.toEqual({

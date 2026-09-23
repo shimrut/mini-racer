@@ -9,10 +9,10 @@ export function getCarAssetUrlCandidates(assetName) {
   const primary = assetName.startsWith("public/")
     ? assetName.slice("public/".length)
     : assetName;
+  // Root-based, so the link works from a page in any folder.
   return [
-    primary,
-    `public/${primary}`,
-    `./${primary}`,
+    `/${primary}`,
+    `/public/${primary}`,
   ];
 }
 

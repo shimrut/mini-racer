@@ -1558,7 +1558,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     loader.prefetch("assets/cars/mr_mr_red.webp");
 
     expect(imageInstances).toHaveLength(1);
-    expect(imageInstances[0].src).toBe("assets/cars/mr_mr_red.webp");
+    expect(imageInstances[0].src).toBe("/assets/cars/mr_mr_red.webp");
 
     global.Image = originalImage;
   });
@@ -1590,7 +1590,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     const record = loader.prefetch("assets/cars/mr_mr_red.webp");
 
     imageInstances[0].listeners.error();
-    expect(imageInstances[0].src).toBe("public/assets/cars/mr_mr_red.webp");
+    expect(imageInstances[0].src).toBe("/public/assets/cars/mr_mr_red.webp");
     imageInstances[0].listeners.load();
     await expect(record.promise).resolves.toBe(imageInstances[0]);
 
@@ -1599,9 +1599,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
 
   it("exposes built and source-local car asset URL candidates", () => {
     expect(getCarAssetUrlCandidates("assets/cars/mr_mr_red.webp")).toEqual([
-      "assets/cars/mr_mr_red.webp",
-      "public/assets/cars/mr_mr_red.webp",
-      "./assets/cars/mr_mr_red.webp",
+      "/assets/cars/mr_mr_red.webp",
+      "/public/assets/cars/mr_mr_red.webp",
     ]);
   });
 
