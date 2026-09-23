@@ -52,32 +52,20 @@ import {
   TRACK_PRESENTATION_SURFACES,
 } from "../track/presentation.js";
 import { isLobbyPaintEligible } from "../lobby/deferred-work.js";
+import {
+  bumpPbGhostPrepareGeneration,
+  claimPbGhostSelection,
+  getPbGhostSelectionChallengeId,
+  getPendingPbGhostCandidates,
+  getTrackPersonalBestForChallenge,
+  normalizeTrackPersonalBest,
+} from "../challenge-run/engine-methods.js";
 
 function isDailyChallengeStillPlayable(challenge) {
   if (!challenge || typeof challenge !== "object") return false;
   const availableUntilMs = Date.parse(challenge.availableUntil || "");
   if (!Number.isFinite(availableUntilMs)) return true;
   return Date.now() < availableUntilMs;
-}
-
-function normalizeTrackPersonalBest(record, trackKey = null, challengeId = null) {
-  if (!record || typeof record !== "object") return null;
-  if (trackKey && record.trackKey && record.trackKey !== trackKey) return null;
-  const bestTimeMs = Number(record.bestTimeMs);
-  if (!Number.isFinite(bestTimeMs) || bestTimeMs <= 0) return null;
-  return {
-    challengeId,
-    trackKey: record.trackKey || trackKey || null,
-    bestTime: bestTimeMs / 1000,
-    checkpointTimesSec: Array.isArray(record.checkpointTimesSec)
-      ? record.checkpointTimesSec.slice()
-      : null,
-    lapCompletionTimesSec: Array.isArray(record.lapCompletionTimesSec)
-      ? record.lapCompletionTimesSec.slice()
-      : null,
-    ghostAvailable: Boolean(record.ghostAvailable || record.ghost),
-    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : null,
-  };
 }
 
 function isValidCanonicalTrackPersonalBest(record, trackKey) {
@@ -100,61 +88,9 @@ function isValidCanonicalTrackPersonalBest(record, trackKey) {
   return record.ghost === null || normalizePbGhostRecord(record) !== null;
 }
 
-function getTrackPersonalBestForChallenge(engine, challenge) {
-  if (!challenge?.trackKey || !challenge?.id) return null;
-  if (
-    engine.trackPersonalBestResult?.challengeId === challenge.id
-    && engine.trackPersonalBestResult?.trackKey === challenge.trackKey
-    && Number.isFinite(engine.trackPersonalBestResult.bestTime)
-  ) {
-    return engine.trackPersonalBestResult;
-  }
-  return engine.trackPersonalBestByTrackKey?.[challenge.id] || null;
-}
-
-function getPbGhostSelectionChallengeId(engine) {
-  return engine.pbGhostSelectionChallengeId
-    || engine.activeDailyChallenge?.id
-    || engine.currentDailyChallenge?.id
-    || null;
-}
-
 function resolveJourneyStartReason({ replacesCurrentRun = false } = {}) {
   if (replacesCurrentRun) return "track_switch";
   return "initial_start";
-}
-
-function claimPbGhostSelection(engine, challengeId) {
-  const normalizedId = challengeId || null;
-  if (engine.pbGhostSelectionChallengeId === normalizedId) {
-    return engine.pbGhostSelectionGeneration || 0;
-  }
-  if (normalizedId && engine.unavailablePbGhostChallengeIds?.has(normalizedId)) {
-    engine.unavailablePbGhostChallengeIds.delete(normalizedId);
-  }
-  if (
-    normalizedId
-    && engine.pbGhostSelectionChallengeId == null
-    && engine.preparedPbGhostChallengeId === normalizedId
-  ) {
-    engine.pbGhostSelectionChallengeId = normalizedId;
-    engine.pbGhostSelectionGeneration = engine.pbGhostSelectionGeneration || 1;
-    return engine.pbGhostSelectionGeneration;
-  }
-  engine.pbGhostSelectionChallengeId = normalizedId;
-  engine.pbGhostSelectionGeneration = (engine.pbGhostSelectionGeneration || 0) + 1;
-  engine.preparedPbGhostChallengeId = null;
-  return engine.pbGhostSelectionGeneration;
-}
-
-function bumpPbGhostPrepareGeneration(engine, challengeId) {
-  if (!engine.pbGhostPrepareGenerationByChallengeId) {
-    engine.pbGhostPrepareGenerationByChallengeId = Object.create(null);
-  }
-  const nextGeneration =
-    (engine.pbGhostPrepareGenerationByChallengeId[challengeId] || 0) + 1;
-  engine.pbGhostPrepareGenerationByChallengeId[challengeId] = nextGeneration;
-  return nextGeneration;
 }
 
 function isCurrentPbGhostPreparation(
@@ -168,13 +104,6 @@ function isCurrentPbGhostPreparation(
     && getPbGhostSelectionChallengeId(engine) === challengeId
     && (engine.pbGhostSelectionGeneration || 0) === selectionGeneration
   );
-}
-
-function getPendingPbGhostCandidates(engine) {
-  if (!engine.pendingPbGhostCandidateChallengeIds) {
-    engine.pendingPbGhostCandidateChallengeIds = new Set();
-  }
-  return engine.pendingPbGhostCandidateChallengeIds;
 }
 
 function applyTrackPersonalBest(engine, challenge, record, { prepareGhost = false } = {}) {

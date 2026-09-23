@@ -11,7 +11,7 @@ import { writeTrackLastLapMedal } from '../medals/last-lap-medal-storage.js';
 import { getLoadedClientTrack } from '../track/client-registry.js';
 import { buildLapRecord, pushRecentLap } from '../race/result-flow.js';
 
-function normalizeTrackPersonalBest(record, trackKey = null, challengeId = null) {
+export function normalizeTrackPersonalBest(record, trackKey = null, challengeId = null) {
     if (!record || typeof record !== 'object') return null;
     if (trackKey && record.trackKey && record.trackKey !== trackKey) return null;
     const bestTimeMs = Number(record.bestTimeMs);
@@ -31,7 +31,7 @@ function normalizeTrackPersonalBest(record, trackKey = null, challengeId = null)
     };
 }
 
-function getTrackPersonalBestForChallenge(engine, challenge) {
+export function getTrackPersonalBestForChallenge(engine, challenge) {
     if (!challenge?.trackKey || !challenge?.id) return null;
     if (
         engine.trackPersonalBestResult?.challengeId === challenge.id
@@ -43,14 +43,14 @@ function getTrackPersonalBestForChallenge(engine, challenge) {
     return engine.trackPersonalBestByTrackKey?.[challenge.id] || null;
 }
 
-function getPbGhostSelectionChallengeId(engine) {
+export function getPbGhostSelectionChallengeId(engine) {
     return engine.pbGhostSelectionChallengeId
         || engine.activeDailyChallenge?.id
         || engine.currentDailyChallenge?.id
         || null;
 }
 
-function claimPbGhostSelection(engine, challengeId) {
+export function claimPbGhostSelection(engine, challengeId) {
     const normalizedId = challengeId || null;
     if (engine.pbGhostSelectionChallengeId === normalizedId) {
         return engine.pbGhostSelectionGeneration || 0;
@@ -73,14 +73,14 @@ function claimPbGhostSelection(engine, challengeId) {
     return engine.pbGhostSelectionGeneration;
 }
 
-function bumpPbGhostPrepareGeneration(engine, challengeId) {
+export function bumpPbGhostPrepareGeneration(engine, challengeId) {
     engine.pbGhostPrepareGenerationByChallengeId ??= Object.create(null);
     const nextGeneration = (engine.pbGhostPrepareGenerationByChallengeId[challengeId] || 0) + 1;
     engine.pbGhostPrepareGenerationByChallengeId[challengeId] = nextGeneration;
     return nextGeneration;
 }
 
-function getPendingPbGhostCandidates(engine) {
+export function getPendingPbGhostCandidates(engine) {
     engine.pendingPbGhostCandidateChallengeIds ??= new Set();
     return engine.pendingPbGhostCandidateChallengeIds;
 }
