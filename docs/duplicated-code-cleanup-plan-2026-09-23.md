@@ -236,6 +236,13 @@ This phase removes only the copies that act the same in both files (§1).
 | 6.2 | Export 6 helpers from the shared module, and let Daily import them: `normalizeTrackPersonalBest`, `getTrackPersonalBestForChallenge`, `getPbGhostSelectionChallengeId`, `claimPbGhostSelection`, `bumpPbGhostPrepareGeneration`, and `getPendingPbGhostCandidates`. Do not touch `applyTrackPersonalBest`, because its two copies differ. | S | Full suite |
 | 6.3 | Delete the Daily copies of the 7 methods that act the same and call no helper that differs: `beginPersonalBestGhostRunAtGo`, `getDailyChallengeProgressText`, `createDailyChallengeRun`, `syncTrackMedalFromChallengeBest`, `syncChallengeHudPrimaryStats`, `updateDailyChallengeHud`, and `resolveTrackPersonalBestGhostPending`. Daily then runs the shared copies. | M | Full suite. Play-check: a full Daily race, with start, laps, finish, HUD, and personal-best ghost. |
 
+**Progress (2026-09-23, `efdf460`):** 6.1 and 6.3 are done. 6.2 was done earlier (`e0ecf60`).
+The seven Daily copies acted the same as the shared ones. One difference: the Daily
+`updateDailyChallengeHud` called the Daily UI without `?.`, so it threw when that UI was
+missing. The shared copy skips. `tests/daily-runtime-methods.test.js` now pins the five Daily
+methods that still override shared ones (the phase 7 race rules). A new Daily copy of a shared
+method fails that test. The suite passes: 243 files, 3,023 tests.
+
 ## Phase 7 — Decisions first (they change what players see, hear, or get)
 
 Each item needs an answer first. Then trace the player effect. Then change the code.
