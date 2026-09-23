@@ -1,5 +1,4 @@
 import { redis } from '@devvit/redis';
-import { createHash } from 'node:crypto';
 import {
     CAMPAIGN_ID,
     CAMPAIGN_STAGES,
@@ -74,6 +73,7 @@ import {
 } from './guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 import { isPlayerProgressSelectionPending } from './guest-retirement.js';
+import { playerFieldHash } from './value-guards.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -107,14 +107,10 @@ const CAMPAIGN_GUEST_CLEANUP_LIMIT = 10;
 export const CAMPAIGN_GUEST_EXPIRY_KEY = `campaign:${CAMPAIGN_ID}:guest-expiry`;
 const CAMPAIGN_GUEST_CLEANUP_THROTTLE_KEY = `${CAMPAIGN_GUEST_EXPIRY_KEY}:cleanup-throttle`;
 
-function playerField(playerId: string): string {
-    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
-}
-
 const progressKey = campaignProgressKey;
 
 function progressLockKey(playerId: string): string {
-    return `campaign:${CAMPAIGN_ID}:progress-lock:${playerField(playerId)}`;
+    return `campaign:${CAMPAIGN_ID}:progress-lock:${playerFieldHash(playerId)}`;
 }
 
 function isGuestPlayerId(playerId: string): boolean {
@@ -363,7 +359,7 @@ export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<
             const competition = competitionFor(stage);
             await transaction.zRem(competition.leaderboardKey, expired);
             await transaction.hDel(competition.entryHashKey, expired);
-            await transaction.hDel(competition.pbHashKey, expired.map(playerField));
+            await transaction.hDel(competition.pbHashKey, expired.map(playerFieldHash));
             await transaction.incrBy(competition.standingsRevisionKey, 1);
         }
         for (const playerId of expired) await transaction.del(progressKey(playerId));
@@ -923,7 +919,7 @@ async function captureClassifiedGuestCampaignSource(
         const competition = competitionFor(stage);
         const [rawEntry, rawPb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
-            redisCompressed.hGet(competition.pbHashKey, playerField(guestPlayerId)),
+            redisCompressed.hGet(competition.pbHashKey, playerFieldHash(guestPlayerId)),
             typeof redis.zScore === 'function'
                 ? redis.zScore(competition.leaderboardKey, guestPlayerId)
                 : Promise.resolve(null),
@@ -1181,7 +1177,7 @@ export async function mergeGuestCampaignProgress({
                     const validated = guestSource ? stageSource?.rawPb ?? null : null;
                     rawGuestPb = validated !== null
                         ? encodeRedisCompressedValue(validated)
-                        : await redis.hGet(guestCompetition.pbHashKey, playerField(guestPlayerId));
+                        : await redis.hGet(guestCompetition.pbHashKey, playerFieldHash(guestPlayerId));
                     if (!rawGuestPb) {
                         throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                     }
@@ -1197,10 +1193,10 @@ export async function mergeGuestCampaignProgress({
                         }
                         if (rawGuestPb) {
                             await transaction.hSet(redditCompetition.pbHashKey, {
-                                [playerField(redditPlayerId)]: rawGuestPb,
+                                [playerFieldHash(redditPlayerId)]: rawGuestPb,
                             });
                         } else if (replace) {
-                            await transaction.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
+                            await transaction.hDel(redditCompetition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                         }
                     });
                 }
@@ -1225,16 +1221,16 @@ export async function mergeGuestCampaignProgress({
                         ? stageSource?.rawPb ?? null
                         : await redisCompressed.hGet(
                             guestCompetition.pbHashKey,
-                            playerField(guestPlayerId),
+                            playerFieldHash(guestPlayerId),
                         );
                     if (!rawGuestPb) {
                         throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                     }
                     await redisCompressed.hSet(redditCompetition.pbHashKey, {
-                        [playerField(redditPlayerId)]: rawGuestPb,
+                        [playerFieldHash(redditPlayerId)]: rawGuestPb,
                     });
                 } else if (replace) {
-                    await redisCompressed.hDel(redditCompetition.pbHashKey, [playerField(redditPlayerId)]);
+                    await redisCompressed.hDel(redditCompetition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                 }
             }
         }
@@ -1304,7 +1300,7 @@ export async function cleanupGuestCampaignProgress({
             const competition = competitionFor(stage);
             await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
             await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
-            await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
+            await transaction.hDel(competition.pbHashKey, [playerFieldHash(guestPlayerId)]);
             await transaction.incrBy(competition.standingsRevisionKey, 1);
         }
         await transaction.del(progressKey(guestPlayerId));
@@ -1391,7 +1387,7 @@ export async function discardGuestCampaignProgress({
             await commit(async (transaction) => {
                 await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
                 await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
-                await transaction.hDel(competition.pbHashKey, [playerField(guestPlayerId)]);
+                await transaction.hDel(competition.pbHashKey, [playerFieldHash(guestPlayerId)]);
                 await transaction.incrBy(competition.standingsRevisionKey, 1);
             });
         }

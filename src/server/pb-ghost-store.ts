@@ -1,5 +1,4 @@
 import { redisCompressed as redis } from '@devvit/redis';
-import { createHash } from 'node:crypto';
 import type { Competition } from './competition.js';
 import {
     createTrackFingerprint,
@@ -20,6 +19,7 @@ import type {
     ObsoleteReason,
     StoredRecordClassification,
 } from './guest-transfer-source-classification.js';
+import { playerFieldHash } from './value-guards.js';
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -63,16 +63,12 @@ function getCompetitionRaceIdentity(competition: Competition): {
     return { rulesRevision: 1, lapCount: competition.lapCount };
 }
 
-function playerField(playerId: string): string {
-    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
-}
-
 export function challengeCollectionKey(challengeId: string): string {
     return `dailygp:challenge-pbs:${challengeId}`;
 }
 
 function playerChallengeLockKey(competitionId: string, playerId: string): string {
-    const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+    const playerHash = playerFieldHash(playerId);
     return `dailygp:challenge-pb-lock:${competitionId}:${playerHash}`;
 }
 
@@ -231,7 +227,7 @@ async function readCompatibleRecord({
     cleanupUnusable?: boolean;
 }): Promise<PlayerTrackPbRecord | null> {
     const collectionKey = competition.pbHashKey;
-    const field = playerField(playerId);
+    const field = playerFieldHash(playerId);
     const raw = await redis.hGet(collectionKey, field);
     const fingerprint = createTrackFingerprint(track);
     const raceIdentity = getCompetitionRaceIdentity(competition);
@@ -275,7 +271,7 @@ export async function getPlayerTrackPbRecords({
     const batchResults = await Promise.all(batches.map(async (batch) => {
         const rawRecords = await redis.hMGet(
             competition.pbHashKey,
-            batch.map(playerField),
+            batch.map(playerFieldHash),
         );
         return batch.map((playerId, index) => [
             playerId,
@@ -393,7 +389,7 @@ export async function upsertPlayerTrackPersonalBest({
         }
         const collectionKey = competition.pbHashKey;
         await transaction.hSet(collectionKey, {
-            [playerField(playerId)]: encodeRedisCompressedValue(JSON.stringify(record)),
+            [playerFieldHash(playerId)]: encodeRedisCompressedValue(JSON.stringify(record)),
         });
         if (ttlSeconds != null) {
             await transaction.expire(collectionKey, ttlSeconds);

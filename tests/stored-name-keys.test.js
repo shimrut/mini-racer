@@ -36,6 +36,8 @@ const {
     readLauncherPostRecord,
 } = await import('../src/server/launcher-post-store.ts');
 const { headToHeadShareResultKey } = await import('../src/server/head-to-head-share.ts');
+const { headToHeadCatalogCardsKey } = await import('../src/server/head-to-head-catalog.ts');
+const { readHeadToHeadPostIdentity } = await import('../src/server/head-to-head-store.ts');
 
 const SUBREDDIT = '  MiniRacerGame ';
 
@@ -75,5 +77,14 @@ describe('stored names from Reddit names', () => {
             username: ' SpeedyRacer ',
             timeMs: 7100,
         })).toBe('miniracer:head-to-head:shared:brag:h2h-1:speedyracer:7100');
+    });
+
+    it('keeps the Head to Head catalog and post identity keys', async () => {
+        expect(headToHeadCatalogCardsKey(' Mini Racer '))
+            .toBe('miniracer:head-to-head:catalog:mini%20racer:cards');
+        await readHeadToHeadPostIdentity(' Mini Racer ', ' Speedy Racer', 'race-1', 7100);
+        expect(mockRedis.get).toHaveBeenCalledWith(
+            'miniracer:head-to-head:post:mini%20racer:speedy%20racer:race-1:7100',
+        );
     });
 });

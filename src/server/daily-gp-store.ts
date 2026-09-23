@@ -140,6 +140,7 @@ import {
     SUBMISSION_LOCK_TTL_MS,
     type RankedSubmitReuseOptions,
 } from './competition-submit.js';
+import { playerFieldHash } from './value-guards.js';
 
 export {
     normalizePlayerPreferences,
@@ -298,7 +299,7 @@ function transferChallengeFromSpec(spec: GuestTransferDailyChallengeSpec): Daily
 async function captureCampaignStageEvidence(
     guestPlayerId: string,
 ): Promise<Record<string, string>> {
-    const playerField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
+    const playerField = playerFieldHash(guestPlayerId);
     const rows = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
         const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
         const [entry, pb, rank] = await Promise.all([
@@ -320,7 +321,7 @@ async function captureDailyEvidence(
     guestPlayerId: string,
     challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
 ): Promise<Record<string, string>> {
-    const field = dailyPlayerField(guestPlayerId);
+    const field = playerFieldHash(guestPlayerId);
     const rows = await Promise.all(challengeSpecs.map(async (spec) => {
         const competition = toDailyCompetition(transferChallengeFromSpec(spec));
         const [entry, pb, rank] = await Promise.all([
@@ -636,8 +637,6 @@ function preferencesAllowedByCarUnlocks(
     };
 }
 
-
-
 function createEmptyDailySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
     return createEmptySnapshot(toDailyCompetition(challenge), DAILY_GP_DEFAULT_LIMIT);
 }
@@ -889,9 +888,6 @@ export function normalizeOffset(offset: unknown): number {
     return Math.max(Math.trunc(Number(offset)), 0);
 }
 
-
-
-
 async function readFinalPodiumPositions(
     challenge: DailyGpChallenge,
 ): Promise<FinalDailyGpPodium['positions']> {
@@ -936,7 +932,6 @@ async function readFinalPodiumPositions(
     };
     return [positionAt(1), positionAt(2), positionAt(3)];
 }
-
 
 async function releaseSubmissionLocksSafely(
     locks: readonly RedisLock[],
@@ -1212,10 +1207,6 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
     return challenges;
 }
 
-function dailyPlayerField(playerId: string): string {
-    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
-}
-
 type ClassifiedGuestDailySource = {
     entry: ReturnType<typeof parseStoredEntry>;
     pb: Awaited<ReturnType<typeof getPlayerTrackPbRecord>>;
@@ -1232,7 +1223,7 @@ async function captureClassifiedGuestDailySource(
 ): Promise<ClassifiedGuestDailySource> {
     const [rawEntry, decodedPb, rank] = await Promise.all([
         redis.hGet(competition.entryHashKey, guestPlayerId),
-        redisCompressed.hGet(competition.pbHashKey, dailyPlayerField(guestPlayerId)),
+        redisCompressed.hGet(competition.pbHashKey, playerFieldHash(guestPlayerId)),
         typeof redis.zScore === 'function'
             ? redis.zScore(competition.leaderboardKey, guestPlayerId)
             : Promise.resolve(null),
@@ -1399,7 +1390,7 @@ export async function mergeGuestDailyProgress({
                     } else {
                         rawGuestPb = await redis.hGet(
                             competition.pbHashKey,
-                            dailyPlayerField(guestPlayerId),
+                            playerFieldHash(guestPlayerId),
                         );
                     }
                     if (!rawGuestPb) {
@@ -1417,10 +1408,10 @@ export async function mergeGuestDailyProgress({
                         }
                         if (rawGuestPb) {
                             await transaction.hSet(competition.pbHashKey, {
-                                [dailyPlayerField(redditPlayerId)]: rawGuestPb,
+                                [playerFieldHash(redditPlayerId)]: rawGuestPb,
                             });
                         } else if (replace) {
-                            await transaction.hDel(competition.pbHashKey, [dailyPlayerField(redditPlayerId)]);
+                            await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                         }
                     });
                 }
@@ -1445,7 +1436,7 @@ export async function mergeGuestDailyProgress({
                         await transaction.incrBy(competition.standingsRevisionKey, 1);
                     }
                     if (replace && !guestPb) {
-                        await transaction.hDel(competition.pbHashKey, [dailyPlayerField(redditPlayerId)]);
+                        await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                     }
                     if (!await commitOwnedRedisLockTransaction(transaction)) {
                         throw new GuestProgressSelectionRetryableError(
@@ -1458,13 +1449,13 @@ export async function mergeGuestDailyProgress({
                         ? guestSource.decodedPb
                         : await redisCompressed.hGet(
                             competition.pbHashKey,
-                            dailyPlayerField(guestPlayerId),
+                            playerFieldHash(guestPlayerId),
                         );
                     if (!rawGuestPb) {
                         throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
                     }
                     await redisCompressed.hSet(competition.pbHashKey, {
-                        [dailyPlayerField(redditPlayerId)]: rawGuestPb,
+                        [playerFieldHash(redditPlayerId)]: rawGuestPb,
                     });
                 }
             }
@@ -1522,7 +1513,7 @@ export async function cleanupGuestDailyProgress({
             }
             await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
             await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
-            await transaction.hDel(competition.pbHashKey, [dailyPlayerField(guestPlayerId)]);
+            await transaction.hDel(competition.pbHashKey, [playerFieldHash(guestPlayerId)]);
             await transaction.incrBy(competition.standingsRevisionKey, 1);
             if (!await commitOwnedRedisLockTransaction(transaction)) {
                 throw new GuestProgressSelectionRetryableError(
@@ -1573,7 +1564,7 @@ export async function discardGuestDailyProgress({
             }
             await transaction.hDel(competition.entryHashKey, [guestPlayerId]);
             await transaction.zRem(competition.leaderboardKey, [guestPlayerId]);
-            await transaction.hDel(competition.pbHashKey, [dailyPlayerField(guestPlayerId)]);
+            await transaction.hDel(competition.pbHashKey, [playerFieldHash(guestPlayerId)]);
             await transaction.incrBy(competition.standingsRevisionKey, 1);
             if (!await commitOwnedRedisLockTransaction(transaction)) {
                 throw new GuestProgressSelectionRetryableError(
@@ -3329,7 +3320,6 @@ export async function prepareServerDailyLeaderboardRace({
         selection,
     });
 }
-
 
 export async function submitServerDailyGpRun({
     playerId,

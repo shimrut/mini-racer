@@ -1,5 +1,4 @@
 import { redis, type RedisClient } from '@devvit/redis';
-import { createHash } from 'node:crypto';
 import {
     buildCarUnlockSnapshot,
 } from '../../game/car/car-unlock-policy.js';
@@ -17,6 +16,7 @@ import {
     GuestProgressRecoveryRequiredError,
     GuestProgressSelectionRetryableError,
 } from './guest-progress-selection-error.js';
+import { playerFieldHash } from './value-guards.js';
 
 type CampaignResultMap = Record<string, { medal?: unknown }>;
 export type CarUnlockSnapshot = ReturnType<typeof buildCarUnlockSnapshot>;
@@ -34,20 +34,16 @@ const REWARD_LOCK_RETRY_DELAYS_MS = [10, 20, 40, 80, 160, 320];
 
 class CarUnlockProgressBusyError extends Error {}
 
-function playerKeyHash(playerId: string): string {
-    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
-}
-
 export function carUnlockHashKey(playerId: string): string {
-    return `miniracer:car-unlocks:v1:${playerKeyHash(playerId)}`;
+    return `miniracer:car-unlocks:v1:${playerFieldHash(playerId)}`;
 }
 
 function promotionKey(playerId: string): string {
-    return `miniracer:car-unlocks:promotion:v1:${playerKeyHash(playerId)}`;
+    return `miniracer:car-unlocks:promotion:v1:${playerFieldHash(playerId)}`;
 }
 
 function owedRewardKey(playerId: string): string {
-    return `miniracer:car-unlocks:owed:v1:${playerKeyHash(playerId)}`;
+    return `miniracer:car-unlocks:owed:v1:${playerFieldHash(playerId)}`;
 }
 
 function promotionLockKey(playerId: string): string {
@@ -99,11 +95,11 @@ export async function readGuestPromotionTarget(
 }
 
 function transferBaselineKey(accountPlayerId: string): string {
-    return `miniracer:car-unlocks:transfer-baseline:v1:${playerKeyHash(accountPlayerId)}`;
+    return `miniracer:car-unlocks:transfer-baseline:v1:${playerFieldHash(accountPlayerId)}`;
 }
 
 function transferJournalKey(accountPlayerId: string): string {
-    return `miniracer:car-unlocks:transfer-journal:v1:${playerKeyHash(accountPlayerId)}`;
+    return `miniracer:car-unlocks:transfer-journal:v1:${playerFieldHash(accountPlayerId)}`;
 }
 
 const TRANSFER_JOURNAL_FIELD_LIMIT = 64;

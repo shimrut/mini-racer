@@ -5,6 +5,7 @@ import {
     releaseRedisLock,
     type RedisLock,
 } from './redis-lock.js';
+import { redisKeyPart } from './value-guards.js';
 
 const PREFIX = 'miniracer:head-to-head';
 const CREATE_LOCK_TTL_MS = 15 * 60_000;
@@ -28,17 +29,13 @@ export type HeadToHeadAcceptRecord = {
     medal: HeadToHeadMedal;
 };
 
-function keyPart(value: string): string {
-    return encodeURIComponent(value.trim().toLowerCase());
-}
-
 function postKey(
     subredditName: string,
     username: string,
     raceId: string,
     bestTimeMs: number,
 ): string {
-    return `${PREFIX}:post:${keyPart(subredditName)}:${keyPart(username)}:${raceId}:${bestTimeMs}`;
+    return `${PREFIX}:post:${redisKeyPart(subredditName)}:${redisKeyPart(username)}:${raceId}:${bestTimeMs}`;
 }
 
 function acceptKey(token: string): string {
@@ -51,7 +48,7 @@ function createCountKey(
     trackKey: string,
     utcDate: string,
 ): string {
-    return `${PREFIX}:create-count:${keyPart(subredditName)}:${keyPart(username)}:${keyPart(trackKey)}:${utcDate}`;
+    return `${PREFIX}:create-count:${redisKeyPart(subredditName)}:${redisKeyPart(username)}:${redisKeyPart(trackKey)}:${utcDate}`;
 }
 
 function createLockKey(

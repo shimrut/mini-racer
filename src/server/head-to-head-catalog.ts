@@ -10,7 +10,7 @@ import {
 } from './head-to-head-model.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { acquireRedisLock, releaseRedisLock } from './redis-lock.js';
-import { isRedditPostId, normalizeName } from './value-guards.js';
+import { isRedditPostId, normalizeName, redisKeyPart } from './value-guards.js';
 
 const PREFIX = 'miniracer:head-to-head:catalog';
 const SWEEP_PAGE_SIZE = 100;
@@ -60,24 +60,20 @@ type SweepPost = {
     getPostData?: () => Promise<unknown>;
 };
 
-function keyPart(value: string): string {
-    return encodeURIComponent(value.trim().toLowerCase());
-}
-
 export function headToHeadCatalogCardsKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:cards`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:cards`;
 }
 
 export function headToHeadCatalogAllKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:all`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:all`;
 }
 
 function headToHeadCatalogByTrackKey(subredditName: string, trackKey: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:by-track:${keyPart(trackKey)}`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:by-track:${redisKeyPart(trackKey)}`;
 }
 
 export function headToHeadCatalogBandKey(subredditName: string, band: EngagementBand): string {
-    return `${PREFIX}:${keyPart(subredditName)}:by-band:${band}`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:by-band:${band}`;
 }
 
 export function headToHeadCatalogBandKeys(subredditName: string): string[] {
@@ -85,11 +81,11 @@ export function headToHeadCatalogBandKeys(subredditName: string): string[] {
 }
 
 function sweepCursorKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:sweep-cursor`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:sweep-cursor`;
 }
 
 function sweepLockKey(subredditName: string): string {
-    return `${PREFIX}:${keyPart(subredditName)}:sweep-lock`;
+    return `${PREFIX}:${redisKeyPart(subredditName)}:sweep-lock`;
 }
 
 function isStoredCount(value: unknown, allowNegative: boolean): boolean {
