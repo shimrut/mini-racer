@@ -3,7 +3,6 @@ import {
     buildCarUnlockSnapshot,
 } from '../../game/car/car-unlock-policy.js';
 import {
-    acquireRedisLock,
     beginOwnedRedisLockGroupTransaction,
     beginOwnedRedisLockTransaction,
     commitOwnedRedisLockTransaction,
@@ -17,6 +16,7 @@ import {
     GuestProgressSelectionRetryableError,
 } from './guest-progress-selection-error.js';
 import { playerFieldHash } from './value-guards.js';
+import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 type CampaignResultMap = Record<string, { medal?: unknown }>;
 export type CarUnlockSnapshot = ReturnType<typeof buildCarUnlockSnapshot>;
@@ -55,17 +55,13 @@ async function acquirePromotionLock(
     client: RedisClient,
     retryDelaysMs: readonly number[] = TRANSFER_LOCK_RETRY_DELAYS_MS,
 ) {
-    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
-        const lock = await acquireRedisLock(
-            promotionLockKey(playerId),
-            CAR_UNLOCK_PROMOTION_LOCK_TTL_MS,
-            client,
-        );
-        if (lock) return lock;
-        if (attempt < retryDelaysMs.length) {
-            await new Promise<void>((resolve) => setTimeout(resolve, retryDelaysMs[attempt]));
-        }
-    }
+    const lock = await acquireRedisLockWithRetry(
+        promotionLockKey(playerId),
+        CAR_UNLOCK_PROMOTION_LOCK_TTL_MS,
+        retryDelaysMs,
+        client,
+    );
+    if (lock) return lock;
     throw new CarUnlockProgressBusyError('Car unlock progress update is already in progress.');
 }
 

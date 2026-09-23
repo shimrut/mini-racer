@@ -74,6 +74,7 @@ import {
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 import { isPlayerProgressSelectionPending } from './guest-retirement.js';
 import { playerFieldHash } from './value-guards.js';
+import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -98,6 +99,7 @@ type CampaignProgress = {
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 const CAMPAIGN_PROGRESS_LOCK_TTL_MS = 30_000;
+const CAMPAIGN_PROGRESS_LOCK_RETRY_DELAYS_MS = [5, 5, 5, 5];
 const CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS = Math.max(
     1,
     Math.floor(CAMPAIGN_PROGRESS_LOCK_TTL_MS / 3),
@@ -274,13 +276,12 @@ async function mutateProgress(
     playerId: string,
     mutate: (progress: CampaignProgress) => CampaignProgress,
 ): Promise<CampaignProgress> {
-    let lock: RedisLock | null = null;
-    for (let attempt = 0; attempt < 5 && !lock; attempt += 1) {
-        lock = await acquireRedisLock(progressLockKey(playerId), CAMPAIGN_PROGRESS_LOCK_TTL_MS, redis);
-        if (!lock && attempt < 4) {
-            await new Promise<void>((resolve) => setTimeout(resolve, 5));
-        }
-    }
+    const lock = await acquireRedisLockWithRetry(
+        progressLockKey(playerId),
+        CAMPAIGN_PROGRESS_LOCK_TTL_MS,
+        CAMPAIGN_PROGRESS_LOCK_RETRY_DELAYS_MS,
+        redis,
+    );
     if (!lock) throw new CampaignProgressBusyError('Campaign progress update is already in progress.');
     try {
         const current = await readProgress(playerId);

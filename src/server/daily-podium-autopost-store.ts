@@ -1,15 +1,14 @@
 import { redis } from '@devvit/web/server';
 import {
-    acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
     type RedisLock,
 } from './redis-lock.js';
+import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 export const DAILY_PODIUM_AUTOPOST_SUBREDDITS_KEY = 'dailygp:podium-autopost:subreddits';
 const DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_TTL_MS = 30_000;
-const DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_ATTEMPTS = 5;
-const DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_RETRY_MS = 5;
+const DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_RETRY_DELAYS_MS = [5, 5, 5, 5];
 
 export type DailyPodiumAutopostSubscription = {
     subredditName: string;
@@ -81,24 +80,13 @@ function dailyPodiumAutopostSubscriptionLockKey(subredditName: string): string {
 async function acquireDailyPodiumAutopostSubscriptionLock(
     subredditName: string,
 ): Promise<RedisLock> {
-    const key = dailyPodiumAutopostSubscriptionLockKey(subredditName);
-    for (
-        let attempt = 0;
-        attempt < DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_ATTEMPTS;
-        attempt += 1
-    ) {
-        const lock = await acquireRedisLock(
-            key,
-            DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_TTL_MS,
-            redis,
-        );
-        if (lock) return lock;
-        if (attempt < DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_ATTEMPTS - 1) {
-            await new Promise<void>((resolve) => {
-                setTimeout(resolve, DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_RETRY_MS);
-            });
-        }
-    }
+    const lock = await acquireRedisLockWithRetry(
+        dailyPodiumAutopostSubscriptionLockKey(subredditName),
+        DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_TTL_MS,
+        DAILY_PODIUM_AUTOPOST_SUBSCRIPTION_LOCK_RETRY_DELAYS_MS,
+        redis,
+    );
+    if (lock) return lock;
     throw new DailyPodiumAutopostSubscriptionBusyError(
         'Daily podium autopost subscription update is already in progress.',
     );

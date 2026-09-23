@@ -8,7 +8,6 @@ import {
     type PbGhostTrace,
 } from './pb-ghost-trace.js';
 import {
-    acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
     type RedisLock,
@@ -20,6 +19,7 @@ import type {
     StoredRecordClassification,
 } from './guest-transfer-source-classification.js';
 import { playerFieldHash } from './value-guards.js';
+import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -36,21 +36,11 @@ export type PlayerTrackPbRecord = {
 };
 
 const PB_LOCK_TTL_MS = 30_000;
-const PB_LOCK_ACQUIRE_ATTEMPTS = 5;
-const PB_LOCK_ACQUIRE_RETRY_MS = 20;
+const PB_LOCK_RETRY_DELAYS_MS = [20, 20, 20, 20];
 const PB_READ_BATCH_SIZE = 10;
 
 async function acquirePersonalBestLock(lockKey: string): Promise<RedisLock | null> {
-    for (let attempt = 0; attempt < PB_LOCK_ACQUIRE_ATTEMPTS; attempt += 1) {
-        const lock = await acquireRedisLock(lockKey, PB_LOCK_TTL_MS, redis);
-        if (lock) return lock;
-        if (attempt < PB_LOCK_ACQUIRE_ATTEMPTS - 1) {
-            await new Promise<void>((resolve) => {
-                setTimeout(resolve, PB_LOCK_ACQUIRE_RETRY_MS);
-            });
-        }
-    }
-    return null;
+    return acquireRedisLockWithRetry(lockKey, PB_LOCK_TTL_MS, PB_LOCK_RETRY_DELAYS_MS, redis);
 }
 
 function getCompetitionRaceIdentity(competition: Competition): {
