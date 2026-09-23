@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createCanvas, Path2D as NodePath2D } from '@napi-rs/canvas';
+import { fileURLToPath } from 'node:url';
+import { createCanvas } from '@napi-rs/canvas';
 import { TRACK_SCHEDULE_KEYS, getTrackName } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
+import { ensurePath2D, isMainModule } from './node-script.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -18,12 +19,6 @@ const BG = '#010410';
 const SURFACE = '#0f172a';
 const TEXT = '#f8fafc';
 const ACCENT = '#ef4444';
-
-function ensurePath2D() {
-    if (typeof globalThis.Path2D === 'undefined') {
-        globalThis.Path2D = NodePath2D;
-    }
-}
 
 export function getShareImageAbsolutePath(trackKey, assetsRoot = join(repoRoot, 'assets')) {
     return join(assetsRoot, 'share', `${trackKey}.jpg`);
@@ -118,13 +113,7 @@ export function renderShareImageJpeg(trackKey, track = TRACKS[trackKey]) {
     return canvas.toBuffer('image/jpeg', SHARE_IMAGE_JPEG_QUALITY);
 }
 
-function isMainModule() {
-    const entry = process.argv[1];
-    if (!entry) return false;
-    return import.meta.url === pathToFileURL(entry).href;
-}
-
-if (isMainModule()) {
+if (isMainModule(import.meta.url)) {
     const { generated, skipped } = generateMissingShareImages();
     console.log(
         `generate-share-images: generated ${generated.length}, skipped ${skipped.length}`,

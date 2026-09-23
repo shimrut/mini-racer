@@ -25,6 +25,7 @@ tools/*
 !tools/mapmaker/
 !tools/mapmaker/*.js
 !tools/geometry.js
+!tools/node-script.js
 public/assets/logo/
 public/assets/medals/
 local-assets/

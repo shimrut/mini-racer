@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createCanvas, Path2D as NodePath2D, loadImage } from '@napi-rs/canvas';
+import { fileURLToPath } from 'node:url';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
 import { TRACKS } from '../game/track/tracks.js';
+import { ensurePath2D, isMainModule } from './node-script.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import {
     resolveTrackPresentation,
@@ -18,12 +19,6 @@ export const LP_TRACK_HEIGHT = 1620;
 export const LP_DEFAULT_TRACK_KEY = 'circuit';
 export const LP_BG = '#020617';
 export const LP_TRACK_INSET_RATIO = 0.1;
-
-function ensurePath2D() {
-    if (typeof globalThis.Path2D === 'undefined') {
-        globalThis.Path2D = NodePath2D;
-    }
-}
 
 export function getLpTrackAbsolutePath(lpRoot = join(repoRoot, 'LP')) {
     return join(lpRoot, 'track.png');
@@ -141,13 +136,7 @@ export async function generateLpTrackAsset(options = {}) {
     return { trackKey, outPath, bytes: buffer.byteLength };
 }
 
-function isMainModule() {
-    const entry = process.argv[1];
-    if (!entry) return false;
-    return import.meta.url === pathToFileURL(entry).href;
-}
-
-if (isMainModule()) {
+if (isMainModule(import.meta.url)) {
     const trackKey = parseTrackKeyFromArgv();
     const result = await generateLpTrackAsset({ trackKey });
     console.log(
