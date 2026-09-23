@@ -29,6 +29,7 @@ import {
     type EncodedDailyPodiumReplay,
 } from './daily-podium-replay.js';
 import { normalizeName } from './value-guards.js';
+import { isRedditAvatarUrl as isSharedRedditAvatarUrl } from '../../game/shared/reddit-avatar.js';
 import { formatChallengeDate } from './format-race-time.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
@@ -70,21 +71,7 @@ function emptyPosition(rank: 1 | 2 | 3): FinalDailyGpPodiumPosition {
 }
 
 export function isRedditAvatarUrl(value: unknown): value is string {
-    if (typeof value !== 'string') return false;
-    try {
-        const url = new URL(value);
-        const hostname = url.hostname.toLowerCase();
-        return url.protocol === 'https:' && (
-            hostname === 'redd.it'
-            || hostname.endsWith('.redd.it')
-            || hostname === 'redditmedia.com'
-            || hostname.endsWith('.redditmedia.com')
-            || hostname === 'redditstatic.com'
-            || hostname.endsWith('.redditstatic.com')
-        );
-    } catch {
-        return false;
-    }
+    return isSharedRedditAvatarUrl(value);
 }
 
 function sanitizePosition(

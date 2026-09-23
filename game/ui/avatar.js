@@ -1,3 +1,5 @@
+import { isRedditAvatarUrl } from '../shared/reddit-avatar.js';
+
 export const GENERIC_SNOO_URL = 'https://www.redditstatic.com/avatars/defaults/v2/avatar_default_0.png';
 
 const SILHOUETTE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`
@@ -7,25 +9,7 @@ const SILHOUETTE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
 
 export const AVATAR_PLACEHOLDER_SRC = `data:image/svg+xml,${SILHOUETTE}`;
 
-// Same hosts as daily-podium-service.ts.
-const REDDIT_AVATAR_HOSTS = [
-    'redd.it',
-    'redditmedia.com',
-    'redditstatic.com',
-];
-
-export function isRedditAvatarUrl(value) {
-    if (typeof value !== 'string') return false;
-    try {
-        const { protocol, hostname } = new URL(value);
-        if (protocol !== 'https:') return false;
-        return REDDIT_AVATAR_HOSTS.some(
-            (host) => hostname === host || hostname.endsWith(`.${host}`),
-        );
-    } catch {
-        return false;
-    }
-}
+export { isRedditAvatarUrl };
 
 export function resolveAvatarUrl(value) {
     return isRedditAvatarUrl(value) ? value : GENERIC_SNOO_URL;
