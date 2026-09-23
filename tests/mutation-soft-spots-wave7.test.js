@@ -5,9 +5,11 @@ import {
     normalizePlayerPreferences,
     parseStoredChallenge,
     parseStoredEntry,
+} from '../src/server/daily-gp-store.ts';
+import {
     parseStoredPlayerProfile,
     salvagePlayerPreferences,
-} from '../src/server/daily-gp-store.ts';
+} from '../src/server/competition-identity.ts';
 import {
     formatDailyGpShareComment,
     getValidShareRequestContext,

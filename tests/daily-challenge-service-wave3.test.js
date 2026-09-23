@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-    formatDailyChallengeBestLabel,
-    formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeSnapshot,
     prefetchDailyChallengeSnapshots,
 } from '../game/daily-challenge/service.js';
+import {
+    formatDailyChallengeBestLabel,
+    formatDailyChallengeResultLabel,
+} from '../game/daily-challenge/labels.js';
 import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 

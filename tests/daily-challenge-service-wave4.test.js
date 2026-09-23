@@ -3,13 +3,15 @@ import {
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengePlaylist,
-    getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshot,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
     resolveDailyPlaylistCacheExpiresAt,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
+import {
+    getDailyChallengeRequiredLaps,
+} from '../game/daily-challenge/labels.js';
 import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 

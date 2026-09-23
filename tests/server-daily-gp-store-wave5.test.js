@@ -139,7 +139,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('repairs one unreadable stored preference while keeping the rest (L472-L487)', async () => {
-        const { parseStoredPlayerProfile } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
 
         expect(parseStoredPlayerProfile(JSON.stringify({
             playerId: 'guest:wave5',

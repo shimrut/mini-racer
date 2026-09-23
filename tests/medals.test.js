@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { TRACK_CATALOG } from '../game/track/catalog.js';
 import {
+    getMedalRowSlots,
+    getWinOverlayAllMedalsUnlocked,
+    maxMedalTier,
+    shouldCelebrateMedalTier,
+    shouldShowPersonalBestMedalHero,
+    planFirstUnlockMedalRevealDelays,
+    FIRST_UNLOCK_MEDAL_HOLD_MS,
+    isPersonalBestTimeImprovement,
+    isStandardMedalTier,
+    resolveCombinedFinishHeadline,
+    renderChallengeFinishHero,
+} from '../game/medals/medals.js';
+import {
     TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
     getMedalForLapTime,
@@ -12,19 +25,8 @@ import {
     getTrackMedalThresholds,
     formatMedalTargetsLine,
     getCombinedMedalStackTiers,
-    getMedalRowSlots,
-    getWinOverlayAllMedalsUnlocked,
-    maxMedalTier,
     allStandardMedalsUnlocked,
-    shouldCelebrateMedalTier,
-    shouldShowPersonalBestMedalHero,
-    planFirstUnlockMedalRevealDelays,
-    FIRST_UNLOCK_MEDAL_HOLD_MS,
-    isPersonalBestTimeImprovement,
-    isStandardMedalTier,
-    resolveCombinedFinishHeadline,
-    renderChallengeFinishHero,
-} from '../game/medals/medals.js';
+} from '../game/medals/medal-timing.js';
 
 describe('medals', () => {
     it('exports a medal icon factory for the browser', async () => {

@@ -1,15 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
-    formatDailyChallengeBestLabel,
-    formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
-    getDailyChallengeCopyLabels,
-    getDailyChallengeObjectiveLabel,
     getDailyChallengePlaylist,
-    getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshot,
     getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
@@ -18,6 +13,13 @@ import {
     resolveDailyPlaylistCacheExpiresAt,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
+import {
+    formatDailyChallengeBestLabel,
+    formatDailyChallengeResultLabel,
+    getDailyChallengeCopyLabels,
+    getDailyChallengeObjectiveLabel,
+    getDailyChallengeRequiredLaps,
+} from '../game/daily-challenge/labels.js';
 import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 

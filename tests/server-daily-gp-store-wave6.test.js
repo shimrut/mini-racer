@@ -169,7 +169,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('preserves hasSeenGame=false on stored player profiles (L515)', async () => {
-        const { parseStoredPlayerProfile } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
 
         const profile = parseStoredPlayerProfile(JSON.stringify({
             playerId: 'guest:wave6',

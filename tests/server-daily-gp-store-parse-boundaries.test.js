@@ -31,8 +31,8 @@ vi.mock('../src/server/replay-validator.js', () => ({
 const {
     parseStoredChallenge,
     parseStoredEntry,
-    parseStoredPlayerProfile,
 } = await import('../src/server/daily-gp-store.ts');
+const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
 
 const VALID_CHALLENGE = {
     id: 'daily-gp-2026-07-11',

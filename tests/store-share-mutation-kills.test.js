@@ -197,7 +197,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('preserves explicit hasAnyData and epoch fallbacks for blank timestamp strings', async () => {
-            const { parseStoredPlayerProfile } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
             const epoch = new Date(0).toISOString();
 
             expect(parseStoredPlayerProfile(JSON.stringify({

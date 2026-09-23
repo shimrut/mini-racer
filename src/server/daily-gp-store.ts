@@ -144,11 +144,7 @@ import {
 import { playerFieldHash } from './redis-names.js';
 import { progressTransferPendingReply } from './progress-transfer-reply.js';
 
-export {
-    normalizePlayerPreferences,
-    parseStoredPlayerProfile,
-    salvagePlayerPreferences,
-} from './competition-identity.js';
+export { normalizePlayerPreferences } from './competition-identity.js';
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from './analytics-store.js';
 export { parseStoredEntry } from './competition-leaderboard.js';
 

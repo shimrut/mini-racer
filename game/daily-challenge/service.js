@@ -28,16 +28,8 @@ import { getChallengeTimeMs } from '../shared/values.js';
 import { DAY_MS, getUtcDayIndex, getUtcDayStart } from '../shared/utc-day.js';
 
 export {
-    formatDailyChallengeBestLabel,
-    formatDailyChallengeRemainingDuration,
-    formatDailyChallengeResultLabel,
-    formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
-    getDailyChallengeCopyLabels,
     getDailyChallengeExpiry,
-    getDailyChallengeObjectiveLabel,
-    getDailyChallengeRequiredLaps,
-    getStrictDailyChallengeLapCount,
     isDailyChallengeLapCount,
 } from './labels.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';

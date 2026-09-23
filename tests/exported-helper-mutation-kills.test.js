@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TRACK_KEY } from '../game/track/catalog.js';
 import {
-    formatDailyChallengeRemainingDuration,
-    formatDailyChallengeResultLabel,
-    formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
-    getDailyChallengeRequiredLaps,
     getDailyChallengeSnapshotIdsToFetch,
     isCachedActiveChallengeStillCurrent,
     isDailyChallengeStoredResultForChallenge,
@@ -14,6 +10,12 @@ import {
     resolveMockDailyTrackKey,
     toCachedActiveChallenge,
 } from '../game/daily-challenge/service.js';
+import {
+    formatDailyChallengeRemainingDuration,
+    formatDailyChallengeResultLabel,
+    formatDailyChallengeStatusDate,
+    getDailyChallengeRequiredLaps,
+} from '../game/daily-challenge/labels.js';
 import {
     CONTACT_EPSILON,
     getCollisionCandidates,

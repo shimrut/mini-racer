@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
-    formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
-    getDailyChallengeCopyLabels,
-    getDailyChallengeObjectiveLabel,
     getDailyChallengeTrackName,
     requestFeaturedDailyChallengeStart,
     resolveDailyPlaylistCacheExpiresAt,
 } from '../game/daily-challenge/service.js';
+import {
+    formatDailyChallengeResultLabel,
+    getDailyChallengeCopyLabels,
+    getDailyChallengeObjectiveLabel,
+} from '../game/daily-challenge/labels.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
 const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
