@@ -1,6 +1,6 @@
 import { queuePlayerPreferencesSave } from './preferences.js';
 import { getActivePlayerOwnerId } from './active-owner.js';
-import { claimVerificationEntriesForOwner } from '../scoreboard/verification-queue.js';
+import { claimVerificationEntriesForOwner } from '../scoreboard/verification-queue-transfer.js';
 import { recoverPlayerIdentity as chasePlayerIdentity } from './identity-recovery.js';
 
 const PROFILE_RECOVERY_DELAYS_MS = [0, 30_000, 120_000];

@@ -1,18 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-    claimVerificationEntriesForOwner,
     clearVerificationQueueTransferBlock,
     enqueueDailyChallengeVerification,
     getDueDailyChallengeVerifications,
     getNextVerificationAttemptAt,
-    isVerificationQueueGuestProgressReconciled,
     isVerificationQueueSubmissionBlocked,
-    prepareVerificationQueueGuestProgressReconciliation,
     readVerificationQueueTransferBlock,
     recordVerificationQueueTransferBlock,
     resetVerificationQueueForTests,
-    resolveVerificationQueueAfterGuestProgressSelection,
 } from '../game/scoreboard/verification-queue.js';
+import {
+    claimVerificationEntriesForOwner,
+    isVerificationQueueGuestProgressReconciled,
+    prepareVerificationQueueGuestProgressReconciliation,
+    resolveVerificationQueueAfterGuestProgressSelection,
+} from '../game/scoreboard/verification-queue-transfer.js';
 import {
     clearActivePlayerOwnerId,
     setActivePlayerOwnerId,

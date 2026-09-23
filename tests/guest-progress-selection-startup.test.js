@@ -16,7 +16,7 @@ describe('promoted guest startup selection', () => {
     afterEach(() => {
         vi.resetModules();
         vi.unstubAllGlobals();
-        vi.doUnmock('../game/scoreboard/verification-queue.js');
+        vi.doUnmock('../game/scoreboard/verification-queue-transfer.js');
     });
 
     it('hands off the loader before asking and uses the POST bootstrap without another GET', async () => {
@@ -219,8 +219,8 @@ describe('promoted guest startup selection', () => {
         vi.doMock('../game/player/guest-progress-selection.js', () => ({
             requestGuestProgressSelection,
         }));
-        vi.doMock('../game/scoreboard/verification-queue.js', async () => {
-            const actual = await vi.importActual('../game/scoreboard/verification-queue.js');
+        vi.doMock('../game/scoreboard/verification-queue-transfer.js', async () => {
+            const actual = await vi.importActual('../game/scoreboard/verification-queue-transfer.js');
             return {
                 ...actual,
                 hasVerificationEntriesForOwner: vi.fn(() => true),

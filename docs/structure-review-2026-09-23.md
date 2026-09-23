@@ -133,6 +133,11 @@ Branch `chore/structure-moves`, started from `chore/duplicate-cleanup` at `4ad66
   `src/server/player/player-account-store.ts` (641 lines). The Daily file is 2,872 lines.
   The new file imports from the Daily file; the Daily file does not import the new file.
 
+- Finding 3: done. The steps that settle the queue after a guest transfer, and move runs
+  between owners, are in `game/scoreboard/verification-queue-transfer.js` (337 lines). The
+  queue keeps the transfer-block records, because it checks them before each send. The
+  queue is 811 lines. The new file imports from the queue; the queue does not import it.
+
 ## Order of work
 
 1. Finding 4 (one file move).

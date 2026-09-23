@@ -21,10 +21,12 @@ import {
     markDailyChallengeVerificationPending,
     markDailyChallengeVerificationRejected,
     resetVerificationQueueForTests,
+} from '../game/scoreboard/verification-queue.js';
+import {
     claimVerificationEntriesForOwner,
     prepareVerificationQueueGuestProgressReconciliation,
-    resolveVerificationQueueAfterGuestProgressSelection
-} from '../game/scoreboard/verification-queue.js';
+    resolveVerificationQueueAfterGuestProgressSelection,
+} from '../game/scoreboard/verification-queue-transfer.js';
 import {
     clearActivePlayerOwnerId,
     getPlayerSessionId,

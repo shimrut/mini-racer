@@ -28,17 +28,19 @@ import { setActivePlayerOwnerId } from "./active-owner.js";
 import { requestGuestProgressSelection } from "./guest-progress-selection.js";
 import { requestServerSyncFailureChoice } from "./server-sync-failure.js";
 import {
-  hasVerificationEntriesForOwner,
-  moveVerificationEntriesToOwner,
   getCampaignVerificationEntriesForOwner,
-  prepareVerificationQueueGuestProgressReconciliation,
-  resolveVerificationQueueAfterGuestProgressSelection,
-  isVerificationQueueGuestProgressReconciled,
   recordVerificationQueueTransferBlock,
   clearVerificationQueueTransferBlock,
   confirmVerificationQueueTransferSafety,
   isVerificationQueueSubmissionBlocked,
 } from "../scoreboard/verification-queue.js";
+import {
+  hasVerificationEntriesForOwner,
+  moveVerificationEntriesToOwner,
+  prepareVerificationQueueGuestProgressReconciliation,
+  resolveVerificationQueueAfterGuestProgressSelection,
+  isVerificationQueueGuestProgressReconciled,
+} from "../scoreboard/verification-queue-transfer.js";
 import { clearDailyChallengeStoredData } from "../daily-challenge/storage.js";
 import { clearTrackLastLapMedals } from "../medals/last-lap-medal-storage.js";
 
