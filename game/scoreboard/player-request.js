@@ -1,4 +1,4 @@
-import { getGuestPlayerToken, getOrCreatePlayerId } from './api-client.js';
+import { getGuestPlayerToken, getOrCreatePlayerId } from './player-identity.js';
 
 export async function requestJsonWithTimeout(url, options = {}, timeoutMs) {
     const controller = typeof AbortController === 'function' && !options.signal
