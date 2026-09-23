@@ -57,8 +57,8 @@ import { resolveAuthorizedPlayerIdentity } from './competition-identity.js';
 import { isProgressTransferPending } from './guest-retirement.js';
 import type { JudgedCompetitionContract } from './competition-submit.js';
 import type { ReplayValidationResult } from './replay-validator.js';
-import { isRecord } from './value-guards.js';
 import { formatHeadToHeadTime } from './format-race-time.js';
+import { isRecord, normalizeName } from './value-guards.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -173,10 +173,6 @@ type PreviewTokenRecord = Omit<PreviewRecord, 'source'> & {
     };
     expiresAt: string;
 };
-
-function normalizeName(value: string): string {
-    return value.trim().toLowerCase();
-}
 
 function playerIdForUsername(username: string): string {
     return `reddit:${normalizeName(username)}`;

@@ -1,5 +1,6 @@
 import { redis } from '@devvit/redis';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
+import { normalizeName } from './value-guards.js';
 
 export const LAUNCHER_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
 
@@ -14,10 +15,6 @@ export type LauncherPostRecord = {
 };
 
 export const LAUNCHER_POSTS_KEY = 'miniracer:launcher-posts';
-
-function normalizeSubredditName(subredditName: string): string {
-    return subredditName.trim().toLowerCase();
-}
 
 function parseLauncherPostRecord(raw: string | null): LauncherPostRecord | null {
     if (!raw) return null;
@@ -48,11 +45,11 @@ function parseLauncherPostRecord(raw: string | null): LauncherPostRecord | null 
 }
 
 function launcherField(subredditName: string, kind: LauncherPostKind): string {
-    return `${normalizeSubredditName(subredditName)}:${kind}`;
+    return `${normalizeName(subredditName)}:${kind}`;
 }
 
 function launcherLockKey(subredditName: string, kind: LauncherPostKind): string {
-    return `miniracer:launcher-post-create-lock:${normalizeSubredditName(subredditName)}:${kind}`;
+    return `miniracer:launcher-post-create-lock:${normalizeName(subredditName)}:${kind}`;
 }
 
 export async function readLauncherPostRecord(

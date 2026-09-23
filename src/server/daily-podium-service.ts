@@ -28,6 +28,7 @@ import {
     podiumReplayHasGhost,
     type EncodedDailyPodiumReplay,
 } from './daily-podium-replay.js';
+import { normalizeName } from './value-guards.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
 const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -60,10 +61,6 @@ export function isDailyGpPodiumPublicationOpen(
         && availableUntilMs <= now.getTime()
         && now.getTime() < deadline.getTime()
     );
-}
-
-function normalizeName(value: string): string {
-    return value.trim().toLowerCase();
 }
 
 function formatChallengeDate(value: string, includeYear = false): string {

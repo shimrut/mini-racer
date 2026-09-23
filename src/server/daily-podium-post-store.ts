@@ -2,6 +2,7 @@ import { redis } from '@devvit/redis';
 import { createDailyGpRecordExpiration } from './daily-gp-model.js';
 import type { DailyGpPodiumPostData } from './daily-podium-model.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
+import { normalizeName } from './value-guards.js';
 
 export const DAILY_GP_PODIUM_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
 
@@ -22,20 +23,16 @@ export type DailyGpPodiumPendingSnapshot = {
     podium: DailyGpPodiumPostData;
 };
 
-function normalizeSubredditName(subredditName: string): string {
-    return subredditName.trim().toLowerCase();
-}
-
 export function createPodiumPostRecordKey(subredditName: string, challengeId: string): string {
-    return `dailygp:podium-post:${normalizeSubredditName(subredditName)}:${challengeId}`;
+    return `dailygp:podium-post:${normalizeName(subredditName)}:${challengeId}`;
 }
 
 function createPodiumPostCreationLockKey(subredditName: string, challengeId: string): string {
-    return `dailygp:podium-post-create-lock:${normalizeSubredditName(subredditName)}:${challengeId}`;
+    return `dailygp:podium-post-create-lock:${normalizeName(subredditName)}:${challengeId}`;
 }
 
 function createPodiumPendingSnapshotKey(subredditName: string, challengeId: string): string {
-    return `dailygp:podium-pending:${normalizeSubredditName(subredditName)}:${challengeId}`;
+    return `dailygp:podium-pending:${normalizeName(subredditName)}:${challengeId}`;
 }
 
 function parsePodiumPendingSnapshot(raw: string | null): DailyGpPodiumPendingSnapshot | null {

@@ -16,6 +16,7 @@ import {
     submitUserComment,
     type UserCommentRecord,
 } from './user-comment-submit.js';
+import { normalizeName } from './value-guards.js';
 
 export const HEAD_TO_HEAD_SHARE_PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SHARE_RECORD_TTL_SECONDS = 365 * 24 * 60 * 60;
@@ -50,7 +51,7 @@ export function headToHeadShareResultKey({
         'miniracer:head-to-head:shared',
         action,
         challengeId,
-        normalizeHeadToHeadName(username),
+        normalizeName(username),
         timeMs,
     ].join(':');
 }
@@ -60,10 +61,6 @@ export type HeadToHeadShareChallengeResolution = {
 } | {
     error: HeadToHeadServiceResult;
 };
-
-export function normalizeHeadToHeadName(value: string): string {
-    return value.trim().toLowerCase();
-}
 
 export function getSignedHeadToHeadContext(
     context: HeadToHeadRequestContext,
@@ -121,8 +118,8 @@ export async function resolveHeadToHeadShareChallenge(
     },
 ): Promise<HeadToHeadShareChallengeResolution> {
     const challenge = await resolveHeadToHeadRecord(challengeId, context);
-    if (!challenge || normalizeHeadToHeadName(challenge.subredditName)
-        !== normalizeHeadToHeadName(request.subredditName)) {
+    if (!challenge || normalizeName(challenge.subredditName)
+        !== normalizeName(request.subredditName)) {
         return {
             error: {
                 status: 404,
@@ -130,8 +127,8 @@ export async function resolveHeadToHeadShareChallenge(
             },
         };
     }
-    if (normalizeHeadToHeadName(request.username)
-        === normalizeHeadToHeadName(challenge.challengerUsername)) {
+    if (normalizeName(request.username)
+        === normalizeName(challenge.challengerUsername)) {
         return {
             error: {
                 status: 403,
@@ -211,8 +208,8 @@ export async function submitHeadToHeadShareComment({
         const preview = await readHeadToHeadSharePreview(tokenKey);
         if (!preview) return expiredResult;
         if (
-            normalizeHeadToHeadName(preview.username) !== normalizeHeadToHeadName(request.username)
-            || normalizeHeadToHeadName(preview.subredditName) !== normalizeHeadToHeadName(request.subredditName)
+            normalizeName(preview.username) !== normalizeName(request.username)
+            || normalizeName(preview.subredditName) !== normalizeName(request.subredditName)
         ) {
             return {
                 status: 403,
@@ -263,8 +260,8 @@ export async function submitHeadToHeadShareComment({
         }
         const published = outcome.record;
         if (
-            normalizeHeadToHeadName(published.authorName || '')
-            !== normalizeHeadToHeadName(preview.username)
+            normalizeName(published.authorName || '')
+            !== normalizeName(preview.username)
         ) {
             return {
                 status: 409,

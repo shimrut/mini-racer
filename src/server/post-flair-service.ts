@@ -1,4 +1,5 @@
 import { reddit } from '@devvit/web/server';
+import { normalizeName } from './value-guards.js';
 
 export type MiniRacerPostType =
     | 'daily-race'
@@ -11,10 +12,6 @@ const POST_FLAIR_TEXT_BY_TYPE: Record<MiniRacerPostType, string> = {
     'daily-podium': 'Podiums',
 };
 
-function normalizeFlairText(value: string): string {
-    return value.trim().toLowerCase();
-}
-
 export async function resolveMiniRacerPostFlairId(
     subredditName: string,
     postType: MiniRacerPostType,
@@ -23,7 +20,7 @@ export async function resolveMiniRacerPostFlairId(
     const templates = await reddit.getPostFlairTemplates(subredditName);
     const template = templates.find((candidate) => (
         typeof candidate?.text === 'string'
-        && normalizeFlairText(candidate.text) === normalizeFlairText(flairText)
+        && normalizeName(candidate.text) === normalizeName(flairText)
     ));
     const flairId = template?.id;
 

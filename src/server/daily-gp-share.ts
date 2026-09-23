@@ -28,6 +28,9 @@ import {
     type RedisLock,
     type RedisLockLease,
 } from './redis-lock.js';
+import { normalizeName } from './value-guards.js';
+
+export { normalizeName as normalizeShareName };
 
 export const DAILY_GP_SCORE_THREAD_TEXT = [
     '🏁 Mini Racer score thread',
@@ -75,14 +78,6 @@ export type ShareServiceResult = {
     status: number;
     body: Record<string, unknown>;
 };
-
-export function normalizeShareName(value: string): string {
-    return value.trim().toLowerCase();
-}
-
-function normalizeName(value: string): string {
-    return normalizeShareName(value);
-}
 
 function createSharePreviewKey(token: string): string {
     return `dailygp:share-preview:${token}`;

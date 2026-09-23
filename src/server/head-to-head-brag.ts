@@ -10,12 +10,12 @@ import {
     headToHeadShareResultKey,
     getSignedHeadToHeadContext,
     headToHeadSharePreviewKey,
-    normalizeHeadToHeadName,
     resolveHeadToHeadShareChallenge,
     submitHeadToHeadShareComment,
     writeHeadToHeadSharePreview,
 } from './head-to-head-share.js';
 import { formatChallengeResultTime } from './format-race-time.js';
+import { normalizeName } from './value-guards.js';
 
 const PREFIX = 'miniracer:head-to-head:brag';
 
@@ -103,8 +103,8 @@ export async function previewHeadToHeadBrag(
         };
     }
     if (
-        normalizeHeadToHeadName(acceptRecord.username)
-        !== normalizeHeadToHeadName(request.username)
+        normalizeName(acceptRecord.username)
+        !== normalizeName(request.username)
     ) {
         return {
             status: 403,

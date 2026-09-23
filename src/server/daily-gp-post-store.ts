@@ -1,6 +1,7 @@
 import { redis, type RedisClient, type TxClientLike } from '@devvit/redis';
 import { createDailyGpRecordExpiration, DAILY_GP_REDIS_TTL_SECONDS } from './daily-gp-model.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from './redis-lock.js';
+import { normalizeName } from './value-guards.js';
 
 export const DAILY_GP_POST_CREATE_CLAIM_TTL_MS = 15 * 60 * 1000;
 
@@ -16,16 +17,12 @@ export type DailyGpPostRecord = {
 
 type DailyGpPostCreationLock = RedisLock;
 
-function normalizeSubredditName(subredditName: string): string {
-    return subredditName.trim().toLowerCase();
-}
-
 export function createPostRecordKey(subredditName: string, challengeId: string): string {
-    return `dailygp:post:${normalizeSubredditName(subredditName)}:${challengeId}`;
+    return `dailygp:post:${normalizeName(subredditName)}:${challengeId}`;
 }
 
 function createPostCreationLockKey(subredditName: string, challengeId: string): string {
-    return `dailygp:post-create-lock:${normalizeSubredditName(subredditName)}:${challengeId}`;
+    return `dailygp:post-create-lock:${normalizeName(subredditName)}:${challengeId}`;
 }
 
 function parsePostRecord(raw: string | null): DailyGpPostRecord | null {
