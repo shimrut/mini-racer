@@ -64,7 +64,6 @@ describe('release pipeline', () => {
             'README.md',
             'assets/share/',
             'docs/',
-            'ok-let-s-plan-for-fluttering-horizon.md',
             'stryker.config.mjs',
             'tests/',
             'tools/*',

@@ -71,7 +71,7 @@ describe('local PB ghost size capture', () => {
       .toBeLessThan(measurement.sizes.recordJsonBytes);
   });
 
-  it('uses the portable gzip fallback when browser compression APIs are unavailable', async () => {
+  it('reports no gzip size when browser compression is unavailable', async () => {
     const previousCompressionStream = globalThis.CompressionStream;
     const previousResponse = globalThis.Response;
     globalThis.CompressionStream = undefined;
@@ -92,9 +92,9 @@ describe('local PB ghost size capture', () => {
         record: createLocalPbGhostStorageRecord({ trace }),
       });
 
-      expect(measurement.sizes.traceGzipBytes).toBeTypeOf('number');
-      expect(measurement.sizes.recordGzipBytes).toBeTypeOf('number');
-      expect(measurement.sizes.recordRedisValueBytes).toBeTypeOf('number');
+      expect(measurement.sizes.traceGzipBytes).toBeNull();
+      expect(measurement.sizes.recordGzipBytes).toBeNull();
+      expect(measurement.sizes.recordRedisValueBytes).toBeNull();
     } finally {
       globalThis.CompressionStream = previousCompressionStream;
       globalThis.Response = previousResponse;

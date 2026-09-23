@@ -1,4 +1,3 @@
-import { gzipSync as gzipSyncFallback } from 'fflate';
 import { finiteNumberOrNull } from '../shared/values.js';
 
 import {
@@ -238,19 +237,13 @@ async function readReadableByteLength(readable) {
 }
 
 async function gzipByteLength(value) {
-  if (typeof CompressionStream === 'function') {
-    try {
-      const stream = new CompressionStream('gzip');
-      const writer = stream.writable.getWriter();
-      await writer.write(getUtf8Bytes(value));
-      await writer.close();
-      return readReadableByteLength(stream.readable);
-    } catch (_error) {
-    }
-  }
-
+  if (typeof CompressionStream !== 'function') return null;
   try {
-    return gzipSyncFallback(getUtf8Bytes(value), { level: 6 }).byteLength;
+    const stream = new CompressionStream('gzip');
+    const writer = stream.writable.getWriter();
+    await writer.write(getUtf8Bytes(value));
+    await writer.close();
+    return readReadableByteLength(stream.readable);
   } catch (_error) {
     return null;
   }
