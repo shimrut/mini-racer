@@ -60,7 +60,6 @@ describe('release pipeline', () => {
             '.vscode/',
             'CHANGELOG.md',
             'FAQ.md',
-            'IGNORE SUPABASE',
             'LP/',
             'README.md',
             'assets/share/',

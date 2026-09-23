@@ -5,15 +5,10 @@ export { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
 export const PLAYER_SELECTABLE_CAR_ASSETS = GENERATED_PLAYER_SELECTABLE_CAR_ASSETS;
 
-const CAR_ASSET_URLS = Object.freeze(
-  Object.fromEntries(PLAYER_SELECTABLE_CAR_ASSETS.map((p) => [p, p]))
-);
-
 export function getCarAssetUrlCandidates(assetName) {
-  const assetUrl = CAR_ASSET_URLS[assetName] || assetName;
-  const primary = assetUrl.startsWith("public/")
-    ? assetUrl.slice("public/".length)
-    : assetUrl;
+  const primary = assetName.startsWith("public/")
+    ? assetName.slice("public/".length)
+    : assetName;
   return [
     primary,
     `public/${primary}`,

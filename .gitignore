@@ -9,7 +9,6 @@ dist/
 
 # Local-only config and non-publish folders
 package.devvit.local.json
-IGNORE SUPABASE/
 tools/*
 !tools/generate-player-car-assets.js
 !tools/generate-share-images.js

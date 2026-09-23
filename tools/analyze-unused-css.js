@@ -113,12 +113,10 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
     });
 
     const unusedIds = [];
-    const dynamicIds = [];
     const usedIds = [];
 
     ids.forEach(id => {
         let exactCount = 0;
-        let substringCount = 0;
 
         fileContents.forEach(f => {
             const exactRegex = new RegExp(`\\b${id}\\b`);
@@ -129,8 +127,6 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
 
         if (exactCount > 0) {
             usedIds.push(id);
-        } else if (substringCount > 0) {
-            dynamicIds.push(id);
         } else {
             unusedIds.push(id);
         }
@@ -140,7 +136,7 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
         totalClasses: classes.length,
         totalIds: ids.length,
         classes: { used: usedClasses, unused: unusedClasses, dynamic: dynamicClasses },
-        ids: { used: usedIds, unused: unusedIds, dynamic: dynamicIds }
+        ids: { used: usedIds, unused: unusedIds }
     };
 }
 

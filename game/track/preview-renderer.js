@@ -153,20 +153,9 @@ function buildMappedPath(points, mapPoint) {
 function drawNeonRoute(ctx, points, mapPoint) {
     if (points.length < 2) return;
 
-    const strokePass = (width, color, blur, shadowRgb) => {
+    const strokePass = (width, color) => {
         ctx.lineWidth = width;
         ctx.strokeStyle = color;
-        if (blur > 0) {
-            ctx.shadowColor = "transparent";
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-        } else {
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            ctx.shadowColor = "transparent";
-        }
         traceMappedPath(ctx, points, mapPoint, false);
         ctx.stroke();
     };
@@ -174,12 +163,16 @@ function drawNeonRoute(ctx, points, mapPoint) {
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 
-    strokePass(18, 'rgba(239, 68, 68, 0.12)', 22, 'rgba(239, 68, 68, 0.75)');
-    strokePass(10, 'rgba(239, 68, 68, 0.22)', 14, 'rgba(248, 113, 113, 0.65)');
-    strokePass(4, 'rgba(252, 165, 165, 0.85)', 6, 'rgba(254, 202, 202, 0.45)');
-    strokePass(2, '#fecaca', 0, 'transparent');
-    strokePass(1.25, CONFIG.curbRed, 0, 'transparent');
+    strokePass(18, 'rgba(239, 68, 68, 0.12)');
+    strokePass(10, 'rgba(239, 68, 68, 0.22)');
+    strokePass(4, 'rgba(252, 165, 165, 0.85)');
+    strokePass(2, '#fecaca');
+    strokePass(1.25, CONFIG.curbRed);
 
     ctx.restore();
 }
@@ -329,7 +322,6 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     startLine,
     startPos,
     startAngle = 0,
-    transparentBackground = false,
     showCarTrail = false,
     moveCarPastStartLine = false,
     carImage = null,
@@ -475,7 +467,6 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             startLine,
             startPos,
             startAngle,
-            transparentBackground,
             showCarTrail: payload.showSchematicCarTrail === true,
             moveCarPastStartLine: payload.moveSchematicCarPastStartLine === true,
             carImage: payload.schematicCarImage || null,
