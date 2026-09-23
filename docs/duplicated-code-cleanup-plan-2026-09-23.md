@@ -163,6 +163,40 @@ replay validator. Findings that change the steps:
 | 5.6 | CSS: one selector list for the sliding tab marker, in place of three rules. | S | Styles tests. Play-check: garage tabs, lobby mode switch, and settings switches. |
 | 5.7 | `engine.js`: one method for the car sound sync. The race loop and the settings switch call it. | S | Play-check: turn car sound off and on during a race |
 
+## Next batch — very low risk (planned 2026-09-23)
+
+This batch takes the "very low" items from phases 4, 5, and 6. Each step moves code that is
+the same in two places to one place. No step touches stored data or posted text. The order
+goes from the smallest to the largest check.
+
+| Step | Change | Size | Check |
+|---|---|---|---|
+| V1 (was 5.7) | Add one race method, `syncCarEffectsAudioFrame`, in `game/race/engine-methods.js`. The race loop and the car sound switch in `game/engine.js` call it. The race methods are always on the engine, so the settings switch can reach it. | S | Audio tests. Play-check: turn car sound off and on during a race. |
+| V2 (was 6.2) | Export six helpers from `game/challenge-run/engine-methods.js` and let `game/daily-challenge/engine-methods.js` import them: `normalizeTrackPersonalBest`, `getTrackPersonalBestForChallenge`, `getPbGhostSelectionChallengeId`, `claimPbGhostSelection`, `bumpPbGhostPrepareGeneration`, and `getPendingPbGhostCandidates`. Four have the same text. Two differ only in syntax. Do not touch `applyTrackPersonalBest`, because its two copies act differently. | S | Full suite. Play-check: a Daily race with a personal-best ghost. |
+| V3 (was 5.1) | In `game/race/result-flow.js`, one function builds the 14 shared fields for `buildModalRunsPayload` and `buildModalRunsViewOptions`. Each builder keeps its own two differences: the track key fallback chain (`buildModalRunsPayload` only) and the snapshot rule (`??` against `||`). | S | Result flow tests, including the mutation-kill tests. The file is in the Stryker list, so the new function stays in the same file. |
+| V4 (was 5.2) | In `game/track/preview-renderer.js`, one bounds function takes the points and the padding. `getTrackBoundsLayout` passes the track and padding 16. `getReplayLayout` passes the track plus the run and padding 28. Both keep what they return. | S | This code also draws the share images and the landing-page track. Render every share image to a temporary folder before and after, and compare the bytes. Play-check: carousel previews. |
+| V5 (was 4.1) | Put the ghost format numbers in `game/shared/pb-ghost-format.js`: schema version, sample rate and interval, maximum samples, maximum encoded bytes, simulation revision, and the two scales. The server, the client decoder, and the debug size tool read them from there. The logic does not change. | S | Ghost tests (12 files) and the typecheck. |
+
+**Notes for V5.** The typecheck covers only `src/**/*.ts` and does not read game files, so a
+value that the server reads from a game file has no exact type. `PbGhostTrace` uses
+`typeof PB_GHOST_SCHEMA_VERSION` and `typeof PB_GHOST_SAMPLE_INTERVAL_MS`. So
+`pb-ghost-trace.ts` re-exports each number with its exact type again (for example
+`as 2`). The existing tests pin the values. Seven test files import the numbers from
+`pb-ghost-trace.ts`, so they stay exported there. The shared file joins the Stryker list,
+because `pb-ghost-trace.ts` is in it. The Redis compression prefix stays out of this step:
+it is a storage setting, not part of the ghost format.
+
+**Dropped: 5.6, the tab indicator style.** `docs/css-architecture.md` gives each stylesheet
+one product area, and `tests/styles-architecture.test.js` checks each of the three rules in
+its own file. One shared rule would take styles away from their owners.
+
+**Found while planning (older bug, not changed):** in `styles/lobby-and-garage.css`, the
+`prefers-reduced-motion` rule for `.garage-tabs::before, .tracks-tabs::before` (line 375) comes
+before the base rule (line 499). Both have the same weight, so the later base rule wins, and the
+Garage and Tracks tab marker still slides for players who ask for less motion. The settings
+switch has its reduce-motion rule after its base rule, so it works. The lobby mode switch has
+no reduce-motion rule. The last change to this rule was `8529560` (2026-07-29).
+
 ## Phase 6 — Daily and shared race-run methods, the safe part (player risk: medium)
 
 This phase removes only the copies that act the same in both files (§1).
