@@ -165,6 +165,15 @@ replay validator. Findings that change the steps:
 
 ## Next batch — very low risk (planned 2026-09-23)
 
+**Done on 2026-09-23 (`9ef5378`..`da4b4b6`): V1 to V5.** After each step the suite passes
+in a clean worktree: 237 files, 3,016 tests. Notes:
+
+- V1: the two loop tests build stand-in engines. They now take the real
+  `syncCarEffectsAudioFrame`, as the spark test already takes `shouldAnimateFrame`.
+- V4: schematic, full, and full-with-run previews and the share image JPEG for all 134
+  tracks hash the same before and after. Two runs before the change gave the same hashes.
+- V5: `pb-ghost-trace.ts` states the exact types again (`as 2`, `as 20`, `as 1`).
+
 This batch takes the "very low" items from phases 4, 5, and 6. Each step moves code that is
 the same in two places to one place. No step touches stored data or posted text. The order
 goes from the smallest to the largest check.
