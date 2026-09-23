@@ -206,6 +206,26 @@ Garage and Tracks tab marker still slides for players who ask for less motion. T
 switch has its reduce-motion rule after its base rule, so it works. The lobby mode switch has
 no reduce-motion rule. The last change to this rule was `8529560` (2026-07-29).
 
+## Low batch (done 2026-09-23, `3fcb14c`..`e497133`)
+
+After each step the esbuild bundle check and the suite in a clean worktree pass: 238 files,
+3,018 tests.
+
+- 5.3: `readStoredChallengeResult` and `writeStoredChallengeResult` in
+  `game/daily-challenge/storage.js`.
+- 5.4: `showDailyVerificationState` in `game/scoreboard/engine-methods.js` replaces 7 of the
+  10 blocks. It is a module function, not an engine method. The other 3 only refresh the card,
+  and one more block updates the leaderboard before it refreshes the card, so they stay.
+- 4.4: `formatChallengeDate` moves to `src/server/format-race-time.ts`.
+  `game/shared/reddit-avatar.js` holds the avatar host check. `game/shared/utc-day.js` holds
+  `DAY_MS` (5 copies), `getUtcDayStart` (3), and `getUtcDayIndex` (2). `preview.js` and
+  `reddit-post-title.ts` use `getDailyChallengeRequiredLaps`.
+- 4.5: `game/shared/race-time-text.js`. `tests/race-time-text.test.js` pins the lobby text
+  and the podium post text, and it passed before the change.
+- 5.5: `startLeaseRenewal` in `src/server/redis-lock.ts`.
+- New files in the Stryker list: `format-race-time.ts`, `reddit-avatar.js`, `utc-day.js`,
+  `race-time-text.js`.
+
 ## Phase 6 — Daily and shared race-run methods, the safe part (player risk: medium)
 
 This phase removes only the copies that act the same in both files (§1).
