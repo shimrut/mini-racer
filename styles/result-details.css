@@ -471,7 +471,7 @@
 }
 
 #modal-combined-view.is-challenge-finish.active-view .challenge-result-lockup__outcome.is-incoming {
-    animation: slideInRight 0.5s var(--ease-glide) both;
+    animation: challengeOutcomePushIn 0.5s var(--ease-glide) both;
 }
 
 @keyframes challengeOutcomePushOut {
@@ -483,6 +483,18 @@
     to {
         opacity: 0;
         transform: translate3d(-120px, 0, 0) skewX(-20deg);
+    }
+}
+
+@keyframes challengeOutcomePushIn {
+    from {
+        opacity: 0;
+        transform: translate3d(120px, 0, 0) skewX(20deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) skewX(0);
     }
 }
 
@@ -560,6 +572,10 @@
 #modal-combined-view .combined-rank-container {
     letter-spacing: -0.025em;
     text-align: right;
+}
+
+#modal.modal--win #modal-combined-view .combined-stat-value--pb-delta {
+    font-size: 1rem;
 }
 
 #modal.modal--win #modal-combined-view .combined-rank-value.combined-rank-value--status {

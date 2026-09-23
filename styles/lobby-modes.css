@@ -150,6 +150,20 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch {
     position: relative;
 }
 
+body[data-lobby-mode="daily"] .lobby-mode-switch::before,
+body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
+    content: "";
+    position: absolute;
+    top: 0.15rem;
+    bottom: 0.15rem;
+    left: 0.15rem;
+    width: calc(50% - 0.15rem);
+    background-color: var(--accent-color);
+    border-radius: var(--radius-full);
+    transition: transform var(--dur-slow) var(--ease-settle);
+    z-index: 0;
+}
+
 body[data-lobby-mode="daily"] .lobby-mode-switch::before {
     transform: translateX(0);
 }

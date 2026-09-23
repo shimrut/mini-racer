@@ -482,10 +482,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .garage-tabs::before,
-.tracks-tabs::before,
-body[data-lobby-mode="daily"] .lobby-mode-switch::before,
-body[data-lobby-mode="campaign"] .lobby-mode-switch::before,
-#settings-modal .modal-sheet-settings-switch::before {
+.tracks-tabs::before {
     content: "";
     position: absolute;
     top: 0.15rem;
@@ -500,8 +497,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before,
 
 @media (prefers-reduced-motion: reduce) {
     .garage-tabs::before,
-    .tracks-tabs::before,
-    #settings-modal .modal-sheet-settings-switch::before {
+    .tracks-tabs::before {
         transition: none;
     }
 }
@@ -558,8 +554,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before,
     box-shadow: var(--menu-ring);
 }
 
-.garage-tab-panel,
-#daily-playlist-modal .tracks-tab-panel {
+.garage-tab-panel {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -821,9 +816,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before,
 }
 
 #garage-modal .garage-tab.is-selected,
-#garage-modal .garage-tab.is-selected:hover,
-#daily-playlist-modal .tracks-tab.is-selected,
-#daily-playlist-modal .tracks-tab.is-selected:hover {
+#garage-modal .garage-tab.is-selected:hover {
     background: transparent;
     color: #ffffff;
 }

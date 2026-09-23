@@ -187,7 +187,7 @@ describe('game stylesheet architecture', () => {
             /is-challenge-finish\.active-view \.combined-actions/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup__outcome\.is-incoming\s*\{[^}]*animation:\s*slideInRight 0\.5s var\(--ease-glide\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup__outcome\.is-incoming\s*\{[^}]*animation:\s*challengeOutcomePushIn 0\.5s var\(--ease-glide\) both;/,
         );
         expect(resultDetailStyles).toMatch(
             /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
@@ -670,6 +670,9 @@ describe('game stylesheet architecture', () => {
             /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*rgba\(51, 65, 85, 0\.7\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(trackShellStyles).toMatch(
+            /#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+        );
+        expect(trackShellStyles).toMatch(
             /#settings-modal \.modal-sheet-settings-switch:has\(:checked\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );
     });
@@ -683,11 +686,11 @@ describe('game stylesheet architecture', () => {
             /\.garage-tabs,\s*\.tracks-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs::before,\s*\.tracks-tabs::before,[^{]*\.lobby-mode-switch::before,[^{]*#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
-        const pillRule = garageStyles.search(/\.garage-tabs::before,\s*\.tracks-tabs::before,[^{]*\{/);
+        const pillRule = garageStyles.search(/\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{\s*content/);
         const reducedPill = garageStyles.search(
-            /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.garage-tabs::before,\s*\.tracks-tabs::before,\s*#settings-modal \.modal-sheet-settings-switch::before\s*\{\s*transition:\s*none;/,
+            /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{\s*transition:\s*none;/,
         );
         expect(reducedPill).toBeGreaterThan(pillRule);
         expect(garageStyles).toMatch(

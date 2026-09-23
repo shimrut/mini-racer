@@ -29,6 +29,10 @@
     pointer-events: none;
 }
 
+.hud-lap-cluster {
+    pointer-events: auto;
+}
+
 .hud-stats {
     display: flex;
     flex-direction: column;

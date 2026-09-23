@@ -269,6 +269,19 @@
     border-radius: var(--radius-full);
 }
 
+#settings-modal .modal-sheet-settings-switch::before {
+    content: "";
+    position: absolute;
+    top: 0.15rem;
+    bottom: 0.15rem;
+    left: 0.15rem;
+    width: calc(50% - 0.15rem);
+    background-color: var(--accent-color);
+    border-radius: var(--radius-full);
+    transition: transform var(--dur-slow) var(--ease-settle);
+    z-index: 0;
+}
+
 #settings-modal .modal-sheet-settings-switch:has(:checked)::before {
     transform: translateX(100%);
 }
@@ -298,6 +311,12 @@
 #settings-modal .modal-sheet-settings-switch:focus-visible,
 #settings-modal .modal-sheet-settings-switch__input:focus-visible {
     outline: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #settings-modal .modal-sheet-settings-switch::before {
+        transition: none;
+    }
 }
 
 #settings-modal .modal-sheet-settings-identity-head:has(.is-menu-selected) {
@@ -360,6 +379,19 @@
     border-radius: var(--radius-full);
     font-size: 0.88rem;
     letter-spacing: 0.05em;
+}
+
+#daily-playlist-modal .tracks-tab.is-selected,
+#daily-playlist-modal .tracks-tab.is-selected:hover {
+    background: transparent;
+    color: #ffffff;
+}
+
+#daily-playlist-modal .tracks-tab-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #daily-playlist-modal .tracks-tab-panel[hidden] {
