@@ -15,10 +15,7 @@ import {
     readHeadToHeadPosterPost,
     resolveHeadToHeadPosterAccess,
 } from './game/head-to-head/poster-access.js';
-
-function cleanText(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
+import { cleanText } from './game/shared/values.js';
 
 export const readHeadToHeadPostData = readHeadToHeadPosterPost;
 

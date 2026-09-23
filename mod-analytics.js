@@ -1,3 +1,4 @@
+import { setText } from './game/ui/dom.js';
 const SUMMARY_URL = '/api/analytics/summary';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -13,10 +14,6 @@ const SECTION_IDS = [
 ];
 const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
 const ANALYTICS_CHART_DAYS = 45;
-
-function setText(node, value) {
-    if (node) node.textContent = value;
-}
 
 function toCount(value) {
     const count = Number(value);

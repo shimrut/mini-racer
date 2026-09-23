@@ -1,12 +1,9 @@
 import { requestGameLaunchTarget } from '../modes/launch-target.js';
+import { cleanText } from '../shared/values.js';
 
 export const HEAD_TO_HEAD_POST_TYPE = 'head-to-head';
 export const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
 export const CHALLENGE_UNAVAILABLE_MESSAGE = 'This Head to Head is unavailable right now.';
-
-function cleanText(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
 
 function accountId(value) {
     const id = cleanText(value);

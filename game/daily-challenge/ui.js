@@ -22,12 +22,7 @@ import { formatCampaignStageLabel } from '../campaign/carousel-model.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
-
-function scheduleAfterModalPaint(callback) {
-    requestAnimationFrame(() => {
-        requestAnimationFrame(callback);
-    });
-}
+import { scheduleAfterModalPaint } from '../ui/dom.js';
 
 function renderPlaylistMessage(list, text) {
     const empty = document.createElement('div');

@@ -24,6 +24,7 @@ import {
     setDailyChallengeBestTime,
 } from './storage.js';
 import { isDailyChallengeLapCount } from './labels.js';
+import { getChallengeTimeMs } from '../shared/values.js';
 
 export {
     formatDailyChallengeBestLabel,
@@ -368,12 +369,6 @@ function cloneDailyPlaylist(challenges) {
     return Array.isArray(challenges)
         ? challenges.map((challenge) => cloneDailyChallenge(challenge)).filter(Boolean)
         : [];
-}
-
-function getChallengeTimeMs(challenge, field) {
-    const value = challenge?.[field];
-    if (typeof value !== 'string') return NaN;
-    return Date.parse(value);
 }
 
 function isChallengeStillUsable(challenge, nowMs = Date.now()) {

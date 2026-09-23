@@ -1,4 +1,5 @@
 import { gzipSync as gzipSyncFallback } from 'fflate';
+import { finiteNumberOrNull } from '../shared/values.js';
 
 const PB_GHOST_SCHEMA_VERSION = 2;
 const PB_GHOST_SAMPLE_INTERVAL_MS = 50;
@@ -12,11 +13,6 @@ const PB_GHOST_SIZE_REPORTS_KEY = 'MiniRacerPbGhostSizeReports';
 const PB_GHOST_SIZE_CAPTURES_KEY = 'MiniRacerPbGhostSizeCaptures';
 export const PB_GHOST_SIZE_ENABLED_STORAGE_KEY = 'MiniRacerPbGhostSizeEnabled';
 const PB_GHOST_TRACK_FINGERPRINT_LENGTH = 43;
-
-function finiteNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
 
 function quantizePose(timeSec, position, angle) {
   if (
@@ -328,7 +324,7 @@ export async function measurePbGhostStorage({ trace, record } = {}) {
     sampleCount: Array.isArray(trace?.deltas)
       ? 1 + trace.deltas.length / 3
       : 0,
-    finishTimeMs: finiteNumber(trace?.finishTimeMs),
+    finishTimeMs: finiteNumberOrNull(trace?.finishTimeMs),
     sizes: {
       traceJsonBytes,
       traceGzipBytes,
@@ -407,7 +403,7 @@ function createJsonOnlyMeasurement({ trace, record } = {}) {
     sampleCount: Array.isArray(trace?.deltas)
       ? 1 + trace.deltas.length / 3
       : 0,
-    finishTimeMs: finiteNumber(trace?.finishTimeMs),
+    finishTimeMs: finiteNumberOrNull(trace?.finishTimeMs),
     sizes: {
       traceJsonBytes,
       traceGzipBytes: null,

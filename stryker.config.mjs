@@ -30,6 +30,7 @@ export default {
         'game/shared/checkpoint-times.js',
 
         'game/shared/leaderboard-identity.js',
+        'game/shared/values.js',
 
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',

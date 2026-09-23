@@ -1,3 +1,4 @@
+import { finiteNumberOrNull } from '../shared/values.js';
 const PB_GHOST_SCHEMA_VERSION = 2;
 const SAMPLE_INTERVAL_MS = 50;
 const MAX_SAMPLES = 4000;
@@ -7,17 +8,12 @@ const ANGLE_SCALE = 1000;
 const GHOST_ALPHA = 0.24;
 const FINISH_FADE_MS = 500;
 
-function finiteNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
 function normalizeObjectSample(sample) {
   if (!sample || typeof sample !== 'object') return null;
-  const timeMs = finiteNumber(sample.timeMs ?? sample.t);
-  const x = finiteNumber(sample.x);
-  const y = finiteNumber(sample.y);
-  const angle = finiteNumber(sample.angle);
+  const timeMs = finiteNumberOrNull(sample.timeMs ?? sample.t);
+  const x = finiteNumberOrNull(sample.x);
+  const y = finiteNumberOrNull(sample.y);
+  const angle = finiteNumberOrNull(sample.angle);
   if (
     timeMs === null
     || x === null
@@ -113,7 +109,7 @@ export function normalizePbGhostRecord(record) {
   if (!samples) return null;
 
   return Object.freeze({
-    bestTimeMs: finiteNumber(record?.bestTimeMs),
+    bestTimeMs: finiteNumberOrNull(record?.bestTimeMs),
     samples: Object.freeze(samples),
     finishTimeMs: samples[samples.length - 1].timeMs,
   });

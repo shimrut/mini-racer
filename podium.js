@@ -10,6 +10,7 @@ import {
     fetchPodiumReplays,
     shouldUseLocalPodiumPreview,
 } from './podium-replay-view.js';
+import { cleanText } from './game/shared/values.js';
 
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';
@@ -162,10 +163,6 @@ function formatChallengeDate(value) {
         year: 'numeric',
         timeZone: 'UTC',
     }).format(date).toUpperCase();
-}
-
-function cleanText(value) {
-    return typeof value === 'string' ? value.trim() : '';
 }
 
 const PODIUM_ANALYTICS_URL = '/api/analytics/podium';

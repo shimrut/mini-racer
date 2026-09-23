@@ -15,6 +15,7 @@ import {
 import { applyAvatar } from '../ui/avatar.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
+import { setText } from '../ui/dom.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
 const TOGGLE_MODES = ['daily', 'campaign'];
@@ -24,10 +25,6 @@ const BLOCKING_OVERLAY_IDS = [
     'garage-modal',
     'daily-playlist-modal',
 ];
-
-function setText(element, value) {
-    if (element) element.textContent = value;
-}
 
 function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });

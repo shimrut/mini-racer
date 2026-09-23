@@ -1,25 +1,22 @@
-function normalizeNumber(value) {
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
+import { finiteNumberOrNull } from '../shared/values.js';
 
 function normalizeCount(value, fallback = 0) {
-    const count = normalizeNumber(value);
+    const count = finiteNumberOrNull(value);
     return count === null ? fallback : Math.max(0, Math.trunc(count));
 }
 
 function normalizeBestTimeSec(row) {
     if (!row || typeof row !== 'object') return null;
-    const bestTime = normalizeNumber(row.bestTime);
+    const bestTime = finiteNumberOrNull(row.bestTime);
     if (bestTime !== null) return bestTime;
-    const bestTimeSec = normalizeNumber(row.bestTimeSec);
+    const bestTimeSec = finiteNumberOrNull(row.bestTimeSec);
     if (bestTimeSec !== null) return bestTimeSec;
-    const bestTimeMs = normalizeNumber(row.bestTimeMs);
+    const bestTimeMs = finiteNumberOrNull(row.bestTimeMs);
     return bestTimeMs !== null ? bestTimeMs / 1000 : null;
 }
 
 function normalizeCompletedLaps(value) {
-    const laps = normalizeNumber(value);
+    const laps = finiteNumberOrNull(value);
     return laps === null ? null : Math.max(0, Math.trunc(laps));
 }
 
@@ -85,7 +82,7 @@ export function normalizeScoreboardSnapshot(raw) {
         totalCount,
         leaderboardEntryCount,
         objectiveType: typeof raw.objectiveType === 'string' ? raw.objectiveType : null,
-        playerRank: raw.playerRank != null ? normalizeNumber(raw.playerRank) : null,
+        playerRank: raw.playerRank != null ? finiteNumberOrNull(raw.playerRank) : null,
         playerRankLabel: raw.playerRankLabel != null ? String(raw.playerRankLabel) : null,
         pageOffset: normalizeCount(raw.pageOffset),
         pageLimit: normalizeCount(raw.pageLimit),

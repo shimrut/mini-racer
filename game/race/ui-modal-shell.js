@@ -23,15 +23,10 @@ import {
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
+import { scheduleAfterModalPaint } from '../ui/dom.js';
 
 function isButtonElement(node) {
     return typeof HTMLButtonElement !== 'undefined' && node instanceof HTMLButtonElement;
-}
-
-function scheduleAfterModalPaint(callback) {
-    requestAnimationFrame(() => {
-        requestAnimationFrame(callback);
-    });
 }
 
 const LEADERBOARD_SWIPE_MIN_DISTANCE_PX = 56;

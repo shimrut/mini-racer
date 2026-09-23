@@ -8,6 +8,7 @@ import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
 } from '../track/presentation.js';
+import { setText } from './dom.js';
 
 const legacyPreviewTracks = import.meta.env.MODE === 'test'
     ? (await import('../track/tracks.js')).TRACKS
@@ -21,10 +22,6 @@ const PROGRAMMATIC_SCROLL_TIMEOUT_MS = 1200;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const REQUIREMENT_CHECK_PATH =
     'M434.8 70.1c14.3 10.4 17.5 30.4 7.1 44.7l-256 352c-5.5 7.6-14 12.3-23.4 13.1s-18.5-2.7-25.1-9.3l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l101.5 101.5 234-321.7c10.4-14.3 30.4-17.5 44.7-7.1z';
-
-function setText(element, value) {
-    if (element) element.textContent = value;
-}
 
 function createUnlockMedalMeter(meter) {
     const icon = createMedalIconSvg('silver', {

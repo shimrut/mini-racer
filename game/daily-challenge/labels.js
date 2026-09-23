@@ -1,3 +1,4 @@
+import { getChallengeTimeMs } from '../shared/values.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 
@@ -8,12 +9,6 @@ export function isDailyChallengeLapCount(value) {
 export function getStrictDailyChallengeLapCount(challenge) {
     const lapCount = challenge?.objectiveParams?.lapCount;
     return isDailyChallengeLapCount(lapCount) ? lapCount : null;
-}
-
-function getChallengeTimeMs(challenge, field) {
-    const value = challenge?.[field];
-    if (typeof value !== 'string') return NaN;
-    return Date.parse(value);
 }
 
 export function getDailyChallengeRequiredLaps(challenge) {
