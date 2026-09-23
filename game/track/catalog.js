@@ -128,6 +128,7 @@ export const TRACK_CATALOG = {
     slateCircuit: { name: "Slate Circuit" },
     blackWater: { name: "Black Water" },
     ravenRock: { name: "Raven Rock" },
+    sharkBite: { name: "Shark Bite" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -244,6 +245,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'slateCircuit',
     'blackWater',
     'ravenRock',
+    'sharkBite',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

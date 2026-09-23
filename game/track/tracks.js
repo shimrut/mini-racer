@@ -127,6 +127,7 @@ import thunderCat from './definitions/thunder-cat.js';
 import slateCircuit from './definitions/slate-circuit.js';
 import blackWater from './definitions/black-water.js';
 import ravenRock from './definitions/raven-rock.js';
+import sharkBite from './definitions/shark-bite.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -259,8 +260,10 @@ const TRACK_GEOMETRY = {
     slateCircuit,
     blackWater,
     ravenRock,
+    sharkBite,
 };
 
+// Compatibility registry for existing gameplay and server consumers.
 export const TRACKS = Object.fromEntries(
     Object.keys(TRACK_CATALOG).map((trackKey) => [
         trackKey,

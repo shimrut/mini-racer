@@ -180,6 +180,7 @@ describe('track runtime integrity', () => {
             'slateCircuit',
             'blackWater',
             'ravenRock',
+            'sharkBite',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -216,8 +217,12 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
             '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
-        expect(hashTrackRegistry(TRACKS)).toBe(
+        const { sharkBite: _sharkBite, ...throughRavenRock } = TRACKS;
+        expect(hashTrackRegistry(throughRavenRock)).toBe(
             '4f6d9e60b03060b5e82472a02657774ee9d55be71800c7c3880dad06de6b3aa9',
+        );
+        expect(hashTrackRegistry(TRACKS)).toBe(
+            '867f6320ed2aec0af420e22f1f8b7821f8fe96bec8b03efa5cf3b5be814d56e4',
         );
     });
 

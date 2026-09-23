@@ -772,5 +772,11 @@
     "gold": 6.72,
     "silver": 6.85,
     "bronze": 7.00
+  },
+  "sharkBite": {
+    "author": 7.1,
+    "gold": 7.25,
+    "silver": 7.4,
+    "bronze": 7.8
   }
 }
