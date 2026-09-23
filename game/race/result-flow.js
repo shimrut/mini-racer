@@ -231,19 +231,9 @@ export function applyCombinedRankValue({
     clearCombinedRankTotal(rankTotalEl);
 }
 
-export function buildModalRunsPayload(source, {
-    currentTrackKey = null,
-    updates = null
-} = {}) {
-    if (!source || typeof source !== 'object') return null;
-
-    const normalized = {
-        lapTimesArray: source.listData ?? source.lapTimesArray ?? null,
-        bestTime: source.bestTime ?? source.lapTime ?? null,
-        currentTime: source.currentTime ?? source.lapTime ?? null,
+function buildRunsViewFields(source) {
+    const fields = {
         scoreboardChallengeId: source.scoreboardChallengeId || null,
-        scoreboardTrackKey: source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
-        scoreboardSnapshot: source.scoreboardSnapshot ?? null,
         scoreboardMode: source.scoreboardMode || 'daily',
         scoreboardTitle: source.scoreboardTitle || null,
         scoreboardSubhead: source.scoreboardSubhead || null,
@@ -266,11 +256,28 @@ export function buildModalRunsPayload(source, {
         allowLeaderboardOpen: source.allowLeaderboardOpen !== false
     };
     if (typeof source.leaderboardRailLabel === 'string' && source.leaderboardRailLabel) {
-        normalized.leaderboardRailLabel = source.leaderboardRailLabel;
+        fields.leaderboardRailLabel = source.leaderboardRailLabel;
     }
     if (typeof source.onRaceOpponent === 'function') {
-        normalized.onRaceOpponent = source.onRaceOpponent;
+        fields.onRaceOpponent = source.onRaceOpponent;
     }
+    return fields;
+}
+
+export function buildModalRunsPayload(source, {
+    currentTrackKey = null,
+    updates = null
+} = {}) {
+    if (!source || typeof source !== 'object') return null;
+
+    const normalized = {
+        lapTimesArray: source.listData ?? source.lapTimesArray ?? null,
+        bestTime: source.bestTime ?? source.lapTime ?? null,
+        currentTime: source.currentTime ?? source.lapTime ?? null,
+        scoreboardTrackKey: source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
+        scoreboardSnapshot: source.scoreboardSnapshot ?? null,
+        ...buildRunsViewFields(source),
+    };
 
     if (!updates || typeof updates !== 'object') {
         return normalized;
@@ -306,36 +313,10 @@ export function buildModalRunsViewOptions(payload) {
     if (!payload || typeof payload !== 'object') return {};
 
     const options = {
-        scoreboardChallengeId: payload.scoreboardChallengeId || null,
         scoreboardSnapshot: payload.scoreboardSnapshot || null,
-        scoreboardMode: payload.scoreboardMode || 'daily',
         scoreboardTrackKey: payload.scoreboardTrackKey || null,
-        scoreboardTitle: payload.scoreboardTitle || null,
-        scoreboardSubhead: payload.scoreboardSubhead || null,
-        leaderboardDayOptions: Array.isArray(payload.leaderboardDayOptions)
-            ? payload.leaderboardDayOptions
-            : null,
-        selectedLeaderboardDayId: payload.selectedLeaderboardDayId || null,
-        onSelectLeaderboardDay: typeof payload.onSelectLeaderboardDay === 'function'
-            ? payload.onSelectLeaderboardDay
-            : null,
-        onLoadMoreLeaderboard: typeof payload.onLoadMoreLeaderboard === 'function'
-            ? payload.onLoadMoreLeaderboard
-            : null,
-        onOpenStandings: typeof payload.onOpenStandings === 'function'
-            ? payload.onOpenStandings
-            : null,
-        primaryActionLabel: payload.primaryActionLabel || null,
-        primaryAction: typeof payload.primaryAction === 'function' ? payload.primaryAction : null,
-        showGlobalLeaderboard: payload.showGlobalLeaderboard !== false,
-        allowLeaderboardOpen: payload.allowLeaderboardOpen !== false
+        ...buildRunsViewFields(payload),
     };
-    if (typeof payload.leaderboardRailLabel === 'string' && payload.leaderboardRailLabel) {
-        options.leaderboardRailLabel = payload.leaderboardRailLabel;
-    }
-    if (typeof payload.onRaceOpponent === 'function') {
-        options.onRaceOpponent = payload.onRaceOpponent;
-    }
     return options;
 }
 
