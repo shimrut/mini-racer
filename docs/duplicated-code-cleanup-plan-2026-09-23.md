@@ -112,7 +112,7 @@ suite passes: 237 files, 3,016 tests. Notes:
 | 3.4 | One autopost store with inputs for the Daily and podium versions (§4c). Keep both Redis keys, the lock key prefixes, the messages, and all exported names. `storage-usage.ts` imports both key constants. | Medium | M | The 4 test files of each store |
 | 3.5 | Share `normalizeSubredditName` and the record parse frame in the three post record stores (§4d). Keep all keys. | Medium | M | Post store tests |
 | 3.6 | One guest-removal function with a label, in place of `cleanupGuestDailyProgress` and `discardGuestDailyProgress` (§4f). The code is the same, but this is the guest transfer area. | Medium | S | All guest transfer test files |
-| 3.7 | One replay-in-post codec with the format name, marker, and size limit as inputs (§3). Also one `collectFallbackTexts`. First add a round-trip test for each format, with a fixed payload from today's code. Podium and Head to Head posts on Reddit already hold this data. A wrong byte makes those posts unreadable. | Medium | M | The new round-trip tests and the replay tests. Play-check: open a podium replay and a Head to Head post. |
+| 3.7 | One replay-in-post codec with the format name, marker, and size limit as inputs (§3). Also one `collectFallbackTexts`. First pin decoding of a saved pre-refactor token and its hash for each format, then add round-trip tests. A fresh encode/decode pair can drift together while old Reddit posts become unreadable. Keep each format's marker, validation, and decompression limit. | Medium | M | The saved-token and round-trip tests and the replay tests. Play-check: open a podium replay and a Head to Head post. |
 | 3.8 | One client request module for Campaign and Head to Head: `requestJson`, `withPlayerIdentity`, `playerIdentityBody`, and `campaignUrl` (§6). The timeout is an input. | Low | S | Play-check: start a Campaign race and open a Head to Head challenge |
 | 3.9 | Optional: one frame for the 14 route handlers (§4h). Each route keeps its log line and its error text. | Low | M | Route contract tests |
 
@@ -244,27 +244,53 @@ Each item needs an answer first. Then trace the player effect. Then change the c
    `applyDailyChallenge`, `applyTrackPersonalBest` (and through it
    `prepareTrackPersonalBestGhost` and `applyVerifiedTrackPersonalBest`),
    `clearDailyChallengeRun`, and `markTrackPersonalBestGhostPending`. The question: do
-   Campaign and Head to Head follow the Daily rules? Recommendation: use the Daily rule by
-   default, because only the Daily copy has tests. Use the other rule only if the trace shows
-   a reason. After the answer, one copy of each method stays, and the Daily module keeps only
-   what is Daily's own.
+   Campaign and Head to Head follow the Daily rules? Recommendation after the current-code
+   check: decide each behavior separately. The last-played-day lobby choice is Daily-specific;
+   the faster session best and ghost rollback may be useful across modes, but need mode tests
+   and their supporting rollback path before adoption. Do not replace all shared methods with
+   the Daily versions as one step.
 2. **Post recovery (§4d).** Use one lookup for Daily and podium posts, and check the post
    type. Daily posts made before 2026-09-08 have no post type. Thus the rule must skip posts
-   of another known type and accept posts with no type. No player gets to this difference
-   today, so this step only prevents a future defect.
+   of another known type and accept posts with no type. Pin a same-challenge-id podium/Daily
+   collision in a test. The current scheduling makes the collision unlikely, but does not
+   prove that it cannot occur in every recovery state.
 3. **The double transfer check (§4e).** Daily and Campaign submits check twice, with two
-   different rules. Remove the first check, or make the two rules the same. The first check
-   replies before the other checks run. Thus a change can alter which message a player sees
-   in rare cases. This is the guest transfer area.
-4. **Race time formats (§5).** Choose one format for each place: lobby, finish sheet,
-   leaderboard, posts, and comments. Players read these times.
-5. **Audio (§7).** Use one audio context for the three sound modules, and add the idle pause
-   to medal sounds. This changes how sound starts on phones. Test on iOS and Android devices.
-6. **Fetch with a timeout (§6).** The 7 copies differ: some obey a cancel signal from the
-   caller, and one returns the raw response. Choose one rule, then merge. This is a technical
-   decision, and the value is low.
-7. **Page stylesheets (§10).** Share one base file (reset and colour tokens) between the
-   separate pages. Each page needs a build check and a visual check. The value is low.
+   different rules. Keep the first check for early rejection and the later check as a race
+   fence after the submission lock. Align their predicates only after testing stale identity
+   status and a transfer starting between the checks. The first check replies before the
+   other checks run, so removal can also change the message and the work spent on a rejected
+   run. This is the guest transfer area.
+4. **Race time formats (§5).** Preserve each current format during code cleanup: lobby,
+   finish sheet, leaderboard, posts, and comments. Standardizing their text is a separate
+   player-facing decision.
+5. **Audio (§7).** Give medal sounds an idle pause as a separate small change. A shared audio
+   context needs one owner to coordinate activity: the current car and music idle timers
+   could otherwise suspend medal or other sounds. Test any context change on iOS and Android.
+6. **Fetch with a timeout (§6).** The original audit found 7 blocks, but Campaign and Head to
+   Head now use `game/scoreboard/player-request.js` (step 3.8). The remaining callers differ:
+   some obey a cancel signal from the caller, and one returns the raw response. Choose one
+   cancellation/deadline rule while keeping each caller's response handling and timeout value.
+   This is a technical decision, and the value is low.
+7. **Page stylesheets (§10).** Keep page-owned body layouts separate. Share only identical
+   reset or colour tokens if that reduces real maintenance; a broad base file has low value
+   and can change the cascade. Each changed page needs a build and visual check.
+
+**Verification on 2026-09-23 (current `chore/duplicate-cleanup` branch):** The browser ghost
+decoder counts `JSON.stringify(trace).length`, while the server counts UTF-8 bytes. A trace
+with valid pose fields and 70,000 `é` characters in an extra field is accepted by the client
+at 70,106 characters and rejected by the server at 140,106 bytes. Normal server-generated
+traces contain only ASCII fields; step 4.2 should retain the server's byte limit and test a
+non-ASCII boundary case. Step 4.3 needs a browser-safe shared recorder: the current server
+module also imports `node:crypto`.
+
+The reduced-motion tab transition is still overridden by a later base rule in
+`styles/lobby-and-garage.css`. A fresh full preview of the older Albert Gardens track also
+reproduces the dark wedge; the fresh schematic preview does not. The combined-path fill is a
+candidate, not a proven cause. These are separate visual fixes, not duplication steps.
+
+At this snapshot, this branch is 47 commits after `chore/dead-code-removal`; both branch tips
+are outside local `main`. The working tree also contains unrelated user changes, so cleanup
+steps should preserve them.
 
 ## Leave as they are
 
