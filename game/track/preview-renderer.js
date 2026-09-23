@@ -82,11 +82,7 @@ function drawCurbs(ctx, path, presentation) {
     ctx.restore();
 }
 
-function getTrackBoundsLayout(trackGeometry, width, height) {
-    const padding = 16;
-    const trackOuter = trackGeometry?.outer ?? [];
-    const trackInner = trackGeometry?.inner ?? [];
-    const points = [...trackOuter, ...trackInner];
+function fitPointsLayout(points, width, height, padding) {
     const xs = points.map((point) => point.x);
     const ys = points.map((point) => point.y);
     const minX = Math.min(...xs);
@@ -108,33 +104,21 @@ function getTrackBoundsLayout(trackGeometry, width, height) {
     };
 }
 
+function getTrackBoundsLayout(trackGeometry, width, height) {
+    const trackOuter = trackGeometry?.outer ?? [];
+    const trackInner = trackGeometry?.inner ?? [];
+    return fitPointsLayout([...trackOuter, ...trackInner], width, height, 16);
+}
+
 function getReplayLayout(payload, width, height) {
-    const padding = 28;
     const trackOuter = payload.trackGeometry?.outer ?? [];
     const trackInner = payload.trackGeometry?.inner ?? [];
     const runHistory = payload.runHistory ?? [];
     const startPos = payload.startPos ?? trackOuter[0] ?? { x: 0, y: 0 };
     const endPos = runHistory[runHistory.length - 1] ?? startPos;
     const run = runHistory.length > 1 ? runHistory : [startPos, endPos];
-    const points = [...trackOuter, ...trackInner, ...run];
-    const xs = points.map((point) => point.x);
-    const ys = points.map((point) => point.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-    const usableWidth = width - padding * 2;
-    const usableHeight = height - padding * 2;
-    const scale = Math.min(usableWidth / Math.max(1, maxX - minX), usableHeight / Math.max(1, maxY - minY));
-    const offsetX = padding + (usableWidth - (maxX - minX) * scale) / 2;
-    const offsetY = padding + (usableHeight - (maxY - minY) * scale) / 2;
-
-    return {
-        mapPoint: (point) => ({
-            x: offsetX + (point.x - minX) * scale,
-            y: offsetY + (point.y - minY) * scale
-        })
-    };
+    const { mapPoint } = fitPointsLayout([...trackOuter, ...trackInner, ...run], width, height, 28);
+    return { mapPoint };
 }
 
 function traceMappedPath(ctx, points, mapPoint, closePath = false) {
