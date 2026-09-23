@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.18">
+    <link rel="stylesheet" href="mapmaker.css?v=2.19">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -16,6 +16,7 @@
             <a class="maker-link ghost-btn" href="tiktok-studio.html">TikTok Studio</a>
             <a class="maker-link ghost-btn" href="runner.html">Runner Lab</a>
             <a class="maker-link" href="../game.html">Back to Game</a>
+            <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
             <button id="save-track-btn" type="button">Save &amp; Integrate</button>
         </div>
     </header>
@@ -37,6 +38,7 @@
                     <button id="new-track-btn" type="button">New Blank</button>
                     <button id="duplicate-track-btn" type="button" class="ghost-btn">Duplicate</button>
                 </div>
+                <button id="remove-track-btn" type="button" class="danger-btn remove-track-btn">Remove Track</button>
 
                 <label class="field">
                     <span>Track Key</span>
@@ -88,7 +90,12 @@
                     <input id="line-smoothing-input" type="number" min="0" max="1" step="0.05">
                 </label>
 
-                <p id="draw-metrics-label" class="panel-note">Car 0.55×1.23u. Brush 3.85u (7 cars wide). Place the first point to start measuring straights.</p>
+                <p id="draw-metrics-label" class="panel-note">Road width 3.85u. Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.</p>
+
+                <div class="button-row">
+                    <button id="undo-edit-btn" type="button" class="ghost-btn" disabled>Undo</button>
+                    <button id="redo-edit-btn" type="button" class="ghost-btn" disabled>Redo</button>
+                </div>
 
                 <div class="button-row">
                     <button id="insert-point-btn" type="button">Insert Point</button>
@@ -117,6 +124,15 @@
                 <p id="selection-label" class="panel-note">No point selected.</p>
             </section>
 
+            <section class="maker-panel" aria-labelledby="quality-title">
+                <div class="panel-head">
+                    <h2 id="quality-title">Track Checks</h2>
+                    <span id="quality-count" class="pill">Draw a track</span>
+                </div>
+                <p id="quality-summary" class="panel-note">Draw a closed road to check its walls, start, and lap gates.</p>
+                <ul id="quality-issues" class="quality-issues"></ul>
+            </section>
+
             <section class="maker-panel">
                 <div class="panel-head">
                     <h2>Checkpoints</h2>
@@ -142,10 +158,12 @@
                 <p id="status-text" class="panel-note">Ready.</p>
                 <ul class="shortcut-list">
                     <li><kbd>Save &amp; Integrate</kbd> writes the selected definition and updates the catalog, schedule, and registry. New tracks are appended to the schedule.</li>
-                    <li><kbd>Line Build</kbd> places loop points one by one. Closing the loop paints a 7-car-wide road along that line. Use Line Smoothing for softer generated walls and Wall Corners for Sharp / Rounded / Soft race corner look.</li>
-                    <li>Ghost car at the start (and under the Line Build cursor) matches race collision size so lane width is easy to judge.</li>
+                    <li><kbd>Remove Track</kbd> discards an unsaved track or permanently removes a saved track from the repository after confirmation. Published race records can depend on saved tracks.</li>
+                    <li><kbd>Line Build</kbd> keeps the road open as you add points and previews each new bend. Hover over the first point to see the closed result, then click it to finish. Reframe fits the result on screen.</li>
+                    <li>The ghost car at the finished start position matches its race collision size.</li>
                     <li>Click any wall, checkpoint, or start marker to select it.</li>
                     <li><kbd>Backspace</kbd> removes the last draft point while building a new loop.</li>
+                    <li><kbd>Ctrl/Cmd</kbd> + <kbd>Z</kbd> and <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> undo and redo committed edits.</li>
                     <li><kbd>Esc</kbd> clears the current draft loop.</li>
                     <li>Drag a start line or checkpoint (the line or its end dots) to slide it along the track. End dots show length; dragging always moves the whole gate. Gates stay perpendicular and stick out past both walls.</li>
                     <li>Drag wall handles to move points.</li>
@@ -209,6 +227,28 @@
         </section>
     </main>
 
-    <script type="module" src="mapmaker.js?v=2.16"></script>
+    <dialog id="remove-track-dialog" class="maker-dialog" aria-labelledby="remove-track-dialog-title">
+        <form method="dialog">
+            <h2 id="remove-track-dialog-title">Remove track?</h2>
+            <p id="remove-track-dialog-message"></p>
+            <div class="maker-dialog-actions">
+                <button type="submit" value="cancel" class="ghost-btn">Cancel</button>
+                <button type="submit" value="remove" class="danger-btn">Remove Track</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="restore-drafts-dialog" class="maker-dialog" aria-labelledby="restore-drafts-dialog-title">
+        <form method="dialog">
+            <h2 id="restore-drafts-dialog-title">Restore unsaved maps?</h2>
+            <p id="restore-drafts-dialog-message"></p>
+            <div class="maker-dialog-actions">
+                <button type="submit" value="discard" class="ghost-btn">Discard Drafts</button>
+                <button type="submit" value="restore">Restore Drafts</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script type="module" src="mapmaker.js?v=2.18"></script>
 </body>
 </html>

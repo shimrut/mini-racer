@@ -11,6 +11,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
     applyTrackRepositoryUpdate,
+    applyTrackRepositoryRemoval,
+    buildTrackRepositoryRemoval,
     buildTrackRepositoryUpdate,
     parseTrackCatalogSource,
 } from '../tools/mapmaker/track-repository.js';
@@ -32,6 +34,22 @@ export function hasTrack(trackKey) {
     return Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey);
 }
 `;
+
+const REMOVABLE_SOURCE = CATALOG_SOURCE
+    .replace('    numberZero: { name: "Number Zero" },',
+        '    numberZero: { name: "Number Zero" },\n    newHarborRun: { name: "New Harbor Run" },')
+    .replace("    'sunlitTemple',", "    'sunlitTemple',\n    'newHarborRun',");
+const CAMPAIGN_SOURCE = "const STAGE_DEFINITIONS = [['00', 'numberZero', 2, 0]];";
+const HISTORY_SOURCE = "export const PUBLISHED_DAILY_GP_TRACKS_BY_DATE = { '2026-06-02': 'albertGardens' };";
+
+function buildRemoval(catalogSource, trackKey) {
+    return buildTrackRepositoryRemoval({
+        catalogSource,
+        trackKey,
+        campaignSource: CAMPAIGN_SOURCE,
+        publishedHistorySource: HISTORY_SOURCE,
+    });
+}
 
 const TRACK = {
     outer: [
@@ -252,5 +270,72 @@ describe('Mapmaker track repository integration', () => {
             .toContain("import sunriseTemple from './definitions/sunrise-temple.js';");
         expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8'))
             .toContain("import numberZero from './definitions/number-zero.js';");
+    });
+
+    it('removes a track from the catalog, schedule, and registry', () => {
+        const removal = buildRemoval(REMOVABLE_SOURCE, 'newHarborRun');
+        const parsed = parseTrackCatalogSource(removal.catalogSource);
+
+        expect(removal.filename).toBe('new-harbor-run.js');
+        expect(parsed.catalogKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
+        expect(removal.tracksSource).not.toContain('newHarborRun');
+        expect(removal.tracksSource).toContain('numberZero');
+    });
+
+    it('refuses removal of the default, Campaign, and known published tracks', () => {
+        expect(() => buildRemoval(CATALOG_SOURCE, 'circuit')).toThrow('default track');
+        expect(() => buildRemoval(CATALOG_SOURCE, 'numberZero')).toThrow('Campaign stage');
+
+        const publishedSource = CATALOG_SOURCE.replace(
+            '    sunlitTemple: { name: "Sunlit Temple" },',
+            '    albertGardens: { name: "Albert Gardens" },',
+        ).replace("    'sunlitTemple',", "    'albertGardens',");
+        expect(() => buildRemoval(publishedSource, 'albertGardens'))
+            .toThrow('published Daily GP history');
+    });
+
+    it('refuses removal when another track uses the same definition filename', () => {
+        const collidingSource = REMOVABLE_SOURCE.replace(
+            '    newHarborRun: { name: "New Harbor Run" },',
+            '    newHarborRun: { name: "New Harbor Run" },\n    new_harbor_run: { name: "Other Harbor Run" },',
+        );
+        expect(() => buildRemoval(collidingSource, 'newHarborRun'))
+            .toThrow('another track shares new-harbor-run.js');
+    });
+
+    it('deletes only the selected definition and medal row after updating integration', () => {
+        const root = mkdtempSync(join(tmpdir(), 'dailygp-mapmaker-remove-'));
+        temporaryRoots.push(root);
+        const trackRoot = join(root, 'game/track');
+        const definitionsRoot = join(trackRoot, 'definitions');
+        const medalsRoot = join(root, 'game/medals');
+        const campaignRoot = join(root, 'game/campaign');
+        const sharedRoot = join(root, 'game/shared');
+        mkdirSync(definitionsRoot, { recursive: true });
+        mkdirSync(medalsRoot, { recursive: true });
+        mkdirSync(campaignRoot, { recursive: true });
+        mkdirSync(sharedRoot, { recursive: true });
+        writeFileSync(join(trackRoot, 'catalog.js'), REMOVABLE_SOURCE);
+        writeFileSync(join(trackRoot, 'tracks.js'), '// old registry\n');
+        writeFileSync(join(definitionsRoot, 'new-harbor-run.js'), '// selected\n');
+        writeFileSync(join(definitionsRoot, 'circuit.js'), '// retained\n');
+        writeFileSync(join(medalsRoot, 'medal-times.json'), JSON.stringify({
+            circuit: { gold: 5 },
+            newHarborRun: { gold: 9 },
+        }, null, 2));
+        writeFileSync(join(campaignRoot, 'manifest.js'), CAMPAIGN_SOURCE);
+        writeFileSync(join(sharedRoot, 'daily-gp-history-backfill.js'), HISTORY_SOURCE);
+
+        const result = applyTrackRepositoryRemoval({ rootDir: root, trackKey: 'newHarborRun' });
+
+        expect(result).toMatchObject({ action: 'removed', filename: 'new-harbor-run.js' });
+        expect(existsSync(join(definitionsRoot, 'new-harbor-run.js'))).toBe(false);
+        expect(readFileSync(join(definitionsRoot, 'circuit.js'), 'utf8')).toBe('// retained\n');
+        expect(parseTrackCatalogSource(readFileSync(join(trackRoot, 'catalog.js'), 'utf8')).catalogKeys)
+            .toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8')).not.toContain('newHarborRun');
+        expect(JSON.parse(readFileSync(join(medalsRoot, 'medal-times.json'), 'utf8')))
+            .toEqual({ circuit: { gold: 5 } });
     });
 });

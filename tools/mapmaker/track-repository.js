@@ -296,3 +296,99 @@ export function applyTrackRepositoryUpdate({
         scheduleLength: update.scheduleLength,
     };
 }
+
+export function buildTrackRepositoryRemoval({
+    catalogSource,
+    trackKey,
+    campaignSource,
+    publishedHistorySource,
+}) {
+    assertTrackKey(trackKey);
+    const { namesByKey, catalogKeys, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    if (!Object.prototype.hasOwnProperty.call(namesByKey, trackKey)) {
+        throw new Error(`Track ${trackKey} is not present in the catalog.`);
+    }
+    const defaultTrackKey = catalogSource.match(/export const DEFAULT_TRACK_KEY = '([^']+)';/)?.[1];
+    if (!defaultTrackKey || typeof campaignSource !== 'string' || typeof publishedHistorySource !== 'string') {
+        throw new Error('Track removal dependencies could not be checked.');
+    }
+    if (trackKey === defaultTrackKey) {
+        throw new Error('Cannot remove the default track.');
+    }
+    if (campaignSource.includes(`'${trackKey}'`)) {
+        throw new Error(`Cannot remove ${trackKey} because a Campaign stage uses it.`);
+    }
+    if (publishedHistorySource.includes(`'${trackKey}'`)) {
+        throw new Error(`Cannot remove ${trackKey} because published Daily GP history uses it.`);
+    }
+
+    const filename = getTrackModuleFilename(trackKey);
+    if (catalogKeys.some((key) => key !== trackKey && getTrackModuleFilename(key) === filename)) {
+        throw new Error(`Cannot remove ${trackKey} because another track shares ${filename}.`);
+    }
+
+    const nextCatalogKeys = catalogKeys.filter((key) => key !== trackKey);
+    const nextScheduleKeys = scheduleKeys.filter((key) => key !== trackKey);
+    if (nextScheduleKeys.length === 0) {
+        throw new Error('Cannot remove the last Daily Challenge track.');
+    }
+    delete namesByKey[trackKey];
+
+    return {
+        filename,
+        catalogSource: catalogSource
+            .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, namesByKey))
+            .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys)),
+        tracksSource: generateTracksRegistrySource(nextCatalogKeys),
+        scheduleLength: nextScheduleKeys.length,
+    };
+}
+
+export function applyTrackRepositoryRemoval({ rootDir, trackKey }) {
+    const resolvedRoot = resolve(rootDir);
+    const catalogPath = join(resolvedRoot, 'game/track/catalog.js');
+    const tracksPath = join(resolvedRoot, 'game/track/tracks.js');
+    const medalsPath = join(resolvedRoot, 'game/medals/medal-times.json');
+    const campaignPath = join(resolvedRoot, 'game/campaign/manifest.js');
+    const publishedHistoryPath = join(resolvedRoot, 'game/shared/daily-gp-history-backfill.js');
+    const definitionsPath = join(resolvedRoot, 'game/track/definitions');
+    const catalogSource = readFileSync(catalogPath, 'utf8');
+    const tracksSource = readFileSync(tracksPath, 'utf8');
+    const medalsSource = readFileSync(medalsPath, 'utf8');
+    const update = buildTrackRepositoryRemoval({
+        catalogSource,
+        trackKey,
+        campaignSource: readFileSync(campaignPath, 'utf8'),
+        publishedHistorySource: readFileSync(publishedHistoryPath, 'utf8'),
+    });
+    assertSafeDefinitionFilename(update.filename);
+    const definitionPath = resolve(definitionsPath, update.filename);
+    assertPathInsideDirectory(definitionPath, definitionsPath, update.filename);
+    if (!existsSync(definitionPath)) {
+        throw new Error(`Cannot remove ${trackKey} because ${update.filename} does not exist.`);
+    }
+
+    const medalTimes = JSON.parse(medalsSource);
+    if (!medalTimes || typeof medalTimes !== 'object' || Array.isArray(medalTimes)) {
+        throw new Error('Track medal times are invalid.');
+    }
+    delete medalTimes[trackKey];
+
+    try {
+        writeFileSync(catalogPath, update.catalogSource, 'utf8');
+        writeFileSync(tracksPath, update.tracksSource, 'utf8');
+        writeFileSync(medalsPath, `${JSON.stringify(medalTimes, null, 2)}\n`, 'utf8');
+        rmSync(definitionPath);
+    } catch (error) {
+        writeFileSync(catalogPath, catalogSource, 'utf8');
+        writeFileSync(tracksPath, tracksSource, 'utf8');
+        writeFileSync(medalsPath, medalsSource, 'utf8');
+        throw error;
+    }
+
+    return {
+        action: 'removed',
+        filename: update.filename,
+        scheduleLength: update.scheduleLength,
+    };
+}

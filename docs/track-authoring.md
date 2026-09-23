@@ -30,14 +30,19 @@ asphalt fill, curbs, and start/finish paint as the game. Sharp outer/inner
 construction walls stay faintly visible on top so editable corners remain
 easy to see.
 
-Mapmaker also draws a ghost car using the real race collision size
-(`0.55u` wide × `1.23u` long):
-
-- always at the start position
-- under the cursor while Line Build is active
+Mapmaker draws a ghost car at the finished start position using the real race
+collision size (`0.55u` wide × `1.23u` long).
 
 Brush size is fixed at **7 car-widths** (`3.85u`). That is the
 usual racing lane width for Line Build.
+
+Line Build keeps the full-width road **open** while placing points. The pointer
+extends the road, and bends are rounded in the draft preview. It never draws
+an implied closing edge. Hover over the first point to see the exact road that
+clicking it will build; the close target is kept small so a nearby click can
+still add a point. The draft view has no length labels or centerline so the
+road footprint stays clear. The editor keeps the same camera scale and
+position after closing; **Reframe** fits the finished track whenever needed.
 
 Line Build fillets each sharp bend on the drawn centerline by half the lane
 width, then offsets both walls by that same half-width. Bends tighter than
@@ -51,10 +56,34 @@ Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
 Changing Wall Corners updates the Mapmaker race preview immediately.
 
-Start line and checkpoint edits snap across the lane, stay perpendicular
-to the nearer track wall, and extend a bit past both walls so wall-hugging
-cars still trigger them. The start car always faces perpendicular to the
-start/finish line and snaps onto that line's center axis when moved.
+Line Build places its start line and checkpoints against the final road after
+tight bends are widened and corners are filleted. It spaces three to five
+checkpoints by road length, in driving order. Start line and checkpoint edits
+snap across the lane, stay perpendicular to the nearer track wall, and extend
+a bit past both walls so wall-hugging cars still trigger them. The start car
+always faces perpendicular to the start/finish line and snaps onto that line's
+center axis when moved. Moving or reversing the start on a newly built road
+updates its automatic checkpoint order while its walls and checkpoints remain
+unedited; manual checkpoint edits keep their authored positions.
+
+The **Track Checks** panel checks the smoothed race walls, road clearance,
+start position, gate coverage, and checkpoint order. It marks problem locations
+on the map and shows approximate lap length plus the narrowest wall gap.
+New structural errors block export and **Save & Integrate**;
+warnings invite a driving check. Existing integrated tracks with a known
+baseline issue can still be renamed or have metadata saved while their race
+geometry is unchanged. Geometry edits must resolve any remaining hard error.
+Use **Drive Draft** to test the current unsaved track with the real race
+simulation before integration. The draft drive runs only in the browser and
+does not publish or save a definition. It reports checkpoint progress, lap
+completion, and wall contacts. **Runner Lab** remains useful for its approximate
+bot swarm and hotspot report after integration.
+
+**Undo** and **Redo** cover wall, gate, start, name, and corner edits; a pointer
+drag is one undo step. While Line Build is open, Undo removes the last sketch
+point. The browser keeps unsaved maps and open sketches locally and offers to
+restore them after a reload. Returning from **Drive Draft** restores the map
+automatically in the same tab.
 
 ## Adding A Track
 
@@ -94,6 +123,29 @@ The repository-writing endpoint exists only in the dedicated local Mapmaker
 Vite configuration and accepts requests only from localhost. It is not part of
 the Devvit playtest or production build. **Download Module**, **Copy Module**,
 and **Copy Integration** remain available as manual fallbacks.
+
+## Removing A Track
+
+**Remove Track** in the local Mapmaker discards a new, unsaved track from the
+editor. For an integrated track, it asks for confirmation and removes the
+definition module, catalog entry, Daily schedule entry, registry import, and
+medal-times row. The repository operation refuses the default track, tracks
+used by Campaign stages, and tracks named in the fixed published Daily GP
+backfill. Review any track-specific presentation or test references before
+shipping a removal.
+
+The local Mapmaker cannot query hosted Redis or Reddit to determine whether a
+track appeared in a published Daily race or Head-to-Head post. Removing such a
+track from the catalog makes those existing records unusable. Check hosted
+history and posts before permanently removing an integrated track. To stop
+future Daily scheduling while retaining old races, select **Campaign only**
+and use **Save & Integrate** instead.
+
+The removal confirmation is an in-page dialog, so it works in browsers that
+do not support native JavaScript confirmation prompts. Dependency checks read
+the current repository files only when a removal is requested; the Mapmaker
+Vite configuration does not import the live track catalog, so saving a track
+does not restart the local server.
 
 ## Dependency Rules
 

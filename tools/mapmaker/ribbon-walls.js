@@ -336,7 +336,9 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadi
         return null;
     }
 
-    return { outer, inner };
+    // Keep the road's actual guide points for start and checkpoint placement.
+    // The input centerline may have moved when tight bends were inflated.
+    return { outer, inner, centerline: samples.map((sample) => clonePoint(sample.point)) };
 }
 
 function collapsePointClusters(points, radius) {

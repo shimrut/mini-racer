@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mapmaker Draft Drive</title>
+    <link rel="stylesheet" href="mapmaker-playtest.css">
+</head>
+<body>
+    <header class="drive-header">
+        <div>
+            <p class="eyebrow">Mapmaker · unsaved draft</p>
+            <h1 id="track-title">Draft Drive</h1>
+        </div>
+        <a class="button quiet" href="mapmaker.html">← Back to Mapmaker</a>
+    </header>
+
+    <main class="drive-layout">
+        <section class="stage" aria-label="Draft track drive">
+            <canvas id="drive-canvas" aria-label="Draft track and car"></canvas>
+            <div class="stage-note" id="stage-note" role="status">Loading draft…</div>
+        </section>
+
+        <aside class="drive-panel">
+            <div class="panel-heading">
+                <span class="eyebrow">Live drive</span>
+                <strong id="drive-state">Ready</strong>
+            </div>
+            <div class="metric"><span>Time</span><strong id="time-value">0.00 s</strong></div>
+            <div class="metric"><span>Next gate</span><strong id="gate-value">—</strong></div>
+            <div class="metric"><span>Speed</span><strong id="speed-value">0 km/h</strong></div>
+            <div class="metric"><span>Wall contacts</span><strong id="contact-value">0</strong></div>
+            <div class="metric"><span>Lap</span><strong id="lap-value">Not finished</strong></div>
+            <p class="drive-feedback" id="drive-feedback">Steer through the checkpoints, then cross the finish line.</p>
+            <div class="controls">
+                <button id="pause-button" type="button">Pause</button>
+                <button id="reset-button" type="button">Reset run</button>
+                <button id="view-button" type="button">Show whole track</button>
+            </div>
+            <div class="steer-buttons" aria-label="Steering controls">
+                <button id="steer-left" type="button" aria-label="Steer left">←</button>
+                <button id="steer-right" type="button" aria-label="Steer right">→</button>
+            </div>
+            <p class="help">Steer: ← / → or A / D. The car accelerates automatically, as in the race. Space pauses, R resets, M changes view.</p>
+            <p class="help">This drive uses the current browser draft. It does not save or integrate a track.</p>
+        </aside>
+    </main>
+    <script type="module" src="mapmaker-playtest.js"></script>
+</body>
+</html>

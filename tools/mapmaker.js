@@ -10,9 +10,15 @@ import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
     buildPerpendicularLaneGate,
-    extendGatePastWalls,
-    GATE_WALL_OVERHANG,
 } from './mapmaker/lane-gate.js';
+import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
+import { validateTrackQuality } from './mapmaker/track-quality.js';
+import {
+    clearDraftRecovery,
+    createEditHistory,
+    loadDraftRecovery,
+    saveDraftRecovery,
+} from './mapmaker/edit-history.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
@@ -58,10 +64,6 @@ const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
 const CAR_WIDTH = CAR_RADIUS * 2;
 const CAR_LENGTH = CAR_HALF_LENGTH * 2 + CAR_RADIUS * 2;
 
-function formatCarWidths(worldUnits) {
-    return formatNumber(worldUnits / CAR_WIDTH);
-}
-
 function cloneTracks(source) {
     if (typeof structuredClone === 'function') {
         return structuredClone(source);
@@ -69,15 +71,24 @@ function cloneTracks(source) {
     return JSON.parse(JSON.stringify(source));
 }
 
-function totalLoopLength(points) {
-    if (!points || points.length < 2) {
-        return 0;
+function getBrowserStorage(name) {
+    try {
+        return window[name];
+    } catch {
+        return null;
     }
-    let total = 0;
-    for (let index = 0; index < points.length; index += 1) {
-        total += distance(points[index], points[(index + 1) % points.length]);
-    }
-    return total;
+}
+
+function geometrySignature(track) {
+    return JSON.stringify([
+        track.outer,
+        track.inner,
+        track.startLine,
+        track.startPos,
+        track.startAngle,
+        track.checkpoints,
+        track.cornerRadius,
+    ]);
 }
 
 function dedupeStrokePoints(points, minimumDistance) {
@@ -114,50 +125,20 @@ function smoothLoopPoints(points, strength) {
     });
 }
 
-function sampleClosedLoopAtDistance(points, targetDistance) {
-    if (points.length < 2) {
-        const fallback = points[0] ? clonePoint(points[0]) : { x: 0, y: 0 };
+function smoothOpenPoints(points, strength) {
+    const smoothing = clamp(strength, MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING);
+    if (points.length < 3 || smoothing <= 0) return points.map(clonePoint);
+    const neighborWeight = smoothing * 0.2;
+    const pointWeight = 1 - neighborWeight * 2;
+    return points.map((point, index) => {
+        if (index === 0 || index === points.length - 1) return clonePoint(point);
+        const prev = points[index - 1];
+        const next = points[index + 1];
         return {
-            point: fallback,
-            tangent: { x: 1, y: 0 }
+            x: prev.x * neighborWeight + point.x * pointWeight + next.x * neighborWeight,
+            y: prev.y * neighborWeight + point.y * pointWeight + next.y * neighborWeight,
         };
-    }
-
-    const loopLength = totalLoopLength(points);
-    if (loopLength < 0.000001) {
-        return {
-            point: clonePoint(points[0]),
-            tangent: { x: 1, y: 0 }
-        };
-    }
-
-    let remaining = ((targetDistance % loopLength) + loopLength) % loopLength;
-    for (let index = 0; index < points.length; index += 1) {
-        const a = points[index];
-        const b = points[(index + 1) % points.length];
-        const segmentLength = distance(a, b);
-        if (segmentLength < 0.000001) {
-            continue;
-        }
-        if (remaining <= segmentLength) {
-            const t = clamp(remaining / segmentLength, 0, 1);
-            return {
-                point: {
-                    x: a.x + (b.x - a.x) * t,
-                    y: a.y + (b.y - a.y) * t
-                },
-                tangent: normalizeVector(b.x - a.x, b.y - a.y)
-            };
-        }
-        remaining -= segmentLength;
-    }
-
-    const last = points[points.length - 1];
-    const first = points[0];
-    return {
-        point: clonePoint(first),
-        tangent: normalizeVector(first.x - last.x, first.y - last.y)
-    };
+    });
 }
 
 function offsetTrackLayout(layout, offsetX, offsetY) {
@@ -177,7 +158,8 @@ function offsetTrackLayout(layout, offsetX, offsetY) {
         checkpoints: layout.checkpoints.map((checkpoint) => ({
             p1: movePoint(checkpoint.p1),
             p2: movePoint(checkpoint.p2)
-        }))
+        })),
+        centerline: layout.centerline?.map(movePoint),
     };
 }
 
@@ -198,89 +180,43 @@ function normalizeTrackLayout(layout, padding = 4) {
     });
     const offsetX = minX < padding ? padding - minX : 0;
     const offsetY = minY < padding ? padding - minY : 0;
-    return offsetX === 0 && offsetY === 0
+    const normalized = offsetX === 0 && offsetY === 0
         ? layout
         : offsetTrackLayout(layout, offsetX, offsetY);
+    return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
 }
 
-function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) {
+function buildRoadWallsFromLoop(rawPoints, trackWidth, lineSmoothing) {
     const filtered = dedupeStrokePoints(rawPoints, 0.35);
     if (filtered.length < 3) {
         return null;
     }
 
     const centerline = smoothLoopPoints(filtered, lineSmoothing);
-    const loopLength = totalLoopLength(centerline);
+    const loopLength = closedLoopLength(centerline);
     if (loopLength < trackWidth * 5) {
         return null;
     }
 
-    const halfWidth = trackWidth / 2;
-    const walls = buildRibbonWallsFromCenterline(centerline, halfWidth);
+    return buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
+}
+
+function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) {
+    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth, lineSmoothing);
     if (!walls) {
         return null;
     }
     const { outer, inner } = walls;
-    const startIndex = 0;
-    const nextIndex = 1 % centerline.length;
-    const startAngle = Math.atan2(
-        centerline[nextIndex].y - centerline[startIndex].y,
-        centerline[nextIndex].x - centerline[startIndex].x
-    );
-    const checkpointCount = Math.min(4, Math.max(3, Math.floor(outer.length / 12)));
-    const checkpoints = [];
-    const gateHalf = halfWidth + GATE_WALL_OVERHANG;
-    for (let index = 1; index <= checkpointCount; index += 1) {
-        const sample = sampleClosedLoopAtDistance(centerline, (loopLength * index) / (checkpointCount + 1));
-        const normal = { x: -sample.tangent.y, y: sample.tangent.x };
-        checkpoints.push({
-            p1: {
-                x: sample.point.x + normal.x * gateHalf,
-                y: sample.point.y + normal.y * gateHalf
-            },
-            p2: {
-                x: sample.point.x - normal.x * gateHalf,
-                y: sample.point.y - normal.y * gateHalf
-            }
-        });
-    }
-
-    const startTangent = normalizeVector(
-        centerline[nextIndex].x - centerline[startIndex].x,
-        centerline[nextIndex].y - centerline[startIndex].y
-    );
-    const startNormal = { x: -startTangent.y, y: startTangent.x };
-    const startLeft = {
-        x: centerline[startIndex].x + startNormal.x * halfWidth,
-        y: centerline[startIndex].y + startNormal.y * halfWidth
-    };
-    const startRight = {
-        x: centerline[startIndex].x - startNormal.x * halfWidth,
-        y: centerline[startIndex].y - startNormal.y * halfWidth
-    };
-    const startSpan = extendGatePastWalls(startLeft, startRight);
-    const poseSample = sampleClosedLoopAtDistance(centerline, Math.min(loopLength * 0.02, halfWidth));
-    const poseNormal = { x: -poseSample.tangent.y, y: poseSample.tangent.x };
-    const startPos = midpoint(
-        {
-            x: poseSample.point.x + poseNormal.x * halfWidth,
-            y: poseSample.point.y + poseNormal.y * halfWidth
-        },
-        {
-            x: poseSample.point.x - poseNormal.x * halfWidth,
-            y: poseSample.point.y - poseNormal.y * halfWidth
-        }
-    );
+    const gates = buildAutoGates(walls.centerline, outer, inner, trackWidth, { cornerRadius });
+    if (!gates) return null;
     return normalizeTrackLayout({
         outer: outer.map(clonePoint),
         inner: inner.map(clonePoint),
-        startLine: {
-            p1: clonePoint(startSpan.p1),
-            p2: clonePoint(startSpan.p2)
-        },
-        startPos,
-        startAngle,
-        checkpoints,
+        startLine: gates.startLine,
+        startPos: gates.startPos,
+        startAngle: gates.startAngle,
+        checkpoints: gates.checkpoints,
+        centerline: walls.centerline.map(clonePoint),
         cornerRadius
     });
 }
@@ -350,6 +286,9 @@ class MapmakerApp {
         this.downloadTrackBtn = document.getElementById('download-track-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.duplicateTrackBtn = document.getElementById('duplicate-track-btn');
+        this.removeTrackBtn = document.getElementById('remove-track-btn');
+        this.removeTrackDialog = document.getElementById('remove-track-dialog');
+        this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
         this.insertPointBtn = document.getElementById('insert-point-btn');
         this.deletePointBtn = document.getElementById('delete-point-btn');
         this.reversePolygonBtn = document.getElementById('reverse-polygon-btn');
@@ -358,6 +297,14 @@ class MapmakerApp {
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.removeCheckpointBtn = document.getElementById('remove-checkpoint-btn');
         this.reframeBtn = document.getElementById('reframe-btn');
+        this.undoEditBtn = document.getElementById('undo-edit-btn');
+        this.redoEditBtn = document.getElementById('redo-edit-btn');
+        this.driveDraftBtn = document.getElementById('drive-draft-btn');
+        this.restoreDraftsDialog = document.getElementById('restore-drafts-dialog');
+        this.restoreDraftsDialogMessage = document.getElementById('restore-drafts-dialog-message');
+        this.qualityCount = document.getElementById('quality-count');
+        this.qualitySummary = document.getElementById('quality-summary');
+        this.qualityIssues = document.getElementById('quality-issues');
 
         const initialTrackKey = Object.keys(TRACKS)[0];
         this.state = {
@@ -387,6 +334,21 @@ class MapmakerApp {
             }
         };
 
+        this.editHistories = new Map(Object.entries(this.state.tracks).map(
+            ([key, track]) => [key, createEditHistory(track)],
+        ));
+        this.activeHistoryEditKey = null;
+        this.draftLoopsByKey = new Map();
+        this.destinationByKey = new Map();
+        this.autoRoadGuideByKey = new Map();
+        this.recoveryTimer = null;
+        this.skipBeforeUnload = false;
+        this.qualityTimer = null;
+        this.qualityReport = null;
+        this.qualityTrackKey = null;
+        this.baselineQualityCodesByKey = new Map();
+        this.baselineGeometryByKey = new Map();
+
         this.bindEvents();
         this.populateTrackSelect();
         this.loadTrack(initialTrackKey);
@@ -394,10 +356,211 @@ class MapmakerApp {
 
         const resizeObserver = new ResizeObserver(() => this.resizeCanvas());
         resizeObserver.observe(this.canvas.parentElement);
+        this.offerDraftRecovery();
     }
 
     get track() {
         return this.state.tracks[this.state.selectedTrackKey];
+    }
+
+    getEditHistory(key = this.state.selectedTrackKey) {
+        if (!this.editHistories.has(key)) {
+            this.editHistories.set(key, createEditHistory(this.state.tracks[key]));
+        }
+        return this.editHistories.get(key);
+    }
+
+    syncHistoryButtons() {
+        const history = this.getEditHistory();
+        this.undoEditBtn.disabled = !history.canUndo && this.state.draftLoop.length === 0;
+        this.redoEditBtn.disabled = !history.canRedo;
+    }
+
+    beginHistoryEdit() {
+        if (this.activeHistoryEditKey) return;
+        this.activeHistoryEditKey = this.state.selectedTrackKey;
+        this.getEditHistory().beginEdit(this.track);
+    }
+
+    commitHistoryEdit() {
+        const key = this.activeHistoryEditKey;
+        if (!key) return;
+        this.activeHistoryEditKey = null;
+        if (this.state.tracks[key]) this.getEditHistory(key).commitEdit(this.state.tracks[key]);
+        this.syncHistoryButtons();
+    }
+
+    restoreEdit(track, message) {
+        this.state.tracks[this.state.selectedTrackKey] = track;
+        this.loadTrack(this.state.selectedTrackKey);
+        this.markDirty(message, true, { recordHistory: false });
+        this.syncHistoryButtons();
+    }
+
+    undoEdit() {
+        if (this.state.draftLoop.length) {
+            this.undoDraftLoopPoint();
+            return;
+        }
+        const track = this.getEditHistory().undo();
+        if (track) this.restoreEdit(track, 'Undid last edit.');
+    }
+
+    redoEdit() {
+        const track = this.getEditHistory().redo();
+        if (track) this.restoreEdit(track, 'Redid edit.');
+    }
+
+    scheduleDraftRecovery() {
+        if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+        this.recoveryTimer = setTimeout(() => this.flushDraftRecovery(), 200);
+    }
+
+    flushDraftRecovery() {
+        if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+        this.recoveryTimer = null;
+        if (this.state.draftLoop.length) {
+            this.draftLoopsByKey.set(this.state.selectedTrackKey, cloneTracks(this.state.draftLoop));
+        } else {
+            this.draftLoopsByKey.delete(this.state.selectedTrackKey);
+        }
+        const keys = new Set([...this.state.dirtyTrackKeys, ...this.draftLoopsByKey.keys()]);
+        const drafts = [...keys].filter((key) => this.state.tracks[key]).map((key) => ({
+            trackKey: key,
+            originalTrackKey: this.state.originalTrackKeyByKey.get(key) ?? null,
+            destination: this.destinationByKey.get(key) ?? this.getDestinationForTrackKey(key),
+            track: this.state.tracks[key],
+            draftLoop: this.draftLoopsByKey.get(key) ?? [],
+        }));
+        if (drafts.length) {
+            saveDraftRecovery(getBrowserStorage('localStorage'), {
+                selectedTrackKey: keys.has(this.state.selectedTrackKey) ? this.state.selectedTrackKey : null,
+                drafts,
+            });
+        } else {
+            clearDraftRecovery(getBrowserStorage('localStorage'));
+        }
+    }
+
+    offerDraftRecovery() {
+        const recovery = loadDraftRecovery(getBrowserStorage('localStorage'));
+        if (!recovery?.drafts.length) {
+            try { getBrowserStorage('sessionStorage')?.removeItem('mapmaker:return-from-playtest:v1'); } catch {}
+            return;
+        }
+        let returningFromPlaytest = false;
+        try {
+            returningFromPlaytest = getBrowserStorage('sessionStorage')?.getItem('mapmaker:return-from-playtest:v1') === '1';
+        } catch {}
+        if (returningFromPlaytest) {
+            try { getBrowserStorage('sessionStorage')?.removeItem('mapmaker:return-from-playtest:v1'); } catch {}
+            this.restoreDraftRecovery(recovery);
+            return;
+        }
+        this.restoreDraftsDialogMessage.textContent = `${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'} found in this browser. Restore them to the editor?`;
+        this.restoreDraftsDialog.returnValue = '';
+        this.restoreDraftsDialog.showModal();
+        this.restoreDraftsDialog.addEventListener('close', () => {
+            if (this.restoreDraftsDialog.returnValue !== 'restore') {
+                clearDraftRecovery(getBrowserStorage('localStorage'));
+                return;
+            }
+            this.restoreDraftRecovery(recovery);
+        }, { once: true });
+    }
+
+    restoreDraftRecovery(recovery) {
+        for (const draft of recovery.drafts) {
+            if (draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
+                delete this.state.tracks[draft.originalTrackKey];
+                this.state.originalTrackKeyByKey.delete(draft.originalTrackKey);
+                this.editHistories.delete(draft.originalTrackKey);
+            }
+            this.state.tracks[draft.trackKey] = draft.track;
+            this.state.dirtyTrackKeys.add(draft.trackKey);
+            if (draft.originalTrackKey) {
+                this.state.originalTrackKeyByKey.set(draft.trackKey, draft.originalTrackKey);
+            }
+            this.destinationByKey.set(draft.trackKey, draft.destination);
+            this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
+            this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
+        }
+        this.populateTrackSelect();
+        this.loadTrack(recovery.selectedTrackKey || recovery.drafts[0].trackKey);
+        this.setStatus(`Restored ${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'}.`);
+    }
+
+    scheduleQualityCheck() {
+        if (this.qualityTimer) clearTimeout(this.qualityTimer);
+        this.qualityTimer = setTimeout(() => this.refreshQualityCheck(), 140);
+    }
+
+    refreshQualityCheck() {
+        if (this.qualityTimer) clearTimeout(this.qualityTimer);
+        this.qualityTimer = null;
+        const key = this.state.selectedTrackKey;
+        const report = validateTrackQuality(this.track);
+        this.qualityReport = report;
+        this.qualityTrackKey = key;
+        const errors = report.issues.filter((issue) => issue.severity === 'error');
+        const warnings = report.issues.filter((issue) => issue.severity === 'warning');
+        this.qualityCount.textContent = `${errors.length} errors · ${warnings.length} warnings`;
+        this.qualityCount.className = `pill${errors.length ? ' pill-danger' : warnings.length ? ' pill-warn' : ' pill-ok'}`;
+        const approximateLapLength = (
+            closedLoopLength(this.track.outer) + closedLoopLength(this.track.inner)
+        ) / 2;
+        this.qualitySummary.textContent = !this.hasTrackGeometry()
+            ? 'Draw a closed road to check its walls, start, and lap gates.'
+            : `${report.issues.length ? 'Review the marked locations.' : 'No structural issues found.'} Approx. lap ${formatNumber(approximateLapLength)}u · narrowest wall gap ${formatNumber(report.minClearance ?? 0)}u.`;
+        this.qualityIssues.replaceChildren();
+        let markerNumber = 0;
+        for (const issue of report.issues.slice(0, 12)) {
+            const item = document.createElement('li');
+            item.dataset.severity = issue.severity;
+            if (issue.hotspot) {
+                markerNumber += 1;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = `${markerNumber}. ${issue.message}`;
+                button.addEventListener('click', () => this.focusQualityIssue(issue));
+                item.appendChild(button);
+            } else {
+                item.textContent = issue.message;
+            }
+            this.qualityIssues.appendChild(item);
+        }
+        this.draw();
+        return report;
+    }
+
+    focusQualityIssue(issue) {
+        if (!issue.hotspot) return;
+        const viewport = this.getViewport();
+        const screen = this.worldToScreen(issue.hotspot, viewport);
+        this.state.view.panX += viewport.width / 2 - screen.x;
+        this.state.view.panY += viewport.height / 2 - screen.y;
+        this.draw();
+    }
+
+    drawQualityMarkers(viewport) {
+        if (this.qualityTrackKey !== this.state.selectedTrackKey) return;
+        this.qualityReport?.issues.filter((issue) => issue.hotspot).slice(0, 12).forEach((issue, index) => {
+            const screen = this.worldToScreen(issue.hotspot, viewport);
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(screen.x, screen.y, 9, 0, Math.PI * 2);
+            this.ctx.fillStyle = issue.severity === 'error' ? '#f43f5e' : '#fbbf24';
+            this.ctx.fill();
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = '#0b1020';
+            this.ctx.stroke();
+            this.ctx.fillStyle = '#0b1020';
+            this.ctx.font = 'bold 10px system-ui';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(String(index + 1), screen.x, screen.y);
+            this.ctx.restore();
+        });
     }
 
     getDrawWidth() {
@@ -455,86 +618,10 @@ class MapmakerApp {
         }
     }
 
-    getDraftSegments() {
-        const committed = [];
-        const points = this.state.draftLoop;
-        for (let index = 1; index < points.length; index += 1) {
-            committed.push({
-                a: points[index - 1],
-                b: points[index],
-                type: 'committed'
-            });
-        }
-
-        if (!points.length || !this.state.draftCursor) {
-            return { committed, preview: null };
-        }
-
-        const previewTarget = this.state.draftCloseHover && points.length >= 3
-            ? points[0]
-            : this.state.draftCursor;
-        const previewLength = distance(points[points.length - 1], previewTarget);
-        const preview = previewLength > 0.001
-            ? {
-                a: points[points.length - 1],
-                b: previewTarget,
-                type: this.state.draftCloseHover && points.length >= 3 ? 'closing' : 'preview'
-            }
-            : null;
-        return { committed, preview };
-    }
-
-    getDraftMetrics() {
-        const { committed, preview } = this.getDraftSegments();
-        const committedLength = committed.reduce((total, segment) => total + distance(segment.a, segment.b), 0);
-        const lastSegment = committed[committed.length - 1] ?? null;
-        const previewLength = preview ? distance(preview.a, preview.b) : 0;
-        return {
-            width: this.getDrawWidth(),
-            lineSmoothing: this.getLineSmoothing(),
-            pointCount: this.state.draftLoop.length,
-            committedLength,
-            previewLength,
-            totalPreviewLength: committedLength + previewLength,
-            lastSegmentLength: lastSegment ? distance(lastSegment.a, lastSegment.b) : 0,
-            previewType: preview?.type ?? null
-        };
-    }
-
     updateDrawMetricsLabel() {
-        if (!this.drawMetricsLabel) {
-            return;
+        if (this.drawMetricsLabel) {
+            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u. Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.`;
         }
-        const metrics = this.getDraftMetrics();
-        const brushCars = formatCarWidths(metrics.width);
-        const carSize = `Car ${formatNumber(CAR_WIDTH)}×${formatNumber(CAR_LENGTH)}u.`;
-        const brushText = `Brush ${formatNumber(metrics.width)}u (${brushCars} cars wide).`;
-        const smoothingText = `Smoothing ${formatNumber(metrics.lineSmoothing)}.`;
-
-        if (!metrics.pointCount) {
-            let startLaneText = '';
-            if (this.hasTrackGeometry() && this.track?.startLine) {
-                const startLane = distance(this.track.startLine.p1, this.track.startLine.p2);
-                if (Number.isFinite(startLane) && startLane > 0) {
-                    startLaneText = ` Start line ${formatNumber(startLane)}u (~${formatCarWidths(startLane)} cars).`;
-                }
-            }
-            this.drawMetricsLabel.textContent = `${carSize} ${brushText} ${smoothingText}${startLaneText} Place the first point to start measuring straights.`;
-            return;
-        }
-
-        const parts = [carSize, brushText, smoothingText];
-        if (metrics.lastSegmentLength > 0) {
-            parts.push(`Last straight ${formatNumber(metrics.lastSegmentLength)}u (~${formatCarWidths(metrics.lastSegmentLength)} cars long).`);
-        }
-        if (metrics.previewLength > 0) {
-            const label = metrics.previewType === 'closing' ? 'Closing straight' : 'Preview straight';
-            parts.push(`${label} ${formatNumber(metrics.previewLength)}u (~${formatCarWidths(metrics.previewLength)} cars).`);
-        }
-        if (metrics.totalPreviewLength > 0) {
-            parts.push(`Draft length ${formatNumber(metrics.totalPreviewLength)}u.`);
-        }
-        this.drawMetricsLabel.textContent = parts.join(' ');
     }
 
     bindEvents() {
@@ -554,6 +641,7 @@ class MapmakerApp {
         });
 
         this.trackDestinationSelect.addEventListener('change', () => {
+            this.destinationByKey.set(this.state.selectedTrackKey, this.getSelectedDestination());
             this.syncDestinationHint();
             this.markDirty(
                 this.getSelectedDestination() === 'daily'
@@ -642,6 +730,7 @@ class MapmakerApp {
 
         this.newTrackBtn.addEventListener('click', () => this.createTrack());
         this.duplicateTrackBtn.addEventListener('click', () => this.duplicateTrack());
+        this.removeTrackBtn.addEventListener('click', () => this.removeTrack());
         this.insertPointBtn.addEventListener('click', () => this.insertPointAfterSelection());
         this.deletePointBtn.addEventListener('click', () => this.deleteSelectedPoint());
         this.reversePolygonBtn.addEventListener('click', () => this.reverseActivePolygon());
@@ -649,6 +738,9 @@ class MapmakerApp {
         this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
         this.removeCheckpointBtn.addEventListener('click', () => this.removeCheckpoint());
         this.reframeBtn.addEventListener('click', () => this.resetView());
+        this.undoEditBtn.addEventListener('click', () => this.undoEdit());
+        this.redoEditBtn.addEventListener('click', () => this.redoEdit());
+        this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
         this.downloadTrackBtn.addEventListener('click', () => this.downloadTrackModule());
         this.copyIntegrationBtn.addEventListener('click', () => this.copyTrackIntegration());
@@ -673,7 +765,9 @@ class MapmakerApp {
             }
         });
         window.addEventListener('beforeunload', (event) => {
-            if (this.state.dirtyTrackKeys.size === 0) {
+            this.flushDraftRecovery();
+            if (this.skipBeforeUnload) return;
+            if (this.state.dirtyTrackKeys.size === 0 && !this.state.draftLoop.length && !this.draftLoopsByKey.size) {
                 return;
             }
             event.preventDefault();
@@ -758,6 +852,9 @@ class MapmakerApp {
     }
 
     getDestinationForTrackKey(trackKey) {
+        if (this.destinationByKey.has(trackKey)) {
+            return this.destinationByKey.get(trackKey);
+        }
         const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
         if (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey)) {
             return 'daily';
@@ -801,6 +898,23 @@ class MapmakerApp {
         if (!this.state.tracks[trackKey]) {
             return;
         }
+        const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
+        if (originalTrackKey && !this.baselineQualityCodesByKey.has(trackKey) && TRACKS[originalTrackKey]) {
+            this.baselineQualityCodesByKey.set(trackKey, new Set(
+                validateTrackQuality(TRACKS[originalTrackKey]).issues
+                    .filter((issue) => issue.severity === 'error')
+                    .map((issue) => issue.code),
+            ));
+            this.baselineGeometryByKey.set(trackKey, geometrySignature(TRACKS[originalTrackKey]));
+        }
+        if (this.state.selectedTrackKey !== trackKey) {
+            if (this.state.draftLoop.length) {
+                this.draftLoopsByKey.set(this.state.selectedTrackKey, cloneTracks(this.state.draftLoop));
+            } else {
+                this.draftLoopsByKey.delete(this.state.selectedTrackKey);
+            }
+        }
+        this.commitHistoryEdit();
         this.state.selectedTrackKey = trackKey;
         this.trackSelect.value = trackKey;
         this.trackKeyInput.value = trackKey;
@@ -809,7 +923,7 @@ class MapmakerApp {
         this.syncCornerRadiusControl();
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
-        this.state.draftLoop = [];
+        this.state.draftLoop = cloneTracks(this.draftLoopsByKey.get(trackKey) ?? []);
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
         this.state.skipDrawClick = false;
@@ -833,7 +947,12 @@ class MapmakerApp {
         this.updateStageText();
         this.updateDrawMetricsLabel();
         this.syncDirtyBadge();
+        this.syncHistoryButtons();
         this.draw();
+        this.scheduleQualityCheck();
+        if (this.state.dirtyTrackKeys.size || this.draftLoopsByKey.size) {
+            this.scheduleDraftRecovery();
+        }
     }
 
     refreshCheckpointSelect() {
@@ -882,6 +1001,24 @@ class MapmakerApp {
             rebuilt[key === currentKey ? nextKey : key] = value;
         });
         this.state.tracks = rebuilt;
+        const history = this.editHistories.get(currentKey);
+        this.editHistories.delete(currentKey);
+        if (history) this.editHistories.set(nextKey, history);
+        const baselineCodes = this.baselineQualityCodesByKey.get(currentKey);
+        this.baselineQualityCodesByKey.delete(currentKey);
+        if (baselineCodes) this.baselineQualityCodesByKey.set(nextKey, baselineCodes);
+        const baselineGeometry = this.baselineGeometryByKey.get(currentKey);
+        this.baselineGeometryByKey.delete(currentKey);
+        if (baselineGeometry) this.baselineGeometryByKey.set(nextKey, baselineGeometry);
+        const draftLoop = this.draftLoopsByKey.get(currentKey);
+        this.draftLoopsByKey.delete(currentKey);
+        if (draftLoop) this.draftLoopsByKey.set(nextKey, draftLoop);
+        const guide = this.autoRoadGuideByKey.get(currentKey);
+        this.autoRoadGuideByKey.delete(currentKey);
+        if (guide) this.autoRoadGuideByKey.set(nextKey, guide);
+        const destination = this.getDestinationForTrackKey(currentKey);
+        this.destinationByKey.delete(currentKey);
+        this.destinationByKey.set(nextKey, destination);
         const originalTrackKey = this.state.originalTrackKeyByKey.get(currentKey) ?? null;
         this.state.originalTrackKeyByKey.delete(currentKey);
         if (originalTrackKey) {
@@ -944,6 +1081,75 @@ class MapmakerApp {
         this.markDirty(`Duplicated ${sourceKey} into ${key}.`);
     }
 
+    confirmTrackRemoval(message) {
+        this.removeTrackDialogMessage.textContent = message;
+        this.removeTrackDialog.returnValue = '';
+        this.removeTrackDialog.showModal();
+        return new Promise((resolve) => {
+            this.removeTrackDialog.addEventListener('close', () => {
+                resolve(this.removeTrackDialog.returnValue === 'remove');
+            }, { once: true });
+        });
+    }
+
+    async removeTrack() {
+        const selectedKey = this.state.selectedTrackKey;
+        const originalKey = this.state.originalTrackKeyByKey.get(selectedKey) ?? null;
+        const trackName = this.track.name;
+        const warning = originalKey
+            ? `Permanently remove ${trackName} (${originalKey}) from the game? This deletes its definition, catalog entry, Daily schedule entry, and medal times. Published Daily races and Head-to-Head posts using it may stop working. Unsaved edits will also be lost.`
+            : `Discard unsaved track ${trackName} (${selectedKey})?`;
+        try {
+            if (!await this.confirmTrackRemoval(warning)) return;
+        } catch (error) {
+            this.setStatus(`Unable to open the removal confirmation: ${error.message}`, true);
+            return;
+        }
+
+        this.removeTrackBtn.disabled = true;
+        this.saveTrackBtn.disabled = true;
+        try {
+            if (originalKey) {
+                const response = await fetch('/__mapmaker/remove-track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trackKey: originalKey }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(result.error || `Removal failed with status ${response.status}.`);
+                }
+                SCHEDULED_TRACK_KEYS.delete(originalKey);
+            }
+
+            const keys = Object.keys(this.state.tracks);
+            const selectedIndex = keys.indexOf(selectedKey);
+            const nextKey = keys[selectedIndex + 1] || keys[selectedIndex - 1];
+            delete this.state.tracks[selectedKey];
+            this.editHistories.delete(selectedKey);
+            this.draftLoopsByKey.delete(selectedKey);
+            this.destinationByKey.delete(selectedKey);
+            this.baselineQualityCodesByKey.delete(selectedKey);
+            this.baselineGeometryByKey.delete(selectedKey);
+            this.autoRoadGuideByKey.delete(selectedKey);
+            this.state.originalTrackKeyByKey.delete(selectedKey);
+            this.state.dirtyTrackKeys.delete(selectedKey);
+            this.state.selectedTrackKey = nextKey;
+            this.populateTrackSelect();
+            this.loadTrack(nextKey);
+            this.setStatus(originalKey
+                ? `Removed ${trackName} (${originalKey}) from the repository. Review track-specific references and registry integrity tests before shipping.`
+                : `Discarded unsaved track ${trackName}.`);
+            this.scheduleDraftRecovery();
+        } catch (error) {
+            console.error(error);
+            this.setStatus(error.message, true);
+        } finally {
+            this.removeTrackBtn.disabled = false;
+            this.saveTrackBtn.disabled = false;
+        }
+    }
+
     getSelectedPointRef() {
         const handle = this.state.selectedHandle;
         if (!handle) {
@@ -1003,6 +1209,10 @@ class MapmakerApp {
         if (!snapped) {
             return false;
         }
+        if (this.state.selectedHandle?.kind === 'checkpoint') {
+            const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+            if (guide) guide.manualGates = true;
+        }
         gate.p1.x = snapped.p1.x;
         gate.p1.y = snapped.p1.y;
         gate.p2.x = snapped.p2.x;
@@ -1037,6 +1247,7 @@ class MapmakerApp {
         this.track.startPos.x = snapped.startPos.x;
         this.track.startPos.y = snapped.startPos.y;
         this.track.startAngle = snapped.startAngle;
+        this.reflowAutoCheckpoints();
         this.syncSelectedInputs();
         if (options.markDirty !== false) {
             this.markDirty(
@@ -1047,6 +1258,27 @@ class MapmakerApp {
             this.draw();
         }
         return true;
+    }
+
+    reflowAutoCheckpoints() {
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        if (!guide || guide.manualGates) return;
+        if (guide.wallSignature !== JSON.stringify([this.track.outer, this.track.inner])) return;
+        const startMid = midpoint(this.track.startLine.p1, this.track.startLine.p2);
+        const nearest = nearestDistanceAlongLoop(guide.centerline, startMid);
+        if (!nearest) return;
+        const heading = { x: Math.cos(this.track.startAngle), y: Math.sin(this.track.startAngle) };
+        const direction = heading.x * nearest.tangent.x + heading.y * nearest.tangent.y < 0 ? -1 : 1;
+        const generated = buildAutoGates(
+            guide.centerline,
+            this.track.outer,
+            this.track.inner,
+            this.getDrawWidth(),
+            { startDistance: nearest.distance, direction, cornerRadius: this.getCornerRadius() },
+        );
+        if (!generated) return;
+        this.track.checkpoints = generated.checkpoints;
+        this.refreshCheckpointSelect();
     }
 
     syncSelectedInputs() {
@@ -1090,21 +1322,17 @@ class MapmakerApp {
         }
         if (this.state.tool === 'draw') {
             const pointCount = this.state.draftLoop.length;
-            const metrics = this.getDraftMetrics();
-            const widthText = formatNumber(metrics.width);
-            const smoothingText = formatNumber(metrics.lineSmoothing);
             if (pointCount === 0) {
-                this.canvasHint.textContent = this.hasTrackGeometry()
-                    ? `Click to place a new loop point. Brush ${widthText}u and smoothing ${smoothingText} are active.`
-                    : `Blank canvas ready. Click to place loop points, then click the first point to close the track with a ${widthText}u corridor.`;
+                this.canvasHint.textContent = 'Click to start drawing the road.';
                 return;
             }
-            const previewText = metrics.previewLength > 0
-                ? `${metrics.previewType === 'closing' ? 'Closing' : 'Next'} straight ${formatNumber(metrics.previewLength)}u.`
-                : 'Move the cursor to preview the next straight.';
-            this.canvasHint.textContent = pointCount < 3
-                ? `${pointCount} point${pointCount === 1 ? '' : 's'} placed. Brush ${widthText}u. ${previewText} Add at least ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before closing the loop.`
-                : `${pointCount} loop points placed. Brush ${widthText}u. ${previewText} Click the first point to finish the track, or keep adding corners.`;
+            if (pointCount < 3) {
+                this.canvasHint.textContent = `Click to keep drawing. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
+            } else if (this.state.draftCloseHover) {
+                this.canvasHint.textContent = 'This is the closed road. Click the first point to build it.';
+            } else {
+                this.canvasHint.textContent = 'Click to add another point. The road stays open until you click the first point.';
+            }
             return;
         }
         if (!this.hasTrackGeometry()) {
@@ -1123,21 +1351,14 @@ class MapmakerApp {
     }
 
     validateTrack(track) {
-        if (!track || track.outer.length < 3 || track.inner.length < 3) {
-            return 'walls are incomplete';
-        }
-
-        const points = [
-            ...track.outer,
-            ...track.inner,
-            track.startLine?.p1,
-            track.startLine?.p2,
-            track.startPos,
-            ...track.checkpoints.flatMap((checkpoint) => [checkpoint.p1, checkpoint.p2])
-        ].filter(Boolean);
-
-        const hasInvalidPoint = points.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y));
-        return hasInvalidPoint ? 'contains invalid coordinates' : null;
+        const report = validateTrackQuality(track);
+        const baseline = this.baselineQualityCodesByKey.get(this.state.selectedTrackKey) ?? new Set();
+        const geometryUnchanged = geometrySignature(track) === this.baselineGeometryByKey.get(this.state.selectedTrackKey);
+        const blocking = report.issues.find((issue) => (
+            issue.severity === 'error' && (!geometryUnchanged || !baseline.has(issue.code))
+        ));
+        this.refreshQualityCheck();
+        return blocking?.message.replace(/\.$/, '') ?? null;
     }
 
     getTrackBounds() {
@@ -1492,7 +1713,7 @@ class MapmakerApp {
         }
         const startPoint = this.state.draftLoop[0];
         const screenPoint = this.worldToScreen(startPoint, viewport);
-        return distance(canvasPoint, screenPoint) <= 40 ? startPoint : null;
+        return distance(canvasPoint, screenPoint) <= 18 ? startPoint : null;
     }
 
     addDraftLoopPoint(point) {
@@ -1503,6 +1724,8 @@ class MapmakerApp {
         this.state.draftLoop = [...this.state.draftLoop, clonePoint(point)];
         this.state.draftCursor = clonePoint(point);
         this.state.draftCloseHover = false;
+        this.syncHistoryButtons();
+        this.scheduleDraftRecovery();
         this.updateDrawMetricsLabel();
         this.updateCanvasHint();
         this.draw();
@@ -1517,6 +1740,8 @@ class MapmakerApp {
             ? clonePoint(this.state.draftLoop[this.state.draftLoop.length - 1])
             : null;
         this.state.draftCloseHover = false;
+        this.syncHistoryButtons();
+        this.scheduleDraftRecovery();
         this.setStatus(this.state.draftLoop.length ? 'Removed last draft point.' : 'Cleared draft loop.');
         this.updateDrawMetricsLabel();
         this.updateCanvasHint();
@@ -1527,6 +1752,8 @@ class MapmakerApp {
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
+        this.syncHistoryButtons();
+        this.scheduleDraftRecovery();
         this.setStatus('Cleared draft loop.');
         this.updateDrawMetricsLabel();
         this.updateCanvasHint();
@@ -1544,6 +1771,13 @@ class MapmakerApp {
             return false;
         }
 
+        // Hold the drawn road at the same screen scale and location when walls appear.
+        const draftViewport = this.getViewport();
+        const draftBounds = this.getTrackBounds();
+        this.state.view.frozenBounds = { ...draftBounds };
+        this.state.view.panX -= generated.normalizationOffset.x * draftViewport.scale;
+        this.state.view.panY -= generated.normalizationOffset.y * draftViewport.scale;
+
         this.track.outer = generated.outer;
         this.track.inner = generated.inner;
         this.track.startLine = generated.startLine;
@@ -1552,11 +1786,17 @@ class MapmakerApp {
         this.track.checkpoints = generated.checkpoints;
         this.track.cornerRadius = generated.cornerRadius;
         this.track.lineSmoothing = lineSmoothing;
+        this.autoRoadGuideByKey.set(this.state.selectedTrackKey, {
+            centerline: generated.centerline,
+            wallSignature: JSON.stringify([generated.outer, generated.inner]),
+            manualGates: false,
+        });
         this.syncCornerRadiusControl();
         this.syncLineSmoothingControl();
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
+        this.draftLoopsByKey.delete(this.state.selectedTrackKey);
         this.state.checkpointIndex = 0;
         this.refreshCheckpointSelect();
         this.updateDrawMetricsLabel();
@@ -1598,6 +1838,7 @@ class MapmakerApp {
 
         const hit = this.hitTest(canvasPoint, viewport);
         if (hit) {
+            this.beginHistoryEdit();
             this.selectHandle(hit);
             this.freezeViewBounds();
             this.state.drag = {
@@ -1620,6 +1861,7 @@ class MapmakerApp {
                 segmentHit.kind === 'startLineSegment'
                 || segmentHit.kind === 'checkpointSegment'
             ) {
+                this.beginHistoryEdit();
                 this.freezeViewBounds();
                 this.state.drag = {
                     type: 'laneGate',
@@ -1643,6 +1885,7 @@ class MapmakerApp {
         }
 
         if (this.state.tool === 'startPos') {
+            this.beginHistoryEdit();
             const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
             this.state.selectedHandle = { kind: 'startPos' };
             this.snapStartPoseToLine({
@@ -1672,7 +1915,6 @@ class MapmakerApp {
         if (this.state.tool === 'draw') {
             this.state.draftCursor = worldPoint;
             this.state.draftCloseHover = Boolean(this.getDraftCloseHandle(canvasPoint, viewport));
-            this.updateDrawMetricsLabel();
             this.updateCanvasHint();
             this.draw();
             return;
@@ -1759,6 +2001,7 @@ class MapmakerApp {
         if (this.state.drag?.type === 'handle' || this.state.drag?.type === 'laneGate') {
             this.releaseViewBounds({ keepCameraSteady: true });
         }
+        this.commitHistoryEdit();
         this.state.drag = null;
         this.canvas.dataset.pan = 'false';
         this.draw();
@@ -1795,6 +2038,13 @@ class MapmakerApp {
 
     onKeyDown(event) {
         if (event.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) {
+            return;
+        }
+
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+            event.preventDefault();
+            if (event.shiftKey) this.redoEdit();
+            else this.undoEdit();
             return;
         }
 
@@ -1999,6 +2249,8 @@ class MapmakerApp {
             y: (bounds.minY + bounds.maxY) / 2,
         };
         const snapped = buildPerpendicularLaneGate(seed, this.track.outer, this.track.inner);
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        if (guide) guide.manualGates = true;
         const checkpoint = snapped || {
             p1: { x: seed.x - 2, y: seed.y },
             p2: { x: seed.x + 2, y: seed.y },
@@ -2022,6 +2274,8 @@ class MapmakerApp {
             this.setStatus('There are no checkpoints to remove.', true);
             return;
         }
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        if (guide) guide.manualGates = true;
         this.track.checkpoints.splice(this.state.checkpointIndex, 1);
         this.state.checkpointIndex = Math.max(0, this.state.checkpointIndex - 1);
         this.refreshCheckpointSelect();
@@ -2041,13 +2295,20 @@ class MapmakerApp {
         this.statusText.style.color = isError ? '#fda4af' : '';
     }
 
-    markDirty(message, updateStatus = true) {
+    markDirty(message, updateStatus = true, options = {}) {
+        if (options.recordHistory !== false && this.activeHistoryEditKey !== this.state.selectedTrackKey) {
+            const history = this.getEditHistory();
+            history.recordEdit(history.current(), this.track);
+            this.syncHistoryButtons();
+        }
         this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
         this.syncTrackSelectText();
         this.syncDirtyBadge();
         if (updateStatus) {
             this.setStatus(message);
         }
+        this.scheduleDraftRecovery();
+        this.scheduleQualityCheck();
         this.draw();
     }
 
@@ -2058,10 +2319,18 @@ class MapmakerApp {
     }
 
     markSaved(message) {
+        this.baselineQualityCodesByKey.set(this.state.selectedTrackKey, new Set(
+            validateTrackQuality(this.track).issues
+                .filter((issue) => issue.severity === 'error')
+                .map((issue) => issue.code),
+        ));
+        this.baselineGeometryByKey.set(this.state.selectedTrackKey, geometrySignature(this.track));
         this.state.dirtyTrackKeys.delete(this.state.selectedTrackKey);
         this.syncTrackSelectText();
         this.syncDirtyBadge();
         this.setStatus(message);
+        this.scheduleDraftRecovery();
+        this.scheduleQualityCheck();
     }
 
     drawGrid(viewport) {
@@ -2073,6 +2342,7 @@ class MapmakerApp {
         const startY = viewport.offsetY % minor;
 
         ctx.save();
+        if (this.state.tool === 'draw') ctx.globalAlpha = 0.45;
         ctx.lineWidth = 1;
 
         for (let x = startX; x < width; x += minor) {
@@ -2214,40 +2484,6 @@ class MapmakerApp {
         this.ctx.setLineDash([]);
     }
 
-    drawSegmentLengthLabel(a, b, viewport, text, active = false) {
-        const start = this.worldToScreen(a, viewport);
-        const end = this.worldToScreen(b, viewport);
-        const screenLength = Math.hypot(end.x - start.x, end.y - start.y);
-        if (screenLength < 56) {
-            return;
-        }
-
-        const midpointX = (start.x + end.x) / 2;
-        const midpointY = (start.y + end.y) / 2;
-        const normal = normalizeVector(start.y - end.y, end.x - start.x);
-        const labelX = midpointX + normal.x * (active ? 18 : 14);
-        const labelY = midpointY + normal.y * (active ? 18 : 14);
-
-        this.ctx.save();
-        this.ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        const metrics = this.ctx.measureText(text);
-        const paddingX = 8;
-        const boxWidth = metrics.width + paddingX * 2;
-        const boxHeight = 22;
-        this.ctx.fillStyle = active ? 'rgba(15, 23, 42, 0.96)' : 'rgba(15, 23, 42, 0.84)';
-        this.ctx.strokeStyle = active ? 'rgba(251, 191, 36, 0.9)' : 'rgba(148, 163, 184, 0.35)';
-        this.ctx.lineWidth = active ? 1.5 : 1;
-        this.ctx.beginPath();
-        this.ctx.rect(labelX - boxWidth / 2, labelY - boxHeight / 2, boxWidth, boxHeight);
-        this.ctx.fill();
-        this.ctx.stroke();
-        this.ctx.fillStyle = active ? '#fef3c7' : '#e2e8f0';
-        this.ctx.fillText(text, labelX, labelY + 0.5);
-        this.ctx.restore();
-    }
-
     drawHandle(handle, viewport) {
         const point = handle.point;
         const screen = this.worldToScreen(point, viewport);
@@ -2280,106 +2516,123 @@ class MapmakerApp {
 
     drawDraftLoop(viewport) {
         const points = this.state.draftLoop;
-        if (!points.length) {
-            return;
-        }
+        if (!points.length) return;
 
-        const { committed, preview } = this.getDraftSegments();
-        const closeReady = points.length >= 3;
-        const previewTarget = preview?.b ?? null;
-        const drawWidth = this.getDrawWidth();
+        const cursor = this.state.draftCursor;
+        const candidate = !this.state.draftCloseHover
+            && cursor
+            && distance(cursor, points[points.length - 1]) >= 0.35
+            ? cursor
+            : null;
+        const previewPoints = candidate ? [...points, candidate] : points;
+        const roadPreview = this.state.draftCloseHover && points.length >= 3
+            ? this.getDraftRoadPreview(points)
+            : null;
 
         this.ctx.save();
-        this.ctx.beginPath();
-        const first = this.worldToScreen(points[0], viewport);
-        this.ctx.moveTo(first.x, first.y);
-        for (let index = 1; index < points.length; index += 1) {
-            const point = this.worldToScreen(points[index], viewport);
-            this.ctx.lineTo(point.x, point.y);
+        if (roadPreview) {
+            const road = new Path2D();
+            road.addPath(this.buildScreenPath(roadPreview.outer, viewport));
+            road.addPath(this.buildScreenPath(roadPreview.inner, viewport));
+            this.ctx.fillStyle = 'rgba(71, 85, 105, 0.96)';
+            this.ctx.fill(road, 'evenodd');
+            this.drawPolygon(roadPreview.outer, viewport, 'transparent', '#fbbf24', { lineWidth: 2 });
+            this.drawPolygon(roadPreview.inner, viewport, 'transparent', '#fbbf24', { lineWidth: 2 });
+        } else {
+            const openPath = this.buildOpenRoadPath(previewPoints, viewport);
+            this.ctx.lineJoin = 'round';
+            this.ctx.lineCap = 'round';
+            this.ctx.strokeStyle = '#fbbf24';
+            this.ctx.lineWidth = this.getDrawWidth() * viewport.scale + 4;
+            this.ctx.stroke(openPath);
+            this.ctx.strokeStyle = '#475569';
+            this.ctx.lineWidth = this.getDrawWidth() * viewport.scale;
+            this.ctx.stroke(openPath);
         }
-        if (previewTarget) {
-            const previewScreen = this.worldToScreen(previewTarget, viewport);
-            this.ctx.lineTo(previewScreen.x, previewScreen.y);
-        }
-        this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.16)';
-        this.ctx.lineWidth = Math.max(10, drawWidth * viewport.scale);
-        this.ctx.lineJoin = 'round';
-        this.ctx.lineCap = 'round';
-        this.ctx.stroke();
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(first.x, first.y);
-        for (let index = 1; index < points.length; index += 1) {
-            const point = this.worldToScreen(points[index], viewport);
-            this.ctx.lineTo(point.x, point.y);
-        }
-        if (previewTarget) {
-            const previewScreen = this.worldToScreen(previewTarget, viewport);
-            this.ctx.lineTo(previewScreen.x, previewScreen.y);
-        }
-        this.ctx.strokeStyle = 'rgba(251, 191, 36, 0.92)';
-        this.ctx.lineWidth = 3;
-        this.ctx.lineJoin = 'round';
-        this.ctx.lineCap = 'round';
-        this.ctx.stroke();
 
         points.forEach((point, index) => {
-            const screenPoint = this.worldToScreen(point, viewport);
+            const screen = this.worldToScreen(point, viewport);
             this.ctx.beginPath();
             this.ctx.fillStyle = index === 0 ? '#fbbf24' : '#f8fafc';
-            this.ctx.strokeStyle = index === 0 && this.state.draftCloseHover ? '#ffffff' : 'rgba(15, 23, 42, 0.9)';
-            this.ctx.lineWidth = index === 0 ? 3 : 2;
-            this.ctx.arc(screenPoint.x, screenPoint.y, index === 0 ? 7 : 5, 0, Math.PI * 2);
+            this.ctx.strokeStyle = '#0f172a';
+            this.ctx.lineWidth = 2;
+            this.ctx.arc(screen.x, screen.y, index === 0 ? 6 : 4, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.stroke();
         });
 
-        if (closeReady) {
+        if (candidate) {
+            const screen = this.worldToScreen(candidate, viewport);
             this.ctx.beginPath();
-            this.ctx.strokeStyle = this.state.draftCloseHover ? 'rgba(255, 255, 255, 0.95)' : 'rgba(251, 191, 36, 0.55)';
-            this.ctx.lineWidth = this.state.draftCloseHover ? 3 : 2;
-            this.ctx.arc(first.x, first.y, this.state.draftCloseHover ? 13 : 11, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.arc(screen.x, screen.y, 5, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        if (points.length >= 3) {
+            const first = this.worldToScreen(points[0], viewport);
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = this.state.draftCloseHover ? '#ffffff' : 'rgba(251, 191, 36, 0.75)';
+            this.ctx.lineWidth = 2;
+            this.ctx.arc(first.x, first.y, this.state.draftCloseHover ? 12 : 10, 0, Math.PI * 2);
             this.ctx.stroke();
         }
         this.ctx.restore();
-
-        committed.forEach((segment) => {
-            this.drawSegmentLengthLabel(
-                segment.a,
-                segment.b,
-                viewport,
-                `${formatNumber(distance(segment.a, segment.b))}u`
-            );
-        });
-        if (preview) {
-            this.drawSegmentLengthLabel(
-                preview.a,
-                preview.b,
-                viewport,
-                `${formatNumber(distance(preview.a, preview.b))}u`,
-                true
-            );
-        }
     }
 
-    getDraftGhostHeading() {
-        const points = this.state.draftLoop;
-        const cursor = this.state.draftCursor;
-        if (points.length >= 1 && cursor) {
-            const from = points[points.length - 1];
-            const to = this.state.draftCloseHover && points.length >= 3 ? points[0] : cursor;
-            const dx = to.x - from.x;
-            const dy = to.y - from.y;
-            if (Math.hypot(dx, dy) > 0.001) {
-                return Math.atan2(dy, dx);
+    buildOpenRoadPath(points, viewport) {
+        const smoothed = smoothOpenPoints(points, this.getLineSmoothing());
+        const path = new Path2D();
+        const first = this.worldToScreen(smoothed[0], viewport);
+        path.moveTo(first.x, first.y);
+        for (let index = 1; index < smoothed.length - 1; index += 1) {
+            const prev = smoothed[index - 1];
+            const curr = smoothed[index];
+            const next = smoothed[index + 1];
+            const incoming = normalizeVector(curr.x - prev.x, curr.y - prev.y);
+            const outgoing = normalizeVector(next.x - curr.x, next.y - curr.y);
+            const turn = Math.acos(clamp(incoming.x * outgoing.x + incoming.y * outgoing.y, -1, 1));
+            const tanHalf = Math.tan(turn / 2);
+            const maxTrim = Math.min(distance(prev, curr), distance(curr, next)) * 0.45;
+            const radius = tanHalf > 1e-6
+                ? Math.min(this.getDrawWidth() / 2, maxTrim / tanHalf)
+                : 0;
+            const corner = this.worldToScreen(curr, viewport);
+            if (!Number.isFinite(radius) || radius < 0.001) {
+                path.lineTo(corner.x, corner.y);
+                continue;
             }
+            const following = this.worldToScreen(next, viewport);
+            path.arcTo(corner.x, corner.y, following.x, following.y, radius * viewport.scale);
         }
-        if (points.length >= 2) {
-            const a = points[points.length - 2];
-            const b = points[points.length - 1];
-            return Math.atan2(b.y - a.y, b.x - a.x);
+        if (smoothed.length > 1) {
+            const last = this.worldToScreen(smoothed[smoothed.length - 1], viewport);
+            path.lineTo(last.x, last.y);
         }
-        return Number(this.track.startAngle) || 0;
+        return path;
+    }
+
+    getDraftRoadPreview(points) {
+        const width = this.getDrawWidth();
+        const smoothing = this.getLineSmoothing();
+        const cornerRadius = this.getCornerRadius();
+        const cached = this.draftRoadPreview;
+        const cacheMatches = cached?.points === points
+            && cached.width === width
+            && cached.smoothing === smoothing
+            && cached.cornerRadius === cornerRadius;
+        let generated = cached?.generated;
+        if (!cacheMatches) {
+            const walls = buildRoadWallsFromLoop(points, width, smoothing);
+            generated = walls ? buildTrackGeometry({
+                outer: walls.outer,
+                inner: walls.inner,
+                cornerRadius,
+            }) : null;
+        }
+        this.draftRoadPreview = {
+            points, width, smoothing, cornerRadius, generated,
+        };
+        return generated;
     }
 
     drawGhostCar(worldPoint, angle, viewport, options = {}) {
@@ -2491,16 +2744,9 @@ class MapmakerApp {
             this.drawCheckpointLabels(viewport);
         }
 
-        this.drawDraftLoop(viewport);
+        this.drawQualityMarkers(viewport);
 
-        if (this.state.tool === 'draw' && this.state.draftCursor) {
-            this.drawGhostCar(
-                this.state.draftCursor,
-                this.getDraftGhostHeading(),
-                viewport,
-                { muted: true },
-            );
-        }
+        this.drawDraftLoop(viewport);
 
         const handles = this.getAllHandles().sort((a, b) => {
             const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 4
@@ -2532,6 +2778,27 @@ class MapmakerApp {
             console.error(error);
         }
         this.setStatus('Clipboard write is not available here.', true);
+    }
+
+    driveDraft() {
+        const track = this.track;
+        if (!track || track.outer.length < 3 || track.inner.length < 3) {
+            this.setStatus('Draw a closed road before driving the draft.', true);
+            return;
+        }
+        try {
+            window.sessionStorage.setItem('mapmaker:playtest-draft:v1', JSON.stringify({
+                trackKey: this.state.selectedTrackKey,
+                track,
+            }));
+            window.sessionStorage.setItem('mapmaker:return-from-playtest:v1', '1');
+            this.flushDraftRecovery();
+            this.skipBeforeUnload = true;
+            window.location.assign('mapmaker-playtest.html');
+        } catch (error) {
+            this.setStatus('Draft Drive could not open in this browser.', true);
+            console.error(error);
+        }
     }
 
     async copyTrackIntegration() {

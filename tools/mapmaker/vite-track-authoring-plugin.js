@@ -1,12 +1,24 @@
-import { applyTrackRepositoryUpdate } from './track-repository.js';
+import { applyTrackRepositoryRemoval, applyTrackRepositoryUpdate } from './track-repository.js';
 import { isValidTrackKey } from './track-source.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
+const REMOVE_ENDPOINT = '/__mapmaker/remove-track';
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
 const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 
 function isLocalHost(host = '') {
     return /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
+}
+
+function isSameLocalOrigin(request) {
+    const origin = request.headers.origin;
+    if (!origin) return true;
+    try {
+        const parsed = new URL(origin);
+        return parsed.protocol === 'http:' && parsed.host === request.headers.host;
+    } catch {
+        return false;
+    }
 }
 
 function readJsonBody(request) {
@@ -90,7 +102,7 @@ export function mapmakerTrackAuthoringPlugin() {
         configureServer(server) {
             server.middlewares.use(async (request, response, next) => {
                 const pathname = new URL(request.url || '/', 'http://localhost').pathname;
-                if (pathname !== ENDPOINT) {
+                if (pathname !== ENDPOINT && pathname !== REMOVE_ENDPOINT) {
                     next();
                     return;
                 }
@@ -98,7 +110,7 @@ export function mapmakerTrackAuthoringPlugin() {
                     writeJson(response, 405, { error: 'Method not allowed.' });
                     return;
                 }
-                if (!isLocalHost(request.headers.host)) {
+                if (!isLocalHost(request.headers.host) || !isSameLocalOrigin(request)) {
                     writeJson(response, 403, {
                         error: 'Mapmaker repository writes are available only from localhost.',
                     });
@@ -106,6 +118,20 @@ export function mapmakerTrackAuthoringPlugin() {
                 }
 
                 try {
+                    if (pathname === REMOVE_ENDPOINT) {
+                        const payload = await readJsonBody(request);
+                        const trackKey = typeof payload?.trackKey === 'string'
+                            ? payload.trackKey.trim()
+                            : '';
+                        if (!isValidTrackKey(trackKey)) {
+                            throw new Error('Track key must be a valid non-reserved JavaScript identifier.');
+                        }
+                        writeJson(response, 200, applyTrackRepositoryRemoval({
+                            rootDir: server.config.root,
+                            trackKey,
+                        }));
+                        return;
+                    }
                     const payload = normalizeSavePayload(await readJsonBody(request));
                     const result = applyTrackRepositoryUpdate({
                         rootDir: server.config.root,
@@ -118,7 +144,7 @@ export function mapmakerTrackAuthoringPlugin() {
                     writeJson(response, 200, result);
                 } catch (error) {
                     writeJson(response, 400, {
-                        error: error instanceof Error ? error.message : 'Unable to save track.',
+                        error: error instanceof Error ? error.message : 'Unable to update track.',
                     });
                 }
             });

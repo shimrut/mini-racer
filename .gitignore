@@ -22,6 +22,9 @@ tools/*
 !tools/mapmaker.html
 !tools/mapmaker.js
 !tools/mapmaker.css
+!tools/mapmaker-playtest.html
+!tools/mapmaker-playtest.js
+!tools/mapmaker-playtest.css
 !tools/mapmaker/
 !tools/mapmaker/*.js
 !tools/geometry.js
