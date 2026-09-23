@@ -41,30 +41,30 @@
     "entrypoints": {
       "default": {
         "height": "tall",
-        "entry": "preview.html"
+        "entry": "pages/preview.html"
       },
       "daily": {
         "height": "tall",
-        "entry": "daily.html"
+        "entry": "pages/daily.html"
       },
       "game": {
-        "entry": "game.html"
+        "entry": "pages/game.html"
       },
       "campaign": {
         "height": "tall",
-        "entry": "campaign.html"
+        "entry": "pages/campaign.html"
       },
       "head-to-head": {
         "height": "tall",
-        "entry": "head-to-head.html"
+        "entry": "pages/head-to-head.html"
       },
       "podium": {
         "height": "tall",
-        "entry": "podium.html"
+        "entry": "pages/podium.html"
       },
       "mod-analytics": {
         "height": "tall",
-        "entry": "mod-analytics.html"
+        "entry": "pages/mod-analytics.html"
       }
     }
   },

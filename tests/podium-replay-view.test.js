@@ -11,7 +11,7 @@ import {
     PODIUM_REPLAY_CAR_ASSETS,
     PODIUM_REPLAY_CHROME_HIDE_MS,
     shouldUseLocalPodiumPreview,
-} from '../podium-replay-view.js';
+} from '../pages/podium-replay-view.js';
 
 const ghost = {
     schemaVersion: 2,

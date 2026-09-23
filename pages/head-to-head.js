@@ -1,21 +1,21 @@
-import { TRACKS } from './game/track/tracks.js';
-import { getTrackName } from './game/track/catalog.js';
-import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
-import { createPosterCarDrive, loadPosterCar } from './game/track/poster-car.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { getTrackName } from '../game/track/catalog.js';
+import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { createPosterCarDrive, loadPosterCar } from '../game/track/poster-car.js';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
-} from './game/track/presentation.js';
-import { exposeHeadToHeadLauncherTestHooks } from './game/debug/launcher-hooks.js';
-import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from './game/ui/avatar.js';
-import { getMedalForRaceTime } from './game/medals/medal-timing.js';
+} from '../game/track/presentation.js';
+import { exposeHeadToHeadLauncherTestHooks } from '../game/debug/launcher-hooks.js';
+import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from '../game/ui/avatar.js';
+import { getMedalForRaceTime } from '../game/medals/medal-timing.js';
 import {
     applyHeadToHeadAccessState,
     HEAD_TO_HEAD_POST_TYPE,
     readHeadToHeadPosterPost,
     resolveHeadToHeadPosterAccess,
-} from './game/head-to-head/poster-access.js';
-import { cleanText } from './game/shared/values.js';
+} from '../game/head-to-head/poster-access.js';
+import { cleanText } from '../game/shared/values.js';
 
 export const readHeadToHeadPostData = readHeadToHeadPosterPost;
 
@@ -240,4 +240,4 @@ export {
     openHeadToHead,
     openHomeAsRedirect,
     resolveHeadToHeadPosterAccess,
-} from './game/head-to-head/poster-access.js';
+} from '../game/head-to-head/poster-access.js';

@@ -12,7 +12,7 @@ import {
     readHeadToHeadViewerIdentity,
     renderHeadToHead,
     resolveHeadToHeadPosterAccess,
-} from '../head-to-head.js';
+} from '../pages/head-to-head.js';
 import { CHALLENGE_UNAVAILABLE_MESSAGE } from '../game/head-to-head/poster-access.js';
 import { LAUNCH_TARGET_KEY } from '../game/modes/launch-target.js';
 
@@ -41,7 +41,7 @@ function accessRoot(postData = PLAYABLE_POST, context = {}) {
 
 describe('head-to-head custom-post preview', () => {
     it('ships an enabled Accept Challenge CTA from the early accept entry', () => {
-        const html = readFileSync(new URL('../head-to-head.html', import.meta.url), 'utf8');
+        const html = readFileSync(new URL('../pages/head-to-head.html', import.meta.url), 'utf8');
         expect(html).toMatch(
             /<script type="module" src="head-to-head-accept\.js"><\/script>/,
         );
@@ -50,12 +50,12 @@ describe('head-to-head custom-post preview', () => {
             /<button id="accept-challenge" type="button">Accept Challenge<\/button>/,
         );
         expect(html).not.toMatch(/Checking Challenge/);
-        const accept = readFileSync(new URL('../head-to-head-accept.js', import.meta.url), 'utf8');
+        const accept = readFileSync(new URL('../pages/head-to-head-accept.js', import.meta.url), 'utf8');
         expect(accept).toMatch(/import\('\.\/head-to-head\.js'\)/);
     });
 
     it('does not fetch challenge access or player bootstrap from the poster', () => {
-        const files = ['head-to-head.js', 'head-to-head-accept.js', 'game/head-to-head/poster-access.js'];
+        const files = ['pages/head-to-head.js', 'pages/head-to-head-accept.js', 'game/head-to-head/poster-access.js'];
         for (const file of files) {
             const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
             expect(source, file).not.toMatch(/\/api\/head-to-head/);
@@ -136,7 +136,7 @@ describe('head-to-head custom-post preview', () => {
     });
 
     it('tints only the challenger ring from the same glow token as the corner wash', () => {
-        const css = readFileSync(new URL('../head-to-head.css', import.meta.url), 'utf8');
+        const css = readFileSync(new URL('../pages/head-to-head.css', import.meta.url), 'utf8');
         expect(css).toMatch(/#challenger-avatar\s*\{[^}]*var\(--glow\)/s);
         expect(css).toMatch(/body\[data-medal="author"\]/);
         expect(css).not.toMatch(/#viewer-avatar\s*\{[^}]*var\(--glow\)/s);

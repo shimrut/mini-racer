@@ -35,7 +35,7 @@ import { LobbyUi } from '../game/lobby/ui.js';
 import { GENERIC_SNOO_URL } from '../game/ui/avatar.js';
 
 function challengePaneDom() {
-    const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
     const pane = html.match(
         /<section id="lobby-challenge-pane"[\s\S]*?<\/section>/,
     )?.[0];

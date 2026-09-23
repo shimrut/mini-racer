@@ -1,4 +1,4 @@
-@import url('../fonts.css');
+@import url('../styles/fonts.css');
 
 :root {
     --runner-panel: rgba(10, 18, 28, 0.92);

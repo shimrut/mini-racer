@@ -1,4 +1,4 @@
-import { setText } from './game/ui/dom.js';
+import { setText } from '../game/ui/dom.js';
 const SUMMARY_URL = '/api/analytics/summary';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

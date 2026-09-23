@@ -4,7 +4,7 @@ import {
     formatDailyPreviewTimeLabel,
     getDailyPreviewChallengeOptions,
     isCurrentDailyLauncherPost,
-} from '../preview.js';
+} from '../pages/preview.js';
 
 describe('current Daily launcher preview', () => {
     it('marks only the dedicated launcher post as current-only', () => {

@@ -254,7 +254,7 @@ describe("RealTimeRacer track layer renderer", () => {
 
 describe("single game canvas", () => {
   it("ships exactly one race canvas in the game shell", () => {
-    const html = readFileSync(new URL("../game.html", import.meta.url), "utf8");
+    const html = readFileSync(new URL("../pages/game.html", import.meta.url), "utf8");
     const raceCanvases = html.match(/<canvas[^>]*class="game-layer-canvas"/g);
 
     expect(raceCanvases).toHaveLength(1);

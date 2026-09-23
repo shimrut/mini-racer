@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readCssBundle } from './helpers/read-css-bundle.js';
 
-const styles = readCssBundle(new URL('../styles.css', import.meta.url));
-const gameHtml = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+const styles = readCssBundle(new URL('../pages/styles.css', import.meta.url));
+const gameHtml = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
 
 describe('finish screen styles', () => {
     it('lines stats up with finish buttons in the same padded column', () => {

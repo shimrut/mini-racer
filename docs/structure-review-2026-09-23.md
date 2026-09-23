@@ -122,6 +122,12 @@ Branch `chore/structure-moves`, started from `chore/duplicate-cleanup` at `4ad66
   `routes/` stay at the top. No file name and no code changed. It was done before finding 1,
   because finding 1 makes new files and does not move the old ones.
 
+- Finding 7, repository root: done. The seven pages, their scripts, and their stylesheets are
+  in `pages/`, and `fonts.css` is in `styles/`. Car pictures load from the site root, so a
+  page works from any folder. `tests/page-links.test.js` fails on any page, stylesheet,
+  font, or car picture link that points at a missing file. The local preview is now
+  `http://127.0.0.1:8000/pages/game.html`.
+
 ## Order of work
 
 1. Finding 4 (one file move).

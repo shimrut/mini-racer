@@ -15,7 +15,7 @@ vi.mock('../game/track/preview-renderer.js', () => ({
 }));
 
 const { renderTrackPreviewCanvas } = await import('../game/track/preview-renderer.js');
-const { bootHeadToHead } = await import('../head-to-head.js');
+const { bootHeadToHead } = await import('../pages/head-to-head.js');
 
 describe('head to head poster car', () => {
     it('draws the stock car at the back of the dash once the picture loads', async () => {

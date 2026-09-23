@@ -145,7 +145,7 @@ describe('head-to-head early accept entry', () => {
 
     it('does not attach a second click when the late card boots', async () => {
         const { bootHeadToHeadAccept } = await import('../game/head-to-head/poster-access.js');
-        const { bootHeadToHead } = await import('../head-to-head.js');
+        const { bootHeadToHead } = await import('../pages/head-to-head.js');
         const documentRef = posterDocument();
         documentRef.body = { attributes: {}, setAttribute() {}, removeAttribute() {} };
         const root = {

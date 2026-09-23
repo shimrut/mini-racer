@@ -3,11 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     bindCampaignRaceButton,
     openCampaignGame,
-} from '../campaign.js';
+} from '../pages/campaign.js';
 
 describe('campaign launcher custom post', () => {
     it('names the Campaign series The Numbers', () => {
-        const markup = readFileSync(new URL('../campaign.html', import.meta.url), 'utf8');
+        const markup = readFileSync(new URL('../pages/campaign.html', import.meta.url), 'utf8');
 
         expect(markup).toContain('<p class="campaign-eyebrow">The Numbers</p>');
         expect(markup).not.toContain('Permanent series');

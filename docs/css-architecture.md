@@ -2,12 +2,12 @@
 
 ## Purpose
 
-`styles.css` remains the single stylesheet entrypoint loaded by `game.html`. It is
+`pages/styles.css` remains the single stylesheet entrypoint loaded by `pages/game.html`. It is
 an ordered manifest whose imports are bundled into the production `game.css`.
 
-Standalone post surfaces (`preview.css`, `campaign.css`, `podium.css`,
-`head-to-head.css`, `mod-analytics.css`)
-import `fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
+Standalone post surfaces (`pages/preview.css`, `pages/campaign.css`, `pages/podium.css`,
+`pages/head-to-head.css`, `pages/mod-analytics.css`)
+import `styles/fonts.css` and reuse the same Outfit / JetBrains Mono + red accent
 (`#ef4444`) tokens as the game. The podium row keeps place, identity, and
 time in one grid, with identity tight to the rank. On phones the title shrinks,
 the “Final podium” line hides, date and lap sit on one line, rows get shorter,
@@ -37,8 +37,8 @@ that trace. Its brand uses the shared stacked Mini/Racer lockup, the duel row
 marks the matchup with italic uppercase VS. (white V, red S), and its
 format line carries the lap count without adding ghost-status copy. Keep the existing
 `challenge-*` IDs stable because
-`head-to-head.js` hydrates them from immutable Reddit post data. The Accept
-  tap is owned by `head-to-head-accept.js`, which is the HTML entry; the rest of
+`pages/head-to-head.js` hydrates them from immutable Reddit post data. The Accept
+  tap is owned by `pages/head-to-head-accept.js`, which is the HTML entry; the rest of
   the card loads after.
 
 The split is structural. Its first priority is preserving the original cascade:
@@ -49,7 +49,7 @@ top-to-bottom order.
 
 | Order | Stylesheet | Product ownership |
 | --- | --- | --- |
-| 1 | `fonts.css` | Hosted Outfit and JetBrains Mono declarations |
+| 1 | `styles/fonts.css` | Hosted Outfit and JetBrains Mono declarations |
 | 2 | `styles/foundation.css` | Tokens, reset, body, focus and global states |
 | 3 | `styles/race-hud-and-medals.css` | HUD, speed display and shared medal system |
 | 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and garage rules. Garage Car/Trail uses the same sliding pill as Settings on/off: slate track (`#1e293b` so it reads on the garage sheet), red thumb, `--radius-full`, `2.5rem` tall. |
@@ -359,7 +359,7 @@ for its single handoff rather than added to the general motion band.
 
 ## Change Rules
 
-- Keep `styles.css` as the only game stylesheet linked from HTML.
+- Keep `pages/styles.css` as the only game stylesheet linked from HTML.
 - Do not size a full-screen child independently from `dvh`; route usable
   embedded-browser height through `--app-visible-height` and let descendants
   flex from their containing block.
@@ -382,7 +382,7 @@ For structural or cross-file changes:
 
 1. Run `npm test`.
 2. Run `npm run build`.
-3. Confirm generated `game.html` references exactly one content-hashed game CSS file.
+3. Confirm generated `pages/game.html` references exactly one content-hashed game CSS file.
 4. Smoke-check loading, lobby, race HUD, pause, results, standings, tracks,
    garage, settings and sharing at desktop, narrow mobile and short landscape
    sizes.

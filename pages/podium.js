@@ -1,16 +1,16 @@
-import { TRACKS } from './game/track/tracks.js';
-import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
-import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
-import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from './game/car/sprite.js';
-import { requestFeaturedDailyChallengeStart } from './game/daily-challenge/service.js';
-import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from './game/ui/avatar.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
+import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
+import { requestFeaturedDailyChallengeStart } from '../game/daily-challenge/service.js';
+import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from '../game/ui/avatar.js';
 import {
     createLocalPodiumPreview,
     createPodiumReplayController,
     fetchPodiumReplays,
     shouldUseLocalPodiumPreview,
 } from './podium-replay-view.js';
-import { cleanText } from './game/shared/values.js';
+import { cleanText } from '../game/shared/values.js';
 
 const PODIUM_SIZE = 3;
 const EMPTY_NAME = 'No verified finish';

@@ -1,5 +1,5 @@
-import { requestGameLaunchTarget } from './game/modes/launch-target.js';
-import { exposeCampaignLauncherTestHooks } from './game/debug/launcher-hooks.js';
+import { requestGameLaunchTarget } from '../game/modes/launch-target.js';
+import { exposeCampaignLauncherTestHooks } from '../game/debug/launcher-hooks.js';
 
 export async function openCampaignGame(event, {
     requestLaunchTarget = requestGameLaunchTarget,

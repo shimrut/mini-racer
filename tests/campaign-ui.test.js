@@ -1109,7 +1109,7 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('places navigation and utilities in the header with a full-width Start Race', () => {
-        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
         const lobbyCss = readFileSync(
             new URL('../styles/lobby-and-garage.css', import.meta.url),
@@ -1260,7 +1260,7 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('preserves the Home menu and uses Font Awesome mode-toolbar icons', () => {
-        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
         const css = readFileSync(new URL('../styles/lobby-modes.css', import.meta.url), 'utf8');
         const lobbyCss = readFileSync(
             new URL('../styles/lobby-and-garage.css', import.meta.url),
@@ -1397,7 +1397,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('sends the wordmark home and leaves it inert once Home is showing', () => {
         const originalDocument = global.document;
-        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
             /<h1 class="lobby-title">\s*<button id="lobby-title-home-btn"[\s\S]*?data-lobby-back disabled>\s*<span class="lobby-title__mini">/,
         );
@@ -1629,7 +1629,7 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('keeps Home unchanged and swaps mode-screen branding for the toolbar', () => {
-        const html = readFileSync(new URL('../game.html', import.meta.url), 'utf8');
+        const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
         expect(html).toMatch(
             /class="lobby-title"[\s\S]*class="lobby-mode-toolbar"[\s\S]*id="lobby-mode-settings-btn"[\s\S]*data-lobby-subhead/,
         );

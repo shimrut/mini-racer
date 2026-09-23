@@ -1,11 +1,11 @@
-import { EXTRA_CAR_ASSETS } from './game/car/car-unlock-policy.js';
-import { CarSpriteLoader, sanitizeCarSpriteAsset } from './game/car/sprite.js';
-import { interpolatePbGhostPose, normalizePbGhostRecord } from './game/ghost/pb-ghost.js';
-import { isLocalEnvironment } from './game/track/environment.js';
-import { buildTrackGeometry } from './game/track/runtime.js';
-import { TRACKS } from './game/track/tracks.js';
-import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
-import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
+import { CarSpriteLoader, sanitizeCarSpriteAsset } from '../game/car/sprite.js';
+import { interpolatePbGhostPose, normalizePbGhostRecord } from '../game/ghost/pb-ghost.js';
+import { isLocalEnvironment } from '../game/track/environment.js';
+import { buildTrackGeometry } from '../game/track/runtime.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
 
 export const PODIUM_REPLAY_CAR_ASSETS = Object.freeze({
     1: EXTRA_CAR_ASSETS.gold,

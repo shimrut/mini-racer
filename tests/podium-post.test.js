@@ -8,7 +8,7 @@ import {
     podiumPostHasPackedReplays,
     readPodiumPostData,
     renderPodium,
-} from '../podium.js';
+} from '../pages/podium.js';
 import { requestFeaturedDailyChallengeStart } from '../game/daily-challenge/service.js';
 
 vi.mock('../game/daily-challenge/service.js', async (importOriginal) => {
@@ -185,7 +185,7 @@ describe('podium custom post', () => {
     });
 
     it('featured open path stores the featured-start override before expanding', async () => {
-        const { openFeaturedGameFromPodium } = await import('../podium.js');
+        const { openFeaturedGameFromPodium } = await import('../pages/podium.js');
         const { requestExpandedMode } = await import('@devvit/web/client');
         requestFeaturedDailyChallengeStart.mockClear();
         requestExpandedMode.mockClear();

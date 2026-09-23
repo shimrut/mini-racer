@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readCssBundle } from './helpers/read-css-bundle.js';
 
-const manifestUrl = new URL('../styles.css', import.meta.url);
+const manifestUrl = new URL('../pages/styles.css', import.meta.url);
 const manifest = readFileSync(manifestUrl, 'utf8');
 const trackCarouselStyles = readFileSync(
     new URL('../styles/track-carousel.css', import.meta.url),
@@ -30,22 +30,22 @@ const resultDetailStyles = readFileSync(
 );
 
 const expectedImports = [
-    './fonts.css',
-    './styles/foundation.css',
-            './styles/race-hud-and-medals.css',
-            './styles/lobby-and-garage.css',
-            './styles/lobby-modes.css',
-            './styles/track-carousel.css',
-            './styles/race-controls-and-feedback.css',
-    './styles/modal-and-result-shell.css',
-    './styles/settings-and-track-shells.css',
-    './styles/modal-components-and-standings.css',
-    './styles/responsive-layout.css',
-    './styles/results.css',
-    './styles/loading.css',
-    './styles/result-details.css',
-    './styles/tracks-and-small-screens.css',
-    './styles/standings-and-sharing.css',
+    '../styles/fonts.css',
+    '../styles/foundation.css',
+            '../styles/race-hud-and-medals.css',
+            '../styles/lobby-and-garage.css',
+            '../styles/lobby-modes.css',
+            '../styles/track-carousel.css',
+            '../styles/race-controls-and-feedback.css',
+    '../styles/modal-and-result-shell.css',
+    '../styles/settings-and-track-shells.css',
+    '../styles/modal-components-and-standings.css',
+    '../styles/responsive-layout.css',
+    '../styles/results.css',
+    '../styles/loading.css',
+    '../styles/result-details.css',
+    '../styles/tracks-and-small-screens.css',
+    '../styles/standings-and-sharing.css',
 ];
 
 describe('game stylesheet architecture', () => {

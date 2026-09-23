@@ -1,23 +1,23 @@
-import { TRACKS } from './game/track/tracks.js';
-import { renderTrackPreviewCanvas } from './game/track/preview-renderer.js';
-import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from './game/track/presentation.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
 import {
     createPosterCarDrive,
     loadPosterCar,
     posterCarTravelAt,
-} from './game/track/poster-car.js';
-import { createMedalIconSvg } from './game/medals/medal-icon.js';
+} from '../game/track/poster-car.js';
+import { createMedalIconSvg } from '../game/medals/medal-icon.js';
 import {
     getActiveDailyChallenge,
     getDailyChallengeCardStatus,
     requestFeaturedDailyChallengeStart
-} from './game/daily-challenge/service.js';
+} from '../game/daily-challenge/service.js';
 import {
     getRaceMedalThresholds,
-} from './game/medals/medal-timing.js';
-import { getDailyChallengeRequiredLaps } from './game/daily-challenge/labels.js';
-import { formatLapsLabel } from './game/shared/laps-label.js';
-import { requestGameLaunchTarget } from './game/modes/launch-target.js';
+} from '../game/medals/medal-timing.js';
+import { getDailyChallengeRequiredLaps } from '../game/daily-challenge/labels.js';
+import { formatLapsLabel } from '../game/shared/laps-label.js';
+import { requestGameLaunchTarget } from '../game/modes/launch-target.js';
 
 export function isCurrentDailyLauncherPost(root = globalThis) {
     return root?.devvit?.context?.postData?.postType === 'daily-launcher';

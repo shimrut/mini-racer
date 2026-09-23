@@ -133,7 +133,7 @@ replay validator. Findings that change the steps:
   ASCII only. The shared check must use `TextEncoder`, which gives bytes on both sides. The
   shared file must not import `node:crypto` or use `Buffer`.
 - 4.4: the game uses `getUtcDayIndex` only for a fallback cache expiry. The server alone
-  decides the live day. The lap count in `preview.js` and `reddit-post-title.ts` reads
+  decides the live day. The lap count in `pages/preview.js` and `reddit-post-title.ts` reads
   `objectiveParams.lapCount` without the objective type, but the validator uses
   `getDailyChallengeRequiredLaps`. `normalizeDailyGpRaceContract` rejects any challenge where
   the two differ, so they agree today. Use `getDailyChallengeRequiredLaps` in both places, and
@@ -218,7 +218,7 @@ After each step the esbuild bundle check and the suite in a clean worktree pass:
   and one more block updates the leaderboard before it refreshes the card, so they stay.
 - 4.4: `formatChallengeDate` moves to `src/server/shared/format-race-time.ts`.
   `game/shared/reddit-avatar.js` holds the avatar host check. `game/shared/utc-day.js` holds
-  `DAY_MS` (5 copies), `getUtcDayStart` (3), and `getUtcDayIndex` (2). `preview.js` and
+  `DAY_MS` (5 copies), `getUtcDayStart` (3), and `getUtcDayIndex` (2). `pages/preview.js` and
   `reddit-post-title.ts` use `getDailyChallengeRequiredLaps`.
 - 4.5: `game/shared/race-time-text.js`. `tests/race-time-text.test.js` pins the lobby text
   and the podium post text, and it passed before the change.

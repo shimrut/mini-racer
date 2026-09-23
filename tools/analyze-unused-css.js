@@ -143,12 +143,12 @@ function analyzeCSS(cssFileName, contentFiles, dynamicPrefixes = []) {
 function runAll() {
     const reports = {};
 
-    console.log('Analyzing styles.css...');
+    console.log('Analyzing pages/styles.css...');
     const gameFiles = [
-        path.resolve('game.html'),
+        path.resolve('pages/game.html'),
         ...getFiles(path.resolve('game'), ['.js'])
     ];
-    reports['styles.css'] = analyzeCSS('styles.css', gameFiles, [
+    reports['pages/styles.css'] = analyzeCSS('pages/styles.css', gameFiles, [
         'medal-svg--',
         'daily-challenge-hud--',
         'combined-rank-value--',
@@ -158,13 +158,13 @@ function runAll() {
         'track-carousel__edge--'
     ]);
 
-    console.log('Analyzing preview.css...');
+    console.log('Analyzing pages/preview.css...');
     const previewFiles = [
-        path.resolve('preview.html'),
-        path.resolve('preview.js'),
+        path.resolve('pages/preview.html'),
+        path.resolve('pages/preview.js'),
         path.resolve('game/medals/medal-icon.js')
     ];
-    reports['preview.css'] = analyzeCSS('preview.css', previewFiles, [
+    reports['pages/preview.css'] = analyzeCSS('pages/preview.css', previewFiles, [
         'challenge-status--'
     ]);
 

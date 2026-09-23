@@ -5,10 +5,10 @@ import {
     loadAnalyticsSummary,
     renderAnalyticsMessage,
     renderAnalyticsSummary,
-} from '../mod-analytics.js';
+} from '../pages/mod-analytics.js';
 
 function analyticsDom() {
-    const html = readFileSync(new URL('../mod-analytics.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../pages/mod-analytics.html', import.meta.url), 'utf8');
     return new JSDOM(html, { url: 'http://localhost' });
 }
 
