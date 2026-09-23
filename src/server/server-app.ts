@@ -6,16 +6,18 @@ import {
     getServerFinalDailyGpPodium,
     getServerDailyGpPlaylist,
     getServerDailyGpSnapshot,
+    getGuestProgressTransferDiagnostic,
+    recordServerRaceStart,
+    submitServerDailyGpRun,
+} from './daily/daily-gp-store.js';
+import {
     getServerPlayerPbGhost,
     getServerPlayerTrackPbSummaries,
-    getGuestProgressTransferDiagnostic,
     getServerPlayerBootstrap,
-    recordServerRaceStart,
     selectServerGuestProgress,
-    submitServerDailyGpRun,
     updateServerPlayerIdentity,
     updateServerPlayerPreferences,
-} from './daily/daily-gp-store.js';
+} from './player/player-account-store.js';
 import {
     confirmDailyGpShare,
     previewDailyGpShare,

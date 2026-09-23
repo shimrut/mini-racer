@@ -354,7 +354,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('getServerPlayerTrackPbSummaries request filtering', () => {
         it('ignores non-array challengeIds and returns an empty track map', async () => {
-            const { getServerPlayerTrackPbSummaries } = await import('../src/server/daily/daily-gp-store.ts');
+            const { getServerPlayerTrackPbSummaries } = await import('../src/server/player/player-account-store.ts');
 
             const result = await getServerPlayerTrackPbSummaries({
                 redditUsername: 'Pb-Reader',

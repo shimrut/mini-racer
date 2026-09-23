@@ -208,7 +208,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('rejects player preference updates with out-of-range crash delay values (L483-L485)', async () => {
-        const { updateServerPlayerPreferences } = await import('../src/server/daily/daily-gp-store.ts');
+        const { updateServerPlayerPreferences } = await import('../src/server/player/player-account-store.ts');
         mockVerifyGuestPlayerToken.mockResolvedValue('guest-wave4');
 
         const invalid = await updateServerPlayerPreferences({
@@ -232,7 +232,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('claims a new guest profile when no identity is supplied (L1210-L1222)', async () => {
-        const { getServerPlayerBootstrap } = await import('../src/server/daily/daily-gp-store.ts');
+        const { getServerPlayerBootstrap } = await import('../src/server/player/player-account-store.ts');
         mockRedis.set.mockImplementation(async (key, value, options = {}) => {
             if (options.nx) {
                 return 'OK';

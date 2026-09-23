@@ -12,11 +12,13 @@ vi.mock("@devvit/redis", () => ({
 const {
   getGuestProgressSelection,
   getServerDailyGpChallenge,
-  getServerPlayerBootstrap,
   resolveAccountTransferState,
   selectGuestProgress,
-  selectServerGuestProgress,
 } = await import("../src/server/daily/daily-gp-store.ts");
+const {
+  getServerPlayerBootstrap,
+  selectServerGuestProgress,
+} = await import("../src/server/player/player-account-store.ts");
 const { recordCompletedRace, carUnlockHashKey } = await import("../src/server/player/car-unlock-store.ts");
 const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
 const {

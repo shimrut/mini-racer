@@ -27,13 +27,15 @@ vi.mock("../src/server/competition/replay-validator.ts", async () => {
 const {
   getServerDailyGpSnapshot,
   getServerDailyGpChallenge,
+  submitServerDailyGpRun,
+} = await import("../src/server/daily/daily-gp-store.ts");
+const {
   getServerPlayerPbGhost,
   getServerPlayerBootstrap,
   getServerPlayerTrackPbSummaries,
-  submitServerDailyGpRun,
   updateServerPlayerIdentity,
   updateServerPlayerPreferences,
-} = await import("../src/server/daily/daily-gp-store.ts");
+} = await import("../src/server/player/player-account-store.ts");
 const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
 const { validateDailyGpReplayDetailed } = await import("../src/server/competition/replay-validator.ts");
 

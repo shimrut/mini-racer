@@ -128,6 +128,11 @@ Branch `chore/structure-moves`, started from `chore/duplicate-cleanup` at `4ad66
   font, or car picture link that points at a missing file. The local preview is now
   `http://127.0.0.1:8000/pages/game.html`.
 
+- Finding 1, player account part: done. Bootstrap, preferences, identity, track PB
+  summaries, PB ghosts, and the step that applies the guest progress choice moved to
+  `src/server/player/player-account-store.ts` (641 lines). The Daily file is 2,872 lines.
+  The new file imports from the Daily file; the Daily file does not import the new file.
+
 ## Order of work
 
 1. Finding 4 (one file move).
