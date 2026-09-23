@@ -5,6 +5,47 @@ holds uncommitted Mapmaker work and nine new tracks. §8 covers that work separa
 
 This report records findings. It does not change code.
 
+## Recheck after the removal commits
+
+Rechecked `chore/duplicate-cleanup` at `1ebf890` on 2026-09-23. The findings below
+the removal-progress section describe the earlier audit snapshot; the completed
+phase 1–3 removals are no longer present. At the start of this recheck the
+working tree had a `.claude/settings.local.json` edit and untracked
+`assets/share/newCircuit.jpg`. Both were absent at final validation; this
+recheck made no change to either path.
+
+New, small candidates found in the current code:
+
+| Location | Finding | Scope |
+|---|---|---|
+| `game/car/sprite.js:8–13` | `CAR_ASSET_URLS` maps every selectable asset path to itself. Its only lookup returns the input for every expected asset name. The candidate URL fallback function is live; only this identity map is redundant. | Client no-op |
+| `game/track/preview-renderer.js:156–182` | Both sides of `blur > 0` clear the same four shadow properties. `shadowRgb` is unread, so the five callers' blur/color arguments cannot change the drawing. Decide whether the intended preview should have a glow before simplifying this path. | Client no-op / possible missing visual effect |
+| `game/track/preview-renderer.js:328–342,474–478` | The inner schematic renderer receives and destructures `transparentBackground` without reading it. The outer renderer already uses it at lines 466–470. | Unread option |
+| `tools/analyze-unused-css.js:115–143` | The ID loop initializes `substringCount` to zero and never increments it, so its `dynamicIds` branch and output are always empty. | Unreachable developer-tool branch |
+| `devvit.json:16` | `sourceIgnores` still names `IGNORE SUPABASE`, although that deleted directory has no tracked or local path. `tests/release-pipeline.test.js:63` pins the stale entry. | Stale config and test expectation |
+
+All five were removed in `b8270d1`. The preview glow code went too: the route never had a glow, and no player saw a change.
+
+Previously recorded cleanup candidates remain: `renderLapTimesList` does not read
+its `bestTime` parameter (`game/race/ui-modal-content.js:498`); the medal entrance
+does not read `staggerMs` or `winSecondaryBaseDelayMs`
+(`game/medals/medals.js:543–545`); `@devvit/public-api` has no project import;
+`fflate` is used only by the development ghost-size module; and the three guest
+merge helpers' `replace: false` paths have no production caller. Those merge
+paths still have tests, so they require a separate transfer-focused change.
+The previously reported Mapmaker constants, medal typo, and Runner Lab stuck
+paths are gone. All 124 tracked share images match scheduled tracks. The
+previously untracked `newCircuit.jpg` was absent at final validation.
+
+No new dead server module, function, or route was confirmed. All route registrars
+are mounted by `src/server/server-app.ts`. TypeScript's unused-local and
+unused-parameter check reports no diagnostics in `src/`.
+
+Validation: `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` passed.
+`npx vitest run --silent` passed outside the filesystem sandbox (242 files,
+3,021 tests); inside the sandbox, 29 localhost-binding route tests fail with
+`listen EPERM` while the other 2,992 pass. No runtime code was changed.
+
 ## Removal progress
 
 The removals ran on branch `chore/duplicate-cleanup`, one commit per phase. After them the
