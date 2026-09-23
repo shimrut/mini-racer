@@ -5,6 +5,36 @@ holds uncommitted Mapmaker work and nine new tracks. §8 covers that work separa
 
 This report records findings. It does not change code.
 
+## Removal progress
+
+The removals ran on branch `chore/duplicate-cleanup`, one commit per phase. After them the
+suite has 242 files and 3,021 tests, and all pass. That is 21 tests fewer than before. Each
+removed test exercised only removed code.
+
+- **Phase 1 — done (`ad9305e`).** Code and fields that nothing reads: the import and constants
+  in §1 and §8, the `setGuestPlayerToken` re-export and the entry-page exports (§2), the
+  `onLeaderboard` action (§3), the fields in §4 and §5 except the three kept below, the Runner
+  Lab stuck path (§6), and the stale `.gitignore` rule (§6).
+- **Phase 2 — done (`92b7256`).** The functions in §3 and §4 that only tests called.
+  `buildModalRunsViewOptions` went too: `updateModalRunSummary` was its only caller. Two
+  day-switch tests, the status text test, and the runs field test now check the live code.
+- **Phase 3 — done (`d5f76f0`).** The re-exports in §2. The tests import the names from the
+  modules that own them.
+
+Kept on purpose:
+
+- `RingBuffer.toArray`. The ring buffer test uses it to read the buffer contents, like the
+  other test probes.
+- `bestResultComparator` in the Campaign fallback policy. `isNewBestResult` needs a policy
+  object that is not empty, and many test fixtures carry the same key.
+- `ghostActive` and `ghostExpected`. The expression that computes `ghostActive` also starts
+  the ghost run.
+- The 18 unread JavaScript parameters, the `fflate` and `@devvit/public-api` entries, the
+  `replace: true` merge branches, and the root planning note. These need a separate decision.
+
+The Sunset Terrace and Anvil Circuit medal rows (§8) were fixed before the new tracks were
+committed in `ea5c8c6`. The `newCircuit.jpg` leftover stays untracked.
+
 ## Why this audit
 
 The last audit ran on 2026-09-22 (`docs/dead-code-audit-2026-09-22.md`). Six removal phases
