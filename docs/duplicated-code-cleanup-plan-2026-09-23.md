@@ -251,6 +251,7 @@ traces from both recorders. 3.4 is done in `41546d8`: `src/server/autopost-subsc
 serves both stores. Each store keeps its Redis key, lock key prefix, messages, and exported
 names. The old and new stores gave the same lock keys, writes, errors, and log lines in 21 cases
 each. Both new files joined the Stryker mutate list.
+The playtest on 2026-09-23 passed: a new personal-best ghost appeared on the next race, and the Daily and podium autopost switches worked.
 
 ## Phase 7 — Decisions first (they change what players see, hear, or get)
 
