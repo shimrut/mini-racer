@@ -67,7 +67,7 @@ describe('the Keep Progress chooser when the queue receipt cannot be saved', () 
         vi.spyOn(console, 'error').mockImplementation(() => {});
         vi.stubGlobal('fetch', vi.fn(async () => response(200, chooserBootstrap())));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState();
         statePromise.catch(() => {});
 
@@ -94,7 +94,7 @@ describe('the Keep Progress chooser when the queue receipt cannot be saved', () 
         vi.spyOn(console, 'error').mockImplementation(() => {});
         vi.stubGlobal('fetch', vi.fn(async () => response(200, chooserBootstrap())));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState();
         statePromise.catch(() => {});
 

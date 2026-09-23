@@ -66,7 +66,7 @@ describe('an empty guest joined to the account at sign-in', () => {
         const fetchMock = vi.fn().mockResolvedValue(response(200, JOINED_BOOTSTRAP));
         vi.stubGlobal('fetch', fetchMock);
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const state = await getPlayerProgressState();
 
         expect(document.querySelector('.guest-progress-selection')).toBeNull();
@@ -92,7 +92,7 @@ describe('an empty guest joined to the account at sign-in', () => {
             });
             vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(200, JOINED_BOOTSTRAP)));
 
-            const { getPlayerProgressState } = await import('../game/storage.js');
+            const { getPlayerProgressState } = await import('../game/player/progress-state.js');
             await getPlayerProgressState();
 
             const queue = readCampaignQueue(dom);
@@ -111,7 +111,7 @@ describe('an empty guest joined to the account at sign-in', () => {
         }));
         vi.stubGlobal('fetch', fetchMock);
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const state = await getPlayerProgressState();
 
         expect(document.querySelector('.guest-progress-selection')).toBeNull();
@@ -132,7 +132,7 @@ describe('an empty guest joined to the account at sign-in', () => {
             return setItem.call(this, key, value);
         });
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         await getPlayerProgressState();
 
         expect(document.querySelector('.guest-progress-selection')).toBeNull();

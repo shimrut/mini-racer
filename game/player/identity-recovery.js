@@ -1,4 +1,4 @@
-import { getPlayerProgressState } from '../storage.js';
+import { getPlayerProgressState } from './progress-state.js';
 
 export async function recoverPlayerIdentity(engine) {
     if (engine?.playerProfileAuthoritative) return true;

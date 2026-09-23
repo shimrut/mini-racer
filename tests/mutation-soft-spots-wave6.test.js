@@ -359,7 +359,7 @@ describe('mutation soft spots wave 6', () => {
                 }),
             }));
 
-            const { getPlayerProgressState } = await import('../game/storage.js');
+            const { getPlayerProgressState } = await import('../game/player/progress-state.js');
             await getPlayerProgressState();
 
             expect(getOrCreatePlayerId).toHaveBeenCalledWith('player bootstrap');
@@ -382,7 +382,7 @@ describe('mutation soft spots wave 6', () => {
             vi.stubGlobal('fetch', fetchMock);
             const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-            const { getPlayerProgressState } = await import('../game/storage.js');
+            const { getPlayerProgressState } = await import('../game/player/progress-state.js');
             const state = await getPlayerProgressState();
 
             expect(fetchMock).toHaveBeenCalledTimes(1);

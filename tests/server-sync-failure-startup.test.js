@@ -30,7 +30,7 @@ describe('server synchronization failure at launch', () => {
         vi.stubGlobal('fetch', fetchMock);
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState({ promptOnSyncFailure: true });
         await vi.waitFor(() => {
             expect(document.querySelector('.server-sync-failure')).not.toBeNull();
@@ -68,7 +68,7 @@ describe('server synchronization failure at launch', () => {
         vi.stubGlobal('fetch', fetchMock);
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState({ promptOnSyncFailure: true });
         await vi.waitFor(() => {
             expect(document.querySelector('[data-choice="retry"]')).not.toBeNull();
@@ -97,7 +97,7 @@ describe('server synchronization failure at launch', () => {
         vi.stubGlobal('fetch', fetchMock);
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState({ promptOnSyncFailure: true });
         await vi.waitFor(() => {
             expect(document.querySelector('.server-sync-failure')).not.toBeNull();

@@ -53,7 +53,7 @@ describe("guest bootstrap recovery", () => {
   it("normalizes a null bootstrap body into empty remote progress fields", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(200, null));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -78,7 +78,7 @@ describe("guest bootstrap recovery", () => {
       playerPreferences: { pbGhostEnabled: true },
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -99,7 +99,7 @@ describe("guest bootstrap recovery", () => {
         isReturningPlayer: true,
       }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -121,7 +121,7 @@ describe("guest bootstrap recovery", () => {
   it("does not rotate for non-authorization failures", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -142,7 +142,7 @@ describe("guest bootstrap recovery", () => {
       isReturningPlayer: true,
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -164,7 +164,7 @@ describe("guest bootstrap recovery", () => {
         playerPreferences: null,
       }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     await getPlayerProgressState();
 
@@ -176,7 +176,7 @@ describe("guest bootstrap recovery", () => {
   it("stops after one failed recovery attempt and keeps the local player id", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(401));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -198,7 +198,7 @@ describe("guest bootstrap recovery", () => {
     });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -225,7 +225,7 @@ describe("guest bootstrap recovery", () => {
       playerPreferences: preferences,
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -256,7 +256,7 @@ describe("guest bootstrap recovery", () => {
       leaderboardIdentity: "constructed",
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -281,7 +281,7 @@ describe("guest bootstrap recovery", () => {
       localStorage,
     });
     vi.stubGlobal("fetch", undefined);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -293,7 +293,7 @@ describe("guest bootstrap recovery", () => {
   it("logs hosted bootstrap failures and still returns local progress", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -306,7 +306,7 @@ describe("guest bootstrap recovery", () => {
   it("marks a hosted outage as non-authoritative without claiming everything is locked", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -332,7 +332,7 @@ describe("guest bootstrap recovery", () => {
       }))
       .mockResolvedValue(createResponse(503));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const confirmed = await getPlayerProgressState();
     const outage = await getPlayerProgressState();
@@ -353,7 +353,7 @@ describe("guest bootstrap recovery", () => {
       playerPreferences: { carSkin: "assets/cars/mr_extra_crimson.webp" },
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     await getPlayerProgressState();
 
@@ -373,7 +373,7 @@ describe("guest bootstrap recovery", () => {
     });
     const fetchMock = vi.fn().mockResolvedValue(createResponse(500));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 
@@ -391,7 +391,7 @@ describe("guest bootstrap recovery", () => {
       };
     });
     vi.stubGlobal("fetch", vi.fn());
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
     const state = await getPlayerProgressState();
     expect(state.leaderboardPlayerId).toBe("old-guest-id");
     expect(fetch).not.toHaveBeenCalled();
@@ -407,7 +407,7 @@ describe("guest bootstrap recovery", () => {
       guestToken: "server-token",
     }));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     await getPlayerProgressState();
 
@@ -423,7 +423,7 @@ describe("guest bootstrap recovery", () => {
   it("logs hosted bootstrap failures with the exact HTTP status message", async () => {
     const fetchMock = vi.fn().mockResolvedValue(createResponse(503));
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     await getPlayerProgressState();
 
@@ -444,7 +444,7 @@ describe("guest bootstrap recovery", () => {
     });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const { getPlayerProgressState } = await import("../game/storage.js");
+    const { getPlayerProgressState } = await import("../game/player/progress-state.js");
 
     const state = await getPlayerProgressState();
 

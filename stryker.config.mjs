@@ -23,7 +23,7 @@ export default {
         'game/car/handling.js',
         'game/daily-challenge/storage.js',
         'game/daily-challenge/service.js',
-        'game/storage.js',
+        'game/player/progress-state.js',
         'game/scoreboard/service.js',
         'game/scoreboard/verification-queue.js',
         'game/scoreboard/snapshot.js',

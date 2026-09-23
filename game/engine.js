@@ -8,7 +8,7 @@ import {
 import { RingBuffer } from "./race/ring-buffer.js";
 import {
   getPlayerProgressState,
-} from "./storage.js";
+} from "./player/progress-state.js";
 import { isVerificationQueueSubmissionBlocked } from "./scoreboard/verification-queue.js";
 import { createRunPolicy } from "./race/run-policy.js";
 import {

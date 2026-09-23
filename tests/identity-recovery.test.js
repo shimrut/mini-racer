@@ -4,7 +4,7 @@ const storageMocks = vi.hoisted(() => ({
     getPlayerProgressState: vi.fn(),
 }));
 
-vi.mock('../game/storage.js', () => ({
+vi.mock('../game/player/progress-state.js', () => ({
     getPlayerProgressState: storageMocks.getPlayerProgressState,
 }));
 

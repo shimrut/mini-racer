@@ -59,7 +59,7 @@ describe('a completed transfer reported at startup', () => {
         const dom = installDom();
         vi.stubGlobal('fetch', vi.fn(async () => response(200, completedBootstrap())));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const state = await getPlayerProgressState();
 
         expect(state.leaderboardPlayerId).toBe(ACCOUNT);
@@ -76,7 +76,7 @@ describe('a completed transfer reported at startup', () => {
         const dom = installDom();
         vi.stubGlobal('fetch', vi.fn(async () => response(200, completedBootstrap())));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         await getPlayerProgressState();
 
         dom.window.localStorage.setItem(DAILY_DATA_KEY, JSON.stringify({ kept: true }));
@@ -104,7 +104,7 @@ describe('a completed transfer reported at startup', () => {
         }));
         vi.stubGlobal('fetch', vi.fn(async () => response(200, completedBootstrap())));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         await getPlayerProgressState();
 
         const queue = JSON.parse(dom.window.localStorage.getItem(QUEUE_KEY));

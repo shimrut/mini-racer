@@ -12,7 +12,7 @@ import { configureCanvasViewport } from "./canvas-resolution.js";
 import {
   readCanvasDevicePixelRatio,
 } from "./environment.js";
-import { getPlayerProgressState } from "../storage.js";
+import { getPlayerProgressState } from "../player/progress-state.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 

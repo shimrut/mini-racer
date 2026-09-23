@@ -9,7 +9,7 @@ import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
 } from '../shared/leaderboard-identity.js';
-import { getPlayerProgressState } from '../storage.js';
+import { getPlayerProgressState } from '../player/progress-state.js';
 import {
     API_ROUTES,
 } from '../scoreboard/api-client.js';

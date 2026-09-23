@@ -76,7 +76,7 @@ describe('promoted guest startup selection', () => {
             .mockResolvedValueOnce(response(200, selectedState));
         vi.stubGlobal('fetch', fetchMock);
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState({
             onProgressSelectionRequired: async () => {
                 document.body.classList.remove('loading-active');
@@ -199,7 +199,7 @@ describe('promoted guest startup selection', () => {
             }))
             .mockResolvedValueOnce(response(200, selectedState)));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const statePromise = getPlayerProgressState();
         await vi.waitFor(() => {
             expect(document.querySelector('.guest-progress-selection')).not.toBeNull();
@@ -250,7 +250,7 @@ describe('promoted guest startup selection', () => {
             hasAnyData: true,
         })));
 
-        const { getPlayerProgressState } = await import('../game/storage.js');
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
         const state = await getPlayerProgressState();
 
         expect(state.authoritative).toBe(true);

@@ -1,32 +1,32 @@
-import { hasAnyDailyChallengeStoredData } from "./daily-challenge/storage.js";
+import { hasAnyDailyChallengeStoredData } from "../daily-challenge/storage.js";
 import {
   getLeaderboardIdentityPreference,
   normalizeLeaderboardIdentityPreference,
   setLeaderboardIdentityPreference,
-} from "./scoreboard/display-preference.js";
+} from "../scoreboard/display-preference.js";
 import {
   API_ROUTES,
-} from "./scoreboard/api-client.js";
+} from "../scoreboard/api-client.js";
 import {
   getGuestPlayerToken,
   getOrCreatePlayerId,
   rotateGuestPlayerIdentity,
   setGuestPlayerToken,
   toGuestOwnerId,
-} from "./scoreboard/player-identity.js";
-import { isLocalEnvironment } from "./track/environment.js";
+} from "../scoreboard/player-identity.js";
+import { isLocalEnvironment } from "../track/environment.js";
 import {
   DEFAULT_CAR_UNLOCK_SNAPSHOT,
   normalizeCarUnlockSnapshot,
-} from "./car/car-unlock-policy.js";
+} from "../car/car-unlock-policy.js";
 import {
   readCachedPlayerProfile,
   readLastConfirmedProfileOwnerId,
   writeCachedPlayerProfile,
-} from "./player/profile-cache.js";
-import { setActivePlayerOwnerId } from "./player/active-owner.js";
-import { requestGuestProgressSelection } from "./player/guest-progress-selection.js";
-import { requestServerSyncFailureChoice } from "./player/server-sync-failure.js";
+} from "./profile-cache.js";
+import { setActivePlayerOwnerId } from "./active-owner.js";
+import { requestGuestProgressSelection } from "./guest-progress-selection.js";
+import { requestServerSyncFailureChoice } from "./server-sync-failure.js";
 import {
   hasVerificationEntriesForOwner,
   moveVerificationEntriesToOwner,
@@ -38,9 +38,9 @@ import {
   clearVerificationQueueTransferBlock,
   confirmVerificationQueueTransferSafety,
   isVerificationQueueSubmissionBlocked,
-} from "./scoreboard/verification-queue.js";
-import { clearDailyChallengeStoredData } from "./daily-challenge/storage.js";
-import { clearTrackLastLapMedals } from "./medals/last-lap-medal-storage.js";
+} from "../scoreboard/verification-queue.js";
+import { clearDailyChallengeStoredData } from "../daily-challenge/storage.js";
+import { clearTrackLastLapMedals } from "../medals/last-lap-medal-storage.js";
 
 export const PLAYER_BOOTSTRAP_TIMEOUT_MS = 8_000;
 
@@ -312,7 +312,7 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
       throw error;
     }
     clearDailyChallengeStoredData();
-    const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
+    const { clearDailyChallengeClientCaches } = await import("../daily-challenge/service.js");
     clearDailyChallengeClientCaches();
     clearTrackLastLapMedals();
     if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
