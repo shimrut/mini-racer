@@ -43,7 +43,7 @@ describe('track canvas presentation', () => {
         drawPresentationBackground(staticCtx, 320, 200, {
             backgroundStyle: 'flat',
             offTrackColor: '#050816'
-        }, 'test-seed');
+        });
         drawViewportPresentationBackground(movingCtx, 320, 200, { x: 0, y: 0 }, 1, {
             backgroundStyle: 'flat',
             offTrackColor: '#050816',
@@ -64,7 +64,7 @@ describe('track canvas presentation', () => {
             backgroundStyle: 'desert',
             offTrackColor: '#8d6a3b',
             key: 'test-desert'
-        }, 'desert-seed');
+        });
         drawViewportPresentationBackground(movingCtx, 320, 200, { x: 120, y: 80 }, 1, {
             backgroundStyle: 'desert',
             offTrackColor: '#8d6a3b',

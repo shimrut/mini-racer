@@ -540,9 +540,7 @@ export function scheduleCombinedMedalEntranceAfterModal(
     combinedViewEl,
     { heroMedalEl = null, stackEl = null } = {},
     {
-        staggerMs = 150,
         stackAfterHeroMs = 280,
-        winSecondaryBaseDelayMs = 200,
         shouldCelebrateTier = null,
         playUnlockSound = null,
     } = {},

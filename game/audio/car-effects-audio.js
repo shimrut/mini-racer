@@ -345,7 +345,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             thud.stop(t + 0.1);
         },
 
-        scheduleCountdownLight(index) {
+        scheduleCountdownLight() {
             if (!enabledCache || tabHidden) return;
             buildGraph();
             if (!ctx || !masterGain) return;

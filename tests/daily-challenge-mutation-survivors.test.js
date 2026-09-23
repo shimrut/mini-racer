@@ -398,11 +398,8 @@ describe('daily-challenge mutation survivors', () => {
     });
 
     it('formats missing result labels and rejects non-object results', () => {
-        expect(formatDailyChallengeResultLabel({ objectiveType: 'single_lap_fastest' }, null)).toBe('--');
-        expect(formatDailyChallengeResultLabel(
-            { objectiveType: 'single_lap_fastest' },
-            { bestTime: Number.NaN },
-        )).toBe('--');
+        expect(formatDailyChallengeResultLabel(null)).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: Number.NaN })).toBe('--');
     });
 
     it('uses the featured card state only while endsAt is still in the future', () => {
@@ -683,10 +680,9 @@ describe('daily-challenge mutation survivors', () => {
     });
 
     it('formats valid result labels and best-time labels while rejecting invalid numbers', () => {
-        const challenge = buildChallenge();
-        expect(formatDailyChallengeResultLabel(challenge, { bestTime: 12.4 })).toBe('12.400s');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.876s');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: 12.4 })).toBe('12.400s');
+        expect(formatDailyChallengeBestLabel(9.876)).toBe('9.876s');
+        expect(formatDailyChallengeBestLabel(Number.NaN)).toBe('--');
     });
 
     it('shows an expires-in label when less than one day remains on the challenge', () => {

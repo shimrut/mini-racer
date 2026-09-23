@@ -384,19 +384,19 @@ export const raceEngineMethods = {
     this.activeTimers.push(
       setTimeout(() => {
         this.hud.turnOnCountdownLight(0);
-        this.carEffectsAudio?.scheduleCountdownLight?.(0);
+        this.carEffectsAudio?.scheduleCountdownLight?.();
       }, 100),
     );
     this.activeTimers.push(
       setTimeout(() => {
         this.hud.turnOnCountdownLight(1);
-        this.carEffectsAudio?.scheduleCountdownLight?.(1);
+        this.carEffectsAudio?.scheduleCountdownLight?.();
       }, 433),
     );
     this.activeTimers.push(
       setTimeout(() => {
         this.hud.turnOnCountdownLight(2);
-        this.carEffectsAudio?.scheduleCountdownLight?.(2);
+        this.carEffectsAudio?.scheduleCountdownLight?.();
       }, 767),
     );
 

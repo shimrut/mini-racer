@@ -43,7 +43,7 @@ describe('ui modal content helpers', () => {
         const lapTimes = [19.5, 20.1];
 
         const component = new ModalContentUi({});
-        component.renderLapTimesList(container, lapTimes, 19.5, 19.5);
+        component.renderLapTimesList(container, lapTimes, 19.5);
 
         expect(container.children[0].className).toBe('runs-header-row');
         expect(container.children[1].className).toBe('lap-times-list');
@@ -124,7 +124,7 @@ describe('ui modal content helpers', () => {
             leaderboardEntryCount: 2,
             playerRank: 1,
             playerRankLabel: '#1',
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.textContent).toContain('1');
         expect(container.textContent).toContain('You');
@@ -157,7 +157,7 @@ describe('ui modal content helpers', () => {
             leaderboardEntryCount: 0,
             playerRank: null,
             playerRankLabel: null,
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.querySelectorAll('.combined-row-rank')).toHaveLength(0);
         expect(container.textContent).toContain('No scores recorded yet.');
@@ -181,7 +181,7 @@ describe('ui modal content helpers', () => {
             ],
             leaderboardEntryCount: 2,
             totalCount: 5,
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.querySelectorAll('.leaderboard-row')).toHaveLength(2);
         expect(container.textContent).not.toContain('No time yet');
@@ -209,7 +209,7 @@ describe('ui modal content helpers', () => {
             pageLimit: 50,
             hasMore: true,
             nextOffset: 50,
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.textContent).toContain('Leader');
         expect(container.textContent).not.toContain('You');
@@ -234,7 +234,7 @@ describe('ui modal content helpers', () => {
             currentPlayerRow: { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
             totalCount: 2,
             leaderboardEntryCount: 2,
-        }, 'daily', 'circuit', null, { shareBest: { challengeId: 'daily-1', bestTime: 6.4 } });
+        }, 'circuit', { shareBest: { challengeId: 'daily-1', bestTime: 6.4 } });
 
         const rows = container.querySelectorAll('.leaderboard-row');
         expect(rows).toHaveLength(2);
@@ -266,7 +266,7 @@ describe('ui modal content helpers', () => {
             currentPlayerRow: { rank: 1, displayName: 'SHIMROOT', bestTime: 6.4, isCurrentPlayer: true },
             totalCount: 2,
             leaderboardEntryCount: 2,
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.querySelector('.leaderboard-row__action')).toBe(null);
         expect(container.querySelector('.leaderboard-row__share')).toBe(null);
@@ -303,7 +303,7 @@ describe('ui modal content helpers', () => {
             currentPlayerRow: { rank: 3, displayName: 'You', bestTime: 8.1, isCurrentPlayer: true },
             totalCount: 3,
             leaderboardEntryCount: 3,
-        }, 'campaign', 'circuit', null, { raceOpponentEnabled: true });
+        }, 'circuit', { raceOpponentEnabled: true });
 
         const rows = container.querySelectorAll('.leaderboard-row');
         expect(rows[0].classList.contains('is-raceable')).toBe(true);
@@ -933,11 +933,11 @@ describe('leaderboard row patching', () => {
             leaderboardEntryCount: 2,
         });
 
-        component.renderScoreboardList(container, snapshot('Two', 11.25), 'daily', 'circuit');
+        component.renderScoreboardList(container, snapshot('Two', 11.25), 'circuit');
         const firstPass = [...container.querySelectorAll('.leaderboard-row')];
         expect(firstPass).toHaveLength(2);
 
-        component.renderScoreboardList(container, snapshot('Renamed', 9.75), 'daily', 'circuit');
+        component.renderScoreboardList(container, snapshot('Renamed', 9.75), 'circuit');
         const secondPass = [...container.querySelectorAll('.leaderboard-row')];
 
         expect(secondPass).toHaveLength(2);
@@ -962,10 +962,10 @@ describe('leaderboard row patching', () => {
             leaderboardEntryCount: count,
         });
 
-        component.renderScoreboardList(container, page(2, true), 'daily', 'circuit');
+        component.renderScoreboardList(container, page(2, true), 'circuit');
         const firstPage = [...container.querySelectorAll('.leaderboard-row')];
 
-        component.renderScoreboardList(container, page(4, false), 'daily', 'circuit');
+        component.renderScoreboardList(container, page(4, false), 'circuit');
         const merged = [...container.querySelectorAll('.leaderboard-row')];
 
         expect(merged).toHaveLength(4);
@@ -987,7 +987,7 @@ describe('leaderboard row patching', () => {
             topRows: [opponent],
             totalCount: 1,
             leaderboardEntryCount: 1,
-        }, 'campaign', 'circuit', null, { raceOpponentEnabled: true });
+        }, 'circuit', { raceOpponentEnabled: true });
 
         const row = container.querySelector('.leaderboard-row');
         row.onclick = () => {};
@@ -997,7 +997,7 @@ describe('leaderboard row patching', () => {
             topRows: [{ ...opponent, opponentRaceAvailable: false }],
             totalCount: 1,
             leaderboardEntryCount: 1,
-        }, 'campaign', 'circuit', null, { raceOpponentEnabled: true });
+        }, 'circuit', { raceOpponentEnabled: true });
 
         expect(container.querySelector('.leaderboard-row')).toBe(row);
         expect(row.classList.contains('is-raceable')).toBe(false);
@@ -1011,7 +1011,7 @@ describe('leaderboard row patching', () => {
     it('replaces the loading line with rows when the fetch answers', () => {
         const { container, component } = mountLeaderboard();
 
-        component.renderScoreboardList(container, { isLoading: true }, 'daily', 'circuit');
+        component.renderScoreboardList(container, { isLoading: true }, 'circuit');
         expect(container.querySelector('.leaderboard-loading-state')).not.toBe(null);
         expect(container.querySelectorAll('.leaderboard-row')).toHaveLength(0);
 
@@ -1019,7 +1019,7 @@ describe('leaderboard row patching', () => {
             topRows: [{ rank: 1, displayName: 'One', bestTime: 10.5 }],
             totalCount: 1,
             leaderboardEntryCount: 1,
-        }, 'daily', 'circuit');
+        }, 'circuit');
 
         expect(container.querySelector('.combined-empty-msg')).toBe(null);
         expect(container.querySelectorAll('.leaderboard-row')).toHaveLength(1);
@@ -1038,10 +1038,10 @@ describe('leaderboard row patching', () => {
             leaderboardEntryCount: ranks.length,
         });
 
-        component.renderScoreboardList(container, withRanks([1, 2, 3, 4]), 'daily', 'circuit');
+        component.renderScoreboardList(container, withRanks([1, 2, 3, 4]), 'circuit');
         const before = [...container.querySelectorAll('.leaderboard-row')];
 
-        component.renderScoreboardList(container, withRanks([1, 2, 4]), 'daily', 'circuit');
+        component.renderScoreboardList(container, withRanks([1, 2, 4]), 'circuit');
         const after = [...container.querySelectorAll('.leaderboard-row')];
 
         expect(after).toHaveLength(3);
@@ -1062,11 +1062,11 @@ describe('leaderboard row patching', () => {
             leaderboardEntryCount: 2,
         };
 
-        component.renderScoreboardList(container, tied, 'daily', 'circuit');
+        component.renderScoreboardList(container, tied, 'circuit');
         const firstPass = [...container.querySelectorAll('.leaderboard-row')];
         expect(firstPass).toHaveLength(2);
 
-        component.renderScoreboardList(container, tied, 'daily', 'circuit');
+        component.renderScoreboardList(container, tied, 'circuit');
         const secondPass = [...container.querySelectorAll('.leaderboard-row')];
 
         expect(secondPass).toEqual(firstPass);

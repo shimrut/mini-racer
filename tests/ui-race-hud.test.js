@@ -258,7 +258,6 @@ describe('ui race hud helpers', () => {
             scoreboardSubmitPromise: null
         });
         expect(hud.setHudBestMetric).toHaveBeenCalledWith({
-            label: 'BEST',
             value: '48.350',
             visible: true
         });

@@ -40,7 +40,6 @@ export class RaceHud {
             speedBar: document.getElementById('speed-bar'),
             bestTimeDisplay: document.getElementById('best-time-display'),
             bestTimeVal: document.getElementById('best-time-val'),
-            bestTimeMedal: document.getElementById('best-time-medal'),
             speedometer: document.getElementById('speedometer'),
             pauseBtn: document.getElementById('pause-btn'),
             hudStatsBtn: document.getElementById('hud-stats-btn'),
@@ -81,7 +80,6 @@ export class RaceHud {
     get timeLabel() { return this.elements.timeLabel; }
     get bestTimeDisplay() { return this.elements.bestTimeDisplay; }
     get bestTimeVal() { return this.elements.bestTimeVal; }
-    get bestTimeMedal() { return this.elements.bestTimeMedal; }
     get speedometer() { return this.elements.speedometer; }
     get pauseBtn() { return this.elements.pauseBtn; }
     get hudStatsBtn() { return this.elements.hudStatsBtn; }
@@ -216,7 +214,7 @@ export class RaceHud {
     this.timeDisplay.style.display = isVisible ? '' : 'none';
 }
 
-    setHudBestMetric({ label = 'BEST', value = '--', visible = false } = {}) {
+    setHudBestMetric({ value = '--', visible = false } = {}) {
     if (!this.bestTimeDisplay || !this.bestTimeVal) return;
 
     if (visible) {
@@ -228,15 +226,6 @@ export class RaceHud {
     this.bestTimeVal.textContent = '--';
     this.bestTimeDisplay.style.display = 'none';
 }
-
-    syncBestTimeMedalBadge(trackKey, bestLapTime) {
-        const el = this.bestTimeMedal;
-        if (!el) return;
-        el.replaceChildren();
-        el.hidden = true;
-        el.className = 'hud-medal';
-        el.removeAttribute('title');
-    }
 
     setBestTime(bestLapTime, {
     persistToTrackCard = true,
@@ -256,15 +245,12 @@ export class RaceHud {
 
     if (bestLapTime !== null && bestLapTime !== undefined) {
         this.setHudBestMetric({
-            label: 'BEST',
             value: bestLapTime.toFixed(3),
             visible: true
         });
-        this.syncBestTimeMedalBadge(trackKey, bestLapTime);
         return;
     }
 
-    this.syncBestTimeMedalBadge(null, null);
     this.setHudBestMetric({ visible: false });
 }
 
@@ -278,11 +264,9 @@ export class RaceHud {
         return;
     }
     this.setHudBestMetric({
-        label: `VS ${displayName}`,
         value: finishTimeSec.toFixed(3),
         visible: true,
     });
-    this.syncBestTimeMedalBadge(null, null);
 }
 
     setPauseVisible(isVisible) {

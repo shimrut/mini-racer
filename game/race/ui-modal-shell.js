@@ -1224,10 +1224,10 @@ export class ModalShell {
 
         if (lapData?.listData !== undefined && this.modalLapTimes) {
             this.modalLapTimes.replaceChildren();
-            this.content.renderLapTimesList(this.modalLapTimes, lapData.listData, lapData.bestTime, lapData.lapTime);
+            this.content.renderLapTimesList(this.modalLapTimes, lapData.listData, lapData.lapTime);
         } else if (lapData?.lapTimesArray !== undefined && this.modalLapTimes) {
             this.modalLapTimes.replaceChildren();
-            this.content.renderLapTimesList(this.modalLapTimes, lapData.lapTimesArray, lapData.bestTime, lapData.lapTime);
+            this.content.renderLapTimesList(this.modalLapTimes, lapData.lapTimesArray, lapData.lapTime);
         } else if (lapData && this.modalLapTimes) {
             this.modalLapTimes.replaceChildren();
         }
@@ -1238,14 +1238,14 @@ export class ModalShell {
         }
 
         if (this._modalKind === 'pause') {
-            this.showPauseResults(lapData, options);
+            this.showPauseResults(options);
             return;
         }
 
         this.showMainResults(options);
     }
 
-    showPauseResults(lapData, options = {}) {
+    showPauseResults(options = {}) {
         if (!this.modal || !this.modalPauseView) return;
 
         this.cancelPendingModalClose();
@@ -1300,9 +1300,6 @@ export class ModalShell {
             time: lapData.lapTime,
             bestLap: lapData.bestTime,
             scoreboardSnapshot: lapData.scoreboardSnapshot,
-            title: lapData.lapMedal === 'challenge' || lapData.challengeConfirmPhase === 'won'
-                ? 'Challenge beaten'
-                : 'RACE COMPLETE',
             lapMedal: lapData.lapMedal ?? null,
             challengeFinish: Boolean(lapData.challengeFinish),
             challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
@@ -1468,7 +1465,6 @@ export class ModalShell {
                 heroMedalEl: medalHostEl,
                 stackEl: null
             }, {
-                staggerMs: 85,
                 stackAfterHeroMs: 0,
                 shouldCelebrateTier,
                 playUnlockSound
@@ -1630,7 +1626,6 @@ export class ModalShell {
                 heroMedalEl,
                 stackEl: null,
             }, {
-                staggerMs: 85,
                 stackAfterHeroMs: 0,
                 shouldCelebrateTier,
                 playUnlockSound,
@@ -1682,7 +1677,7 @@ export class ModalShell {
         this._leaderboardDayRailOptionsKey = null;
         this._leaderboardDayRailKey = null;
         const hasPersonalBestList = Array.isArray(lapTimesArray);
-        this.content.renderLapTimesList(this.modalLapTimes, lapTimesArray, bestTime, currentTime);
+        this.content.renderLapTimesList(this.modalLapTimes, lapTimesArray, currentTime);
         this._modalRunsPayload = buildModalRunsPayload({
             lapTimesArray,
             bestTime,
@@ -1717,9 +1712,7 @@ export class ModalShell {
             this.content.renderScoreboardList(
                 this.modalLapTimes,
                 this._modalRunsPayload.scoreboardSnapshot,
-                this._modalRunsPayload.scoreboardMode,
                 this._modalRunsPayload.scoreboardTrackKey,
-                this._modalRunsPayload.scoreboardSubhead,
                 {
                     showHeader: hasPersonalBestList,
                     shareBest,
@@ -2203,9 +2196,7 @@ export class ModalShell {
                 this.content.renderScoreboardList(
                     this.modalLapTimes,
                     this._modalRunsPayload.scoreboardSnapshot,
-                    this._modalRunsPayload.scoreboardMode,
                     this._modalRunsPayload.scoreboardTrackKey,
-                    this._modalRunsPayload.scoreboardSubhead,
                     {
                         showHeader: hasPersonalBestList,
                         shareBest,

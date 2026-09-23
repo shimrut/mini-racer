@@ -46,7 +46,7 @@ export function getDailyChallengeCopyLabels(challenge) {
     };
 }
 
-export function formatDailyChallengeResultLabel(challenge, result) {
+export function formatDailyChallengeResultLabel(result) {
     if (!result || typeof result !== 'object') {
         return '--';
     }
@@ -54,7 +54,7 @@ export function formatDailyChallengeResultLabel(challenge, result) {
     return bestTime !== null ? `${bestTime.toFixed(3)}s` : '--';
 }
 
-export function formatDailyChallengeBestLabel(objectiveType, bestTime, completedLaps = null) {
+export function formatDailyChallengeBestLabel(bestTime) {
     return Number.isFinite(bestTime) ? `${Number(bestTime).toFixed(3)}s` : '--';
 }
 

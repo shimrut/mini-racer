@@ -462,11 +462,7 @@ export class DailyChallengeUi {
                 nextSummary.bestTime = Number.isFinite(verificationEntry.bestTime)
                     ? verificationEntry.bestTime
                     : verifiedBestTime;
-                nextSummary.bestLabel = formatDailyChallengeBestLabel(
-                    summary.objectiveType,
-                    verificationEntry.bestTime,
-                    verificationEntry.completedLaps
-                );
+                nextSummary.bestLabel = formatDailyChallengeBestLabel(verificationEntry.bestTime);
             }
             nextSummary.scoreboardSnapshot = {
                 ...(verifiedScoreboardSnapshot || {}),

@@ -90,17 +90,14 @@ describe('daily-challenge service', () => {
     });
 
     it('formatDailyChallengeResultLabel covers missing and time-trial results', () => {
-        expect(formatDailyChallengeResultLabel(null, null)).toBe('--');
+        expect(formatDailyChallengeResultLabel(null)).toBe('--');
         expect(
-            formatDailyChallengeResultLabel(
-                { objectiveType: 'single_lap_fastest' },
-                { bestTime: 19.5 }
-            )
+            formatDailyChallengeResultLabel({ bestTime: 19.5 })
         ).toBe('19.500s');
     });
 
     it('formatDailyChallengeBestLabel formats daily challenge best values for ui surfaces', () => {
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 19.5)).toBe('19.500s');
+        expect(formatDailyChallengeBestLabel(19.5)).toBe('19.500s');
     });
 
     it('getDailyChallengeExpiry dates the run-out and asks to be redrawn when the wording can change', () => {
@@ -1036,14 +1033,11 @@ describe('daily-challenge service', () => {
     });
 
     it('formats missing result labels as placeholders', () => {
-        expect(formatDailyChallengeResultLabel({ objectiveType: 'single_lap_fastest' }, null)).toBe('--');
-        expect(formatDailyChallengeResultLabel({ objectiveType: 'single_lap_fastest' }, {})).toBe('--');
-        expect(formatDailyChallengeResultLabel(
-            { objectiveType: 'single_lap_fastest' },
-            { bestTime: 12.345 },
-        )).toBe('12.345s');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', Number.NaN)).toBe('--');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.1)).toBe('9.100s');
+        expect(formatDailyChallengeResultLabel(null)).toBe('--');
+        expect(formatDailyChallengeResultLabel({})).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: 12.345 })).toBe('12.345s');
+        expect(formatDailyChallengeBestLabel(Number.NaN)).toBe('--');
+        expect(formatDailyChallengeBestLabel(9.1)).toBe('9.100s');
     });
 
     it('treats a missing window.location as having no mock params instead of throwing', async () => {

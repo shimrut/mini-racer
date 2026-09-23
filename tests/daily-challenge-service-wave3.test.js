@@ -131,15 +131,13 @@ describe('daily-challenge service wave3', () => {
     });
 
     it('returns -- for non-object result payloads (L656)', () => {
-        const challenge = buildChallenge();
-
-        expect(formatDailyChallengeResultLabel(challenge, 'not-an-object')).toBe('--');
-        expect(formatDailyChallengeResultLabel(challenge, { bestTime: 'bad' })).toBe('--');
+        expect(formatDailyChallengeResultLabel('not-an-object')).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: 'bad' })).toBe('--');
     });
 
     it('formats finite best-time labels with three decimal places (L663-L664)', () => {
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', 9.876)).toBe('9.876s');
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', null)).toBe('--');
+        expect(formatDailyChallengeBestLabel(9.876)).toBe('9.876s');
+        expect(formatDailyChallengeBestLabel(null)).toBe('--');
     });
 
     it('returns a cloned best-result object instead of the internal reference (L595)', () => {

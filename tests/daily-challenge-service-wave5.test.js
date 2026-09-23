@@ -171,8 +171,8 @@ describe('daily-challenge service wave5', () => {
         expect(getDailyChallengeObjectiveLabel(single)).toBe('1 lap');
         expect(getDailyChallengeObjectiveLabel(multi)).toBe('3 laps');
         expect(getDailyChallengeCopyLabels(multi).primaryStatLabel).toBe('Race Time');
-        expect(formatDailyChallengeResultLabel(single, { bestTime: 12.345 })).toBe('12.345s');
-        expect(formatDailyChallengeResultLabel(single, null)).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: 12.345 })).toBe('12.345s');
+        expect(formatDailyChallengeResultLabel(null)).toBe('--');
         expect(getDailyChallengeTrackName({ trackKey: 'circuit' })).not.toBe('Unknown Track');
         expect(getDailyChallengeTrackName({ trackKey: 'missing-track' })).toBe('Unknown Track');
     });

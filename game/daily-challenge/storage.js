@@ -18,7 +18,7 @@ function normalizeCompletedLaps(value) {
   return Math.max(0, Math.trunc(value || 0));
 }
 
-function isBetterStoredResult(challenge, nextResult, previous) {
+function isBetterStoredResult(nextResult, previous) {
   if (!Number.isFinite(nextResult?.bestTime)) return false;
   const previousBest = Number.isFinite(previous?.bestTime)
     ? previous.bestTime
@@ -132,7 +132,6 @@ export function saveDailyChallengeBestTime(
   );
   const { challengeMap, previous } = readStoredChallengeResult(challenge.id);
   const nextResult = isBetterStoredResult(
-    challenge,
     { bestTime, completedLaps },
     previous,
   )

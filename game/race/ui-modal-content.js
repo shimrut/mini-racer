@@ -495,7 +495,7 @@ export class ModalContentUi {
     return stat;
 }
 
-    renderLapTimesList(container, lapTimesArray, bestTime, currentTime) {
+    renderLapTimesList(container, lapTimesArray, currentTime) {
     if (!container || !Array.isArray(lapTimesArray)) return;
     const headerRow = document.createElement('div');
     headerRow.className = 'runs-header-row';
@@ -540,7 +540,7 @@ export class ModalContentUi {
     container.appendChild(list);
 }
 
-    renderScoreboardList(container, scoreboardSnapshot, scoreboardMode, trackKey = null, scoreboardSubhead = null, {
+    renderScoreboardList(container, scoreboardSnapshot, trackKey = null, {
     showHeader = true,
     shareBest = null,
     raceOpponentEnabled = false,
@@ -738,7 +738,6 @@ export class ModalContentUi {
         time,
         bestLap,
         scoreboardSnapshot,
-        title = 'RACE COMPLETE',
         lapMedal = null,
         challengeFinish = false,
         challengeConfirmPhase = null,

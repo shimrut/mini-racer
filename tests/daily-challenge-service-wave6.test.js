@@ -376,8 +376,8 @@ describe('daily-challenge service wave6', () => {
     });
 
     it('returns -- for invalid best-time labels (L663-L664)', () => {
-        expect(formatDailyChallengeBestLabel('single_lap_fastest', undefined)).toBe('--');
-        expect(formatDailyChallengeResultLabel(buildChallenge(), { bestTime: Infinity })).toBe('--');
+        expect(formatDailyChallengeBestLabel(undefined)).toBe('--');
+        expect(formatDailyChallengeResultLabel({ bestTime: Infinity })).toBe('--');
     });
 
     it('loads playlist from the network when the cache is under capacity (L841-L843)', async () => {

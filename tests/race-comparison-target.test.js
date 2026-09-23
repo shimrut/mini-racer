@@ -172,7 +172,6 @@ describe('leaderboard race comparison target', () => {
     const setHudBestMetric = vi.fn();
     const hud = {
       setHudBestMetric,
-      syncBestTimeMedalBadge: vi.fn(),
     };
 
     RaceHud.prototype.setComparisonTarget.call(hud, {
@@ -181,7 +180,6 @@ describe('leaderboard race comparison target', () => {
     });
 
     expect(setHudBestMetric).toHaveBeenCalledWith({
-      label: 'VS Rival',
       value: '12.345',
       visible: true,
     });

@@ -120,7 +120,7 @@ function buildClosedPath(points, mapPoint) {
     return path;
 }
 
-export function drawPresentationBackground(ctx, width, height, presentation = {}, seed = 'default') {
+export function drawPresentationBackground(ctx, width, height, presentation = {}) {
     if (presentation.backgroundStyle === 'desert') {
         drawDesertBackdrop(ctx, width, height, presentation);
         return;
