@@ -74,3 +74,6 @@ page-snapshot.md
 
 # Draft image exports (not wired in game code; use assets under public/assets/)
 **/ChatGPT Image*
+
+# Claude Code settings for this computer only
+.claude/settings.local.json
