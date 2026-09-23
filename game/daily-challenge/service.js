@@ -29,16 +29,12 @@ import { DAY_MS, getUtcDayIndex, getUtcDayStart } from '../shared/utc-day.js';
 
 export {
     formatDailyChallengeBestLabel,
-    formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeRemainingDuration,
     formatDailyChallengeResultLabel,
     formatDailyChallengeStatusDate,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
     getDailyChallengeExpiry,
-    getDailyChallengeModeSelectObjectiveLine,
-    getDailyChallengeModifierBadges,
-    getDailyChallengeModifierLabel,
     getDailyChallengeObjectiveLabel,
     getDailyChallengeRequiredLaps,
     getStrictDailyChallengeLapCount,

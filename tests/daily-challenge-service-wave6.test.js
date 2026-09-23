@@ -2,14 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
     formatDailyChallengeBestLabel,
-    formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
-    getDailyChallengeModeSelectObjectiveLine,
-    getDailyChallengeModifierLabel,
     getDailyChallengeObjectiveLabel,
     getDailyChallengePlaylist,
     getDailyChallengeRequiredLaps,
@@ -211,22 +208,6 @@ describe('daily-challenge service wave6', () => {
         });
     });
 
-    it('formats multi-day remaining durations with days and hours (L692-L694)', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-07-21T06:00:00.000Z',
-        })).toBe('2d 18h');
-
-        vi.useRealTimers();
-    });
-
-    it('returns empty modifier labels for valid challenges (L749)', () => {
-        expect(getDailyChallengeModifierLabel(buildChallenge())).toBe('');
-        expect(getDailyChallengeModifierLabel(null)).toBe('');
-    });
-
     it('returns mode-select objective lines from copy labels (L631-L633)', () => {
         const single = buildChallenge({ objectiveType: 'single_lap_fastest' });
         const multi = buildChallenge({
@@ -234,8 +215,6 @@ describe('daily-challenge service wave6', () => {
             objectiveParams: { lapCount: 3 },
         });
 
-        expect(getDailyChallengeModeSelectObjectiveLine(single)).toBe('Best lap time');
-        expect(getDailyChallengeModeSelectObjectiveLine(multi)).toBe('Best race time');
         expect(getDailyChallengeObjectiveLabel(multi)).toBe('3 laps');
         expect(getDailyChallengeCopyLabels(single).hudPrimaryLabel).toBe('LAP');
         expect(getDailyChallengeCopyLabels(multi).primaryStatLabel).toBe('Race Time');

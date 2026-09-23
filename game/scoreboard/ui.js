@@ -4,7 +4,6 @@ import {
     DAY_MS,
     getCachedDailyChallengePlaylist,
     getCachedDailyChallengeSnapshot,
-    getDailyChallengePlaylist,
     getDailyChallengeTrackName,
     getDailyChallengeSnapshot
 } from '../daily-challenge/service.js';
@@ -359,32 +358,6 @@ export class LeaderboardsUi {
         return requestPromise;
     }
 
-    primeDailyLeaderboardRefreshSession(challenges, refreshSession) {
-        const challengeIds = [...new Set(
-            (Array.isArray(challenges) ? challenges : [])
-                .filter((challenge) => isValidDailyChallenge(challenge))
-                .map((challenge) => challenge.id)
-        )];
-        const requests = [];
-        for (const challengeId of challengeIds) {
-            const requiresRefresh = this._pendingDailyLeaderboardRefreshChallengeIds
-                .has(challengeId);
-            const cachedSnapshot = getCachedDailyChallengeSnapshot(challengeId);
-            if (cachedSnapshot && !requiresRefresh) {
-                refreshSession.snapshotByChallengeId.set(challengeId, cachedSnapshot);
-                continue;
-            }
-            requests.push(this.requestDailyChallengeLeaderboardSessionRefresh(
-                challengeId,
-                refreshSession,
-                { forceRefresh: requiresRefresh },
-            ));
-        }
-        return Promise.allSettled(
-            requests
-        );
-    }
-
     async refreshDailyChallengeAfterAcceptedSubmission(challengeId) {
         if (!challengeId) return null;
 
@@ -529,88 +502,6 @@ export class LeaderboardsUi {
 
     publishDailyChallengeLeaderboardSnapshot(scoreboardSnapshot) {
         this.updateModalScoreboardSnapshot(scoreboardSnapshot);
-    }
-
-    async openDailyChallengeLeaderboard(returnMode = 'close', options = {}) {
-        const summary = this.dailyChallengeUi.getSummary();
-        if (!summary?.challengeId || !summary.trackKey) return;
-
-        const fallbackChallenge = {
-            id: summary.challengeId,
-            trackKey: summary.trackKey,
-            startsAt: summary.startsAt || null,
-            challengeDate: summary.challengeDate || null
-        };
-        const initialPlaylist = mergeDailyChallengeHistory(
-            getCachedDailyChallengePlaylist(),
-            fallbackChallenge
-        );
-        const currentChallenge = initialPlaylist.find(
-            (challenge) => challenge.id === summary.challengeId
-        ) || fallbackChallenge;
-        const windowAnchorChallenge = resolveWindowAnchorChallenge(
-            initialPlaylist,
-            currentChallenge,
-        );
-        const leaderboardDayOptions = buildLeaderboardDayOptionsForWindow({
-            anchorChallenge: windowAnchorChallenge,
-            playlistChallenges: initialPlaylist,
-        });
-
-        const refreshSession = this.startDailyLeaderboardRefreshSession();
-        void this.primeDailyLeaderboardRefreshSession(
-            initialPlaylist,
-            refreshSession,
-        );
-
-        const openPromise = this.openDailyChallengeLeaderboardForChallenge(
-            currentChallenge,
-            returnMode,
-            {
-                ...options,
-                playlistChallenges: initialPlaylist,
-                leaderboardDayOptions,
-                refreshSession,
-            }
-        );
-
-        void getDailyChallengePlaylist()
-            .then((playlistChallenges) => {
-                if (this._activeDailyLeaderboardRefreshSession !== refreshSession) return;
-
-                const mergedPlaylist = mergeDailyChallengeHistory(
-                    playlistChallenges,
-                    fallbackChallenge
-                );
-                const updatedAnchorChallenge = resolveWindowAnchorChallenge(
-                    mergedPlaylist,
-                    currentChallenge,
-                );
-                const updatedDayOptions = buildLeaderboardDayOptionsForWindow({
-                    anchorChallenge: updatedAnchorChallenge,
-                    playlistChallenges: mergedPlaylist,
-                });
-                this.updateModalLeaderboardDayOptions({
-                    leaderboardDayOptions: updatedDayOptions,
-                    onSelectLeaderboardDay: this.buildOnSelectLeaderboardDayHandler(
-                        currentChallenge,
-                        mergedPlaylist,
-                        updatedDayOptions,
-                        refreshSession,
-                        returnMode,
-                        options.onClose ?? null,
-                    ),
-                });
-                void this.primeDailyLeaderboardRefreshSession(
-                    mergedPlaylist,
-                    refreshSession,
-                );
-            })
-            .catch((error) => {
-                console.error('Error loading daily challenge playlist for standings:', error);
-            });
-
-        await openPromise;
     }
 
     async openDailyChallengeLeaderboardForChallenge(challenge, returnMode = 'close', {

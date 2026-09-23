@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     formatDailyChallengeBestLabel,
-    formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
@@ -115,17 +114,6 @@ describe('daily-challenge service wave3', () => {
 
         expect(challenge.trackKey).toBe('circuit');
         expect(challenge.id).toBe('mock-daily-challenge-local');
-    });
-
-    it('formats sub-minute playlist availability as at least one minute (L679)', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-07-18T12:00:30.000Z',
-        })).toBe('1m');
-
-        vi.useRealTimers();
     });
 
     it('returns expired status when both endsAt and availableUntil are invalid (L679, L711)', () => {

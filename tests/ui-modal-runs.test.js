@@ -3,10 +3,10 @@ import { JSDOM } from 'jsdom';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
 import { ModalContentUi } from '../game/race/ui-modal-content.js';
 import { TRACK_MODE_DAILY_GP } from '../game/config.js';
+import { buildScoreboardRankDisplay } from '../game/race/result-flow.js';
 
 const {
     applyRankModalStatContent,
-    getModalScoreboardStatusText,
     matchesModalScoreboardContext,
     showRunsModal,
     showModalLeaderboardPayload,
@@ -15,7 +15,6 @@ const {
     updateModalScoreboardSnapshot,
     updateModalLeaderboardDayOptions,
     configureRunsModalHeader,
-    updateModalRunSummary,
     dismissRunsView,
     bindLeaderboardPagination,
     bindLeaderboardDaySwipe,
@@ -884,13 +883,12 @@ describe('ui modal runs helpers', () => {
     });
 
     it('trims scoreboard status text and returns null for blanks', () => {
-        expect(getModalScoreboardStatusText({ statusText: '  Pending verification  ' })).toBe('Pending verification');
-        expect(getModalScoreboardStatusText({ statusText: '   ' })).toBe(null);
-        expect(getModalScoreboardStatusText(null)).toBe(null);
+        expect(buildScoreboardRankDisplay({ statusText: '  Pending verification  ' }).statusText).toBe('Pending verification');
+        expect(buildScoreboardRankDisplay({ statusText: '   ' }).statusText).toBe(null);
+        expect(buildScoreboardRankDisplay(null).statusText).toBe(null);
     });
 
     it('routes leaderboard actions to the correct destination', () => {
-        const openDailyChallengeLeaderboard = vi.fn();
         const openDailyChallengeLeaderboardForChallenge = vi.fn();
         const showTrackLeaderboardModal = vi.fn();
         const scoreboardSnapshot = { playerRankLabel: '#2' };
@@ -903,7 +901,6 @@ describe('ui modal runs helpers', () => {
                 scoreboardMode: TRACK_MODE_DAILY_GP
             },
             getLeaderboards: () => ({
-                openDailyChallengeLeaderboard,
                 openDailyChallengeLeaderboardForChallenge,
                 showTrackLeaderboardModal
             })
@@ -914,7 +911,6 @@ describe('ui modal runs helpers', () => {
             trackKey: 'circuit',
             scoreboardSnapshot,
         }, 'back');
-        expect(openDailyChallengeLeaderboard).not.toHaveBeenCalled();
         expect(showTrackLeaderboardModal).not.toHaveBeenCalled();
 
         showModalLeaderboardPayload.call({
@@ -924,7 +920,6 @@ describe('ui modal runs helpers', () => {
                 scoreboardMode: TRACK_MODE_DAILY_GP
             },
             getLeaderboards: () => ({
-                openDailyChallengeLeaderboard,
                 openDailyChallengeLeaderboardForChallenge,
                 showTrackLeaderboardModal
             })
@@ -1288,70 +1283,6 @@ describe('ui modal runs helpers', () => {
                 scoreboardMode: TRACK_MODE_DAILY_GP
             }
         }, { trackKey: 'circuit', mode: TRACK_MODE_DAILY_GP })).toBe(true);
-    });
-
-    it('refreshes modal run summaries in-place when the main modal view is active', () => {
-        const primaryValue = { textContent: '22.40s' };
-        const modalLapTimes = { replaceChildren: vi.fn() };
-        const renderLapTimesList = vi.fn();
-
-        const context = {
-            _modalRunsPayload: {
-                lapTimesArray: [22.4, 22.9],
-                bestTime: 22.4,
-                currentTime: 22.4,
-                scoreboardChallengeId: null,
-                scoreboardTrackKey: 'circuit',
-                scoreboardSnapshot: { isLoading: true, statusText: 'Verifying...' },
-                scoreboardMode: TRACK_MODE_DAILY_GP,
-                scoreboardSubhead: null,
-                showGlobalLeaderboard: true,
-                allowLeaderboardOpen: true
-            },
-            modalStatsRow: {
-                querySelector: vi.fn((selector) => (
-                    selector === '.modal-stat-stack:not([data-modal-rank-stat]) .modal-stat-value'
-                        ? primaryValue
-                        : null
-                ))
-            },
-            modalLapTimes,
-            modalMainView: {
-                classList: {
-                    contains: (className) => className === 'active-view'
-                }
-            },
-            modalRunsView: {
-                classList: {
-                    contains: () => false
-                }
-            },
-            content: {
-                renderLapTimesList
-            },
-            showRunsModal: vi.fn(),
-            _runsViewMode: 'back'
-        };
-
-        updateModalRunSummary.call(context, {
-            bestTime: 22.18,
-            currentTime: 22.18,
-            lapTimesArray: [22.18, 22.4]
-        });
-
-        expect(context._modalRunsPayload).toMatchObject({
-            bestTime: 22.18,
-            currentTime: 22.18,
-            lapTimesArray: [22.18, 22.4]
-        });
-        expect(primaryValue.textContent).toBe('22.180s');
-        expect(modalLapTimes.replaceChildren).toHaveBeenCalledTimes(1);
-        expect(renderLapTimesList).toHaveBeenCalledWith(
-            modalLapTimes,
-            [22.18, 22.4],
-            22.18,
-            22.18
-        );
     });
 
     it('applies rank stat loading state using scoreboard display rules', () => {

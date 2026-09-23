@@ -2,7 +2,6 @@ import { TRACK_MODE_DAILY_GP } from '../config.js';
 import { getTrackName } from '../track/catalog.js';
 import {
     buildModalRunsPayload,
-    buildModalRunsViewOptions,
     applyCombinedRankValue,
     buildScoreboardRankDisplay
 } from './result-flow.js';
@@ -2125,10 +2124,6 @@ export class ModalShell {
         }
     }
 
-    getModalScoreboardStatusText(scoreboardSnapshot) {
-        return buildScoreboardRankDisplay(scoreboardSnapshot).statusText;
-    }
-
     applyRankModalStatContent(rankStat, scoreboardSnapshot) {
         if (!rankStat) return;
 
@@ -2271,52 +2266,6 @@ export class ModalShell {
         this._modalRunsPayload = buildModalRunsPayload(this._modalRunsPayload, { updates });
         this.renderLeaderboardDayRail({ force: true });
         this.bindLeaderboardDaySwipe?.();
-    }
-
-    updateModalRunSummary({
-        bestTime = undefined,
-        currentTime = undefined,
-        lapTimesArray = undefined
-    } = {}) {
-        if (!this._modalRunsPayload) return;
-        this._modalRunsPayload = buildModalRunsPayload(this._modalRunsPayload, {
-            updates: { bestTime, currentTime, lapTimesArray }
-        });
-
-        if (bestTime !== undefined) {
-            const primaryValue = this.modalStatsRow?.querySelector('.modal-stat-stack:not([data-modal-rank-stat]) .modal-stat-value');
-            if (primaryValue && Number.isFinite(bestTime)) {
-                primaryValue.textContent = `${bestTime.toFixed(3)}s`;
-            }
-        }
-
-        if (!this.modalLapTimes) return;
-
-        if (this.modalRunsView?.classList.contains('active-view')) {
-            this.showRunsModal(
-                this._modalRunsPayload.lapTimesArray,
-                this._modalRunsPayload.bestTime,
-                this._modalRunsPayload.currentTime,
-                this._runsViewMode,
-                {
-                    ...buildModalRunsViewOptions(this._modalRunsPayload),
-                    onRaceOpponent: this._onRaceOpponent,
-                }
-            );
-            return;
-        }
-
-        if (!this.modalMainView?.classList.contains('active-view')) return;
-
-        this.modalLapTimes.replaceChildren();
-        if (this._modalRunsPayload.lapTimesArray !== undefined && this._modalRunsPayload.lapTimesArray !== null) {
-            this.content.renderLapTimesList(
-                this.modalLapTimes,
-                this._modalRunsPayload.lapTimesArray,
-                this._modalRunsPayload.bestTime,
-                this._modalRunsPayload.currentTime
-            );
-        }
     }
 
     showModalLeaderboardPayload() {

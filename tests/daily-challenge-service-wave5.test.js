@@ -168,7 +168,6 @@ describe('daily-challenge service wave5', () => {
 
         expect(getDailyChallengeObjectiveLabel(single)).toBe('1 lap');
         expect(getDailyChallengeObjectiveLabel(multi)).toBe('3 laps');
-        expect(getDailyChallengeCopyLabels(single).modeSelectLine).toBe('Best lap time');
         expect(getDailyChallengeCopyLabels(multi).primaryStatLabel).toBe('Race Time');
         expect(formatDailyChallengeResultLabel(single, { bestTime: 12.345 })).toBe('12.345s');
         expect(formatDailyChallengeResultLabel(single, null)).toBe('--');

@@ -72,62 +72,6 @@ describe('ui leaderboard helpers', () => {
         });
     });
 
-    it('shows the daily leaderboard immediately, then refreshes it with the fetched snapshot', async () => {
-        const today = new Date(Date.now()).toISOString().slice(0, 10);
-        const scoreboardSnapshot = { playerRankLabel: '#5' };
-        const showRunsModal = vi.fn();
-        const updateModalLeaderboardDayOptions = vi.fn();
-        const updateModalScoreboardSnapshot = vi.fn();
-        const fallbackChallenge = {
-            id: 'daily-1',
-            trackKey: 'circuit',
-            challengeDate: today,
-        };
-        const dailyChallengeUi = {
-            getSummary: vi.fn(() => ({
-                challengeId: 'daily-1',
-                trackKey: 'circuit',
-                challengeDate: today,
-                scoreboardSnapshot: { playerRankLabel: '#9' }
-            }))
-        };
-        const instance = new LeaderboardsUi({
-            showRunsModal,
-            dailyChallengeUi,
-            updateModalLeaderboardDayOptions,
-            updateModalScoreboardSnapshot,
-        });
-        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockImplementation(async () => scoreboardSnapshot);
-        const service = await import('../game/daily-challenge/service.js');
-        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
-        const playlistDeferred = createDeferred();
-        vi.spyOn(service, 'getDailyChallengePlaylist').mockReturnValue(playlistDeferred.promise);
-
-        const openPromise = instance.openDailyChallengeLeaderboard('back');
-        const expectedDayOptions = buildExpectedDayOptions(fallbackChallenge);
-        expect(showRunsModal).toHaveBeenNthCalledWith(1, null, null, null, 'back', expect.objectContaining({
-            scoreboardMode: TRACK_MODE_DAILY_GP,
-            scoreboardTrackKey: 'circuit',
-            scoreboardTitle: 'Classic Circuit',
-            scoreboardSubhead: 'Classic Circuit',
-            scoreboardChallengeId: 'daily-1',
-            scoreboardSnapshot: { isLoading: true },
-            selectedLeaderboardDayId: 'daily-1',
-            leaderboardDayOptions: expectedDayOptions,
-        }));
-        expect(expectedDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
-
-        playlistDeferred.resolve([]);
-        await openPromise;
-
-        expect(instance.requestDailyChallengeLeaderboardSnapshot).toHaveBeenCalledWith(
-            'daily-1',
-            { forceRefresh: false, limit: 50, offset: 0 }
-        );
-        expect(showRunsModal).toHaveBeenCalledTimes(1);
-        expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(scoreboardSnapshot);
-    });
-
     it('shows the track name in the standings header instead of the challenge date', async () => {
         const originalDateNow = Date.now;
         Date.now = () => Date.parse('2026-07-12T12:00:00.000Z');
@@ -311,7 +255,7 @@ describe('ui leaderboard helpers', () => {
         expect(updateModalScoreboardSnapshot).toHaveBeenCalledWith(freshSnapshot);
     });
 
-    it('uses the initially loaded day snapshots without refreshing on day changes', async () => {
+    it('reuses a loaded day snapshot when the player switches back to that day', async () => {
         const challengeA = {
             id: 'daily-a',
             trackKey: 'circuit',
@@ -339,18 +283,12 @@ describe('ui leaderboard helpers', () => {
             refreshSession
         };
 
-        await instance.primeDailyLeaderboardRefreshSession(
-            [challengeA, challengeB],
-            refreshSession,
-        );
-        expect(requestSnapshot).toHaveBeenCalledTimes(2);
-
         await instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
         showRunsModal.mock.calls.at(-1)[4].onSelectLeaderboardDay(challengeB.id);
         await vi.waitFor(() => {
             expect(showRunsModal.mock.calls.at(-1)[4].scoreboardChallengeId)
                 .toBe(challengeB.id);
-            expect(showRunsModal.mock.calls.at(-1)[4].scoreboardSnapshot).toBe(freshB);
+            expect(refreshSession.refreshedChallengeIds.has(challengeB.id)).toBe(true);
         });
         const callsBeforeReturningToA = showRunsModal.mock.calls.length;
         showRunsModal.mock.calls.at(-1)[4].onSelectLeaderboardDay(challengeA.id);
@@ -370,7 +308,7 @@ describe('ui leaderboard helpers', () => {
             .toBeUndefined();
     });
 
-    it('reuses initial day loads that are still running while the player switches days', async () => {
+    it('reuses day loads that are still running while the player switches days', async () => {
         const challengeA = {
             id: 'daily-a',
             trackKey: 'circuit',
@@ -397,10 +335,6 @@ describe('ui leaderboard helpers', () => {
             refreshSession
         };
 
-        const initialLoads = instance.primeDailyLeaderboardRefreshSession(
-            [challengeA, challengeB],
-            refreshSession,
-        );
         const firstA = instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
         const firstB = instance.openDailyChallengeLeaderboardForChallenge(challengeB, 'close', options);
         const secondA = instance.openDailyChallengeLeaderboardForChallenge(challengeA, 'close', options);
@@ -412,7 +346,7 @@ describe('ui leaderboard helpers', () => {
 
         deferredA.resolve({ playerRankLabel: '#2' });
         deferredB.resolve({ playerRankLabel: '#3' });
-        await Promise.all([initialLoads, firstA, firstB, secondA]);
+        await Promise.all([firstA, firstB, secondA]);
     });
 
     it('retries a day in the same session after its refresh fails', async () => {
@@ -809,151 +743,5 @@ describe('ui leaderboard helpers', () => {
             challengeDate: today,
         });
         expect(options.slice(1).every((option) => option.challengeId === null)).toBe(true);
-    });
-
-    it('keeps the standings rail anchored to today when an older track is loaded', async () => {
-        const today = '2026-07-25';
-        const olderDate = '2026-07-20';
-        const originalDateNow = Date.now;
-        Date.now = () => Date.parse(`${today}T12:00:00.000Z`);
-        try {
-            const showRunsModal = vi.fn();
-            const updateModalLeaderboardDayOptions = vi.fn();
-            const todayChallenge = {
-                id: 'daily-today',
-                trackKey: 'circuit',
-                challengeDate: today,
-            };
-            const olderChallenge = {
-                id: 'daily-older',
-                trackKey: 'circuit',
-                challengeDate: olderDate,
-            };
-            const dailyChallengeUi = {
-                getSummary: vi.fn(() => ({
-                    challengeId: olderChallenge.id,
-                    trackKey: olderChallenge.trackKey,
-                    challengeDate: olderChallenge.challengeDate,
-                })),
-            };
-            const instance = new LeaderboardsUi({
-                showRunsModal,
-                dailyChallengeUi,
-                updateModalLeaderboardDayOptions,
-            });
-            vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue({
-                playerRankLabel: '#1',
-            });
-            const service = await import('../game/daily-challenge/service.js');
-            vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([
-                todayChallenge,
-                olderChallenge,
-            ]);
-            vi.spyOn(service, 'getDailyChallengePlaylist').mockResolvedValue([
-                todayChallenge,
-                olderChallenge,
-            ]);
-
-            await instance.openDailyChallengeLeaderboard('close');
-
-            const payload = showRunsModal.mock.calls[0][4];
-            expect(payload.selectedLeaderboardDayId).toBe(olderChallenge.id);
-            expect(payload.leaderboardDayOptions[0]).toMatchObject({
-                challengeId: todayChallenge.id,
-                dayLabel: 'Today',
-                challengeDate: today,
-            });
-            expect(payload.leaderboardDayOptions).toEqual(
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        challengeId: olderChallenge.id,
-                        challengeDate: olderDate,
-                    }),
-                ]),
-            );
-            expect(payload.leaderboardDayOptions).toHaveLength(DAILY_PLAYLIST_DAYS);
-        } finally {
-            Date.now = originalDateNow;
-        }
-    });
-
-    it('updates the day rail when the playlist resolves while standings stay open', async () => {
-        const today = new Date(Date.now()).toISOString().slice(0, 10);
-        const showRunsModal = vi.fn();
-        const updateModalLeaderboardDayOptions = vi.fn();
-        const dailyChallengeUi = {
-            getSummary: vi.fn(() => ({
-                challengeId: 'daily-1',
-                trackKey: 'circuit',
-                challengeDate: today,
-            })),
-        };
-        const instance = new LeaderboardsUi({
-            showRunsModal,
-            dailyChallengeUi,
-            updateModalLeaderboardDayOptions,
-        });
-        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue({
-            playerRankLabel: '#3',
-        });
-        const service = await import('../game/daily-challenge/service.js');
-        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
-        const playlistDeferred = createDeferred();
-        vi.spyOn(service, 'getDailyChallengePlaylist').mockReturnValue(playlistDeferred.promise);
-
-        const openPromise = instance.openDailyChallengeLeaderboard('close');
-        playlistDeferred.resolve([
-            {
-                id: 'daily-1',
-                trackKey: 'circuit',
-                challengeDate: today,
-            },
-            {
-                id: 'daily-0',
-                trackKey: 'harborParkLoop',
-                challengeDate: new Date(Date.parse(`${today}T00:00:00.000Z`) - 86400000)
-                    .toISOString()
-                    .slice(0, 10),
-            },
-        ]);
-        await openPromise;
-
-        expect(updateModalLeaderboardDayOptions).toHaveBeenCalledWith(expect.objectContaining({
-            leaderboardDayOptions: expect.arrayContaining([
-                expect.objectContaining({ challengeId: 'daily-1' }),
-                expect.objectContaining({ challengeId: 'daily-0' }),
-            ]),
-        }));
-    });
-
-    it('clears loading when the refresh returns null without a cached snapshot', async () => {
-        const today = new Date(Date.now()).toISOString().slice(0, 10);
-        const showRunsModal = vi.fn();
-        const dailyChallengeUi = {
-            getSummary: vi.fn(() => ({
-                challengeId: 'daily-1',
-                trackKey: 'circuit',
-                challengeDate: today,
-            })),
-        };
-        const updateModalScoreboardSnapshot = vi.fn();
-        const instance = new LeaderboardsUi({
-            showRunsModal,
-            updateModalScoreboardSnapshot,
-            dailyChallengeUi,
-        });
-        vi.spyOn(instance, 'requestDailyChallengeLeaderboardSnapshot').mockResolvedValue(null);
-        const service = await import('../game/daily-challenge/service.js');
-        vi.spyOn(service, 'getCachedDailyChallengePlaylist').mockReturnValue([]);
-        vi.spyOn(service, 'getDailyChallengePlaylist').mockResolvedValue([]);
-
-        await instance.openDailyChallengeLeaderboard('close');
-
-        expect(showRunsModal).toHaveBeenCalledTimes(1);
-        expect(showRunsModal.mock.calls[0][4]).toEqual(expect.objectContaining({
-            scoreboardChallengeId: 'daily-1',
-            scoreboardSnapshot: { isLoading: true },
-        }));
-        expect(updateModalScoreboardSnapshot).toHaveBeenLastCalledWith(null);
     });
 });

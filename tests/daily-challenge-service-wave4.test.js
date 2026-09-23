@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-    formatDailyChallengePlaylistAvailabilityLabel,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengePlaylist,
@@ -145,10 +144,6 @@ describe('daily-challenge service wave4', () => {
             key: 'available',
             label: 'Expires on Jul 22',
         });
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-07-18T12:00:45.000Z',
-        })).toBe('1m');
 
         vi.useRealTimers();
     });

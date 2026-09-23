@@ -3,7 +3,6 @@ import {
     applyCombinedRankValue,
     buildChallengeRankSnapshot,
     buildModalRunsPayload,
-    buildModalRunsViewOptions,
     buildModalDeltaDisplay,
     buildScoreboardRankDisplay,
     createModalActions,
@@ -235,15 +234,15 @@ describe('result-flow helpers', () => {
         });
     });
 
-    it('builds modal runs view options from payload fields', () => {
-        expect(buildModalRunsViewOptions(null)).toEqual({});
-        expect(buildModalRunsViewOptions('bad')).toEqual({});
+    it('normalizes the runs view fields of a modal runs payload', () => {
+        expect(buildModalRunsPayload(null)).toBe(null);
+        expect(buildModalRunsPayload('bad')).toBe(null);
 
         const onSelect = () => {};
         const onLoadMore = () => {};
         const onOpenStandings = () => {};
         const primaryAction = () => {};
-        expect(buildModalRunsViewOptions({
+        expect(buildModalRunsPayload({
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot: { isLoading: false },
             scoreboardMode: 'global',
@@ -259,7 +258,7 @@ describe('result-flow helpers', () => {
             primaryAction,
             showGlobalLeaderboard: false,
             allowLeaderboardOpen: false
-        })).toEqual({
+        })).toMatchObject({
             scoreboardChallengeId: 'daily-1',
             scoreboardSnapshot: { isLoading: false },
             scoreboardMode: 'global',
@@ -277,7 +276,7 @@ describe('result-flow helpers', () => {
             allowLeaderboardOpen: false
         });
 
-        expect(buildModalRunsViewOptions({
+        expect(buildModalRunsPayload({
             leaderboardDayOptions: 'nope',
             onSelectLeaderboardDay: 'nope',
             onLoadMoreLeaderboard: 7,

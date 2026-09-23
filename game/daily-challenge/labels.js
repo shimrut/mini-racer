@@ -30,25 +30,19 @@ export function getDailyChallengeObjectiveLabel(challenge) {
     return '1 lap';
 }
 
-export function getDailyChallengeModeSelectObjectiveLine(challenge) {
-    return getDailyChallengeCopyLabels(challenge).modeSelectLine;
-}
-
 export function getDailyChallengeCopyLabels(challenge) {
     const objectiveType = challenge?.objectiveType || 'single_lap_fastest';
 
     if (objectiveType === 'multi_lap_total') {
         return {
             hudPrimaryLabel: 'RACE',
-            primaryStatLabel: 'Race Time',
-            modeSelectLine: 'Best race time'
+            primaryStatLabel: 'Race Time'
         };
     }
 
     return {
         hudPrimaryLabel: 'LAP',
-        primaryStatLabel: 'Lap Time',
-        modeSelectLine: 'Best lap time'
+        primaryStatLabel: 'Lap Time'
     };
 }
 
@@ -150,23 +144,3 @@ export function getDailyChallengeCardStatus(challenge, nowMs = Date.now()) {
     };
 }
 
-export function formatDailyChallengePlaylistAvailabilityLabel(challenge) {
-    const until = challenge?.availableUntil;
-    if (!until || typeof until !== 'string') return '';
-
-    const untilMs = Date.parse(until);
-    if (!Number.isFinite(untilMs)) return '';
-
-    const remainingMs = untilMs - Date.now();
-    if (remainingMs <= 0) return 'Expired';
-
-    return formatDailyChallengeRemainingDuration(remainingMs);
-}
-
-export function getDailyChallengeModifierBadges(challenge) {
-    return challenge ? [] : [];
-}
-
-export function getDailyChallengeModifierLabel(challenge) {
-    return getDailyChallengeModifierBadges(challenge).join(' • ');
-}

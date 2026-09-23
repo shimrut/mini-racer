@@ -2,15 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
     confirmDailyChallengeShare,
-    formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getCachedDailyChallengePlaylist,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
-    getDailyChallengeModifierBadges,
-    getDailyChallengeModifierLabel,
     getDailyChallengeObjectiveLabel,
     getDailyChallengePlaylist,
     getDailyChallengeRequiredLaps,
@@ -395,7 +392,6 @@ describe('daily-challenge mutation survivors', () => {
         expect(getDailyChallengeCopyLabels({})).toEqual({
             hudPrimaryLabel: 'LAP',
             primaryStatLabel: 'Lap Time',
-            modeSelectLine: 'Best lap time',
         });
     });
 
@@ -405,10 +401,6 @@ describe('daily-challenge mutation survivors', () => {
             { objectiveType: 'single_lap_fastest' },
             { bestTime: Number.NaN },
         )).toBe('--');
-    });
-
-    it('returns an empty modifier label because daily challenges expose no modifier badges', () => {
-        expect(getDailyChallengeModifierLabel(buildChallenge())).toBe('');
     });
 
     it('uses the featured card state only while endsAt is still in the future', () => {
@@ -425,11 +417,6 @@ describe('daily-challenge mutation survivors', () => {
             key: 'available',
             label: 'Expires on Jul 25',
         });
-    });
-
-    it('returns an empty playlist availability label for non-string until values', () => {
-        expect(formatDailyChallengePlaylistAvailabilityLabel({ availableUntil: 123 })).toBe('');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({ availableUntil: 'not-a-date' })).toBe('');
     });
 
     it('caches post-bound challenges into the playlist before returning them', async () => {
@@ -714,11 +701,6 @@ describe('daily-challenge mutation survivors', () => {
             key: 'expired',
             label: 'Expired',
         });
-    });
-
-    it('returns empty modifier badges for null challenges and an empty label string', () => {
-        expect(getDailyChallengeModifierBadges(null)).toEqual([]);
-        expect(getDailyChallengeModifierLabel(null)).toBe('');
     });
 
     it('treats isPreviewPage as false when window is unavailable', () => {

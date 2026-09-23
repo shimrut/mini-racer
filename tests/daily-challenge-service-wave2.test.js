@@ -2,11 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     cacheDailyChallengePlaylist,
     confirmDailyChallengeShare,
-    formatDailyChallengePlaylistAvailabilityLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
-    getDailyChallengeModeSelectObjectiveLine,
     getDailyChallengePlaylist,
     getDailyChallengeSnapshot,
     getDailyChallengeSnapshotIdsToFetch,
@@ -124,30 +122,6 @@ describe('daily-challenge service wave 2', () => {
             key: 'available',
             label: 'Expires on Jul 21',
         });
-    });
-
-    it('formats playlist availability labels from remaining time', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-07-18T12:30:00.000Z',
-        })).toBe('30m');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-07-17T12:00:00.000Z',
-        })).toBe('Expired');
-
-        vi.useRealTimers();
-    });
-
-    it('exposes the mode-select objective line from copy labels', () => {
-        expect(getDailyChallengeModeSelectObjectiveLine({
-            objectiveType: 'multi_lap_total',
-            objectiveParams: { lapCount: 3 },
-        })).toBe('Best race time');
-        expect(getDailyChallengeModeSelectObjectiveLine({
-            objectiveType: 'single_lap_fastest',
-        })).toBe('Best lap time');
     });
 
     it('deduplicates concurrent playlist fetches through the in-flight promise', async () => {
@@ -321,19 +295,6 @@ describe('daily-challenge service wave 2', () => {
             key: 'expired',
             label: 'Expired',
         });
-    });
-
-    it('formats playlist availability as Expired only after the window closes', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));
-
-        const challenge = buildChallenge({ availableUntil: '2026-07-18T12:00:01.000Z' });
-        expect(formatDailyChallengePlaylistAvailabilityLabel(challenge)).toBe('1m');
-
-        vi.setSystemTime(new Date('2026-07-18T12:00:01.000Z'));
-        expect(formatDailyChallengePlaylistAvailabilityLabel(challenge)).toBe('Expired');
-
-        vi.useRealTimers();
     });
 
     it('rejects stored results when metadata disagrees but accepts matching rows', () => {

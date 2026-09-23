@@ -309,14 +309,3 @@ export function buildModalRunsPayload(source, {
     return normalized;
 }
 
-export function buildModalRunsViewOptions(payload) {
-    if (!payload || typeof payload !== 'object') return {};
-
-    const options = {
-        scoreboardSnapshot: payload.scoreboardSnapshot || null,
-        scoreboardTrackKey: payload.scoreboardTrackKey || null,
-        ...buildRunsViewFields(payload),
-    };
-    return options;
-}
-

@@ -1,16 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     formatDailyChallengeBestLabel,
-    formatDailyChallengePlaylistAvailabilityLabel,
     formatDailyChallengeResultLabel,
     getActiveDailyChallenge,
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeCopyLabels,
     getDailyChallengeExpiry,
-    getDailyChallengeModeSelectObjectiveLine,
-    getDailyChallengeModifierBadges,
-    getDailyChallengeModifierLabel,
     getDailyChallengeObjectiveLabel,
     getDailyChallengePlaylist,
     getDailyChallengeRequiredLaps,
@@ -84,24 +80,10 @@ describe('daily-challenge service', () => {
         ).toBe('1 lap');
     });
 
-    it('getDailyChallengeModeSelectObjectiveLine matches mode-select blurbs', () => {
-        expect(getDailyChallengeModeSelectObjectiveLine(null)).toBe('Best lap time');
-        expect(getDailyChallengeModeSelectObjectiveLine({ objectiveType: 'single_lap_fastest' })).toBe(
-            'Best lap time'
-        );
-        expect(getDailyChallengeModeSelectObjectiveLine({ objectiveType: 'multi_lap_total' })).toBe(
-            'Best race time'
-        );
-        expect(getDailyChallengeModeSelectObjectiveLine({ objectiveType: 'unknown' })).toBe(
-            'Best lap time'
-        );
-    });
-
     it('getDailyChallengeCopyLabels centralizes daily challenge metric copy', () => {
         expect(getDailyChallengeCopyLabels({ objectiveType: 'single_lap_fastest' })).toEqual({
             hudPrimaryLabel: 'LAP',
             primaryStatLabel: 'Lap Time',
-            modeSelectLine: 'Best lap time'
         });
     });
 
@@ -117,27 +99,6 @@ describe('daily-challenge service', () => {
 
     it('formatDailyChallengeBestLabel formats daily challenge best values for ui surfaces', () => {
         expect(formatDailyChallengeBestLabel('single_lap_fastest', 19.5)).toBe('19.500s');
-    });
-
-    it('formatDailyChallengePlaylistAvailabilityLabel only flags urgent or expired tracks', () => {
-        expect(formatDailyChallengePlaylistAvailabilityLabel(null)).toBe('');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({})).toBe('');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2020-01-01T00:00:00.000Z',
-        })).toBe('Expired');
-
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2025-05-24T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2025-05-24T14:00:00.000Z',
-        })).toBe('2h');
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2025-05-27T12:00:00.000Z',
-        })).toBe('3d');
-
-        vi.useRealTimers();
     });
 
     it('getDailyChallengeExpiry dates the run-out and asks to be redrawn when the wording can change', () => {
@@ -215,20 +176,6 @@ describe('daily-challenge service', () => {
         });
 
         vi.useRealTimers();
-    });
-
-    it('does not expose car tuning as daily challenge modifiers', () => {
-        expect(getDailyChallengeModifierBadges(null)).toEqual([]);
-        expect(getDailyChallengeModifierBadges({
-            physicsOverrides: {
-                accel: 58,
-                brakePower: 90,
-                maxSpeed: 320,
-                turnRate: 5.75,
-                grip: 2.5
-            }
-        })).toEqual([]);
-        expect(getDailyChallengeModifierLabel({ physicsOverrides: { accel: 58 } })).toBe('');
     });
 
     it('submitDailyChallengeBestTime returns null without calling fetch when invalid', async () => {
@@ -835,32 +782,6 @@ describe('daily-challenge service', () => {
         });
     });
 
-    it('formats remaining playlist availability across minute, hour, and day ranges', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-06-03T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-03T12:25:00.000Z',
-        })).toBe('25m');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-03T14:15:00.000Z',
-        })).toBe('2h 15m');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-03T14:00:00.000Z',
-        })).toBe('2h');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-05T15:00:00.000Z',
-        })).toBe('2d 3h');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-05T12:00:00.000Z',
-        })).toBe('2d');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: 'not-a-date',
-        })).toBe('');
-
-        vi.useRealTimers();
-    });
-
     it('rejects stored results with mismatched objective or non-finite times', () => {
         const challenge = {
             id: VALID_UUID,
@@ -1278,31 +1199,6 @@ describe('daily-challenge service', () => {
         vi.useRealTimers();
     });
 
-    it('formats remaining durations at the exact minute/hour boundary instead of rolling over early', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-06-03T00:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-03T01:00:00.000Z',
-        })).toBe('1h');
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-04T00:00:00.000Z',
-        })).toBe('1d');
-
-        vi.useRealTimers();
-    });
-
-    it('treats a snapshot exactly at "now" as expired for playlist availability', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-06-03T00:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-03T00:00:00.000Z',
-        })).toBe('Expired');
-
-        vi.useRealTimers();
-    });
-
     it('uses the snapshot result directly when there is no locally stored best time', async () => {
         const challenge = {
             id: 'no-local-best-challenge',
@@ -1692,7 +1588,6 @@ describe('daily-challenge service', () => {
         })).toEqual({
             hudPrimaryLabel: 'RACE',
             primaryStatLabel: 'Race Time',
-            modeSelectLine: 'Best race time',
         });
 
         vi.useRealTimers();
@@ -2112,17 +2007,6 @@ describe('daily-challenge service', () => {
             replay: MINIMAL_REPLAY,
         })).resolves.toBeNull();
         expect(fetch).not.toHaveBeenCalled();
-    });
-
-    it('formats playlist availability in days when more than 24 hours remain', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
-
-        expect(formatDailyChallengePlaylistAvailabilityLabel({
-            availableUntil: '2026-06-04T12:00:00.000Z',
-        })).toBe('3d');
-
-        vi.useRealTimers();
     });
 
     it('discards an expired featured start override before fetching the active challenge', async () => {
