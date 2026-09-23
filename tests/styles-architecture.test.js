@@ -187,7 +187,7 @@ describe('game stylesheet architecture', () => {
             /is-challenge-finish\.active-view \.combined-actions/,
         );
         expect(resultDetailStyles).toMatch(
-            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup__outcome\.is-incoming\s*\{[^}]*animation:\s*challengeOutcomePushIn 0\.5s var\(--ease-glide\) both;/,
+            /#modal-combined-view\.is-challenge-finish\.active-view \.challenge-result-lockup__outcome\.is-incoming\s*\{[^}]*animation:\s*slideInRight 0\.5s var\(--ease-glide\) both;/,
         );
         expect(resultDetailStyles).toMatch(
             /@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*is-challenge-finish\.active-view[\s\S]*animation:\s*none;/,
@@ -375,7 +375,7 @@ describe('game stylesheet architecture', () => {
             /body\.start-overlay-active:not\(:has\(#start-overlay\.is-race-start-exiting\)\)/,
         );
         expect(foundationStyles).toMatch(
-            /body:has\(#start-overlay\.is-race-start-exiting\) :is\([^)]*\)\s*\{[^}]*animation:\s*raceChromeIn/s,
+            /body:has\(#start-overlay\.is-race-start-exiting\) :is\([^)]*\)\s*\{[^}]*animation:\s*opacityIn/s,
         );
         expect(foundationStyles).not.toContain('body.race-start-exiting');
     });

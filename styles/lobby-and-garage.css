@@ -333,17 +333,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     border-top-color: #ffffff;
     animation:
         rankSpinnerSpin .8s linear infinite,
-        mainMenuSpinnerIn var(--dur-base) ease-out both;
-}
-
-@keyframes mainMenuSpinnerIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
+        opacityIn var(--dur-base) ease-out both;
 }
 
 .main-menu__item--primary .main-menu__label.is-swapping {

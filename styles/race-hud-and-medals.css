@@ -29,10 +29,6 @@
     pointer-events: none;
 }
 
-.hud-lap-cluster {
-    pointer-events: auto;
-}
-
 .hud-stats {
     display: flex;
     flex-direction: column;
@@ -190,22 +186,22 @@
 
 .medal-svg--bronze .medal-svg__shape,
 .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
-    stroke: #c17f59;
+    stroke: var(--medal-bronze);
 }
 
 .medal-svg--silver .medal-svg__shape,
 .medal-svg--outline.medal-svg--silver .medal-svg__shape {
-    stroke: #b8c4d4;
+    stroke: var(--medal-silver);
 }
 
 .medal-svg--gold .medal-svg__shape,
 .medal-svg--outline.medal-svg--gold .medal-svg__shape {
-    stroke: #e8b84a;
+    stroke: var(--medal-gold);
 }
 
 .medal-svg--author .medal-svg__shape,
 .medal-svg--outline.medal-svg--author .medal-svg__shape {
-    stroke: #c4b5fd;
+    stroke: var(--medal-author);
 }
 
 .medal-svg--personal-best .medal-svg__shape,
@@ -298,6 +294,10 @@
     height: auto;
     display: block;
     flex-shrink: 0;
+    transition:
+        transform var(--dur-slow) var(--ease-back),
+        filter var(--dur-slow) ease,
+        opacity var(--dur-slow) ease;
 }
 
 .combined-medal-row-slot--fallback .medal-svg--hero {
@@ -322,13 +322,6 @@
 .medal-svg--hero .medal-svg__center-time {
     font-size: 92px;
     stroke-width: 9px;
-}
-
-.combined-medal-row-slot .medal-svg--hero {
-    transition:
-        transform var(--dur-slow) var(--ease-back),
-        filter var(--dur-slow) ease,
-        opacity var(--dur-slow) ease;
 }
 
 .medal-svg__placeholder-fill {
@@ -523,10 +516,6 @@
 
     .speedometer-text {
         min-width: 4.8rem;
-    }
-
-    .speedometer-value {
-        font-size: 1.2rem;
     }
 
     .hud-pause-btn {

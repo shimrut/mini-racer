@@ -554,14 +554,6 @@
 }
 
 @media (max-width: 480px) {
-    .leaderboard-summary__value {
-        font-size: 1.15rem;
-    }
-
-    .leaderboard-summary__meta {
-        font-size: 0.72rem;
-    }
-
     .leaderboard-day-chip {
         padding: 0.32rem 0.58rem;
     }

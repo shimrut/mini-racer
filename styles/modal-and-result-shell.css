@@ -190,7 +190,7 @@
 
 .guest-progress-selection__source-stat-label {
     overflow: hidden;
-    color: var(--text-dim);
+    color: var(--text-muted);
     font-family: var(--mono-font);
     font-size: .62rem;
     font-weight: 700;
@@ -199,10 +199,6 @@
     text-transform: uppercase;
     white-space: nowrap;
     text-overflow: ellipsis;
-}
-
-.guest-progress-selection__source-stat-label {
-    color: var(--text-muted);
 }
 
 .guest-progress-selection__source-stat-value {
@@ -325,10 +321,6 @@
     margin-top: 0;
     margin-bottom: 0;
     background: transparent;
-}
-
-#modal.modal--pause:not(.modal--win) .modal-card,
-#modal.modal--win .modal-card {
     max-width: min(92vw, 26rem);
 }
 
@@ -350,18 +342,6 @@
 @media (max-width: 768px) {
     .modal {
         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
-
-    .modal .modal-card {
-        padding: 0;
-    }
-
-    .result-modal .modal-card-section {
-        padding-inline: 0;
-    }
-
-    .result-modal .modal-card-section--runs,
-    .result-modal .modal-card-section--sheet {
     }
 }
 
@@ -418,9 +398,6 @@
 #modal.modal--win .modal-card {
     margin-left: auto;
     margin-right: auto;
-}
-
-#modal.modal--win .modal-card {
     width: 100%;
     max-width: min(92vw, 26rem);
 }
@@ -477,12 +454,6 @@
     text-align: right;
 }
 
-#modal.modal--win #modal-combined-view .combined-rank-value {
-    font-style: normal;
-    color: #ffffff;
-    margin-bottom: 0;
-}
-
 #modal.modal--win #modal-combined-view .combined-rank-value--status {
     font-family: var(--header-font);
     font-size: clamp(0.95rem, 3.8vw, 1.15rem);
@@ -517,6 +488,9 @@
     letter-spacing: -0.04em;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    font-style: normal;
+    color: #ffffff;
+    margin-bottom: 0;
 }
 
 #modal.modal--win #modal-combined-view .combined-stat-value--pb-delta {
@@ -524,7 +498,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.3rem;
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;

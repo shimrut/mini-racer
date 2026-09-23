@@ -489,17 +489,7 @@
     display: inline-flex;
     align-items: center;
     gap: .65rem;
-    animation: leaderboardLoadingIn var(--dur-base) ease-out backwards;
-}
-
-@keyframes leaderboardLoadingIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
+    animation: opacityIn var(--dur-base) ease-out backwards;
 }
 
 .leaderboard-list :is(.leaderboard-row, .leaderboard-gap-row) {
@@ -694,7 +684,8 @@
     flex-direction: column;
     align-items: stretch;
     width: max-content;
-    max-width: min(560px, calc(100vw - 2rem))
+    max-width: min(560px, calc(100vw - 2rem));
+    pointer-events: auto;
 }
 
 .daily-challenge-hud {

@@ -60,6 +60,11 @@ body[data-lobby-mode="campaign"] #start-overlay {
     grid-template-rows: minmax(0, 1fr) 4rem;
     grid-template-columns: minmax(0, 1fr);
     row-gap: clamp(0.55rem, 2.2vh, 1.35rem);
+    --poster-gap: clamp(0.5rem, 2.2vw, 0.85rem);
+    --poster-peek: calc(
+        var(--poster-gap)
+        + clamp(0.85rem, 0.062 * var(--track-carousel-card-width, 20rem), 2.1rem)
+    );
 }
 
 /* Percentages break in the Reddit WebView. */
@@ -88,6 +93,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     box-sizing: border-box;
     gap: var(--poster-gap);
     padding-block: 0;
+    transition: opacity var(--dur-base) ease-out;
 }
 
 /* WebKit can drop a scroller's trailing padding. */
@@ -99,14 +105,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     flex-basis: calc(
         var(--track-carousel-edge-space, 0px)
         + var(--track-carousel-tail-shortfall, 0px)
-    );
-}
-
-.track-carousel {
-    --poster-gap: clamp(0.5rem, 2.2vw, 0.85rem);
-    --poster-peek: calc(
-        var(--poster-gap)
-        + clamp(0.85rem, 0.062 * var(--track-carousel-card-width, 20rem), 2.1rem)
     );
 }
 
@@ -204,10 +202,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     z-index: 2;
 }
 
-.track-carousel__card-foot {
-    opacity: 1;
-}
-
 .track-carousel .daily-playlist-entry--hero:hover {
     transform: none;
 }
@@ -265,6 +259,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     overflow: hidden;
     text-align: left;
     user-select: none;
+    opacity: 1;
 }
 
 .track-carousel--lobby .track-carousel__card-foot {
@@ -656,21 +651,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     align-items: center;
     justify-content: center;
     margin: 0;
-    animation: trackCarouselStatusIn var(--dur-base) ease-out both;
-}
-
-@keyframes trackCarouselStatusIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-.track-carousel__rail {
-    transition: opacity var(--dur-base) ease-out;
+    animation: opacityIn var(--dur-base) ease-out both;
 }
 
 .track-carousel__rail:not(:has(.daily-playlist-entry--hero)) {

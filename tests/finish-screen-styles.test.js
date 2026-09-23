@@ -94,7 +94,7 @@ describe('finish screen styles', () => {
             /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="new-best"\]\s*\{\s*color:\s*var\(--success-bright\);/,
         );
         expect(styles).toMatch(
-            /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="gold"\]\s*\{\s*color:\s*#e8b84a;/,
+            /#modal-combined-view:not\(\.is-challenge-finish\) \.combined-finish-heading\[data-kind="gold"\]\s*\{\s*color:\s*var\(--medal-gold\);/,
         );
         expect(styles).toMatch(
             /#modal-combined-view\.is-challenge-finish \.combined-finish-heading\s*\{\s*display:\s*none;/,

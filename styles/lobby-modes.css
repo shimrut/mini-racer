@@ -5,6 +5,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: clip;
+    view-transition-name: lobby-panes;
 }
 
 .lobby-pane {
@@ -601,6 +602,3 @@ html.is-lobby-view-transition::view-transition-new(root) {
     display: none !important;
 }
 
-.lobby-panes {
-    view-transition-name: lobby-panes;
-}
