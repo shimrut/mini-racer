@@ -372,18 +372,14 @@
     opacity: 0.9;
 }
 
-.combined-medal-row .medal-pile-icon--deferred {
+.combined-medal-row .medal-pile-icon--deferred,
+.win-combined-medal-overlay .medal-pile-icon--deferred {
     opacity: 0;
     transform: none;
 }
 
 .combined-medal-row .medal-svg--row-placeholder {
     opacity: 0.72;
-    transform: none;
-}
-
-.win-combined-medal-overlay .medal-pile-icon--deferred {
-    opacity: 0;
     transform: none;
 }
 

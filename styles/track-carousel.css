@@ -411,12 +411,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     display: none;
 }
 
-.track-carousel__unlock-medal {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
+.track-carousel__unlock-medal,
 .track-carousel__requirement-medal-icon {
     display: block;
     width: 100%;
@@ -691,7 +686,8 @@ body[data-lobby-mode="campaign"] #start-overlay {
         font-size: 0.65rem;
     }
 
-    .track-carousel__unlock-medal-host {
+    .track-carousel__unlock-medal-host,
+    .track-carousel__requirement-medal {
         width: 1.5rem;
         height: 1.5rem;
     }
@@ -713,11 +709,6 @@ body[data-lobby-mode="campaign"] #start-overlay {
     .track-carousel__requirement-item {
         grid-template-columns: 1.5rem minmax(0, 1fr);
         column-gap: 0.3rem;
-    }
-
-    .track-carousel__requirement-medal {
-        width: 1.5rem;
-        height: 1.5rem;
     }
 
     .track-carousel__requirement-note {

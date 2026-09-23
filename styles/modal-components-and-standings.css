@@ -357,11 +357,7 @@
     cursor: default;
 }
 
-.leaderboard-day-chip.is-selected {
-    color: var(--text-color);
-    background: var(--accent-color);
-}
-
+.leaderboard-day-chip.is-selected,
 .leaderboard-day-chip.is-selected:hover {
     color: var(--text-color);
     background: var(--accent-color);
@@ -370,12 +366,12 @@
 .leaderboard-day-chip.is-menu-selected {
     color: var(--text-color);
     background: var(--border-default);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .leaderboard-day-chip.is-selected.is-menu-selected {
     background: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .leaderboard-day-chip__stack {

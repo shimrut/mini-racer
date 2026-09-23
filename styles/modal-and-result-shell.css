@@ -48,12 +48,6 @@
     -ms-overflow-style: none;
 }
 
-.guest-progress-selection__card::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
-}
-
 .guest-progress-selection h2 {
     margin: 0 0 .45rem;
     color: var(--text-color);
@@ -263,11 +257,6 @@
     cursor: not-allowed;
 }
 
-.guest-progress-selection__button--primary:disabled {
-    background: var(--accent-color);
-    color: white;
-}
-
 @media (max-width: 600px) {
     .guest-progress-selection__card {
         padding-block: 0;
@@ -383,6 +372,7 @@
 }
 
 .modal .modal-card::-webkit-scrollbar,
+.guest-progress-selection__card::-webkit-scrollbar,
 .daily-playlist-list::-webkit-scrollbar,
 .result-modal .modal-card-section--runs .modal-lap-times-container::-webkit-scrollbar,
 .reusable-modal-content::-webkit-scrollbar {

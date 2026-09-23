@@ -144,11 +144,11 @@
 }
 
 .combined-action-btn.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .combined-action-btn--primary.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+    box-shadow: var(--menu-ring);
 }
 
 .combined-action-btn svg,

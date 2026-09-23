@@ -22,6 +22,7 @@
     --border-subtle: rgba(255, 255, 255, 0.08);
     --border-default: rgba(255, 255, 255, 0.12);
     --border-strong: rgba(255, 255, 255, 0.18);
+    --menu-ring: 0 0 0 2px rgba(255, 255, 255, 0.92);
 
     --hud-panel-bg: var(--bg-color-darker);
     --hud-panel-border: rgba(148, 163, 184, 0.2);

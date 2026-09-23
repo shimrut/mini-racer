@@ -1318,13 +1318,13 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-mode-action\s*\{[^}]*padding:\s*0\.65rem 0\.85rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.lobby-mode-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*var\(--menu-ring\);/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.lobby-mode-switch__btn\.is-menu-selected\s*\{[^}]*box-shadow:\s*var\(--menu-ring\);/s,
         );
         expect(css).toMatch(
-            /\.lobby-mode-toolbar__action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.lobby-mode-toolbar__action\.is-menu-selected\s*\{[^}]*box-shadow:\s*var\(--menu-ring\);/s,
         );
         expect(css).not.toContain('.lobby-utility-row');
         expect(css).not.toContain('lobby-mode-action::after');
@@ -1336,7 +1336,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             /\.lobby-header-action\s*\{[^}]*color:\s*#fff;[^}]*background:\s*transparent;[^}]*border:\s*0;/s,
         );
         expect(lobbyCss).toMatch(
-            /\.lobby-header-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.lobby-header-action\.is-menu-selected\s*\{[^}]*box-shadow:\s*var\(--menu-ring\);/s,
         );
         expect(lobbyCss).toMatch(
             /\.lobby-back-btn\s*\{[^}]*color:\s*#fff;[^}]*background:\s*none;[^}]*border:\s*0;/s,

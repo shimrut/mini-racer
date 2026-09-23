@@ -269,19 +269,6 @@
     border-radius: var(--radius-full);
 }
 
-#settings-modal .modal-sheet-settings-switch::before {
-    content: "";
-    position: absolute;
-    top: 0.15rem;
-    bottom: 0.15rem;
-    left: 0.15rem;
-    width: calc(50% - 0.15rem);
-    background-color: var(--accent-color);
-    border-radius: var(--radius-full);
-    transition: transform var(--dur-slow) var(--ease-settle);
-    z-index: 0;
-}
-
 #settings-modal .modal-sheet-settings-switch:has(:checked)::before {
     transform: translateX(100%);
 }
@@ -313,19 +300,13 @@
     outline: none !important;
 }
 
-@media (prefers-reduced-motion: reduce) {
-    #settings-modal .modal-sheet-settings-switch::before {
-        transition: none;
-    }
-}
-
 #settings-modal .modal-sheet-settings-identity-head:has(.is-menu-selected) {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
     border-radius: var(--radius-sm);
 }
 
 #settings-modal .settings-collision-delay-stepper.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 #settings-modal .modal-sheet-settings-identity-desc {
@@ -379,19 +360,6 @@
     border-radius: var(--radius-full);
     font-size: 0.88rem;
     letter-spacing: 0.05em;
-}
-
-#daily-playlist-modal .tracks-tab.is-selected,
-#daily-playlist-modal .tracks-tab.is-selected:hover {
-    background: transparent;
-    color: #ffffff;
-}
-
-#daily-playlist-modal .tracks-tab-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
 }
 
 #daily-playlist-modal .tracks-tab-panel[hidden] {
@@ -540,7 +508,7 @@
 
 #campaign-playlist-list .daily-playlist-entry--hero.is-menu-selected,
 #daily-playlist-list .daily-playlist-entry--hero.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .daily-playlist-empty {

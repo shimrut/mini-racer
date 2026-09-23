@@ -94,7 +94,7 @@
 
 .leaderboard-row:is(.is-shareable, .is-raceable).is-menu-selected {
     outline: none !important;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .leaderboard-row:is(.is-shareable, .is-raceable):hover .combined-row-time,
@@ -262,11 +262,11 @@
 }
 
 .result-share-panel__button.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .result-share-panel__button--primary.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+    box-shadow: var(--menu-ring);
 }
 
 .result-share-panel__button--primary {

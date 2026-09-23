@@ -174,7 +174,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 .lobby-header-action.is-menu-selected {
     color: #fff;
     background: transparent;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .lobby-header-action:active {
@@ -361,11 +361,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     .main-menu__item--primary .main-menu__label.is-swapping {
         animation: none;
     }
-
-    .garage-tabs::before,
-    .tracks-tabs::before {
-        transition: none;
-    }
 }
 
 .main-menu__item--primary .main-menu__label {
@@ -456,11 +451,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .main-menu__item.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .main-menu__item--primary.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+    box-shadow: var(--menu-ring);
 }
 
 .main-menu__item:active {
@@ -487,7 +482,10 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 .garage-tabs::before,
-.tracks-tabs::before {
+.tracks-tabs::before,
+body[data-lobby-mode="daily"] .lobby-mode-switch::before,
+body[data-lobby-mode="campaign"] .lobby-mode-switch::before,
+#settings-modal .modal-sheet-settings-switch::before {
     content: "";
     position: absolute;
     top: 0.15rem;
@@ -498,6 +496,14 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     border-radius: var(--radius-full);
     transition: transform var(--dur-slow) var(--ease-settle);
     z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .garage-tabs::before,
+    .tracks-tabs::before,
+    #settings-modal .modal-sheet-settings-switch::before {
+        transition: none;
+    }
 }
 
 .garage-tabs:has(#garage-tab-trails[aria-selected="true"])::before,
@@ -549,10 +555,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 .garage-tab.is-selected.is-menu-selected,
 .tracks-tab.is-menu-selected,
 .tracks-tab.is-selected.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
-.garage-tab-panel {
+.garage-tab-panel,
+#daily-playlist-modal .tracks-tab-panel {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -627,12 +634,12 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 
 .garage-skin-option.is-menu-selected,
 .garage-trail-option.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .garage-skin-option.is-selected.is-menu-selected,
 .garage-trail-option.is-selected.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+    box-shadow: var(--menu-ring);
 }
 
 .garage-skin-option__thumb {
@@ -814,7 +821,9 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 #garage-modal .garage-tab.is-selected,
-#garage-modal .garage-tab.is-selected:hover {
+#garage-modal .garage-tab.is-selected:hover,
+#daily-playlist-modal .tracks-tab.is-selected,
+#daily-playlist-modal .tracks-tab.is-selected:hover {
     background: transparent;
     color: #ffffff;
 }
@@ -913,12 +922,12 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 
 #garage-modal .garage-tab.is-menu-selected,
 #garage-modal .garage-tab.is-selected.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 #garage-modal .garage-skin-option.is-menu-selected,
 #garage-modal .garage-trail-option.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 #garage-modal .garage-unlock-panel {

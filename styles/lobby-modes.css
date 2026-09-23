@@ -150,20 +150,6 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch {
     position: relative;
 }
 
-body[data-lobby-mode="daily"] .lobby-mode-switch::before,
-body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
-    content: "";
-    position: absolute;
-    top: 0.15rem;
-    bottom: 0.15rem;
-    left: 0.15rem;
-    width: calc(50% - 0.15rem);
-    background-color: var(--accent-color);
-    border-radius: var(--radius-full);
-    transition: transform var(--dur-slow) var(--ease-settle);
-    z-index: 0;
-}
-
 body[data-lobby-mode="daily"] .lobby-mode-switch::before {
     transform: translateX(0);
 }
@@ -203,7 +189,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
 }
 
 .lobby-mode-switch__btn.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 body[data-lobby-mode="challenge"] .lobby-mode-label,
@@ -303,7 +289,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .lobby-mode-toolbar__action:focus-visible,
 .lobby-mode-toolbar__action.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .lobby-mode-toolbar__action:active {
@@ -351,7 +337,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 }
 
 .lobby-mode-action.is-menu-selected {
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .track-carousel--lobby.is-menu-selected,
@@ -361,7 +347,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
 
 .track-carousel--lobby.is-menu-selected .track-carousel__count {
     color: var(--text-color);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
+    box-shadow: var(--menu-ring);
 }
 
 .lobby-primary-row {

@@ -135,7 +135,7 @@ describe('game stylesheet architecture', () => {
 
     it('does not scale or recolor the finish RANK row on hover', () => {
         expect(resultDetailStyles).toMatch(
-            /\.combined-stats-right-group--interactive\s*\{[^}]*cursor:\s*pointer;/,
+            /\.combined-stats-right-group--interactive,[^{]*\{[^}]*cursor:\s*pointer;/,
         );
         expect(resultDetailStyles).not.toContain('.combined-stats-right-group--interactive:hover');
         expect(resultDetailStyles).not.toContain('.combined-stats-right-group--interactive:active');
@@ -575,7 +575,7 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel__count\s*\{[^}]*padding:\s*0\.2rem 0\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(lobbyModeStyles).toMatch(
-            /\.track-carousel--lobby\.is-menu-selected \.track-carousel__count\s*\{[^}]*color:\s*var\(--text-color\);[^}]*box-shadow:\s*0 0 0 2px rgba\(255, 255, 255, 0\.92\);/s,
+            /\.track-carousel--lobby\.is-menu-selected \.track-carousel__count\s*\{[^}]*color:\s*var\(--text-color\);[^}]*box-shadow:\s*var\(--menu-ring\);/s,
         );
         expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-toolbar__action\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*width:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*height:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,
@@ -670,9 +670,6 @@ describe('game stylesheet architecture', () => {
             /#settings-modal \.modal-sheet-settings-switch\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*rgba\(51, 65, 85, 0\.7\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(trackShellStyles).toMatch(
-            /#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
-        );
-        expect(trackShellStyles).toMatch(
             /#settings-modal \.modal-sheet-settings-switch:has\(:checked\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );
     });
@@ -686,8 +683,13 @@ describe('game stylesheet architecture', () => {
             /\.garage-tabs,\s*\.tracks-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.garage-tabs::before,\s*\.tracks-tabs::before,[^{]*\.lobby-mode-switch::before,[^{]*#settings-modal \.modal-sheet-settings-switch::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
+        const pillRule = garageStyles.search(/\.garage-tabs::before,\s*\.tracks-tabs::before,[^{]*\{/);
+        const reducedPill = garageStyles.search(
+            /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.garage-tabs::before,\s*\.tracks-tabs::before,\s*#settings-modal \.modal-sheet-settings-switch::before\s*\{\s*transition:\s*none;/,
+        );
+        expect(reducedPill).toBeGreaterThan(pillRule);
         expect(garageStyles).toMatch(
             /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before,\s*\.tracks-tabs:has\(#tracks-tab-campaign\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
         );

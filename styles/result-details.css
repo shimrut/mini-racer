@@ -151,11 +151,7 @@
     color: #f87171;
 }
 
-.combined-stats-right-group--interactive {
-    cursor: pointer;
-    user-select: none;
-}
-
+.combined-stats-right-group--interactive,
 #combined-medals-stat.combined-medals-stat--interactive {
     cursor: pointer;
     user-select: none;
