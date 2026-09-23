@@ -19,7 +19,7 @@ Work in the order of this file. Each section starts with the lowest risk.
 - CSS: styles that never apply, split style blocks, copied animations, and matching style
   pairs are removed or joined. The medal colours and the menu selection ring are named
   settings. The Garage and Tracks tab marker obeys "reduce motion".
-- Net effect: about 3,326 lines of code are removed. The count is about 5,430 lines if you
+- Net effect: about 3,266 lines of code are removed. The count is about 5,370 lines if you
   include the removed code comments.
 
 ## 1. Before other work
@@ -30,30 +30,13 @@ Work in the order of this file. Each section starts with the lowest risk.
 | Puppet Master | Drive the track once. Confirm the medal times: author 9.60, gold 9.81, silver 9.95, bronze 10.17. |
 | Untracked file | `LP/mini_racer_analytics.png` is not part of the cleanup. Decide if it goes in a commit. |
 
-## 2. Decision needed: CSS ownership
+## 2. CSS ownership (resolved)
 
-The plan dropped step 5.6 (one shared tab marker style). The reason: `docs/css-architecture.md`
-gives each stylesheet one product area, and `tests/styles-architecture.test.js` checked each
-marker rule in its own file. The CSS merge commit of 2026-09-23 did not follow this. It moved
-these rules into `styles/lobby-and-garage.css`:
-
-- the Daily/Campaign switch marker (owner: `styles/lobby-modes.css`)
-- the Settings switch marker and its reduce-motion rule (owner:
-  `styles/settings-and-track-shells.css`)
-- the Tracks tab panel and the selected Tracks tab (owner: `styles/settings-and-track-shells.css`)
-
-The same commit changed the architecture test to accept the shared rule. The earlier CSS commit
-also moved rules across files: the `.hud-lap-cluster` pointer rule, the finish-sheet PB delta
-size, and the `challengeOutcomePushIn` animation, which now uses `slideInRight` from
-`styles/lobby-and-garage.css`.
-
-Choose one:
-
-- **Restore ownership (recommended).** Put each moved rule back in its owner file with the same
-  values, and restore the per-file test checks. Keep the fixes and the named settings: the
-  reduce-motion fix, `--menu-ring`, the medal colours, and the merges inside one file.
-- **Keep the merge.** Update `docs/css-architecture.md` to allow shared rules across product
-  areas, and say which file owns them.
+The CSS merges of 2026-09-23 moved some rules across stylesheets. `docs/css-architecture.md`
+gives each stylesheet one product area, and the plan had dropped step 5.6 for this reason.
+`aba32ea` returns each moved rule to its owner file with the same values, and restores the
+per-file test checks. The reduce-motion fix, `--menu-ring`, the medal colours, `opacityIn` in
+`foundation.css`, and the merges inside one file stay. Every selector keeps its final value.
 
 ## 3. Duplicated code (medium effort)
 
