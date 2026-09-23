@@ -15,6 +15,7 @@ import {
 import {
     getRaceMedalThresholds,
 } from './game/medals/medal-timing.js';
+import { getDailyChallengeRequiredLaps } from './game/daily-challenge/labels.js';
 import { formatLapsLabel } from './game/shared/laps-label.js';
 import { requestGameLaunchTarget } from './game/modes/launch-target.js';
 
@@ -67,7 +68,7 @@ export async function bootDailyPreview() {
         currentTrack = TRACKS[currentTrackKey] || fallbackTrack;
         currentSkin = challenge.skin || 'default';
 
-        const lapCount = getChallengeLapCount(challenge);
+        const lapCount = getDailyChallengeRequiredLaps(challenge);
         setTrackName(trackNameEl, currentTrack.name);
         await applyTimeToBeat(timeToBeatEl, currentTrackKey, lapCount);
         renderChallengeStatus(challenge);
@@ -152,11 +153,6 @@ function getChallengeTrackName(challenge) {
     return TRACKS[trackKey]?.name || 'This track';
 }
 
-function getChallengeLapCount(challenge) {
-    const lapCount = challenge?.objectiveParams?.lapCount;
-    return Number.isInteger(lapCount) && lapCount >= 1 && lapCount <= 3 ? lapCount : 1;
-}
-
 async function applyTimeToBeat(el, trackKey, lapCount = 1) {
     if (!el) return;
     const labelEl = el.querySelector('.hud-label');
@@ -229,8 +225,6 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage 
         runHistory: []
     });
 }
-
-
 
 function setTrackName(el, name) {
     if (!el) return;

@@ -1,4 +1,5 @@
 import { getTrackName } from '../../game/track/catalog.js';
+import { getDailyChallengeRequiredLaps } from '../../game/daily-challenge/labels.js';
 import { getRaceMedalThresholds } from '../../game/medals/medal-timing.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
 import { formatChallengeDate } from './format-race-time.js';
@@ -36,11 +37,6 @@ function formatSeconds(value: unknown): string {
     return Number.isFinite(seconds) && seconds > 0
         ? `${seconds.toFixed(3)}s`
         : '--';
-}
-
-function getChallengeLapCount(challenge: DailyGpChallenge): number {
-    const lapCount = challenge.objectiveParams?.lapCount;
-    return Number.isInteger(lapCount) && lapCount >= 1 && lapCount <= 3 ? lapCount : 1;
 }
 
 function getMedalTimeTokens(trackKey: string, lapCount = 1) {
@@ -85,13 +81,13 @@ export function formatDailyMiniRacerPostTitle(
         personalBest: personalBestTime,
         personalBestTime,
         trackName,
-        ...getMedalTimeTokens(challenge.trackKey, getChallengeLapCount(challenge)),
+        ...getMedalTimeTokens(challenge.trackKey, getDailyChallengeRequiredLaps(challenge)),
     });
 }
 
 export function formatDailyMiniRacerTextFallback(challenge: DailyGpChallenge): string {
     const trackName = getTrackName(challenge.trackKey, challenge.trackKey);
-    const lapCount = getChallengeLapCount(challenge);
+    const lapCount = getDailyChallengeRequiredLaps(challenge);
     const medalTimeTokens = getMedalTimeTokens(challenge.trackKey, lapCount);
     const raceLabel = lapCount === 1 ? 'one-lap race' : `${lapCount}-lap race`;
 
