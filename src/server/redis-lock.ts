@@ -283,10 +283,10 @@ export type RedisLockLease = {
     stop(): Promise<void>;
 };
 
-export function startRedisLockLeaseRenewal(
-    lock: RedisLock,
+function startLeaseRenewal(
+    renew: () => Promise<boolean>,
+    isOwned: () => Promise<boolean>,
     renewalIntervalMs: number,
-    client: RedisClient = redis,
 ): RedisLockLease {
     let stopped = false;
     let ownershipLost = false;
@@ -296,7 +296,7 @@ export function startRedisLockLeaseRenewal(
         renewal = renewal.then(async () => {
             if (stopped || ownershipLost) return;
             try {
-                if (!await renewRedisLock(lock, client)) ownershipLost = true;
+                if (!await renew()) ownershipLost = true;
             } catch (_error) {
                 ownershipLost = true;
             }
@@ -311,7 +311,7 @@ export function startRedisLockLeaseRenewal(
             await renewal;
             if (stopped || ownershipLost) return false;
             try {
-                ownershipLost = !await isRedisLockOwned(lock, client);
+                ownershipLost = !await isOwned();
             } catch (_error) {
                 ownershipLost = true;
             }
@@ -325,44 +325,26 @@ export function startRedisLockLeaseRenewal(
     };
 }
 
+export function startRedisLockLeaseRenewal(
+    lock: RedisLock,
+    renewalIntervalMs: number,
+    client: RedisClient = redis,
+): RedisLockLease {
+    return startLeaseRenewal(
+        () => renewRedisLock(lock, client),
+        () => isRedisLockOwned(lock, client),
+        renewalIntervalMs,
+    );
+}
+
 export function startRedisLockGroupLeaseRenewal(
     locks: readonly RedisLock[],
     renewalIntervalMs: number,
     client: RedisClient = redis,
 ): RedisLockLease {
-    let stopped = false;
-    let ownershipLost = false;
-    let renewal = Promise.resolve();
-
-    const queueRenewal = (): void => {
-        renewal = renewal.then(async () => {
-            if (stopped || ownershipLost) return;
-            try {
-                if (!await renewRedisLockGroup(locks, client)) ownershipLost = true;
-            } catch (_error) {
-                ownershipLost = true;
-            }
-        });
-    };
-    const timer = setInterval(queueRenewal, renewalIntervalMs);
-    timer.unref?.();
-
-    return {
-        isOwned: () => !ownershipLost,
-        async confirmOwnership(): Promise<boolean> {
-            await renewal;
-            if (stopped || ownershipLost) return false;
-            try {
-                ownershipLost = !await ownsEveryLock(locks, client);
-            } catch (_error) {
-                ownershipLost = true;
-            }
-            return !ownershipLost;
-        },
-        async stop(): Promise<void> {
-            stopped = true;
-            clearInterval(timer);
-            await renewal;
-        },
-    };
+    return startLeaseRenewal(
+        () => renewRedisLockGroup(locks, client),
+        () => ownsEveryLock(locks, client),
+        renewalIntervalMs,
+    );
 }
