@@ -91,6 +91,33 @@ export function getDailyChallengeData(challengeId) {
   return stored && typeof stored === "object" ? { ...stored } : null;
 }
 
+function readStoredChallengeResult(challengeId) {
+  const challengeMap = readDailyChallengeMap();
+  const previous =
+    challengeMap[challengeId] && typeof challengeMap[challengeId] === "object"
+      ? challengeMap[challengeId]
+      : {};
+  return { challengeMap, previous };
+}
+
+function writeStoredChallengeResult(challengeMap, challenge, previous, result) {
+  const nextMap = pruneDailyChallengeMap({
+    ...challengeMap,
+    [challenge.id]: {
+      ...previous,
+      challengeDate: challenge.challengeDate || previous.challengeDate || null,
+      trackKey: challenge.trackKey || previous.trackKey || null,
+      objectiveType: challenge.objectiveType || previous.objectiveType || null,
+      bestTime: result.bestTime,
+      completedLaps: result.completedLaps,
+      checkpointTimesSec: result.checkpointTimesSec,
+      updatedAt: new Date().toISOString(),
+    },
+  });
+  writeDailyChallengeMap(nextMap);
+  return getDailyChallengeData(challenge.id);
+}
+
 export function saveDailyChallengeBestTime(
   challenge,
   bestTime,
@@ -103,11 +130,7 @@ export function saveDailyChallengeBestTime(
     bestTime,
     checkpointTimesSec,
   );
-  const challengeMap = readDailyChallengeMap();
-  const previous =
-    challengeMap[challenge.id] && typeof challengeMap[challenge.id] === "object"
-      ? challengeMap[challenge.id]
-      : {};
+  const { challengeMap, previous } = readStoredChallengeResult(challenge.id);
   const nextResult = isBetterStoredResult(
     challenge,
     { bestTime, completedLaps },
@@ -131,21 +154,7 @@ export function saveDailyChallengeBestTime(
           : null,
         checkpointTimesSec: readStoredCheckpointTimesSec(previous),
       };
-  const nextMap = pruneDailyChallengeMap({
-    ...challengeMap,
-    [challenge.id]: {
-      ...previous,
-      challengeDate: challenge.challengeDate || previous.challengeDate || null,
-      trackKey: challenge.trackKey || previous.trackKey || null,
-      objectiveType: challenge.objectiveType || previous.objectiveType || null,
-      bestTime: nextResult.bestTime,
-      completedLaps: nextResult.completedLaps,
-      checkpointTimesSec: nextResult.checkpointTimesSec,
-      updatedAt: new Date().toISOString(),
-    },
-  });
-  writeDailyChallengeMap(nextMap);
-  return getDailyChallengeData(challenge.id);
+  return writeStoredChallengeResult(challengeMap, challenge, previous, nextResult);
 }
 
 export function setDailyChallengeBestTime(
@@ -160,28 +169,14 @@ export function setDailyChallengeBestTime(
     bestTime,
     checkpointTimesSec,
   );
-  const challengeMap = readDailyChallengeMap();
-  const previous =
-    challengeMap[challenge.id] && typeof challengeMap[challenge.id] === "object"
-      ? challengeMap[challenge.id]
-      : {};
-  const nextMap = pruneDailyChallengeMap({
-    ...challengeMap,
-    [challenge.id]: {
-      ...previous,
-      challengeDate: challenge.challengeDate || previous.challengeDate || null,
-      trackKey: challenge.trackKey || previous.trackKey || null,
-      objectiveType: challenge.objectiveType || previous.objectiveType || null,
-      bestTime,
-      completedLaps: Number.isFinite(completedLaps)
-        ? normalizeCompletedLaps(completedLaps)
-        : null,
-      checkpointTimesSec: normalizedCheckpoints,
-      updatedAt: new Date().toISOString(),
-    },
+  const { challengeMap, previous } = readStoredChallengeResult(challenge.id);
+  return writeStoredChallengeResult(challengeMap, challenge, previous, {
+    bestTime,
+    completedLaps: Number.isFinite(completedLaps)
+      ? normalizeCompletedLaps(completedLaps)
+      : null,
+    checkpointTimesSec: normalizedCheckpoints,
   });
-  writeDailyChallengeMap(nextMap);
-  return getDailyChallengeData(challenge.id);
 }
 
 export function clearDailyChallengeBestTime(challengeId) {
