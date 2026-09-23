@@ -140,7 +140,7 @@ import {
     SUBMISSION_LOCK_TTL_MS,
     type RankedSubmitReuseOptions,
 } from './competition-submit.js';
-import { playerFieldHash } from './value-guards.js';
+import { playerFieldHash } from './redis-names.js';
 import { progressTransferPendingReply } from './progress-transfer-reply.js';
 
 export {

@@ -15,7 +15,7 @@ import {
     GuestProgressRecoveryRequiredError,
     GuestProgressSelectionRetryableError,
 } from './guest-progress-selection-error.js';
-import { playerFieldHash } from './value-guards.js';
+import { playerFieldHash } from './redis-names.js';
 import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 type CampaignResultMap = Record<string, { medal?: unknown }>;

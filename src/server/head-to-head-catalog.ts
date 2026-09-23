@@ -10,7 +10,8 @@ import {
 } from './head-to-head-model.js';
 import { createTrackFingerprint } from './pb-ghost-trace.js';
 import { acquireRedisLock, releaseRedisLock } from './redis-lock.js';
-import { isRedditPostId, normalizeName, redisKeyPart } from './value-guards.js';
+import { redisKeyPart } from './redis-names.js';
+import { isRedditPostId, normalizeName } from './value-guards.js';
 
 const PREFIX = 'miniracer:head-to-head:catalog';
 const SWEEP_PAGE_SIZE = 100;

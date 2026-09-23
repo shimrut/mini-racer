@@ -19,11 +19,3 @@ export function sha256Hex(value: string): string {
 export function normalizeName(value: string): string {
     return value.trim().toLowerCase();
 }
-
-export function redisKeyPart(value: string): string {
-    return encodeURIComponent(normalizeName(value));
-}
-
-export function playerFieldHash(playerId: string): string {
-    return createHash('sha256').update(playerId, 'utf8').digest('base64url');
-}

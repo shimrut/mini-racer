@@ -73,7 +73,7 @@ import {
 } from './guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from './analytics-store.js';
 import { isPlayerProgressSelectionPending } from './guest-retirement.js';
-import { playerFieldHash } from './value-guards.js';
+import { playerFieldHash } from './redis-names.js';
 import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 import { progressTransferPendingReply } from './progress-transfer-reply.js';
 

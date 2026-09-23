@@ -45,6 +45,7 @@ export default {
 
         'src/server/redis-lock.ts',
         'src/server/value-guards.ts',
+        'src/server/redis-names.ts',
         'src/server/rate-limit.ts',
         'src/server/redis-lock-retry.ts',
         'src/server/progress-transfer-reply.ts',

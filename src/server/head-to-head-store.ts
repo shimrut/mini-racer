@@ -5,7 +5,7 @@ import {
     releaseRedisLock,
     type RedisLock,
 } from './redis-lock.js';
-import { redisKeyPart } from './value-guards.js';
+import { redisKeyPart } from './redis-names.js';
 
 const PREFIX = 'miniracer:head-to-head';
 const CREATE_LOCK_TTL_MS = 15 * 60_000;

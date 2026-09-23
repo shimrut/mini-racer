@@ -18,7 +18,7 @@ import type {
     ObsoleteReason,
     StoredRecordClassification,
 } from './guest-transfer-source-classification.js';
-import { playerFieldHash } from './value-guards.js';
+import { playerFieldHash } from './redis-names.js';
 import { acquireRedisLockWithRetry } from './redis-lock-retry.js';
 
 export type PlayerTrackPbRecord = {
