@@ -29,6 +29,7 @@ import {
     type RedisLockLease,
 } from './redis-lock.js';
 import { normalizeName } from './value-guards.js';
+import { checkFixedWindowRateLimit } from './rate-limit.js';
 
 export { normalizeName as normalizeShareName };
 
@@ -210,16 +211,12 @@ async function stillOwnLock(lease: RedisLockLease): Promise<boolean> {
 }
 
 async function checkRateLimit(username: string): Promise<number | null> {
-    const key = createShareRateLimitKey(username);
-    const attempts = await redis.incrBy(key, 1);
-    if (attempts === 1) await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
-    if (attempts <= SHARE_RATE_LIMIT_MAX) return null;
-    const expiresAt = await redis.expireTime(key);
-    if (Number.isFinite(expiresAt) && expiresAt > 0) {
-        return Math.max(1, expiresAt - Math.floor(Date.now() / 1000));
-    }
-    await redis.expire(key, SHARE_RATE_LIMIT_SECONDS);
-    return SHARE_RATE_LIMIT_SECONDS;
+    const result = await checkFixedWindowRateLimit(
+        createShareRateLimitKey(username),
+        SHARE_RATE_LIMIT_MAX,
+        SHARE_RATE_LIMIT_SECONDS,
+    );
+    return result.allowed === false ? result.retryAfterSeconds : null;
 }
 
 export async function registerDailyGpPost({

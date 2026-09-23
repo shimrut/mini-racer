@@ -1,6 +1,6 @@
-import { redis } from '@devvit/redis';
 import { prepareServerCampaignLeaderboardRace } from './campaign-store.js';
 import { prepareServerDailyLeaderboardRace } from './daily-gp-store.js';
+import { checkFixedWindowRateLimit } from './rate-limit.js';
 
 const PREPARE_RATE_LIMIT_WINDOW_SECONDS = 60;
 const PREPARE_RATE_LIMIT_MAX_REQUESTS = 12;
@@ -21,19 +21,11 @@ function competitionIdForInput(input: Record<string, unknown>): string | null {
 }
 
 async function checkPrepareRateLimit(competitionId: string, identity: string) {
-    const key = `leaderboard-race:prepare-rate-limit:${competitionId}:${identity}`;
-    const count = await redis.incrBy(key, 1);
-    if (count === 1) await redis.expire(key, PREPARE_RATE_LIMIT_WINDOW_SECONDS);
-    if (count <= PREPARE_RATE_LIMIT_MAX_REQUESTS) return { allowed: true as const };
-    const expiresAt = await redis.expireTime(key);
-    if (Number.isFinite(expiresAt) && expiresAt > 0) {
-        return {
-            allowed: false as const,
-            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
-        };
-    }
-    await redis.expire(key, PREPARE_RATE_LIMIT_WINDOW_SECONDS);
-    return { allowed: false as const, retryAfterSeconds: PREPARE_RATE_LIMIT_WINDOW_SECONDS };
+    return checkFixedWindowRateLimit(
+        `leaderboard-race:prepare-rate-limit:${competitionId}:${identity}`,
+        PREPARE_RATE_LIMIT_MAX_REQUESTS,
+        PREPARE_RATE_LIMIT_WINDOW_SECONDS,
+    );
 }
 
 export async function prepareServerLeaderboardRace(
@@ -56,7 +48,7 @@ export async function prepareServerLeaderboardRace(
         };
     }
     const rateLimit = await checkPrepareRateLimit(competitionId, requestIdentity);
-    if (!rateLimit.allowed) {
+    if (rateLimit.allowed === false) {
         return {
             status: 429,
             body: {

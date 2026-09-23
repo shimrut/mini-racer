@@ -45,6 +45,7 @@ export default {
 
         'src/server/redis-lock.ts',
         'src/server/value-guards.ts',
+        'src/server/rate-limit.ts',
         'src/server/redis-compressed-value.ts',
         'src/server/daily-gp-post-store.ts',
         'src/server/daily-podium-post-store.ts',

@@ -19,6 +19,7 @@ import { sanitizeRedditUsername } from '../../game/shared/leaderboard-identity.j
 import { TRACKS } from '../../game/track/tracks.js';
 import type { DailyGpLeaderboardEntry } from './daily-gp-model.js';
 import { isProgressTransferPending } from './guest-retirement.js';
+import { checkFixedWindowRateLimit, type RateLimitResult } from './rate-limit.js';
 
 export const SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 export const SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
@@ -35,24 +36,12 @@ export function competitionSubmissionLockKey(competition: Competition, playerId:
 export async function checkSubmissionRateLimit(
     competition: Competition,
     identity: string,
-): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
-    const key = rateLimitKey(competition, identity);
-    const attemptCount = await redis.incrBy(key, 1);
-    if (attemptCount === 1) {
-        await redis.expire(key, SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    }
-    if (attemptCount <= SUBMISSION_RATE_LIMIT_MAX_REQUESTS) {
-        return { allowed: true };
-    }
-    const expiresAt = await redis.expireTime(key);
-    if (Number.isFinite(expiresAt) && expiresAt > 0) {
-        return {
-            allowed: false,
-            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
-        };
-    }
-    await redis.expire(key, SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    return { allowed: false, retryAfterSeconds: SUBMISSION_RATE_LIMIT_WINDOW_SECONDS };
+): Promise<RateLimitResult> {
+    return checkFixedWindowRateLimit(
+        rateLimitKey(competition, identity),
+        SUBMISSION_RATE_LIMIT_MAX_REQUESTS,
+        SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
+    );
 }
 
 function resolveRateLimitIdentity(

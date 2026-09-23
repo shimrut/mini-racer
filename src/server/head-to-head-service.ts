@@ -59,6 +59,7 @@ import type { JudgedCompetitionContract } from './competition-submit.js';
 import type { ReplayValidationResult } from './replay-validator.js';
 import { formatHeadToHeadTime } from './format-race-time.js';
 import { isRecord, normalizeName } from './value-guards.js';
+import { checkFixedWindowRateLimit, type RateLimitResult } from './rate-limit.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -236,27 +237,12 @@ function submissionRateLimitIdentity(
 
 async function checkHeadToHeadSubmissionRateLimit(
     identity: string,
-): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number }> {
-    const key = `miniracer:head-to-head:submit-rate-limit:${encodeURIComponent(identity)}`;
-    const attemptCount = await redis.incrBy(key, 1);
-    if (attemptCount === 1) {
-        await redis.expire(key, HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    }
-    if (attemptCount <= HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS) {
-        return { allowed: true };
-    }
-    const expiresAt = await redis.expireTime(key);
-    if (Number.isFinite(expiresAt) && expiresAt > 0) {
-        return {
-            allowed: false,
-            retryAfterSeconds: Math.max(1, expiresAt - Math.floor(Date.now() / 1000)),
-        };
-    }
-    await redis.expire(key, HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS);
-    return {
-        allowed: false,
-        retryAfterSeconds: HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
-    };
+): Promise<RateLimitResult> {
+    return checkFixedWindowRateLimit(
+        `miniracer:head-to-head:submit-rate-limit:${encodeURIComponent(identity)}`,
+        HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS,
+        HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS,
+    );
 }
 
 async function readChallengeCarUnlocks(playerId: string) {
