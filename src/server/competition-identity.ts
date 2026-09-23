@@ -14,7 +14,7 @@ import {
     PAUSE_PLACEMENT_SEPARATE,
     PAUSE_PLACEMENT_TIMER,
     normalizePausePlacement,
-} from '../../game/settings/pause-placement-preference.js';
+} from '../../game/shared/pause-placement.js';
 import {
     normalizeLeaderboardIdentityPreference,
     sanitizeRedditUsername,
