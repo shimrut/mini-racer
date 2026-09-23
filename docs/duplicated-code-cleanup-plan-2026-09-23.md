@@ -91,6 +91,19 @@ The copies have the same text. They hold no stored data and no posted text.
 Each step makes one function with inputs in place of two or more copies. Stored keys and
 posted text must stay the same, byte for byte.
 
+**Low-risk steps done on 2026-09-23 (`433693f`..`407de92`): 3.1, 3.2, 3.3, and 3.8.** The
+suite passes: 237 files, 3,016 tests. Notes:
+
+- New files: `src/server/rate-limit.ts`, `src/server/redis-lock-retry.ts`,
+  `src/server/progress-transfer-reply.ts`, and `game/scoreboard/player-request.js`. The three
+  server files joined the Stryker list.
+- 3.2: the retry function is in its own file, not in `redis-lock.ts`. Four test files mock
+  `redis-lock.js`, and they must still control each lock attempt.
+- 3.9 is skipped. Each handler builds its inputs in a different way, so a shared frame saves
+  about four lines for each handler.
+- Still to do: the medium-risk steps 3.4, 3.5, 3.6, and 3.7. Step 2.4 already merged the
+  name part of 3.5.
+
 | Step | Change | Risk | Size | Check |
 |---|---|---|---|---|
 | 3.1 | One fixed-window rate limit in place of 4 copies (§4b). Each caller keeps its key, limit, and window. | Low | S | Tests of the 4 callers |
