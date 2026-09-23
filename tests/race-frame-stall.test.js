@@ -32,6 +32,7 @@ function createLoopEngine(overrides = {}) {
     requestFrame: vi.fn(),
     update: vi.fn(),
     render: vi.fn(),
+    syncCarEffectsAudioFrame: raceEngineMethods.syncCarEffectsAudioFrame,
     ...overrides,
   };
 }

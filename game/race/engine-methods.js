@@ -229,6 +229,21 @@ export const raceEngineMethods = {
     return target;
   },
 
+  syncCarEffectsAudioFrame() {
+    const cs = this.cachedSpeed;
+    const vx = Math.cos(this.angle);
+    const vy = Math.sin(this.angle);
+    const sideSlip = Math.abs(-vy * this.velocity.x + vx * this.velocity.y);
+    const slipRatio = cs > 0.001 ? sideSlip / cs : 0;
+    this.carEffectsAudio?.syncFrame?.({
+      status: this.status,
+      speed: cs,
+      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      slipRatio,
+      throttleBlocked: this.relaunchDelayRemaining > 0,
+    });
+  },
+
   clearRaceComparisonTarget() {
     const previous = this.raceComparisonTarget;
     this.raceComparisonTarget = null;
@@ -1138,21 +1153,10 @@ export const raceEngineMethods = {
       this.hud.syncHud({ time: this.currentTime, speed: this.cachedSpeed });
     }
 
-    const cs = this.cachedSpeed;
-    const vx = Math.cos(this.angle);
-    const vy = Math.sin(this.angle);
-    const sideSlip = Math.abs(-vy * this.velocity.x + vx * this.velocity.y);
-    const slipRatio = cs > 0.001 ? sideSlip / cs : 0;
-    this.carEffectsAudio?.syncFrame?.({
-      status: this.status,
-      speed: cs,
-      maxSpeedKph: this.runtimeConfig.maxSpeed,
-      slipRatio,
-      throttleBlocked: this.relaunchDelayRemaining > 0,
-    });
+    this.syncCarEffectsAudioFrame();
     this.proceduralMusic?.syncFrame?.({
       status: this.status,
-      speed: cs,
+      speed: this.cachedSpeed,
       maxSpeedKph: this.runtimeConfig.maxSpeed,
     });
 

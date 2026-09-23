@@ -491,18 +491,7 @@ export class RealTimeRacer {
       },
       onCarAudioChanged: (enabled) => {
         this.carEffectsAudio?.setEnabled?.(enabled);
-        const cs = this.cachedSpeed;
-        const vx = Math.cos(this.angle);
-        const vy = Math.sin(this.angle);
-        const sideSlip = Math.abs(-vy * this.velocity.x + vx * this.velocity.y);
-        const slipRatio = cs > 0.001 ? sideSlip / cs : 0;
-        this.carEffectsAudio?.syncFrame?.({
-          status: this.status,
-          speed: cs,
-          maxSpeedKph: this.runtimeConfig.maxSpeed,
-          slipRatio,
-          throttleBlocked: this.relaunchDelayRemaining > 0,
-        });
+        this.syncCarEffectsAudioFrame();
       },
       onMusicChanged: (enabled) => {
         this.proceduralMusic?.setEnabled?.(enabled);
