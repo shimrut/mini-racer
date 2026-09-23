@@ -1,12 +1,9 @@
 import { getTrackName } from '../../game/track/catalog.js';
 import { getRaceMedalThresholds } from '../../game/medals/medal-timing.js';
 import type { DailyGpChallenge } from './daily-gp-model.js';
+import { formatChallengeDate } from './format-race-time.js';
 
 const DEFAULT_DAILY_POST_TITLE_FORMAT = 'Mini Racer, {displayDate}: {trackName}';
-const SHORT_MONTH_NAMES = Object.freeze([
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]);
 
 type DailyPostTitleTokens = {
     authorMedalTime: string;
@@ -39,19 +36,6 @@ function formatSeconds(value: unknown): string {
     return Number.isFinite(seconds) && seconds > 0
         ? `${seconds.toFixed(3)}s`
         : '--';
-}
-
-function formatChallengeDate(value: string, includeYear = false): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!match) return value;
-
-    const [, year, monthText, dayText] = match;
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const monthName = SHORT_MONTH_NAMES[month - 1];
-    if (!monthName || day < 1 || day > 31) return value;
-
-    return `${day} ${monthName}${includeYear ? ` ${year}` : ''}`;
 }
 
 function getChallengeLapCount(challenge: DailyGpChallenge): number {

@@ -29,15 +29,12 @@ import {
     type EncodedDailyPodiumReplay,
 } from './daily-podium-replay.js';
 import { normalizeName } from './value-guards.js';
+import { formatChallengeDate } from './format-race-time.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
 const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
 const SNOOVATAR_CACHE_TTL_SECONDS = 60 * 60;
 const SNOOVATAR_CACHE_KEY_PREFIX = 'mini-racer:snoovatar:v1:';
-const SHORT_MONTH_NAMES = Object.freeze([
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]);
 
 export type DailyPodiumPostResult = {
     created: boolean;
@@ -61,17 +58,6 @@ export function isDailyGpPodiumPublicationOpen(
         && availableUntilMs <= now.getTime()
         && now.getTime() < deadline.getTime()
     );
-}
-
-function formatChallengeDate(value: string, includeYear = false): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if (!match) return value;
-
-    const [, year, monthText, dayText] = match;
-    const monthName = SHORT_MONTH_NAMES[Number(monthText) - 1];
-    const day = Number(dayText);
-    if (!monthName || day < 1 || day > 31) return value;
-    return `${day} ${monthName}${includeYear ? ` ${year}` : ''}`;
 }
 
 function emptyPosition(rank: 1 | 2 | 3): FinalDailyGpPodiumPosition {
