@@ -181,6 +181,16 @@ describe('track runtime integrity', () => {
             'blackWater',
             'ravenRock',
             'sharkBite',
+            'puzzlePiece',
+            'castleWall',
+            'blasterLoop',
+            'canyonFold',
+            'whistleRidge',
+            'monoRail',
+            'anchorPark',
+            'puppetMaster',
+            'sunsetTerrace',
+            'anvilCircuit',
         ]);
         const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -217,12 +227,23 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
             '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
         );
-        const { sharkBite: _sharkBite, ...throughRavenRock } = TRACKS;
-        expect(hashTrackRegistry(throughRavenRock)).toBe(
-            '4f6d9e60b03060b5e82472a02657774ee9d55be71800c7c3880dad06de6b3aa9',
+        const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
+        const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
+        const withoutReshapedOrAdded = Object.fromEntries(
+            Object.entries(TRACKS)
+                .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
+        );
+        expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
+            '6a0f24978e278dbf4f8744d834286dbbf27a8077b7dff22c8f0408adfad13bcb',
+        );
+        const throughSharkBite = Object.fromEntries(
+            Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
+        );
+        expect(hashTrackRegistry(throughSharkBite)).toBe(
+            '736d4932897ae996cffecd6b85c8bd82ac169006639449d97332867de678d52f',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '867f6320ed2aec0af420e22f1f8b7821f8fe96bec8b03efa5cf3b5be814d56e4',
+            '1afc5ad492cac16468e5daed4335dde51cbba0cebd1dc1af80c142cf6842fea1',
         );
     });
 

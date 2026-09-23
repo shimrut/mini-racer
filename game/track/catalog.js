@@ -129,6 +129,16 @@ export const TRACK_CATALOG = {
     blackWater: { name: "Black Water" },
     ravenRock: { name: "Raven Rock" },
     sharkBite: { name: "Shark Bite" },
+    puzzlePiece: { name: "Puzzle Piece" },
+    castleWall: { name: "Castle Wall" },
+    blasterLoop: { name: "Blaster Loop" },
+    canyonFold: { name: "Canyon Fold" },
+    whistleRidge: { name: "Whistle Ridge" },
+    monoRail: { name: "Mono Rail" },
+    anchorPark: { name: "Anchor Park" },
+    puppetMaster: { name: "Puppet Master" },
+    sunsetTerrace: { name: "Sunset Terrace" },
+    anvilCircuit: { name: "Anvil Circuit" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -246,6 +256,16 @@ export const TRACK_SCHEDULE_KEYS = [
     'blackWater',
     'ravenRock',
     'sharkBite',
+    'puzzlePiece',
+    'castleWall',
+    'blasterLoop',
+    'canyonFold',
+    'whistleRidge',
+    'monoRail',
+    'anchorPark',
+    'puppetMaster',
+    'sunsetTerrace',
+    'anvilCircuit',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

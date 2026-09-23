@@ -128,6 +128,16 @@ import slateCircuit from './definitions/slate-circuit.js';
 import blackWater from './definitions/black-water.js';
 import ravenRock from './definitions/raven-rock.js';
 import sharkBite from './definitions/shark-bite.js';
+import puzzlePiece from './definitions/puzzle-piece.js';
+import castleWall from './definitions/castle-wall.js';
+import blasterLoop from './definitions/blaster-loop.js';
+import canyonFold from './definitions/canyon-fold.js';
+import whistleRidge from './definitions/whistle-ridge.js';
+import monoRail from './definitions/mono-rail.js';
+import anchorPark from './definitions/anchor-park.js';
+import puppetMaster from './definitions/puppet-master.js';
+import sunsetTerrace from './definitions/sunset-terrace.js';
+import anvilCircuit from './definitions/anvil-circuit.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -261,6 +271,16 @@ const TRACK_GEOMETRY = {
     blackWater,
     ravenRock,
     sharkBite,
+    puzzlePiece,
+    castleWall,
+    blasterLoop,
+    canyonFold,
+    whistleRidge,
+    monoRail,
+    anchorPark,
+    puppetMaster,
+    sunsetTerrace,
+    anvilCircuit,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

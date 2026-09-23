@@ -116,7 +116,8 @@ automatically in the same tab.
    fingerprint as a subset assertion so adding a track cannot hide changes to
    existing track geometry. The current approved fingerprint includes the
    intentional Mistfall Circuit outer-boundary shape committed in `c4da688`,
-   plus the appended Daily tracks through Shark Bite.
+   the reshaped Double Trouble, Monkey Wrench, and Shark Bite, and the
+   appended Daily tracks through Anvil Circuit.
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 The repository-writing endpoint exists only in the dedicated local Mapmaker
