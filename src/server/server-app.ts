@@ -1,6 +1,6 @@
 import express from 'express';
 import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
-import { isDailyGpChallengePlayable } from './daily-gp-model.js';
+import { isDailyGpChallengePlayable } from './daily/daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
     getServerFinalDailyGpPodium,
@@ -15,11 +15,11 @@ import {
     submitServerDailyGpRun,
     updateServerPlayerIdentity,
     updateServerPlayerPreferences,
-} from './daily-gp-store.js';
+} from './daily/daily-gp-store.js';
 import {
     confirmDailyGpShare,
     previewDailyGpShare,
-} from './daily-gp-share.js';
+} from './daily/daily-gp-share.js';
 import {
     getRequestRateLimitIdentity,
     getRequestAppSlug,
@@ -28,39 +28,39 @@ import {
     readContextPostId,
     readContextPostData,
     readContextSubredditName,
-} from './request-context.js';
-import { getPostBoundDailyGpChallenge } from './post-bound-challenge.js';
+} from './request/request-context.js';
+import { getPostBoundDailyGpChallenge } from './posts/post-bound-challenge.js';
 import {
     enableDailyAutopost,
     ensureDailyMiniRacerPostForSubreddit,
     getDailyGpShareRequestContext,
-} from './daily-post-service.js';
+} from './daily/daily-post-service.js';
 import {
     deleteDailyAutopostSubscription,
     readAllDailyAutopostSubscriptions,
-} from './daily-autopost-store.js';
+} from './daily/daily-autopost-store.js';
 import {
     enableDailyPodiumAutopost,
     ensureDailyMiniRacerPodiumPostForSubreddit,
-} from './daily-podium-service.js';
+} from './podium/daily-podium-service.js';
 import {
     deleteDailyPodiumAutopostSubscription,
     readAllDailyPodiumAutopostSubscriptions,
-} from './daily-podium-autopost-store.js';
-import { ensureMiniRacerLauncherPostForSubreddit } from './launcher-post-service.js';
-import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator-access.js';
-import { recordAnalyticsPodiumEvent } from './analytics-store.js';
-import { getModeratorAnalyticsSummary } from './moderator-analytics-summary.js';
+} from './podium/daily-podium-autopost-store.js';
+import { ensureMiniRacerLauncherPostForSubreddit } from './posts/launcher-post-service.js';
+import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator/moderator-access.js';
+import { recordAnalyticsPodiumEvent } from './moderator/analytics-store.js';
+import { getModeratorAnalyticsSummary } from './moderator/moderator-analytics-summary.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
     resolveAnalyticsToolSubredditName,
-} from './moderator-analytics-post.js';
+} from './moderator/moderator-analytics-post.js';
 import { registerPlayerRoutes } from './routes/player-routes.js';
 import { registerAnalyticsRoutes } from './routes/analytics-routes.js';
 import { registerCompetitionRoutes } from './routes/competition-routes.js';
 import { registerShareRoutes } from './routes/share-routes.js';
 import { registerInternalRoutes } from './routes/internal-routes.js';
-import { sweepHeadToHeadCatalog } from './head-to-head-catalog.js';
+import { sweepHeadToHeadCatalog } from './head-to-head/head-to-head-catalog.js';
 import { registerPbGhostRoutes } from './routes/pb-ghost-routes.js';
 import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
@@ -72,25 +72,25 @@ import {
     getServerCampaignSnapshot,
     startServerCampaignRace,
     submitServerCampaignRun,
-} from './campaign-store.js';
-import { createHeadToHeadService } from './head-to-head-service.js';
+} from './campaign/campaign-store.js';
+import { createHeadToHeadService } from './head-to-head/head-to-head-service.js';
 import {
     confirmHeadToHeadBrag,
     previewHeadToHeadBrag,
-} from './head-to-head-brag.js';
+} from './head-to-head/head-to-head-brag.js';
 import {
     confirmHeadToHeadComment,
     previewHeadToHeadComment,
-} from './head-to-head-comment.js';
+} from './head-to-head/head-to-head-comment.js';
 import {
     readHeadToHeadViewerBest,
     recordHeadToHeadBest,
     resolveHeadToHeadSource,
     validateHeadToHeadReplay,
-} from './head-to-head-runtime.js';
-import { resolveLegacyDailyGpPodiumAvatars } from './daily-podium-avatar-backfill.js';
-import { loadDailyPodiumReplayForPost } from './daily-podium-replay.js';
-import { prepareServerLeaderboardRace } from './leaderboard-race-service.js';
+} from './head-to-head/head-to-head-runtime.js';
+import { resolveLegacyDailyGpPodiumAvatars } from './podium/daily-podium-avatar-backfill.js';
+import { loadDailyPodiumReplayForPost } from './podium/daily-podium-replay.js';
+import { prepareServerLeaderboardRace } from './competition/leaderboard-race-service.js';
 
 const headToHeadService = createHeadToHeadService({
     resolveSource: resolveHeadToHeadSource,

@@ -19,7 +19,7 @@ const {
     releaseDailyGpPostCreationLock,
     writeDailyGpPostRecord,
     writeDailyGpPostRecordIfAbsent,
-} = await import('../src/server/daily-gp-post-store.ts');
+} = await import('../src/server/daily/daily-gp-post-store.ts');
 
 describe('daily GP post store', () => {
     beforeEach(() => {

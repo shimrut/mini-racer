@@ -12,10 +12,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@devvit/redis', () => ({ redis: mocks.redis }));
-vi.mock('../src/server/daily-gp-store.js', () => ({
+vi.mock('../src/server/daily/daily-gp-store.js', () => ({
     prepareServerDailyLeaderboardRace: mocks.prepareDaily,
 }));
-vi.mock('../src/server/campaign-store.js', () => ({
+vi.mock('../src/server/campaign/campaign-store.js', () => ({
     prepareServerCampaignLeaderboardRace: mocks.prepareCampaign,
 }));
 
@@ -30,7 +30,7 @@ describe('leaderboard opponent race server contract', () => {
     });
 
     it('dispatches Daily preparation after applying a trusted per-competition rate limit', async () => {
-        const { prepareServerLeaderboardRace } = await import('../src/server/leaderboard-race-service.ts');
+        const { prepareServerLeaderboardRace } = await import('../src/server/competition/leaderboard-race-service.ts');
         const input = {
             mode: 'daily',
             challengeId: 'daily-gp-2026-07-27',
@@ -50,7 +50,7 @@ describe('leaderboard opponent race server contract', () => {
     });
 
     it('rejects missing trusted identity and returns rate-limit retry metadata', async () => {
-        const { prepareServerLeaderboardRace } = await import('../src/server/leaderboard-race-service.ts');
+        const { prepareServerLeaderboardRace } = await import('../src/server/competition/leaderboard-race-service.ts');
         await expect(prepareServerLeaderboardRace({
             mode: 'campaign',
             raceId: 'numbered-v1-00',

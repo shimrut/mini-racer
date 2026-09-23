@@ -4,7 +4,7 @@ import {
   createRedisChallengeEntryHashKey,
   createRedisChallengeLeaderboardKey,
   encodeDailyGpLeaderboardScore,
-} from "../src/server/daily-gp-model.ts";
+} from "../src/server/daily/daily-gp-model.ts";
 import { RedisTestDouble } from "./redis-test-double.js";
 
 const redis = new RedisTestDouble();
@@ -15,8 +15,8 @@ vi.mock("@devvit/redis", () => ({
   redisCompressed: redis,
 }));
 
-vi.mock("../src/server/replay-validator.ts", async () => {
-  const actual = await vi.importActual("../src/server/replay-validator.ts");
+vi.mock("../src/server/competition/replay-validator.ts", async () => {
+  const actual = await vi.importActual("../src/server/competition/replay-validator.ts");
   actualValidateDailyGpReplayDetailed = actual.validateDailyGpReplayDetailed;
   return {
     ...actual,
@@ -33,9 +33,9 @@ const {
   submitServerDailyGpRun,
   updateServerPlayerIdentity,
   updateServerPlayerPreferences,
-} = await import("../src/server/daily-gp-store.ts");
-const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
-const { validateDailyGpReplayDetailed } = await import("../src/server/replay-validator.ts");
+} = await import("../src/server/daily/daily-gp-store.ts");
+const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
+const { validateDailyGpReplayDetailed } = await import("../src/server/competition/replay-validator.ts");
 
 const validateDailyGpReplayDetailedMock = vi.mocked(validateDailyGpReplayDetailed);
 
@@ -718,7 +718,7 @@ describe("daily-gp-store submission hardening", () => {
   });
 
   it("resolves today's playable challenge even when it has not been written to the ledger yet", async () => {
-    const { getServerDailyGpPlayableChallenge } = await import("../src/server/daily-gp-store.ts");
+    const { getServerDailyGpPlayableChallenge } = await import("../src/server/daily/daily-gp-store.ts");
     const challenge = await getServerDailyGpChallenge();
     const playable = await getServerDailyGpPlayableChallenge(challenge.id);
 
@@ -788,9 +788,9 @@ describe("daily-gp-store submission hardening", () => {
   });
 });
 
-const carUnlockStore = await import("../src/server/car-unlock-store.ts");
-const leaderboard = await import("../src/server/competition-leaderboard.ts");
-const identityStore = await import("../src/server/competition-identity.ts");
+const carUnlockStore = await import("../src/server/player/car-unlock-store.ts");
+const leaderboard = await import("../src/server/competition/competition-leaderboard.ts");
+const identityStore = await import("../src/server/competition/competition-identity.ts");
 
 describe("Daily finish after the run is saved", () => {
   beforeEach(() => {

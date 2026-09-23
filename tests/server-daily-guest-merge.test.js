@@ -5,7 +5,7 @@ import {
     DAY_MS,
     formatUtcChallengeDate,
     getUtcDayIndex,
-} from '../src/server/daily-gp-model.ts';
+} from '../src/server/daily/daily-gp-model.ts';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 
 function getTodayChallengeIdForTest() {
@@ -169,7 +169,7 @@ describe('mergeGuestDailyProgress', () => {
         const {
             cleanupGuestDailyProgress,
             mergeGuestDailyProgress,
-        } = await import('../src/server/daily-gp-store.ts');
+        } = await import('../src/server/daily/daily-gp-store.ts');
         const result = await mergeGuestDailyProgress({
             guestPlayerId,
             redditPlayerId,
@@ -231,7 +231,7 @@ describe('mergeGuestDailyProgress', () => {
         });
         mockRedis.zScore.mockResolvedValue(8000);
 
-        const { mergeGuestDailyProgress } = await import('../src/server/daily-gp-store.ts');
+        const { mergeGuestDailyProgress } = await import('../src/server/daily/daily-gp-store.ts');
         const result = await mergeGuestDailyProgress({
             guestPlayerId,
             redditPlayerId,

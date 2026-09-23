@@ -6,8 +6,8 @@ import {
 } from '../game/track/catalog.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } from '../game/shared/daily-gp-history-backfill.js';
-import { getBackfilledDailyGpChallenge } from '../src/server/daily-gp-history-backfill.ts';
-import { CAMPAIGN_GUEST_TTL_SECONDS } from '../src/server/competition.ts';
+import { getBackfilledDailyGpChallenge } from '../src/server/daily/daily-gp-history-backfill.ts';
+import { CAMPAIGN_GUEST_TTL_SECONDS } from '../src/server/competition/competition.ts';
 import {
     buildDailyGpChallengeForDayIndexWithTrack,
     createDailyChallengeId,
@@ -31,7 +31,7 @@ import {
     isDailyGpChallengePlayable,
     normalizeDailyGpRaceContract,
     selectDailyGpLapCount,
-} from '../src/server/daily-gp-model.ts';
+} from '../src/server/daily/daily-gp-model.ts';
 
 describe('reddit daily gp model', () => {
     it('pins retention and window constants to exact second/ms budgets', () => {

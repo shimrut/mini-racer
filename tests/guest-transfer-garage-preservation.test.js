@@ -6,15 +6,15 @@ const redis = new RedisTestDouble();
 vi.mock("@devvit/redis", () => ({ redis, redisCompressed: redis }));
 
 const { getGuestProgressSelection, selectGuestProgress } =
-  await import("../src/server/daily-gp-store.ts");
+  await import("../src/server/daily/daily-gp-store.ts");
 const {
   carUnlockHashKey,
   recordCompletedRace,
   recordHeadToHeadPost,
   recordHeadToHeadWin,
   settleOwedRewards,
-} = await import("../src/server/car-unlock-store.ts");
-const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
+} = await import("../src/server/player/car-unlock-store.ts");
+const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
 
 const accountHash = (playerId) => createHash("sha256").update(playerId, "utf8").digest("base64url");
 const baselineKey = (playerId) => `miniracer:car-unlocks:transfer-baseline:v1:${accountHash(playerId)}`;

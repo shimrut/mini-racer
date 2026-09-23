@@ -9,7 +9,7 @@ import {
     createTrackFingerprint,
     getPbGhostTraceSampleCount,
     isValidPbGhostTrace,
-} from '../src/server/pb-ghost-trace.ts';
+} from '../src/server/competition/pb-ghost-trace.ts';
 import { TRACKS } from '../game/track/tracks.js';
 
 function validTrace(overrides = {}) {

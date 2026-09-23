@@ -12,7 +12,7 @@ import {
     recordHeadToHeadWin,
     retireEmptyGuestIdentity,
     settleOwedRewards,
-} from '../src/server/car-unlock-store.ts';
+} from '../src/server/player/car-unlock-store.ts';
 import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
 
 function createRedisMock() {

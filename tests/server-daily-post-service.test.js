@@ -38,18 +38,18 @@ const {
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
-vi.mock('../src/server/daily-gp-share.js', () => mockShare);
-vi.mock('../src/server/daily-gp-post-store.js', () => mockPostStore);
-vi.mock('../src/server/daily-autopost-store.js', () => mockAutopostStore);
-vi.mock('../src/server/request-context.js', () => mockContext);
-vi.mock('../src/server/share-image.js', () => mockShareImage);
-vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
+vi.mock('../src/server/daily/daily-gp-share.js', () => mockShare);
+vi.mock('../src/server/daily/daily-gp-post-store.js', () => mockPostStore);
+vi.mock('../src/server/daily/daily-autopost-store.js', () => mockAutopostStore);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
+vi.mock('../src/server/posts/share-image.js', () => mockShareImage);
+vi.mock('../src/server/posts/post-flair-service.js', () => mockPostFlair);
 
 const {
     enableDailyAutopost,
     ensureDailyMiniRacerPostForSubreddit,
     getDailyGpShareRequestContext,
-} = await import('../src/server/daily-post-service.ts');
+} = await import('../src/server/daily/daily-post-service.ts');
 
 const challenge = {
     id: 'daily-gp-2026-07-16',

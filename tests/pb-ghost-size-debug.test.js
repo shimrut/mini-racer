@@ -6,7 +6,7 @@ import {
   measurePbGhostStorage,
   PbGhostSizeCapture,
 } from '../game/ghost/pb-ghost-size-debug.js';
-import { createPbGhostTraceRecorder } from '../src/server/pb-ghost-trace.ts';
+import { createPbGhostTraceRecorder } from '../src/server/competition/pb-ghost-trace.ts';
 
 function pose(timeSec, x, y = 0, angle = 0) {
   return {

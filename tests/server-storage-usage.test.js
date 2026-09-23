@@ -46,7 +46,7 @@ vi.mock('@devvit/web/server', () => ({
     context: {},
 }));
 
-const { getServerStorageUsage } = await import('../src/server/storage-usage.ts');
+const { getServerStorageUsage } = await import('../src/server/moderator/storage-usage.ts');
 const { CAMPAIGN_ID } = await import('../game/campaign/manifest.js');
 
 const SUBREDDIT = 'mini_racer';

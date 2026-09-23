@@ -3,7 +3,7 @@ import {
     isValidPbGhostTrace,
     PB_GHOST_SAMPLE_INTERVAL_MS,
     PB_GHOST_SCHEMA_VERSION,
-} from '../src/server/pb-ghost-trace.ts';
+} from '../src/server/competition/pb-ghost-trace.ts';
 
 function validTrace(overrides = {}) {
     return {

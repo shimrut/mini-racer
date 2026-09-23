@@ -1,6 +1,6 @@
 import type { Application } from 'express';
-import type { DailyGpPodiumAvatarPosition } from '../daily-podium-avatar-backfill.js';
-import type { DailyPodiumReplayEnvelope } from '../daily-podium-replay.js';
+import type { DailyGpPodiumAvatarPosition } from '../podium/daily-podium-avatar-backfill.js';
+import type { DailyPodiumReplayEnvelope } from '../podium/daily-podium-replay.js';
 
 export type PodiumRouteDependencies = {
     readContextPostId(): string | null;

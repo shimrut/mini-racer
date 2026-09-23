@@ -20,24 +20,24 @@ const {
   getServerDailyGpChallenge,
   getServerDailyGpPlaylist,
   selectGuestProgress,
-} = await import("../src/server/daily-gp-store.ts");
-const { startServerCampaignRace } = await import("../src/server/campaign-store.ts");
-const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
-const { recordCompletedRace } = await import("../src/server/car-unlock-store.ts");
-const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
+} = await import("../src/server/daily/daily-gp-store.ts");
+const { startServerCampaignRace } = await import("../src/server/campaign/campaign-store.ts");
+const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
+const { recordCompletedRace } = await import("../src/server/player/car-unlock-store.ts");
+const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
 const {
     guestProgressSelectionAccountPendingKey,
     guestProgressSelectionPendingKey,
     isPlayerProgressSelectionPending,
-} = await import("../src/server/guest-retirement.ts");
-const { resolveAuthorizedPlayerIdentity } = await import("../src/server/competition-identity.ts");
-const { discardGuestCampaignProgress } = await import("../src/server/campaign-store.ts");
-const { discardGuestDailyProgress } = await import("../src/server/daily-gp-store.ts");
-const { toDailyCompetition } = await import("../src/server/competition.ts");
-const { upsertPlayerTrackPersonalBest } = await import("../src/server/pb-ghost-store.ts");
+} = await import("../src/server/player/guest-retirement.ts");
+const { resolveAuthorizedPlayerIdentity } = await import("../src/server/competition/competition-identity.ts");
+const { discardGuestCampaignProgress } = await import("../src/server/campaign/campaign-store.ts");
+const { discardGuestDailyProgress } = await import("../src/server/daily/daily-gp-store.ts");
+const { toDailyCompetition } = await import("../src/server/competition/competition.ts");
+const { upsertPlayerTrackPersonalBest } = await import("../src/server/competition/pb-ghost-store.ts");
 const { TRACKS } = await import("../game/track/tracks.js");
 const { CAMPAIGN_STAGES } = await import("../game/campaign/manifest.js");
-const { toCampaignCompetition } = await import("../src/server/competition.ts");
+const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 
 afterEach(() => {
   vi.restoreAllMocks();

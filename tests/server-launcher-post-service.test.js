@@ -16,12 +16,12 @@ const {
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
-vi.mock('../src/server/launcher-post-store.js', () => mockStore);
-vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/posts/launcher-post-store.js', () => mockStore);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
 
 const {
     ensureMiniRacerLauncherPostForSubreddit,
-} = await import('../src/server/launcher-post-service.ts');
+} = await import('../src/server/posts/launcher-post-service.ts');
 
 describe('launcher post service', () => {
     beforeEach(() => {

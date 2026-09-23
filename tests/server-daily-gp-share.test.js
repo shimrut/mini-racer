@@ -72,11 +72,11 @@ const challenge = {
 
 vi.mock('@devvit/redis', () => ({ redis }));
 vi.mock('@devvit/web/server', () => ({ reddit }));
-vi.mock('../src/server/daily-gp-store.js', () => ({
+vi.mock('../src/server/daily/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: vi.fn(async () => challenge),
     getServerDailyGpPlayerBest: vi.fn(async () => ({ challenge, bestTimeMs: 42380 })),
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: vi.fn(() => ({
         ok: true,
         run: { bestTimeMs: 42380, bestTimeSec: 42.38 },
@@ -85,8 +85,8 @@ vi.mock('../src/server/replay-validator.js', () => ({
 
 const {
     getServerDailyGpPlayerBest,
-} = await import('../src/server/daily-gp-store.js');
-const { validateDailyGpReplayDetailed } = await import('../src/server/replay-validator.js');
+} = await import('../src/server/daily/daily-gp-store.js');
+const { validateDailyGpReplayDetailed } = await import('../src/server/competition/replay-validator.js');
 const {
     DAILY_GP_SCORE_THREAD_TEXT,
     confirmDailyGpShare,
@@ -95,7 +95,7 @@ const {
     previewDailyGpShare,
     registerDailyGpPost,
     registerDailyGpPostWithScoreThread,
-} = await import('../src/server/daily-gp-share.ts');
+} = await import('../src/server/daily/daily-gp-share.ts');
 
 const requestContext = {
     username: 'RaceFan',
@@ -970,7 +970,7 @@ describe('daily GP result sharing', () => {
     });
 
     it('reports no verified result when the finished challenge cannot be found', async () => {
-        const { getServerDailyGpPlayableChallenge } = await import('../src/server/daily-gp-store.js');
+        const { getServerDailyGpPlayableChallenge } = await import('../src/server/daily/daily-gp-store.js');
         getServerDailyGpPlayableChallenge.mockResolvedValueOnce(null);
 
         expect(await previewDailyGpShare({

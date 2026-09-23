@@ -17,7 +17,7 @@ vi.mock('@devvit/web/server', () => ({
     reddit: mockReddit,
     redis: mockRedis,
 }));
-vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
 
 describe('moderator analytics post', () => {
     beforeEach(() => {
@@ -37,7 +37,7 @@ describe('moderator analytics post', () => {
         });
         const {
             ensureModeratorAnalyticsPostForSubreddit,
-        } = await import('../src/server/moderator-analytics-post.ts');
+        } = await import('../src/server/moderator/moderator-analytics-post.ts');
 
         await expect(ensureModeratorAnalyticsPostForSubreddit('MiniRacer')).resolves.toEqual({
             created: false,
@@ -63,7 +63,7 @@ describe('moderator analytics post', () => {
         mockReddit.submitCustomPost.mockResolvedValue(post);
         const {
             ensureModeratorAnalyticsPostForSubreddit,
-        } = await import('../src/server/moderator-analytics-post.ts');
+        } = await import('../src/server/moderator/moderator-analytics-post.ts');
 
         await expect(ensureModeratorAnalyticsPostForSubreddit('MiniRacer')).resolves.toEqual({
             created: true,
@@ -80,7 +80,7 @@ describe('moderator analytics post', () => {
     it('resolves the tool subreddit from context or post data', async () => {
         const {
             resolveAnalyticsToolSubredditName,
-        } = await import('../src/server/moderator-analytics-post.ts');
+        } = await import('../src/server/moderator/moderator-analytics-post.ts');
 
         mockContext.readContextSubredditName.mockReturnValue('FromContext');
         await expect(resolveAnalyticsToolSubredditName()).resolves.toBe('FromContext');

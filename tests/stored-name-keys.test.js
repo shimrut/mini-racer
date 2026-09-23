@@ -13,7 +13,7 @@ const { mockRedis, lockKeys } = vi.hoisted(() => ({
 }));
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
-vi.mock('../src/server/redis-lock.js', () => ({
+vi.mock('../src/server/redis/redis-lock.js', () => ({
     acquireRedisLock: vi.fn(async (key) => {
         lockKeys.push(key);
         return { key, value: 'lock', ttlMs: 1 };
@@ -24,20 +24,20 @@ vi.mock('../src/server/redis-lock.js', () => ({
 const {
     acquireDailyGpPostCreationLock,
     createPostRecordKey,
-} = await import('../src/server/daily-gp-post-store.ts');
+} = await import('../src/server/daily/daily-gp-post-store.ts');
 const {
     acquireDailyGpPodiumPostCreationLock,
     createPodiumPostRecordKey,
     readDailyGpPodiumPendingSnapshot,
-} = await import('../src/server/daily-podium-post-store.ts');
+} = await import('../src/server/podium/daily-podium-post-store.ts');
 const {
     acquireLauncherPostCreationLock,
     LAUNCHER_POSTS_KEY,
     readLauncherPostRecord,
-} = await import('../src/server/launcher-post-store.ts');
-const { headToHeadShareResultKey } = await import('../src/server/head-to-head-share.ts');
-const { headToHeadCatalogCardsKey } = await import('../src/server/head-to-head-catalog.ts');
-const { readHeadToHeadPostIdentity } = await import('../src/server/head-to-head-store.ts');
+} = await import('../src/server/posts/launcher-post-store.ts');
+const { headToHeadShareResultKey } = await import('../src/server/head-to-head/head-to-head-share.ts');
+const { headToHeadCatalogCardsKey } = await import('../src/server/head-to-head/head-to-head-catalog.ts');
+const { readHeadToHeadPostIdentity } = await import('../src/server/head-to-head/head-to-head-store.ts');
 
 const SUBREDDIT = '  MiniRacerGame ';
 

@@ -5,7 +5,7 @@ import {
     decodeDailyPodiumReplay,
     encodeDailyPodiumReplay,
     resolveDailyPodiumReplayFromPost,
-} from '../src/server/daily-podium-replay.ts';
+} from '../src/server/podium/daily-podium-replay.ts';
 
 const ghost = {
     schemaVersion: 2,

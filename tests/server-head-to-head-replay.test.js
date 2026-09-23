@@ -5,7 +5,7 @@ import {
     decodeHeadToHeadReplay,
     encodeHeadToHeadReplay,
     formatHeadToHeadTextFallback,
-} from '../src/server/head-to-head-replay.ts';
+} from '../src/server/head-to-head/head-to-head-replay.ts';
 
 const postData = {
     postType: 'head-to-head',

@@ -11,19 +11,19 @@ vi.mock('@devvit/web/server', () => ({
     cache: vi.fn(),
     context: undefined,
 }));
-vi.mock('../src/server/daily-podium-autopost-store.js', () => ({
+vi.mock('../src/server/podium/daily-podium-autopost-store.js', () => ({
     readDailyPodiumAutopostSubscription: vi.fn(),
     upsertDailyPodiumAutopostSubscription: vi.fn(),
 }));
-vi.mock('../src/server/daily-podium-post-store.js', () => ({
+vi.mock('../src/server/podium/daily-podium-post-store.js', () => ({
     acquireDailyGpPodiumPostCreationLock: vi.fn(),
     readDailyGpPodiumPostRecord: vi.fn(),
     releaseDailyGpPodiumPostCreationLock: vi.fn(),
 }));
-vi.mock('../src/server/request-context.js', () => ({ getRequestAppSlug: vi.fn() }));
+vi.mock('../src/server/request/request-context.js', () => ({ getRequestAppSlug: vi.fn() }));
 
 const { resolveLegacyDailyGpPodiumAvatars } = await import(
-    '../src/server/daily-podium-avatar-backfill.ts'
+    '../src/server/podium/daily-podium-avatar-backfill.ts'
 );
 
 describe('legacy daily podium avatar backfill', () => {

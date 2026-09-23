@@ -10,16 +10,16 @@ const {
   getServerDailyGpChallenge,
   getServerPlayerBootstrap,
   selectGuestProgress,
-} = await import("../src/server/daily-gp-store.ts");
+} = await import("../src/server/daily/daily-gp-store.ts");
 const { recordCompletedRace, retireEmptyGuestIdentity } =
-  await import("../src/server/car-unlock-store.ts");
-const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
-const { toDailyCompetition } = await import("../src/server/competition.js");
-const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
+  await import("../src/server/player/car-unlock-store.ts");
+const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
+const { toDailyCompetition } = await import("../src/server/competition/competition.js");
+const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
 const {
   guestProgressSelectionPendingKey,
   guestProgressSelectionAccountPendingKey,
-} = await import("../src/server/guest-retirement.ts");
+} = await import("../src/server/player/guest-retirement.ts");
 
 function selectionKey(guestPlayerId, redditPlayerId) {
   return `dailygp:guest-progress-selection:v1:${createHash("sha256")

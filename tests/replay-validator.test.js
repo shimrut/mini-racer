@@ -3,8 +3,8 @@ import {
     MAX_REPLAY_FRAMES,
     REPLAY_FRAMES_PER_LAP,
     validateDailyGpReplayDetailed,
-} from '../src/server/replay-validator.ts';
-import { isValidPbGhostTrace } from '../src/server/pb-ghost-trace.ts';
+} from '../src/server/competition/replay-validator.ts';
+import { isValidPbGhostTrace } from '../src/server/competition/pb-ghost-trace.ts';
 
 const CHALLENGE = {
     id: 'daily-gp-2026-05-06',

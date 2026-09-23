@@ -106,7 +106,7 @@ vi.mock('@devvit/web/server', () => ({
     cache: vi.fn(),
     context: undefined,
 }));
-vi.mock('../src/server/post-flair-service.js', () => ({
+vi.mock('../src/server/posts/post-flair-service.js', () => ({
     resolveMiniRacerPostFlairId: mockResolveMiniRacerPostFlairId,
 }));
 
@@ -114,13 +114,13 @@ const {
     createHeadToHeadService,
     formatHeadToHeadTitle,
     HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_MAX_REQUESTS,
-} = await import('../src/server/head-to-head-service.ts');
+} = await import('../src/server/head-to-head/head-to-head-service.ts');
 const {
     resolveHeadToHeadRecordResult,
-} = await import('../src/server/head-to-head-post.ts');
+} = await import('../src/server/head-to-head/head-to-head-post.ts');
 const {
     guestProgressSelectionAccountPendingKey,
-} = await import('../src/server/guest-retirement.ts');
+} = await import('../src/server/player/guest-retirement.ts');
 const context = {
     username: 'RaceFan',
     userId: 't2_racefan',
@@ -313,7 +313,7 @@ describe('head-to-head service', () => {
     });
 
     it('loads a newly created Daily challenge when the viewer request has no post context', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const service = createHeadToHeadService({
             resolveSource: vi.fn(async () => dailySource()),
             validateReplay: vi.fn(),
@@ -577,7 +577,7 @@ describe('head-to-head service', () => {
 
     it('creates and loads a challenge from every Campaign stage, including the last ones', async () => {
         const { CAMPAIGN_STAGES } = await import('../game/campaign/manifest.js');
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const viewer = {
             subredditName: context.subredditName,
             playerId: 'campaign-h2h-racer',
@@ -1095,7 +1095,7 @@ describe('head-to-head service', () => {
         }
 
         it('still answers the win, without a brag button, when the brag record fails', async () => {
-            const store = await import('../src/server/head-to-head-store.ts');
+            const store = await import('../src/server/head-to-head/head-to-head-store.ts');
             const won = await winWith(async () => vi.spyOn(store, 'writeHeadToHeadAccept')
                 .mockRejectedValueOnce(new Error('brag record failed')));
 
@@ -1105,7 +1105,7 @@ describe('head-to-head service', () => {
         });
 
         it('still answers the win when the rewards fail', async () => {
-            const unlockStore = await import('../src/server/car-unlock-store.ts');
+            const unlockStore = await import('../src/server/player/car-unlock-store.ts');
             const won = await winWith(async () => vi.spyOn(unlockStore, 'recordHeadToHeadWin')
                 .mockRejectedValueOnce(new Error('reward busy')));
 
@@ -1115,7 +1115,7 @@ describe('head-to-head service', () => {
         });
 
         it('still answers the win, without a Garage, when the Garage read fails', async () => {
-            const unlockStore = await import('../src/server/car-unlock-store.ts');
+            const unlockStore = await import('../src/server/player/car-unlock-store.ts');
             const won = await winWith(async () => vi.spyOn(unlockStore, 'getCarUnlockSnapshot')
                 .mockRejectedValueOnce(new Error('garage unavailable')));
 
@@ -1222,7 +1222,7 @@ describe('head-to-head service', () => {
     });
 
     it('lets a guest load and submit a challenge result', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const service = makeService({ validatedTimeMs: 25_000 });
         const created = await createChallenge(service);
         const guestPlayerId = 'guest:h2h-racer';
@@ -1303,7 +1303,7 @@ describe('head-to-head service', () => {
     });
 
     it('uses the server-derived request identity so rotating guest IDs cannot reset the limit', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const validateReplay = vi.fn(async () => ({
             ok: true,
             bestTimeMs: 25_000,

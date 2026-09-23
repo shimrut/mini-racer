@@ -97,8 +97,8 @@ const {
     sweepHeadToHeadCatalog,
     catalogHeadToHeadSize,
     readHeadToHeadCatalogCard,
-} = await import('../src/server/head-to-head-catalog.ts');
-const { createTrackFingerprint } = await import('../src/server/pb-ghost-trace.ts');
+} = await import('../src/server/head-to-head/head-to-head-catalog.ts');
+const { createTrackFingerprint } = await import('../src/server/competition/pb-ghost-trace.ts');
 
 const TRACK_KEY = Object.keys(TRACKS)[0];
 const OTHER_TRACK_KEY = Object.keys(TRACKS)[1];

@@ -21,7 +21,7 @@ const {
     releaseDailyGpPodiumPostCreationLock,
     writeDailyGpPodiumPostRecordIfAbsent,
     writeDailyGpPodiumPendingSnapshot,
-} = await import('../src/server/daily-podium-post-store.ts');
+} = await import('../src/server/podium/daily-podium-post-store.ts');
 
 describe('daily podium post store', () => {
     beforeEach(() => {

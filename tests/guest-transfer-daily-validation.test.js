@@ -16,20 +16,20 @@ const {
   mergeGuestDailyProgress,
   resolveAccountTransferState,
   selectGuestProgress,
-} = await import("../src/server/daily-gp-store.ts");
-const { toDailyCompetition } = await import("../src/server/competition.ts");
+} = await import("../src/server/daily/daily-gp-store.ts");
+const { toDailyCompetition } = await import("../src/server/competition/competition.ts");
 const {
   recordCompletedRace,
   recordHeadToHeadWin,
   carUnlockHashKey,
-} = await import("../src/server/car-unlock-store.ts");
-const { upsertPlayerProfile } = await import("../src/server/competition-identity.ts");
-const { mintGuestPlayerToken } = await import("../src/server/player-token.ts");
-const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
+} = await import("../src/server/player/car-unlock-store.ts");
+const { upsertPlayerProfile } = await import("../src/server/competition/competition-identity.ts");
+const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
+const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
 const {
   guestProgressSelectionAccountPendingKey,
   guestProgressSelectionPendingKey,
-} = await import("../src/server/guest-retirement.ts");
+} = await import("../src/server/player/guest-retirement.ts");
 
 function selectionKey(guestPlayerId, redditPlayerId) {
   return `dailygp:guest-progress-selection:v1:${createHash("sha256")

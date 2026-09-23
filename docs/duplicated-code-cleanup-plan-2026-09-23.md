@@ -68,7 +68,7 @@ passes: 236 files, 3,011 tests. Differences from the plan:
 The local play-check (carousels, podium, replay view, analytics) and the playtest on
 r/mini_racer_dev (finish times, Head to Head, sharing) found no problem. Differences from the plan:
 
-- New shared files: `src/server/value-guards.ts`, `game/shared/values.js`, and
+- New shared files: `src/server/shared/value-guards.ts`, `game/shared/values.js`, and
   `game/ui/dom.js`. The first two joined the Stryker list, because they hold code from
   mutated files.
 - 2.3 shares all three preview car callbacks, not only the size.
@@ -94,8 +94,8 @@ posted text must stay the same, byte for byte.
 **Low-risk steps done on 2026-09-23 (`433693f`..`407de92`): 3.1, 3.2, 3.3, and 3.8.** The
 suite passes: 237 files, 3,016 tests. Notes:
 
-- New files: `src/server/rate-limit.ts`, `src/server/redis-lock-retry.ts`,
-  `src/server/progress-transfer-reply.ts`, and `game/scoreboard/player-request.js`. The three
+- New files: `src/server/request/rate-limit.ts`, `src/server/redis/redis-lock-retry.ts`,
+  `src/server/guest-transfer/progress-transfer-reply.ts`, and `game/scoreboard/player-request.js`. The three
   server files joined the Stryker list.
 - 3.2: the retry function is in its own file, not in `redis-lock.ts`. Four test files mock
   `redis-lock.js`, and they must still control each lock attempt.
@@ -125,7 +125,7 @@ plain JavaScript.
 replay validator. Findings that change the steps:
 
 - The server makes every ghost. The client sends only its inputs, and
-  `src/server/replay-validator.ts` records the ghost while it replays them. The client decoder
+  `src/server/competition/replay-validator.ts` records the ghost while it replays them. The client decoder
   only reads ghosts that the server made. The shared check must keep the server's rules and
   must not become looser.
 - 4.2: the server measures the ghost size in UTF-8 bytes with `Buffer`, which the browser does
@@ -216,13 +216,13 @@ After each step the esbuild bundle check and the suite in a clean worktree pass:
 - 5.4: `showDailyVerificationState` in `game/scoreboard/engine-methods.js` replaces 7 of the
   10 blocks. It is a module function, not an engine method. The other 3 only refresh the card,
   and one more block updates the leaderboard before it refreshes the card, so they stay.
-- 4.4: `formatChallengeDate` moves to `src/server/format-race-time.ts`.
+- 4.4: `formatChallengeDate` moves to `src/server/shared/format-race-time.ts`.
   `game/shared/reddit-avatar.js` holds the avatar host check. `game/shared/utc-day.js` holds
   `DAY_MS` (5 copies), `getUtcDayStart` (3), and `getUtcDayIndex` (2). `preview.js` and
   `reddit-post-title.ts` use `getDailyChallengeRequiredLaps`.
 - 4.5: `game/shared/race-time-text.js`. `tests/race-time-text.test.js` pins the lobby text
   and the podium post text, and it passed before the change.
-- 5.5: `startLeaseRenewal` in `src/server/redis-lock.ts`.
+- 5.5: `startLeaseRenewal` in `src/server/redis/redis-lock.ts`.
 - New files in the Stryker list: `format-race-time.ts`, `reddit-avatar.js`, `utc-day.js`,
   `race-time-text.js`.
 
@@ -247,7 +247,7 @@ The Daily race play-check passed in the playtest on 2026-09-23, and the dev serv
 **Progress (2026-09-23):** 4.3 is done in `5ce015d`. The recorder moved unchanged into
 `game/shared/pb-ghost-recorder.js`. The server wraps it and still validates each trace, and the
 debug size tool uses it directly. Before and after the move, 1,500 random drives gave the same
-traces from both recorders. 3.4 is done in `41546d8`: `src/server/autopost-subscription-store.ts`
+traces from both recorders. 3.4 is done in `41546d8`: `src/server/posts/autopost-subscription-store.ts`
 serves both stores. Each store keeps its Redis key, lock key prefix, messages, and exported
 names. The old and new stores gave the same lock keys, writes, errors, and log lines in 21 cases
 each. Both new files joined the Stryker mutate list.

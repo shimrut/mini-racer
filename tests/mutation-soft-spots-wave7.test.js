@@ -5,18 +5,18 @@ import {
     normalizePlayerPreferences,
     parseStoredChallenge,
     parseStoredEntry,
-} from '../src/server/daily-gp-store.ts';
+} from '../src/server/daily/daily-gp-store.ts';
 import {
     parseStoredPlayerProfile,
     salvagePlayerPreferences,
-} from '../src/server/competition-identity.ts';
+} from '../src/server/competition/competition-identity.ts';
 import {
     formatDailyGpShareComment,
     getValidShareRequestContext,
     normalizeShareName,
     parseSharePreviewRecord,
     parseShareSharedResult,
-} from '../src/server/daily-gp-share.ts';
+} from '../src/server/daily/daily-gp-share.ts';
 
 const VALID_CHALLENGE = {
     id: 'daily-gp-2026-07-11',

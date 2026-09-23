@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
-import { PB_GHOST_SAMPLE_INTERVAL_MS } from '../src/server/pb-ghost-trace.ts';
+import { PB_GHOST_SAMPLE_INTERVAL_MS } from '../src/server/competition/pb-ghost-trace.ts';
 
 vi.mock('@devvit/redis', async () => {
     const { RedisTestDouble } = await import('./redis-test-double.js');
@@ -26,11 +26,11 @@ vi.mock('@devvit/redis', async () => {
 });
 
 import { redis } from '@devvit/redis';
-import { toCampaignCompetition, toDailyCompetition } from '../src/server/competition.ts';
-import { createRedisPlayerProfileKey } from '../src/server/competition-identity.ts';
-import { getPlayerTrackPbRecords, upsertPlayerTrackPersonalBest } from '../src/server/pb-ghost-store.ts';
-import { getServerDailyGpChallenge } from '../src/server/daily-gp-store.ts';
-import { prepareServerLeaderboardRace } from '../src/server/leaderboard-race-service.ts';
+import { toCampaignCompetition, toDailyCompetition } from '../src/server/competition/competition.ts';
+import { createRedisPlayerProfileKey } from '../src/server/competition/competition-identity.ts';
+import { getPlayerTrackPbRecords, upsertPlayerTrackPersonalBest } from '../src/server/competition/pb-ghost-store.ts';
+import { getServerDailyGpChallenge } from '../src/server/daily/daily-gp-store.ts';
+import { prepareServerLeaderboardRace } from '../src/server/competition/leaderboard-race-service.ts';
 import { opponentRaceEngineMethods } from '../game/scoreboard/opponent-race-engine-methods.js';
 import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 

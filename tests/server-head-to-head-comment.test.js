@@ -44,11 +44,11 @@ const {
     formatChallengeComment,
     previewHeadToHeadComment,
     confirmHeadToHeadComment,
-} = await import('../src/server/head-to-head-comment.ts');
+} = await import('../src/server/head-to-head/head-to-head-comment.ts');
 const {
     encodeHeadToHeadReplay,
     formatHeadToHeadTextFallback,
-} = await import('../src/server/head-to-head-replay.ts');
+} = await import('../src/server/head-to-head/head-to-head-replay.ts');
 
 const challenge = {
     postType: 'head-to-head',

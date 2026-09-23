@@ -25,9 +25,9 @@ const reddit = {
 };
 vi.mock('@devvit/redis', () => ({ redis }));
 vi.mock('@devvit/web/server', () => ({ reddit }));
-const { confirmHeadToHeadBrag } = await import('../src/server/head-to-head-brag.ts');
-const { confirmHeadToHeadComment } = await import('../src/server/head-to-head-comment.ts');
-const { writeHeadToHeadSharePreview } = await import('../src/server/head-to-head-share.ts');
+const { confirmHeadToHeadBrag } = await import('../src/server/head-to-head/head-to-head-brag.ts');
+const { confirmHeadToHeadComment } = await import('../src/server/head-to-head/head-to-head-comment.ts');
+const { writeHeadToHeadSharePreview } = await import('../src/server/head-to-head/head-to-head-share.ts');
 const context = { username: 'Racer', subredditName: 'MiniRacer' };
 const resultKey = (action) => `miniracer:head-to-head:shared:${action}:challenge:racer:9000`;
 const previewFor = (action) => ({

@@ -1,6 +1,6 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
-import { encodeRedisCompressedValue } from '../src/server/redis-compressed-value.ts';
+import { encodeRedisCompressedValue } from '../src/server/redis/redis-compressed-value.ts';
 
 describe('Redis compressed transaction values', () => {
     it('matches the pinned redisCompressed envelope for compressible values', () => {
@@ -51,7 +51,7 @@ describe('Redis compressed transaction values', () => {
             };
         });
         const { encodeRedisCompressedValue: encodeWithBrokenGzip } = await import(
-            '../src/server/redis-compressed-value.ts'
+            '../src/server/redis/redis-compressed-value.ts'
         );
         const value = 'x'.repeat(120);
         expect(encodeWithBrokenGzip(value)).toBe(value);

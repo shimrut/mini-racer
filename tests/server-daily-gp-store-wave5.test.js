@@ -29,10 +29,10 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
-vi.mock('../src/server/player-token.js', () => ({
+vi.mock('../src/server/player/player-token.js', () => ({
     mintGuestPlayerToken: mockMintGuestPlayerToken,
     verifyGuestPlayerToken: mockVerifyGuestPlayerToken,
 }));
@@ -70,7 +70,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('rejects stored challenges with unknown track keys (L148-L150)', async () => {
-        const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredChallenge(JSON.stringify({
             id: 'daily-gp-2026-07-11',
@@ -83,7 +83,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('preserves strict-replay metadata on stored leaderboard entries (L450-L455)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
         const base = {
             playerId: 'reddit:Strict',
             trackKey: 'circuit',
@@ -110,7 +110,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('formats podium times with minute padding for long laps (L783-L788)', async () => {
-        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
             id: 'daily-gp-2026-07-10',
             challengeDate: '2026-07-10',
@@ -139,7 +139,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('repairs one unreadable stored preference while keeping the rest (L472-L487)', async () => {
-        const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const { parseStoredPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
 
         expect(parseStoredPlayerProfile(JSON.stringify({
             playerId: 'guest:wave5',
@@ -174,7 +174,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('returns null for expired playable challenges (L950-L955)', async () => {
-        const { getServerDailyGpPlayableChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpPlayableChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
             id: 'daily-gp-2020-01-01',
             challengeDate: '2020-01-01',

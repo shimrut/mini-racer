@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getModeratorAnalyticsSummary } from '../src/server/moderator-analytics-summary.ts';
+import { getModeratorAnalyticsSummary } from '../src/server/moderator/moderator-analytics-summary.ts';
 
 describe('moderator analytics summary payload', () => {
     it('loads player counts and Redis occupancy together', async () => {

@@ -1,5 +1,5 @@
 import type { Application, Response } from 'express';
-import { hasText } from '../value-guards.js';
+import { hasText } from '../shared/value-guards.js';
 
 type TrackPbPayload = {
     playerId: string | null;

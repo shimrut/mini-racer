@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
-import { DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS, getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
+import { DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS, getDailyGpCompetitionTtlSeconds } from '../src/server/daily/daily-gp-model.ts';
 
 const mockRedis = {
     get: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
 
@@ -63,7 +63,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('rejects stored challenges whose id regex or challengeDate do not match', async () => {
-        const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallengeById } = await import('../src/server/daily/daily-gp-store.ts');
 
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
             id: 'not-a-daily-id',
@@ -87,7 +87,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('rejects stored challenges with non-parseable schedule timestamps', async () => {
-        const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallengeById } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify({
             id: 'daily-gp-2026-07-11',
             challengeDate: '2026-07-11',
@@ -101,7 +101,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('rotates to the next catalog track after the most recent ledger entry', async () => {
-        const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         const priorTrack = TRACK_SCHEDULE_KEYS[0];
         const expectedNext = TRACK_SCHEDULE_KEYS[1] || TRACK_SCHEDULE_KEYS[0];
         mockRedis.hGet.mockResolvedValue(null);
@@ -123,7 +123,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('deletes expired challenge-history fields during maintenance', async () => {
-        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = {
             id: 'daily-gp-2030-07-02',
             challengeDate: '2030-07-02',
@@ -204,7 +204,7 @@ describe('server daily gp store wave 2', () => {
             objectiveParams: {},
             skin: 'default',
         };
-        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hSetNX.mockResolvedValue(1);
         mockRedis.hScan.mockResolvedValue({
@@ -231,7 +231,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('falls back to the first catalog track when the playhead track left the schedule', async () => {
-        const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hGetAll.mockResolvedValue({
             'daily-gp-2026-07-10': JSON.stringify({
@@ -251,7 +251,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('returns hasMore false when the page exactly fills the leaderboard', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         mockRedis.zCard.mockResolvedValue(10);
         mockRedis.zRange.mockResolvedValue(
@@ -288,7 +288,7 @@ describe('server daily gp store wave 2', () => {
     });
 
     it('returns the existing ledger entry when another writer wins the publish race', async () => {
-        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         const winner = {
             id: 'daily-gp-2030-07-03',
             challengeDate: '2030-07-03',

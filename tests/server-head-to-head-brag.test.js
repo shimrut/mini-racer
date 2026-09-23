@@ -60,14 +60,14 @@ const {
     formatChallengeBragComment,
     previewHeadToHeadBrag,
     confirmHeadToHeadBrag,
-} = await import('../src/server/head-to-head-brag.ts');
+} = await import('../src/server/head-to-head/head-to-head-brag.ts');
 const { writeHeadToHeadAccept } = await import(
-    '../src/server/head-to-head-store.ts'
+    '../src/server/head-to-head/head-to-head-store.ts'
 );
 const {
     encodeHeadToHeadReplay,
     formatHeadToHeadTextFallback,
-} = await import('../src/server/head-to-head-replay.ts');
+} = await import('../src/server/head-to-head/head-to-head-replay.ts');
 
 const challenge = {
     postType: 'head-to-head',

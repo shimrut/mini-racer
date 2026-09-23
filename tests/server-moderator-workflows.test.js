@@ -17,13 +17,13 @@ const {
 vi.mock('@devvit/web/server', () => ({
     reddit: mockReddit,
 }));
-vi.mock('../src/server/request-context.js', () => mockContext);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
 
 const {
     assertModeratorForSubreddit,
     isModeratorForSubreddit,
     resolveMenuTargetSubredditName,
-} = await import('../src/server/moderator-access.ts');
+} = await import('../src/server/moderator/moderator-access.ts');
 
 describe('moderator workflows', () => {
     beforeEach(() => {

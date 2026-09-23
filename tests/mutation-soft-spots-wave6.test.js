@@ -31,9 +31,9 @@ import {
     createPbGhostTraceRecorder,
     createTrackFingerprint,
     isValidPbGhostTrace,
-} from '../src/server/pb-ghost-trace.ts';
-import { parseDailyAutopostSubscription } from '../src/server/daily-autopost-store.ts';
-import { parseDailyPodiumAutopostSubscription } from '../src/server/daily-podium-autopost-store.ts';
+} from '../src/server/competition/pb-ghost-trace.ts';
+import { parseDailyAutopostSubscription } from '../src/server/daily/daily-autopost-store.ts';
+import { parseDailyPodiumAutopostSubscription } from '../src/server/podium/daily-podium-autopost-store.ts';
 
 const VERIFICATION_STORAGE_KEY = 'VectorGpVerificationQueue';
 const DAILY_CHALLENGE_STORAGE_KEY = 'VectorGpDailyChallengeData';

@@ -8,7 +8,7 @@ const { mockReddit } = vi.hoisted(() => ({
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
 
-const { resolveMiniRacerPostFlairId } = await import('../src/server/post-flair-service.ts');
+const { resolveMiniRacerPostFlairId } = await import('../src/server/posts/post-flair-service.ts');
 
 describe('Mini Racer post flair service', () => {
     beforeEach(() => {

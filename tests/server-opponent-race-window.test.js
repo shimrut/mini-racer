@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
-import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
+import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
 
 const { mockRedis, hashes, strings, sortedSets } = vi.hoisted(() => {
     const hashes = new Map();
@@ -50,9 +50,9 @@ vi.mock('@devvit/redis', () => ({
     redisCompressed: mockRedis,
 }));
 
-import { toCampaignCompetition } from '../src/server/competition.ts';
-import { createRedisPlayerProfileKey } from '../src/server/competition-identity.ts';
-import { prepareCompetitionOpponentRace } from '../src/server/competition-opponent-race.ts';
+import { toCampaignCompetition } from '../src/server/competition/competition.ts';
+import { createRedisPlayerProfileKey } from '../src/server/competition/competition-identity.ts';
+import { prepareCompetitionOpponentRace } from '../src/server/competition/competition-opponent-race.ts';
 
 const stage = CAMPAIGN_STAGES[0];
 const competition = toCampaignCompetition(CAMPAIGN_ID, stage);

@@ -10,7 +10,7 @@ vi.mock('@devvit/web/server', () => ({
     context: mocks.context,
 }));
 
-const { cacheSharedJson } = await import('../src/server/shared-cache.ts');
+const { cacheSharedJson } = await import('../src/server/redis/shared-cache.ts');
 
 describe('shared Devvit cache adapter', () => {
     beforeEach(() => {

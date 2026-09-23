@@ -11,7 +11,7 @@ vi.mock('@devvit/shared-types/server/get-devvit-config.js', () => ({
 const {
     getShareImageAssetPath,
     resolveDailyShareImageUrl,
-} = await import('../src/server/share-image.ts');
+} = await import('../src/server/posts/share-image.ts');
 
 describe('share-image', () => {
     beforeEach(() => {

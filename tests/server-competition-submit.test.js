@@ -23,17 +23,17 @@ vi.mock('@devvit/redis', () => ({
     },
 }));
 
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: (...args) => mockValidateDailyGpReplayDetailed(...args),
 }));
 
-vi.mock('../src/server/redis-lock.js', () => ({
+vi.mock('../src/server/redis/redis-lock.js', () => ({
     acquireRedisLock: (...args) => mockAcquireRedisLock(...args),
     releaseRedisLock: (...args) => mockReleaseRedisLock(...args),
     beginOwnedRedisLockTransaction: (...args) => mockBeginOwnedRedisLockTransaction(...args),
 }));
 
-vi.mock('../src/server/competition-leaderboard.js', async (importOriginal) => {
+vi.mock('../src/server/competition/competition-leaderboard.js', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
@@ -42,7 +42,7 @@ vi.mock('../src/server/competition-leaderboard.js', async (importOriginal) => {
     };
 });
 
-vi.mock('../src/server/pb-ghost-store.js', () => ({
+vi.mock('../src/server/competition/pb-ghost-store.js', () => ({
     upsertPlayerTrackPersonalBest: (...args) => mockUpsertPlayerTrackPersonalBest(...args),
 }));
 
@@ -108,7 +108,7 @@ describe('submitCompetitionRun', () => {
         const {
             competitionSubmissionLockKey,
             submitCompetitionRun,
-        } = await import('../src/server/competition-submit.ts');
+        } = await import('../src/server/competition/competition-submit.ts');
 
         const outcome = await submitCompetitionRun({
             competition,
@@ -136,7 +136,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('swallows a failing release to console.error without disturbing the 200', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         mockReleaseRedisLock.mockRejectedValue(new Error('cleanup unavailable'));
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -158,7 +158,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('returns 422 on a bad replay and 429 when the lock is already held', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
 
         mockValidateDailyGpReplayDetailed.mockReturnValueOnce({
             ok: false,
@@ -192,7 +192,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('waits when a guest transfer marker appears before the commit check', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         mockRedisGet.mockResolvedValueOnce('guest:pending-transfer');
 
         const outcome = await submitCompetitionRun({
@@ -220,7 +220,7 @@ describe('submitCompetitionRun', () => {
     };
 
     it('reuses a judged run and skips the origin rate limit', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const outcome = await submitCompetitionRun({
@@ -245,7 +245,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('falls back to a full re-drive when the judged contract does not match', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const outcome = await submitCompetitionRun({
@@ -270,7 +270,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('falls back to a full re-drive when the judged run is malformed', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const outcome = await submitCompetitionRun({
@@ -294,7 +294,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('does not log when an ordinary submit has no judged run', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         await submitCompetitionRun({
@@ -310,7 +310,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('writes opponentRaceReady with the new row when the run has a matching ghost', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const bestTimeMs = 12_345;
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
@@ -345,7 +345,7 @@ describe('submitCompetitionRun', () => {
     });
 
     it('stamps opponentRaceReady when a later ghost matches an unmarked stored time', async () => {
-        const { submitCompetitionRun } = await import('../src/server/competition-submit.ts');
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
         const previous = {
             playerId: 'reddit:pm-user',
             trackKey: 'circuit',

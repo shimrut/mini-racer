@@ -8,7 +8,7 @@ import {
 import {
     createRedisChallengeEntryHashKey,
     createRedisChallengeLeaderboardKey,
-} from '../src/server/daily-gp-model.ts';
+} from '../src/server/daily/daily-gp-model.ts';
 
 vi.mock('@devvit/redis', () => ({
     redis: {},
@@ -20,7 +20,7 @@ const {
     createSharedStandingsCacheKey,
     toCampaignCompetition,
     toDailyCompetition,
-} = await import('../src/server/competition.ts');
+} = await import('../src/server/competition/competition.ts');
 
 function dailyChallenge(overrides = {}) {
     return {

@@ -40,12 +40,12 @@ const {
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
-vi.mock('../src/server/daily-podium-autopost-store.js', () => mockAutopostStore);
-vi.mock('../src/server/daily-podium-post-store.js', () => mockPostStore);
-vi.mock('../src/server/request-context.js', () => mockContext);
-vi.mock('../src/server/shared-cache.js', () => ({ cacheSharedJson: mockSharedCache }));
-vi.mock('../src/server/daily-gp-store.js', () => mockDailyGpStore);
-vi.mock('../src/server/post-flair-service.js', () => mockPostFlair);
+vi.mock('../src/server/podium/daily-podium-autopost-store.js', () => mockAutopostStore);
+vi.mock('../src/server/podium/daily-podium-post-store.js', () => mockPostStore);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
+vi.mock('../src/server/redis/shared-cache.js', () => ({ cacheSharedJson: mockSharedCache }));
+vi.mock('../src/server/daily/daily-gp-store.js', () => mockDailyGpStore);
+vi.mock('../src/server/posts/post-flair-service.js', () => mockPostFlair);
 
 const {
     enableDailyPodiumAutopost,
@@ -57,7 +57,7 @@ const {
     isRedditAvatarUrl,
     resolveRedditAvatarUrl,
     sanitizeDailyGpPodiumForPost,
-} = await import('../src/server/daily-podium-service.ts');
+} = await import('../src/server/podium/daily-podium-service.ts');
 
 const podium = {
     challengeId: 'daily-gp-2026-07-10',

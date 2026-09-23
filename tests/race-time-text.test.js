@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRaceTime } from '../src/server/format-race-time.ts';
+import { formatRaceTime } from '../src/server/shared/format-race-time.ts';
 import { formatLobbyTime } from '../game/lobby/service.js';
 
 describe('m:ss.mmm race time text', () => {

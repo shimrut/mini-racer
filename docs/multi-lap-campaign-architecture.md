@@ -150,10 +150,10 @@ several result paths still enforce or assume one lap.
 
 ### 1. The server erases multi-lap configuration
 
-`src/server/daily-gp-model.ts` types and creates only
+`src/server/daily/daily-gp-model.ts` types and creates only
 `single_lap_fastest` challenges with empty objective parameters.
-`src/server/daily-gp-store.ts`, `src/server/post-bound-challenge.ts`, and
-`src/server/daily-gp-history-backfill.ts` also normalize stored or restored
+`src/server/daily/daily-gp-store.ts`, `src/server/posts/post-bound-challenge.ts`, and
+`src/server/daily/daily-gp-history-backfill.ts` also normalize stored or restored
 challenges back to one lap.
 
 The browser accepts `multi_lap_total`, but its lightweight active-challenge
@@ -166,7 +166,7 @@ count, but the persisted row cannot currently reproduce it.
 
 ### 2. Server replay validation always finishes after lap one
 
-`src/server/replay-validator.ts` hardcodes `requiredLaps: 1`. A locally
+`src/server/competition/replay-validator.ts` hardcodes `requiredLaps: 1`. A locally
 completed two- or three-lap replay would not be validated against the same race
 the player saw.
 

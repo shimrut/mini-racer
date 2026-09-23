@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSharedStandingsCacheKey } from '../src/server/competition.ts';
+import { createSharedStandingsCacheKey } from '../src/server/competition/competition.ts';
 
 const mocks = vi.hoisted(() => ({
     redis: {
@@ -16,17 +16,17 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@devvit/redis', () => ({ redis: mocks.redis }));
-vi.mock('../src/server/shared-cache.js', () => ({
+vi.mock('../src/server/redis/shared-cache.js', () => ({
     cacheSharedJson: mocks.cacheSharedJson,
 }));
-vi.mock('../src/server/competition-identity.js', () => ({
+vi.mock('../src/server/competition/competition-identity.js', () => ({
     readPlayerProfileMap: mocks.readPlayerProfileMap,
 }));
-vi.mock('../src/server/pb-ghost-store.js', () => ({
+vi.mock('../src/server/competition/pb-ghost-store.js', () => ({
     getPlayerTrackPbRecords: mocks.getPlayerTrackPbRecords,
 }));
 
-const { readSnapshot } = await import('../src/server/competition-leaderboard.ts');
+const { readSnapshot } = await import('../src/server/competition/competition-leaderboard.ts');
 
 const competition = {
     id: 'daily-gp-2026-08-08',

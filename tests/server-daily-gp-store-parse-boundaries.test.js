@@ -24,15 +24,15 @@ vi.mock('@devvit/redis', () => ({
     },
     redisCompressed: {},
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: vi.fn(),
 }));
 
 const {
     parseStoredChallenge,
     parseStoredEntry,
-} = await import('../src/server/daily-gp-store.ts');
-const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
+} = await import('../src/server/daily/daily-gp-store.ts');
+const { parseStoredPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
 
 const VALID_CHALLENGE = {
     id: 'daily-gp-2026-07-11',

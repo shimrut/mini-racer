@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { toDailyCompetition } from '../src/server/competition.ts';
+import { toDailyCompetition } from '../src/server/competition/competition.ts';
 import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
 const { redis } = vi.hoisted(() => {
@@ -74,14 +74,14 @@ import {
     PB_GHOST_SAMPLE_INTERVAL_MS,
     PB_GHOST_SAMPLE_RATE_HZ,
     PB_GHOST_SIMULATION_REVISION,
-} from '../src/server/pb-ghost-trace.ts';
+} from '../src/server/competition/pb-ghost-trace.ts';
 import {
     getPlayerTrackPbRecord,
     getPlayerTrackPbRecords,
     seedPlayerTrackPersonalBest,
     upsertPlayerTrackPersonalBest,
-} from '../src/server/pb-ghost-store.ts';
-import { getDailyGpCompetitionTtlSeconds } from '../src/server/daily-gp-model.ts';
+} from '../src/server/competition/pb-ghost-store.ts';
+import { getDailyGpCompetitionTtlSeconds } from '../src/server/daily/daily-gp-model.ts';
 
 const TRACK = {
     outer: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }],

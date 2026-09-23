@@ -6,15 +6,15 @@ const redis = new RedisTestDouble();
 vi.mock("@devvit/redis", () => ({ redis, redisCompressed: redis }));
 
 const { getGuestProgressSelection, selectGuestProgress } =
-  await import("../src/server/daily-gp-store.ts");
-const { recordCompletedRace } = await import("../src/server/car-unlock-store.ts");
-const { campaignProgressKey } = await import("../src/server/campaign-progress-key.js");
+  await import("../src/server/daily/daily-gp-store.ts");
+const { recordCompletedRace } = await import("../src/server/player/car-unlock-store.ts");
+const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
 const { cleanupExpiredCampaignGuests, CAMPAIGN_GUEST_EXPIRY_KEY } =
-  await import("../src/server/campaign-store.ts");
-const { classifyStoredPbRecordValue } = await import("../src/server/pb-ghost-store.ts");
+  await import("../src/server/campaign/campaign-store.ts");
+const { classifyStoredPbRecordValue } = await import("../src/server/competition/pb-ghost-store.ts");
 const { classifyStoredCampaignProgress } =
-  await import("../src/server/guest-transfer-source-classification.ts");
-const { toCampaignCompetition } = await import("../src/server/competition.ts");
+  await import("../src/server/guest-transfer/guest-transfer-source-classification.ts");
+const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 
 
 function selectionKey(guestPlayerId, redditPlayerId) {
@@ -231,7 +231,7 @@ describe("a damaged leaderboard entry is damage, not obsolescence", () => {
 
   it("classifies a wrong-typed lap count as malformed", async () => {
     const { classifyStoredLeaderboardEntry } =
-      await import("../src/server/guest-transfer-source-classification.ts");
+      await import("../src/server/guest-transfer/guest-transfer-source-classification.ts");
 
     const classification = classifyStoredLeaderboardEntry(
       JSON.stringify({

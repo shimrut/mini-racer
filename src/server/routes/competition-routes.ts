@@ -1,5 +1,5 @@
 import type { Application } from 'express';
-import type { DailyGpChallenge } from '../daily-gp-model.js';
+import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 
 type ServiceResult = {
     status: number;

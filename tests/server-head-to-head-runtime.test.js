@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../game/medals/medal-timing.js';
-import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
+import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
 
 const mockDailyChallenge = vi.hoisted(() => vi.fn());
 const mockValidateReplay = vi.hoisted(() => vi.fn());
@@ -14,23 +14,23 @@ const mockReadEntry = vi.hoisted(() => vi.fn());
 const mockGetCampaignProgress = vi.hoisted(() => vi.fn());
 const mockRepairStandings = vi.hoisted(() => vi.fn());
 
-vi.mock('../src/server/campaign-store.js', () => ({
+vi.mock('../src/server/campaign/campaign-store.js', () => ({
     submitServerCampaignRun: mockSubmitCampaignRun,
     getCampaignProgressForSelection: mockGetCampaignProgress,
     repairCampaignStandingsFromEntries: mockRepairStandings,
 }));
-vi.mock('../src/server/daily-gp-store.js', () => ({
+vi.mock('../src/server/daily/daily-gp-store.js', () => ({
     getServerDailyGpPlayableChallenge: mockDailyChallenge,
     submitServerDailyGpRun: mockSubmitDailyRun,
 }));
-vi.mock('../src/server/competition-leaderboard.js', () => ({
+vi.mock('../src/server/competition/competition-leaderboard.js', () => ({
     readPlayerRank: mockReadPlayerRank,
     readEntryByPlayerId: mockReadEntry,
 }));
-vi.mock('../src/server/head-to-head-post.js', () => ({
+vi.mock('../src/server/head-to-head/head-to-head-post.js', () => ({
     resolveHeadToHeadRecord: vi.fn(),
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateReplay,
 }));
 
@@ -39,7 +39,7 @@ const {
     recordHeadToHeadBest,
     resolveHeadToHeadSource,
     validateHeadToHeadReplay,
-} = await import('../src/server/head-to-head-runtime.ts');
+} = await import('../src/server/head-to-head/head-to-head-runtime.ts');
 
 const trackKey = 'numberZero';
 const trackFingerprint = createTrackFingerprint(TRACKS[trackKey]);

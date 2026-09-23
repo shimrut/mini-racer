@@ -47,12 +47,12 @@ const mockRedis = {
 };
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
-vi.mock('../src/server/request-context.ts', () => ({
+vi.mock('../src/server/request/request-context.ts', () => ({
     readContextSubredditName: () => 'mini_racer',
 }));
 
 const profiles = new Map();
-vi.mock('../src/server/competition-identity.ts', () => ({
+vi.mock('../src/server/competition/competition-identity.ts', () => ({
     readPlayerProfile: async (playerId) => profiles.get(playerId) ?? null,
 }));
 
@@ -60,7 +60,7 @@ const SUBREDDIT = 'mini_racer';
 const day = (iso) => new Date(iso);
 
 async function store() {
-    return import('../src/server/analytics-store.ts');
+    return import('../src/server/moderator/analytics-store.ts');
 }
 
 function dayFor(summary, date) {

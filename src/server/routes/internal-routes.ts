@@ -1,9 +1,9 @@
 import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
-import type { DailyGpChallenge } from '../daily-gp-model.js';
-import type { FinalDailyGpPodium } from '../daily-podium-model.js';
-import type { LauncherPostKind } from '../launcher-post-store.js';
-import { isDailyGpPodiumPublicationOpen } from '../daily-podium-service.js';
+import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
+import type { FinalDailyGpPodium } from '../podium/daily-podium-model.js';
+import type { LauncherPostKind } from '../posts/launcher-post-store.js';
+import { isDailyGpPodiumPublicationOpen } from '../podium/daily-podium-service.js';
 
 type DailyAutopostSubscription = {
     subredditName: string;

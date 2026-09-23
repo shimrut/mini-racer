@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { createRequestRateLimitIdentity } from "../src/server/request-rate-limit-identity.ts";
+import { createRequestRateLimitIdentity } from "../src/server/request/request-rate-limit-identity.ts";
 
 function expectedIdentity(source) {
   return createHash("sha256")

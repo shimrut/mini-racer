@@ -17,7 +17,7 @@ const { mockRedis, mockLocking, mockState } = vi.hoisted(() => ({
 }));
 
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis }));
-vi.mock('../src/server/redis-lock.js', () => mockLocking);
+vi.mock('../src/server/redis/redis-lock.js', () => mockLocking);
 
 const {
     deleteDailyAutopostSubscription,
@@ -25,7 +25,7 @@ const {
     readAllDailyAutopostSubscriptions,
     readDailyAutopostSubscription,
     upsertDailyAutopostSubscription,
-} = await import('../src/server/daily-autopost-store.ts');
+} = await import('../src/server/daily/daily-autopost-store.ts');
 
 describe('daily autopost store', () => {
     beforeEach(() => {

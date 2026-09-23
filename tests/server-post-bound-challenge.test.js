@@ -15,13 +15,13 @@ const { mockReddit, mockContext, mockStore } = vi.hoisted(() => ({
 }));
 
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
-vi.mock('../src/server/request-context.js', () => mockContext);
-vi.mock('../src/server/daily-gp-store.js', () => mockStore);
+vi.mock('../src/server/request/request-context.js', () => mockContext);
+vi.mock('../src/server/daily/daily-gp-store.js', () => mockStore);
 
 const {
     getPostBoundDailyGpChallenge,
     normalizePostBoundDailyGpChallenge,
-} = await import('../src/server/post-bound-challenge.ts');
+} = await import('../src/server/posts/post-bound-challenge.ts');
 
 const challenge = {
     id: 'daily-gp-2026-07-16',

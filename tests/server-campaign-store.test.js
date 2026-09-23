@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { TRACKS } from '../game/track/tracks.js';
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
-import { createTrackFingerprint } from '../src/server/pb-ghost-trace.ts';
+import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
 
 const hashes = new Map();
 const strings = new Map();
@@ -104,7 +104,7 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
 
@@ -174,7 +174,7 @@ describe('Campaign server store', () => {
     });
 
     it('refuses an unidentified request and performs no Campaign write', async () => {
-        const { getServerCampaignBootstrap, submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { getServerCampaignBootstrap, submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         const bootstrap = await getServerCampaignBootstrap({ redditUsername: null });
         expect(bootstrap).toMatchObject({
             status: 200,
@@ -197,7 +197,7 @@ describe('Campaign server store', () => {
     });
 
     it('keeps each player progress in its own key rather than one campaign hash', async () => {
-        const { startServerCampaignRace, getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+        const { startServerCampaignRace, getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
         await startServerCampaignRace({ raceId: 'numbered-v1-00', redditUsername: 'RaceFan' });
         await startServerCampaignRace({ raceId: 'numbered-v1-00', redditUsername: 'OtherRacer' });
 
@@ -216,7 +216,7 @@ describe('Campaign server store', () => {
         const {
             getServerCampaignBootstrap,
             startServerCampaignRace,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
         const first = await startServerCampaignRace({
             raceId: 'numbered-v1-00',
             redditUsername: 'RaceFan',
@@ -252,7 +252,7 @@ describe('Campaign server store', () => {
             },
             updatedAt: '2026-07-27T10:00:00.000Z',
         }));
-        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
 
         const bootstrap = await getServerCampaignBootstrap({
             redditUsername: 'Campaign-Veteran',
@@ -285,7 +285,7 @@ describe('Campaign server store', () => {
         const {
             getServerCampaignPbGhost,
             submitServerCampaignRun,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
@@ -357,7 +357,7 @@ describe('Campaign server store', () => {
         const {
             getServerCampaignPbGhost,
             submitServerCampaignRun,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
 
         const submission = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
@@ -401,7 +401,7 @@ describe('Campaign server store', () => {
             return defaultHSet(key, entries);
         });
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
@@ -421,7 +421,7 @@ describe('Campaign server store', () => {
     });
 
     it('rejects locked stages before replay validation', async () => {
-        const { startServerCampaignRace, submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { startServerCampaignRace, submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         expect(await startServerCampaignRace({
             raceId: 'numbered-v1-01',
             redditUsername: 'RaceFan',
@@ -436,7 +436,7 @@ describe('Campaign server store', () => {
     });
 
     it('refuses a queued result whose account changed, before the stage lock can hide why', async () => {
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
 
         const lockedStage = await submitServerCampaignRun({
             raceId: 'numbered-v1-01',
@@ -463,7 +463,7 @@ describe('Campaign server store', () => {
     });
 
     it('accepts a queued result that still names the account submitting it', async () => {
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
 
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
@@ -519,7 +519,7 @@ describe('Campaign server store', () => {
         const {
             getServerCampaignSnapshot,
             prepareServerCampaignLeaderboardRace,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
         await expect(getServerCampaignSnapshot({
             raceId,
             redditUsername: 'RaceFan',
@@ -633,7 +633,7 @@ describe('Campaign server store', () => {
             return index === -1 ? undefined : index;
         });
 
-        const { prepareServerCampaignLeaderboardRace } = await import('../src/server/campaign-store.ts');
+        const { prepareServerCampaignLeaderboardRace } = await import('../src/server/campaign/campaign-store.ts');
         await expect(prepareServerCampaignLeaderboardRace({
             raceId,
             redditUsername: 'RaceFan',
@@ -705,7 +705,7 @@ describe('Campaign server store', () => {
         const {
             getServerCampaignSnapshot,
             prepareServerCampaignLeaderboardRace,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
         await expect(getServerCampaignSnapshot({
             raceId,
             redditUsername: 'RaceFan',
@@ -760,9 +760,9 @@ describe('Campaign server store', () => {
     });
 
     it('ranks a guest who carries a valid token', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const guestToken = await mintGuestPlayerToken('guest-racer');
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
 
         const submission = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
@@ -783,9 +783,9 @@ describe('Campaign server store', () => {
     });
 
     it('keeps shared Campaign collections permanent and expires only guest-owned progress after one year', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const guestToken = await mintGuestPlayerToken('guest-ttl');
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
 
         await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
@@ -816,7 +816,7 @@ describe('Campaign server store', () => {
         const guestPlayerId = 'guest:expired';
         const guestField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
         const { CAMPAIGN_GUEST_EXPIRY_KEY, cleanupExpiredCampaignGuests } = await import(
-            '../src/server/campaign-store.ts'
+            '../src/server/campaign/campaign-store.ts'
         );
         mockRedis.zRange.mockResolvedValue([{
             member: guestPlayerId,
@@ -854,7 +854,7 @@ describe('Campaign server store', () => {
     it('does not delete a guest whose expiry was refreshed while cleanup was reading', async () => {
         const nowMs = Date.now();
         const guestPlayerId = 'guest:returning';
-        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign-store.ts');
+        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign/campaign-store.ts');
         mockRedis.zRange.mockResolvedValue([{
             member: guestPlayerId,
             score: nowMs - 1,
@@ -871,7 +871,7 @@ describe('Campaign server store', () => {
         const nowMs = Date.now();
         const guestPlayerId = 'guest:locked';
         const guestField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
-        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign-store.ts');
+        const { cleanupExpiredCampaignGuests } = await import('../src/server/campaign/campaign-store.ts');
         strings.set(`campaign:numbered-v1:progress-lock:${guestField}`, 'active');
         mockRedis.zRange.mockResolvedValue([{
             member: guestPlayerId,
@@ -888,7 +888,7 @@ describe('Campaign server store', () => {
     });
 
     it('never expires a signed-in player Campaign standing', async () => {
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
@@ -917,7 +917,7 @@ describe('Campaign server store', () => {
             }),
         ]]));
         const { submitServerCampaignRun, getServerCampaignBootstrap } = await import(
-            '../src/server/campaign-store.ts'
+            '../src/server/campaign/campaign-store.ts'
         );
 
         const result = await submitServerCampaignRun({
@@ -955,7 +955,7 @@ describe('Campaign server store', () => {
                 validationMethod: 'strict-replay',
             }),
         ]]));
-        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
 
         await expect(getServerCampaignBootstrap({ redditUsername: 'Bootstrap-Repair' }))
             .resolves.toMatchObject({
@@ -1002,7 +1002,7 @@ describe('Campaign server store', () => {
             }),
         ]]));
         const { submitServerCampaignRun, getServerCampaignBootstrap } = await import(
-            '../src/server/campaign-store.ts'
+            '../src/server/campaign/campaign-store.ts'
         );
 
         const result = await submitServerCampaignRun({
@@ -1046,7 +1046,7 @@ describe('Campaign server store', () => {
             updatedAt: '2026-07-27T10:00:00.000Z',
         }));
         const { getServerCampaignBootstrap, submitServerCampaignRun } = await import(
-            '../src/server/campaign-store.ts'
+            '../src/server/campaign/campaign-store.ts'
         );
 
         const [first, second] = await Promise.all([
@@ -1080,13 +1080,13 @@ describe('Campaign server store', () => {
     });
 
     it('moves a guest Campaign standing onto the account at sign-in, keeping the better time', async () => {
-        const { mintGuestPlayerToken } = await import('../src/server/player-token.ts');
+        const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const guestToken = await mintGuestPlayerToken('guest-merge');
         const {
             getServerCampaignBootstrap,
             mergeGuestCampaignProgress,
             submitServerCampaignRun,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
 
         mockValidateDailyGpReplayDetailed.mockReturnValue({
             ok: true,
@@ -1185,7 +1185,7 @@ describe('Campaign server store', () => {
             cleanupGuestCampaignProgress,
             getServerCampaignBootstrap,
             mergeGuestCampaignProgress,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
 
         await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
             .resolves.toEqual({ merged: true, mergedRaceIds: [raceId] });
@@ -1244,7 +1244,7 @@ describe('Campaign server store', () => {
                 validationMethod: 'strict-replay',
             }),
         ]]));
-        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign/campaign-store.ts');
         const defaultHSet = mockRedis.hSet.getMockImplementation();
         mockRedis.hSet.mockImplementation(async (key, entries) => {
             if (String(key) === guestEntryKey && Object.hasOwn(entries, redditPlayerId)) {
@@ -1304,7 +1304,7 @@ describe('Campaign server store', () => {
                 strictReplayFailureReason: null,
             })],
         ]));
-        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign/campaign-store.ts');
 
         await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
             .resolves.toEqual({ merged: false, mergedRaceIds: [] });
@@ -1347,7 +1347,7 @@ describe('Campaign server store', () => {
                 completedLaps: 2,
             }),
         ]]));
-        const { getServerCampaignBootstrap } = await import('../src/server/campaign-store.ts');
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
 
         await getServerCampaignBootstrap({ redditUsername: 'Rank-Bootstrap' });
 
@@ -1360,7 +1360,7 @@ describe('Campaign server store', () => {
     it('renews every Campaign merge lock while stage data is still being read', async () => {
         vi.useFakeTimers();
         try {
-            const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+            const { mergeGuestCampaignProgress } = await import('../src/server/campaign/campaign-store.ts');
             const defaultHGet = mockRedis.hGet.getMockImplementation();
             let releaseStageRead;
             const stageReadBlocked = new Promise((resolve) => { releaseStageRead = resolve; });
@@ -1414,7 +1414,7 @@ describe('Campaign server store', () => {
             }
             return defaultGet(key);
         });
-        const { mergeGuestCampaignProgress } = await import('../src/server/campaign-store.ts');
+        const { mergeGuestCampaignProgress } = await import('../src/server/campaign/campaign-store.ts');
 
         await expect(mergeGuestCampaignProgress({ guestPlayerId, redditPlayerId }))
             .rejects.toThrow('Campaign merge ownership was lost.');
@@ -1430,7 +1430,7 @@ describe('Campaign server store', () => {
             getServerCampaignPbGhost,
             mergeGuestCampaignProgress,
             parseCampaignProgress,
-        } = await import('../src/server/campaign-store.ts');
+        } = await import('../src/server/campaign/campaign-store.ts');
         const progressKeyFor = (playerId) => `campaign:numbered-v1:progress:${
             createHash('sha256').update(playerId, 'utf8').digest('base64url')
         }`;
@@ -1495,13 +1495,13 @@ describe('Campaign server store', () => {
     });
 
     it('strips releaseLock from Campaign non-200 replies', async () => {
-        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        const competitionSubmit = await import('../src/server/competition/competition-submit.ts');
         vi.spyOn(competitionSubmit, 'submitCompetitionRun').mockResolvedValueOnce({
             status: 422,
             body: { accepted: false, error: 'bad replay', reason: 'truncated_mismatch' },
             releaseLock: Promise.resolve(),
         });
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
@@ -1517,7 +1517,7 @@ describe('Campaign server store', () => {
     });
 
     it('answers saved and awaits releaseLock when the Garage read after the save rejects', async () => {
-        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        const competitionSubmit = await import('../src/server/competition/competition-submit.ts');
         let releaseResolved = false;
         const releaseLock = Promise.resolve().then(() => {
             releaseResolved = true;
@@ -1532,9 +1532,9 @@ describe('Campaign server store', () => {
             },
             releaseLock,
         });
-        const carUnlockStore = await import('../src/server/car-unlock-store.ts');
+        const carUnlockStore = await import('../src/server/player/car-unlock-store.ts');
         vi.spyOn(carUnlockStore, 'getCarUnlockSnapshot').mockRejectedValueOnce(new Error('unlock snapshot failed'));
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',
@@ -1550,7 +1550,7 @@ describe('Campaign server store', () => {
     });
 
     it('answers saved without a Garage and awaits releaseLock when the reward write rejects', async () => {
-        const competitionSubmit = await import('../src/server/competition-submit.ts');
+        const competitionSubmit = await import('../src/server/competition/competition-submit.ts');
         let releaseResolved = false;
         const releaseLock = Promise.resolve().then(() => {
             releaseResolved = true;
@@ -1565,9 +1565,9 @@ describe('Campaign server store', () => {
             },
             releaseLock,
         });
-        const carUnlockStore = await import('../src/server/car-unlock-store.ts');
+        const carUnlockStore = await import('../src/server/player/car-unlock-store.ts');
         vi.spyOn(carUnlockStore, 'recordCompletedRace').mockRejectedValueOnce(new Error('reward busy'));
-        const { submitServerCampaignRun } = await import('../src/server/campaign-store.ts');
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
         const result = await submitServerCampaignRun({
             raceId: 'numbered-v1-00',
             trackKey: 'numberZero',

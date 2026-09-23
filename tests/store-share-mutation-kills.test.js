@@ -38,7 +38,7 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
 
@@ -118,7 +118,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('parseStoredChallenge regex and field guards', () => {
         it('rejects ids that only match the daily-gp pattern as a substring', async () => {
-            const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
             expect(parseStoredChallenge(JSON.stringify({
                 ...VALID_CHALLENGE,
@@ -135,7 +135,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('rejects a valid-looking id when challengeDate is empty or the track is unknown', async () => {
-            const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
             expect(parseStoredChallenge(JSON.stringify({
                 ...VALID_CHALLENGE,
@@ -148,14 +148,14 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('returns null for thrown JSON instead of undefined', async () => {
-            const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
             expect(parseStoredChallenge('{bad json')).toBeNull();
         });
     });
 
     describe('parseStoredEntry and parseStoredPlayerProfile guards', () => {
         it('clears non-strict validation methods and keeps strict-replay literals', async () => {
-            const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
             const base = {
                 playerId: 'reddit:strict',
                 bestTimeMs: 12000,
@@ -180,7 +180,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('uses the expected track when the stored entry omits or blanks trackKey', async () => {
-            const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
+            const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
             const base = {
                 playerId: 'reddit:track',
                 bestTimeMs: 9000,
@@ -197,7 +197,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('preserves explicit hasAnyData and epoch fallbacks for blank timestamp strings', async () => {
-            const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
+            const { parseStoredPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
             const epoch = new Date(0).toISOString();
 
             expect(parseStoredPlayerProfile(JSON.stringify({
@@ -221,7 +221,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('getServerDailyGpChallengeById input guards', () => {
         it('returns null for non-string and empty challenge ids without touching Redis', async () => {
-            const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+            const { getServerDailyGpChallengeById } = await import('../src/server/daily/daily-gp-store.ts');
 
             await expect(getServerDailyGpChallengeById(undefined)).resolves.toBeNull();
             await expect(getServerDailyGpChallengeById(null)).resolves.toBeNull();
@@ -233,7 +233,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('getServerDailyGpSnapshot pagination and in-page player rows', () => {
         it('reuses the visible top-row entry when the current player is on the requested page', async () => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
             const members = Array.from({ length: 8 }, (_, index) => ({
                 member: `reddit:page-${index + 1}`,
@@ -264,7 +264,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('sets hasMore false only when offset plus limit reaches the leaderboard size', async () => {
-            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+            const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
             const members = Array.from({ length: 10 }, (_, index) => ({
                 member: `reddit:edge-${index + 1}`,
@@ -293,7 +293,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('submitServerDailyGpRun improvement guard', () => {
         it('returns completedLaps null when the stored time is already faster', async () => {
-            const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+            const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily/daily-gp-store.ts');
             const challenge = await getServerDailyGpChallenge();
             mockRedis.hGet.mockImplementation(async (key, field) => {
                 if (key === 'dailygp:challenges') return JSON.stringify(challenge);
@@ -331,7 +331,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('track rotation fallbacks', () => {
         it('uses the first scheduled track when the ledger playhead is missing or unknown', async () => {
-            const { getServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+            const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
             mockRedis.hGet.mockResolvedValue(null);
             mockRedis.hGetAll.mockResolvedValue({
                 'daily-gp-2026-07-10': JSON.stringify({
@@ -354,7 +354,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('getServerPlayerTrackPbSummaries request filtering', () => {
         it('ignores non-array challengeIds and returns an empty track map', async () => {
-            const { getServerPlayerTrackPbSummaries } = await import('../src/server/daily-gp-store.ts');
+            const { getServerPlayerTrackPbSummaries } = await import('../src/server/daily/daily-gp-store.ts');
 
             const result = await getServerPlayerTrackPbSummaries({
                 redditUsername: 'Pb-Reader',

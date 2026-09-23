@@ -9,7 +9,7 @@ const {
     renewRedisLockGroup,
     renewRedisLock,
     startRedisLockLeaseRenewal,
-} = await import('../src/server/redis-lock.ts');
+} = await import('../src/server/redis/redis-lock.ts');
 
 function createVersionedRedis() {
     const values = new Map();

@@ -15,7 +15,7 @@ vi.mock('@devvit/redis', () => ({
 const {
     mintGuestPlayerToken,
     verifyGuestPlayerToken,
-} = await import('../src/server/player-token.ts');
+} = await import('../src/server/player/player-token.ts');
 
 describe('guest player tokens', () => {
     beforeEach(() => {

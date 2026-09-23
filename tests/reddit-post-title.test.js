@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     formatDailyMiniRacerPostTitle,
     formatDailyMiniRacerTextFallback,
-} from '../src/server/reddit-post-title.ts';
+} from '../src/server/posts/reddit-post-title.ts';
 
 const challenge = {
     id: 'daily-gp-2026-06-03',

@@ -18,7 +18,7 @@ vi.mock('../game/config.js', async (importOriginal) => {
     };
 });
 
-import { validateDailyGpReplayDetailed } from '../src/server/replay-validator.ts';
+import { validateDailyGpReplayDetailed } from '../src/server/competition/replay-validator.ts';
 
 const CHALLENGE = {
     id: 'daily-gp-2026-05-06',

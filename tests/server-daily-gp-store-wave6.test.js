@@ -29,10 +29,10 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
-vi.mock('../src/server/player-token.js', () => ({
+vi.mock('../src/server/player/player-token.js', () => ({
     mintGuestPlayerToken: mockMintGuestPlayerToken,
     verifyGuestPlayerToken: mockVerifyGuestPlayerToken,
 }));
@@ -103,7 +103,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored challenges with malformed daily-gp ids (L144)', async () => {
-        const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredChallenge(JSON.stringify(buildStoredChallenge({
             id: 'not-daily-gp-format',
@@ -114,7 +114,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored challenges with non-string track keys (L148-L150)', async () => {
-        const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredChallenge(JSON.stringify({
             ...buildStoredChallenge(),
@@ -127,7 +127,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored challenges with invalid startsAt timestamps (L157-L159)', async () => {
-        const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredChallenge(JSON.stringify({
             ...buildStoredChallenge(),
@@ -136,7 +136,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored entries missing required player fields (L418-L425)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredEntry(JSON.stringify({
             ...buildStoredEntry(),
@@ -153,7 +153,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored entries whose track disagrees with the expected track (L430-L434)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
 
         expect(parseStoredEntry(JSON.stringify({
             ...buildStoredEntry(),
@@ -169,7 +169,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('preserves hasSeenGame=false on stored player profiles (L515)', async () => {
-        const { parseStoredPlayerProfile } = await import('../src/server/competition-identity.ts');
+        const { parseStoredPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
 
         const profile = parseStoredPlayerProfile(JSON.stringify({
             playerId: 'guest:wave6',
@@ -182,14 +182,14 @@ describe('server daily gp store wave6', () => {
     });
 
     it('returns null for empty challenge ids (L922-L923)', async () => {
-        const { getServerDailyGpChallengeById } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallengeById } = await import('../src/server/daily/daily-gp-store.ts');
 
         await expect(getServerDailyGpChallengeById('')).resolves.toBeNull();
         await expect(getServerDailyGpChallengeById(null)).resolves.toBeNull();
     });
 
     it('returns null for final podiums before availability expires (L950-L951)', async () => {
-        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify(buildStoredChallenge({
             id: 'daily-gp-2026-07-10',
             challengeDate: '2026-07-10',
@@ -204,7 +204,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('formats sub-minute podium times without minute padding (L783-L788)', async () => {
-        const { getServerFinalDailyGpPodium } = await import('../src/server/daily-gp-store.ts');
+        const { getServerFinalDailyGpPodium } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(JSON.stringify(buildStoredChallenge({
             id: 'daily-gp-2026-07-10',
             challengeDate: '2026-07-10',
@@ -230,7 +230,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('returns empty nearby rows when the player is already in the top page (L1427-L1430)', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         const members = Array.from({ length: 5 }, (_, index) => ({
             member: `reddit:rank-${index + 1}`,
@@ -262,7 +262,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('sets hasMore and nextOffset when another page exists (L1442-L1444)', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         const members = Array.from({ length: 8 }, (_, index) => ({
             member: `reddit:rank-${index + 1}`,
@@ -288,7 +288,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('returns an empty snapshot for unknown playable challenges (L1376-L1377)', async () => {
-        const { getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.hGet.mockResolvedValueOnce(null);
 
         const snapshot = await getServerDailyGpSnapshot({
@@ -301,7 +301,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('returns null for player best lookups without a username (L988-L989)', async () => {
-        const { getServerDailyGpPlayerBest } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpPlayerBest } = await import('../src/server/daily/daily-gp-store.ts');
 
         await expect(getServerDailyGpPlayerBest({
             challengeId: 'daily-gp-2026-07-11',
@@ -310,7 +310,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('returns the existing stored challenge from persist when one already exists (L365-L367)', async () => {
-        const { persistServerDailyGpChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { persistServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         const stored = {
             id: 'daily-gp-2026-07-11',
             challengeDate: '2026-07-11',

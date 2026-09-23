@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DAILY_GP_NEARBY_RADIUS } from '../src/server/daily-gp-model.ts';
+import { DAILY_GP_NEARBY_RADIUS } from '../src/server/daily/daily-gp-model.ts';
 
 const mockRedis = {
     get: vi.fn(),
@@ -31,10 +31,10 @@ vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,
 }));
-vi.mock('../src/server/replay-validator.js', () => ({
+vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: mockValidateDailyGpReplayDetailed,
 }));
-vi.mock('../src/server/player-token.js', () => ({
+vi.mock('../src/server/player/player-token.js', () => ({
     mintGuestPlayerToken: mockMintGuestPlayerToken,
     verifyGuestPlayerToken: mockVerifyGuestPlayerToken,
 }));
@@ -115,7 +115,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('rejects stored challenges when any schedule timestamp is non-finite (L157-L159)', async () => {
-        const { parseStoredChallenge } = await import('../src/server/daily-gp-store.ts');
+        const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
         const base = {
             id: 'daily-gp-2026-07-11',
             challengeDate: '2026-07-11',
@@ -136,7 +136,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('returns retryAfterSeconds from expireTime once the submission cap is exceeded (L885-L895)', async () => {
-        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         mockRedis.incrBy.mockResolvedValue(13);
         mockRedis.expireTime.mockResolvedValue(Math.floor(Date.now() / 1000) + 22);
@@ -160,7 +160,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('repairs a rate-limit counter left without an expiry instead of blocking forever', async () => {
-        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         mockRedis.incrBy.mockResolvedValue(13);
         mockRedis.expireTime.mockResolvedValue(-1);
@@ -182,7 +182,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('loads nearby rows when the player rank equals the page boundary (L1460-L1463)', async () => {
-        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, getServerDailyGpSnapshot } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
         const members = Array.from({ length: 12 }, (_, index) => ({
             member: `reddit:rank-${index + 1}`,
@@ -208,7 +208,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('rejects player preference updates with out-of-range crash delay values (L483-L485)', async () => {
-        const { updateServerPlayerPreferences } = await import('../src/server/daily-gp-store.ts');
+        const { updateServerPlayerPreferences } = await import('../src/server/daily/daily-gp-store.ts');
         mockVerifyGuestPlayerToken.mockResolvedValue('guest-wave4');
 
         const invalid = await updateServerPlayerPreferences({
@@ -232,7 +232,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('claims a new guest profile when no identity is supplied (L1210-L1222)', async () => {
-        const { getServerPlayerBootstrap } = await import('../src/server/daily-gp-store.ts');
+        const { getServerPlayerBootstrap } = await import('../src/server/daily/daily-gp-store.ts');
         mockRedis.set.mockImplementation(async (key, value, options = {}) => {
             if (options.nx) {
                 return 'OK';
@@ -252,7 +252,7 @@ describe('server daily gp store wave4', () => {
     });
 
     it('rejects submissions whose trackKey does not match the challenge (L1532-L1539)', async () => {
-        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily-gp-store.ts');
+        const { getServerDailyGpChallenge, submitServerDailyGpRun } = await import('../src/server/daily/daily-gp-store.ts');
         const challenge = await getServerDailyGpChallenge();
 
         const result = await submitServerDailyGpRun({

@@ -2,7 +2,7 @@ import type { Application } from 'express';
 import type {
     HeadToHeadRequestContext,
     HeadToHeadServiceResult,
-} from '../head-to-head-service.js';
+} from '../head-to-head/head-to-head-service.js';
 
 export type HeadToHeadRouteDependencies = {
     getHeadToHeadRequestContext(): Promise<HeadToHeadRequestContext>
