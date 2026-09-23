@@ -244,6 +244,14 @@ methods that still override shared ones (the phase 7 race rules). A new Daily co
 method fails that test. The suite passes: 243 files, 3,023 tests.
 The Daily race play-check passed in the playtest on 2026-09-23, and the dev server log had no errors.
 
+**Progress (2026-09-23):** 4.3 is done in `5ce015d`. The recorder moved unchanged into
+`game/shared/pb-ghost-recorder.js`. The server wraps it and still validates each trace, and the
+debug size tool uses it directly. Before and after the move, 1,500 random drives gave the same
+traces from both recorders. 3.4 is done in `41546d8`: `src/server/autopost-subscription-store.ts`
+serves both stores. Each store keeps its Redis key, lock key prefix, messages, and exported
+names. The old and new stores gave the same lock keys, writes, errors, and log lines in 21 cases
+each. Both new files joined the Stryker mutate list.
+
 ## Phase 7 — Decisions first (they change what players see, hear, or get)
 
 Each item needs an answer first. Then trace the player effect. Then change the code.
