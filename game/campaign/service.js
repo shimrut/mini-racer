@@ -1,8 +1,4 @@
-import {
-    API_ROUTES,
-    getGuestPlayerToken,
-    getOrCreatePlayerId,
-} from '../scoreboard/api-client.js';
+import { API_ROUTES } from '../scoreboard/api-client.js';
 import {
     CAMPAIGN_ID,
     CAMPAIGN_STAGES,
@@ -12,8 +8,14 @@ import {
     clearCampaignVerification,
     getCampaignVerificationEntries,
 } from '../scoreboard/verification-queue.js';
+import { playerIdentityBody, playerRequestUrl, requestJsonWithTimeout } from '../scoreboard/player-request.js';
 
 export const CAMPAIGN_REQUEST_TIMEOUT_MS = 20_000;
+
+function requestJson(url, options = {}) {
+    return requestJsonWithTimeout(url, options, CAMPAIGN_REQUEST_TIMEOUT_MS);
+}
+
 const LEGACY_PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
 
 function emptyResults() {
@@ -60,45 +62,6 @@ export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null) {
     };
 }
 
-async function requestJson(url, options = {}) {
-    const controller = typeof AbortController === 'function' && !options.signal
-        ? new AbortController()
-        : null;
-    const timeoutId = controller
-        ? setTimeout(() => controller.abort(), CAMPAIGN_REQUEST_TIMEOUT_MS)
-        : null;
-    try {
-        const response = await fetch(url, controller
-            ? { ...options, signal: controller.signal }
-            : options);
-        const body = await response.json().catch(() => null);
-        return { ok: response.ok, status: response.status, body };
-    } finally {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-    }
-}
-
-function withPlayerIdentity(url) {
-    url.searchParams.set('playerId', getOrCreatePlayerId('campaign'));
-    const guestToken = getGuestPlayerToken();
-    if (guestToken) url.searchParams.set('guestToken', guestToken);
-    return url;
-}
-
-function playerIdentityBody(extra = {}) {
-    return {
-        ...extra,
-        playerId: getOrCreatePlayerId('campaign'),
-        guestToken: getGuestPlayerToken(),
-    };
-}
-
-function campaignUrl(route) {
-    return withPlayerIdentity(
-        new URL(route, globalThis.location?.origin ?? 'http://localhost'),
-    );
-}
-
 export function normalizeCampaignStandings(value) {
     const source = value && typeof value === 'object' ? value : {};
     const standings = Object.create(null);
@@ -139,7 +102,7 @@ export async function getCampaignBootstrap() {
     clearLegacyPendingCampaignResults();
     if (typeof fetch !== 'function') return unavailableCampaignBootstrap();
     try {
-        const response = await requestJson(campaignUrl(API_ROUTES.campaignBootstrapUrl).toString());
+        const response = await requestJson(playerRequestUrl(API_ROUTES.campaignBootstrapUrl).toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         const ranked = response.body.ranked === true;
         const authoritative = ranked
@@ -192,7 +155,7 @@ export async function startServerCampaignRace(raceId) {
 }
 
 export async function getCampaignSnapshot(raceId, { limit = 50, offset = 0 } = {}) {
-    const url = campaignUrl(API_ROUTES.campaignSnapshotUrl);
+    const url = playerRequestUrl(API_ROUTES.campaignSnapshotUrl);
     url.searchParams.set('raceId', raceId);
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('offset', String(offset));
@@ -208,7 +171,7 @@ export async function submitCampaignRun({ raceId, trackKey, replay, submissionOw
 }
 
 export async function getCampaignPbGhost(raceId) {
-    const url = campaignUrl(API_ROUTES.campaignPbGhostUrl);
+    const url = playerRequestUrl(API_ROUTES.campaignPbGhostUrl);
     url.searchParams.set('raceId', raceId);
     return requestJson(url.toString());
 }

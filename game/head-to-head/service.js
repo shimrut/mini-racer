@@ -1,42 +1,10 @@
-import {
-    API_ROUTES,
-    getGuestPlayerToken,
-    getOrCreatePlayerId,
-} from '../scoreboard/api-client.js';
+import { API_ROUTES } from '../scoreboard/api-client.js';
+import { playerIdentityBody, playerRequestUrl, requestJsonWithTimeout } from '../scoreboard/player-request.js';
 
 export const HEAD_TO_HEAD_REQUEST_TIMEOUT_MS = 20_000;
 
-async function requestJson(url, options = {}) {
-    const controller = typeof AbortController === 'function' && !options.signal
-        ? new AbortController()
-        : null;
-    const timeoutId = controller
-        ? setTimeout(() => controller.abort(), HEAD_TO_HEAD_REQUEST_TIMEOUT_MS)
-        : null;
-    try {
-        const response = await fetch(url, controller
-            ? { ...options, signal: controller.signal }
-            : options);
-        const body = await response.json().catch(() => null);
-        return { ok: response.ok, status: response.status, body };
-    } finally {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-    }
-}
-
-function withPlayerIdentity(url) {
-    url.searchParams.set('playerId', getOrCreatePlayerId('campaign'));
-    const guestToken = getGuestPlayerToken();
-    if (guestToken) url.searchParams.set('guestToken', guestToken);
-    return url;
-}
-
-function playerIdentityBody(extra = {}) {
-    return {
-        ...extra,
-        playerId: getOrCreatePlayerId('campaign'),
-        guestToken: getGuestPlayerToken(),
-    };
+function requestJson(url, options = {}) {
+    return requestJsonWithTimeout(url, options, HEAD_TO_HEAD_REQUEST_TIMEOUT_MS);
 }
 
 export function readChallengePostId() {
@@ -53,16 +21,10 @@ export function challengePostIdentityBody(extra = {}) {
 }
 
 function challengeUrl(route) {
-    const url = campaignUrl(route);
+    const url = playerRequestUrl(route);
     const postId = readChallengePostId();
     if (postId) url.searchParams.set('postId', postId);
     return url;
-}
-
-function campaignUrl(route) {
-    return withPlayerIdentity(
-        new URL(route, globalThis.location?.origin ?? 'http://localhost'),
-    );
 }
 
 export async function previewHeadToHead(input) {
