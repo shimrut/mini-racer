@@ -372,4 +372,4 @@ export const challengeRunEngineMethods = {
     },
 };
 
-export { applyTrackPersonalBest, getTrackPersonalBestForChallenge };
+export { applyTrackPersonalBest };
