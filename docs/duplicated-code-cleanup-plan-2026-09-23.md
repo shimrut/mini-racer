@@ -41,6 +41,19 @@ smallest work come first.
 
 ## Phase 1 — Code that players do not run (player risk: none)
 
+**Done on 2026-09-23, branch `chore/duplicate-cleanup` (`944c211`..`c0c1b3d`).** The suite
+passes: 236 files, 3,011 tests. Differences from the plan:
+
+- 1.1: all 23 copies now use the helper, because the 7 others were compatible with it.
+- 1.3: the tools keep their own `clamp`. `game/shared/clamp.js` gives a different result when
+  the minimum is larger than the maximum.
+- 1.4: only Runner Lab changed. It now uses the game's `smoothPoly`. On all 258 track
+  outlines, the largest change is 3e-14. The TikTok Studio finish line and car are not
+  copies: they have a different look on purpose. The lane-gate intersection is not a copy:
+  it rejects lines that are almost parallel.
+- `.gitignore` ignores `tools/*` except the files it lists. The new `tools/geometry.js` and
+  `tools/node-script.js` got an exception each.
+
 | Step | Change | Size | Check |
 |---|---|---|---|
 | 1.1 | Put one `createMemoryLocalStorage` in `tests/helpers/`. 16 of the 23 copies are the same. Replace those 16. Compare the 7 others one by one. | M | Full suite |
