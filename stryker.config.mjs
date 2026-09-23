@@ -32,6 +32,7 @@ export default {
         'game/shared/leaderboard-identity.js',
         'game/shared/values.js',
         'game/shared/pb-ghost-format.js',
+        'game/shared/pb-ghost-recorder.js',
         'game/shared/reddit-avatar.js',
         'game/shared/utc-day.js',
         'game/shared/race-time-text.js',

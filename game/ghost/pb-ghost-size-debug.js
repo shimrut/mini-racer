@@ -1,13 +1,12 @@
 import { finiteNumberOrNull } from '../shared/values.js';
 
 import {
-  PB_GHOST_ANGLE_SCALE,
-  PB_GHOST_MAX_SAMPLES,
-  PB_GHOST_POSITION_SCALE,
-  PB_GHOST_SAMPLE_INTERVAL_MS,
   PB_GHOST_SCHEMA_VERSION,
   PB_GHOST_SIMULATION_REVISION,
 } from '../shared/pb-ghost-format.js';
+import { createPbGhostPoseRecorder } from '../shared/pb-ghost-recorder.js';
+
+export { createPbGhostPoseRecorder as createLocalPbGhostTraceRecorder };
 
 const REDIS_COMPRESSION_PREFIX = '__gz:b64__:';
 const REDIS_COMPRESSION_MIN_LENGTH = 80;
@@ -15,180 +14,6 @@ const PB_GHOST_SIZE_REPORTS_KEY = 'MiniRacerPbGhostSizeReports';
 const PB_GHOST_SIZE_CAPTURES_KEY = 'MiniRacerPbGhostSizeCaptures';
 export const PB_GHOST_SIZE_ENABLED_STORAGE_KEY = 'MiniRacerPbGhostSizeEnabled';
 const PB_GHOST_TRACK_FINGERPRINT_LENGTH = 43;
-
-function quantizePose(timeSec, position, angle) {
-  if (
-    !Number.isFinite(timeSec)
-    || timeSec < 0
-    || !Number.isFinite(position?.x)
-    || !Number.isFinite(position?.y)
-    || !Number.isFinite(angle)
-  ) {
-    return null;
-  }
-
-  return {
-    timeMs: Math.max(0, Math.round(timeSec * 1000)),
-    xCm: Math.round(position.x * PB_GHOST_POSITION_SCALE),
-    yCm: Math.round(position.y * PB_GHOST_POSITION_SCALE),
-    angleMilli: Math.round(angle * PB_GHOST_ANGLE_SCALE),
-  };
-}
-
-function cloneRawPose(pose) {
-  return {
-    timeSec: pose.timeSec,
-    position: { x: pose.position.x, y: pose.position.y },
-    angle: pose.angle,
-  };
-}
-
-function isFiniteRawPose(pose) {
-  return (
-    Number.isFinite(pose?.timeSec)
-    && pose.timeSec >= 0
-    && Number.isFinite(pose.position?.x)
-    && Number.isFinite(pose.position?.y)
-    && Number.isFinite(pose.angle)
-  );
-}
-
-function shortestAngleDeltaMilli(next, previous) {
-  const fullTurnMilli = Math.round(Math.PI * 2 * PB_GHOST_ANGLE_SCALE);
-  const halfTurnMilli = Math.round(Math.PI * PB_GHOST_ANGLE_SCALE);
-  let delta = next - previous;
-  while (delta > halfTurnMilli) delta -= fullTurnMilli;
-  while (delta < -halfTurnMilli) delta += fullTurnMilli;
-  return delta;
-}
-
-function lerpRawPoseAtTime(last, current, atTimeSec) {
-  const span = current.timeSec - last.timeSec;
-  if (span <= Number.EPSILON) {
-    return {
-      timeSec: atTimeSec,
-      position: { x: current.position.x, y: current.position.y },
-      angle: current.angle,
-    };
-  }
-
-  const progress = Math.min(
-    1,
-    Math.max(0, (atTimeSec - last.timeSec) / span),
-  );
-  let angleDelta = current.angle - last.angle;
-  while (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
-  while (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
-
-  return {
-    timeSec: atTimeSec,
-    position: {
-      x: last.position.x + (current.position.x - last.position.x) * progress,
-      y: last.position.y + (current.position.y - last.position.y) * progress,
-    },
-    angle: last.angle + angleDelta * progress,
-  };
-}
-
-export function createLocalPbGhostTraceRecorder(initialPose) {
-  const sampleIntervalSec = PB_GHOST_SAMPLE_INTERVAL_MS / 1000;
-  const poses = [];
-  let nextSampleTimeSec = 0;
-  let overflowed = false;
-  let lastPose = isFiniteRawPose(initialPose)
-    ? cloneRawPose(initialPose)
-    : { timeSec: 0, position: { x: 0, y: 0 }, angle: 0 };
-
-  function appendPose(pose, exact = false) {
-    if (overflowed) return;
-    const sample = quantizePose(pose.timeSec, pose.position, pose.angle);
-    if (!sample) return;
-
-    const previous = poses.at(-1);
-    if (
-      previous
-      && previous.timeMs === sample.timeMs
-      && previous.xCm === sample.xCm
-      && previous.yCm === sample.yCm
-      && previous.angleMilli === sample.angleMilli
-    ) {
-      return;
-    }
-    if (exact && previous?.timeMs === sample.timeMs) {
-      poses[poses.length - 1] = sample;
-      return;
-    }
-    if (poses.length >= PB_GHOST_MAX_SAMPLES) {
-      overflowed = true;
-      return;
-    }
-    poses.push(sample);
-  }
-
-  appendPose(initialPose, true);
-  nextSampleTimeSec = sampleIntervalSec;
-
-  return {
-    sample(pose) {
-      if (overflowed || !isFiniteRawPose(pose)) return;
-
-      while (pose.timeSec + Number.EPSILON >= nextSampleTimeSec) {
-        appendPose(lerpRawPoseAtTime(lastPose, pose, nextSampleTimeSec));
-        nextSampleTimeSec += sampleIntervalSec;
-        if (overflowed) break;
-      }
-      lastPose = cloneRawPose(pose);
-    },
-    finish(pose) {
-      appendPose(pose, true);
-      if (overflowed || poses.length < 2) return null;
-
-      const finishPose = poses.at(-1);
-      const finishTimeMs = finishPose?.timeMs;
-      if (!finishPose || !Number.isSafeInteger(finishTimeMs) || finishTimeMs <= 0) {
-        return null;
-      }
-
-      const requiredCount = Math.ceil(
-        finishTimeMs / PB_GHOST_SAMPLE_INTERVAL_MS,
-      ) + 1;
-      if (requiredCount < 2 || requiredCount > PB_GHOST_MAX_SAMPLES) return null;
-
-      const regularPoses = poses.slice(0, -1);
-      while (regularPoses.length + 1 < requiredCount) {
-        const padSource = regularPoses.at(-1);
-        if (!padSource) return null;
-        regularPoses.push({ ...padSource });
-      }
-      if (regularPoses.length + 1 > requiredCount) {
-        regularPoses.length = requiredCount - 1;
-      }
-      if (regularPoses.length < 1) return null;
-
-      const alignedPoses = [...regularPoses, finishPose];
-      const originPose = alignedPoses[0];
-      const deltas = [];
-      let previous = originPose;
-      for (let index = 1; index < alignedPoses.length; index += 1) {
-        const current = alignedPoses[index];
-        deltas.push(
-          current.xCm - previous.xCm,
-          current.yCm - previous.yCm,
-          shortestAngleDeltaMilli(current.angleMilli, previous.angleMilli),
-        );
-        previous = current;
-      }
-
-      return {
-        schemaVersion: PB_GHOST_SCHEMA_VERSION,
-        sampleIntervalMs: PB_GHOST_SAMPLE_INTERVAL_MS,
-        finishTimeMs,
-        origin: [originPose.xCm, originPose.yCm, originPose.angleMilli],
-        deltas,
-      };
-    },
-  };
-}
 
 function getUtf8Bytes(value) {
   if (typeof TextEncoder === 'function') {
@@ -444,7 +269,7 @@ export class PbGhostSizeCapture {
     position,
     angle,
   } = {}) {
-    this.recorder = createLocalPbGhostTraceRecorder({
+    this.recorder = createPbGhostPoseRecorder({
       timeSec: 0,
       position,
       angle,
