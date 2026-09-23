@@ -1,12 +1,15 @@
 import { gzipSync as gzipSyncFallback } from 'fflate';
 import { finiteNumberOrNull } from '../shared/values.js';
 
-const PB_GHOST_SCHEMA_VERSION = 2;
-const PB_GHOST_SAMPLE_INTERVAL_MS = 50;
-const PB_GHOST_MAX_SAMPLES = 4000;
-const PB_GHOST_SIMULATION_REVISION = 1;
-const PB_GHOST_POSITION_SCALE = 100;
-const PB_GHOST_ANGLE_SCALE = 1000;
+import {
+  PB_GHOST_ANGLE_SCALE,
+  PB_GHOST_MAX_SAMPLES,
+  PB_GHOST_POSITION_SCALE,
+  PB_GHOST_SAMPLE_INTERVAL_MS,
+  PB_GHOST_SCHEMA_VERSION,
+  PB_GHOST_SIMULATION_REVISION,
+} from '../shared/pb-ghost-format.js';
+
 const REDIS_COMPRESSION_PREFIX = '__gz:b64__:';
 const REDIS_COMPRESSION_MIN_LENGTH = 80;
 const PB_GHOST_SIZE_REPORTS_KEY = 'MiniRacerPbGhostSizeReports';

@@ -31,6 +31,7 @@ export default {
 
         'game/shared/leaderboard-identity.js',
         'game/shared/values.js',
+        'game/shared/pb-ghost-format.js',
 
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',

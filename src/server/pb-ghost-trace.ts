@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
+import * as ghostFormat from '../../game/shared/pb-ghost-format.js';
 
-export const PB_GHOST_SCHEMA_VERSION = 2;
-export const PB_GHOST_SAMPLE_RATE_HZ = 20;
-export const PB_GHOST_SAMPLE_INTERVAL_MS = 1000 / PB_GHOST_SAMPLE_RATE_HZ;
-export const PB_GHOST_SIMULATION_REVISION = 1;
-export const PB_GHOST_MAX_SAMPLES = 4_000;
-export const PB_GHOST_MAX_ENCODED_BYTES = 128 * 1024;
-const PB_GHOST_POSITION_SCALE = 100;
-const PB_GHOST_ANGLE_SCALE = 1000;
+export const PB_GHOST_SCHEMA_VERSION = ghostFormat.PB_GHOST_SCHEMA_VERSION as 2;
+export const PB_GHOST_SAMPLE_RATE_HZ = ghostFormat.PB_GHOST_SAMPLE_RATE_HZ as 20;
+export const PB_GHOST_SAMPLE_INTERVAL_MS: number = ghostFormat.PB_GHOST_SAMPLE_INTERVAL_MS;
+export const PB_GHOST_SIMULATION_REVISION = ghostFormat.PB_GHOST_SIMULATION_REVISION as 1;
+export const PB_GHOST_MAX_SAMPLES: number = ghostFormat.PB_GHOST_MAX_SAMPLES;
+export const PB_GHOST_MAX_ENCODED_BYTES: number = ghostFormat.PB_GHOST_MAX_ENCODED_BYTES;
+const PB_GHOST_POSITION_SCALE: number = ghostFormat.PB_GHOST_POSITION_SCALE;
+const PB_GHOST_ANGLE_SCALE: number = ghostFormat.PB_GHOST_ANGLE_SCALE;
 const FULL_TURN_MILLI = Math.round(Math.PI * 2 * PB_GHOST_ANGLE_SCALE);
 const HALF_TURN_MILLI = Math.round(Math.PI * PB_GHOST_ANGLE_SCALE);
 
