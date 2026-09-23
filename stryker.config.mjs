@@ -33,6 +33,7 @@ export default {
         'game/shared/values.js',
         'game/shared/pb-ghost-format.js',
         'game/shared/reddit-avatar.js',
+        'game/shared/utc-day.js',
 
         'src/server/daily-gp-store.ts',
         'src/server/replay-validator.ts',

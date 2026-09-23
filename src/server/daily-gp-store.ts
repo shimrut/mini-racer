@@ -26,6 +26,7 @@ import {
     formatRankLabel,
     formatUtcChallengeDate,
     getUtcDayIndex,
+    getUtcDayStart,
     getDailyGpCompetitionTtlSeconds,
     isDailyGpChallengePlayable,
     normalizeDailyGpRaceContract,
@@ -567,7 +568,6 @@ function guestProgressSelectionAccountLockKey(redditPlayerId: string): string {
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_CURSOR_KEY = 'dailygp:maintenance:challenge-history:v1:cursor';
 const DAILY_GP_CHALLENGE_HISTORY_MAINTENANCE_BATCH_SIZE = 50;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function readPlayerCarUnlocks(
     playerId: string,
@@ -640,10 +640,6 @@ function preferencesAllowedByCarUnlocks(
 
 function createEmptyDailySnapshot(challenge: DailyGpChallenge): SnapshotPayload {
     return createEmptySnapshot(toDailyCompetition(challenge), DAILY_GP_DEFAULT_LIMIT);
-}
-
-function getUtcDayStart(dayIndex: number): Date {
-    return new Date(dayIndex * DAY_MS);
 }
 
 export function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {

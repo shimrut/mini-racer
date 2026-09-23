@@ -1,7 +1,8 @@
 import { getAuthorMedalSeconds } from '../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../game/race/race-spec.js';
+import * as utcDay from '../../game/shared/utc-day.js';
 
-export const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS: number = utcDay.DAY_MS;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
@@ -42,6 +43,14 @@ export type DailyGpChallenge = {
 
 export function createDailyGpRecordExpiration(): Date {
     return new Date(Date.now() + (DAILY_GP_REDIS_TTL_SECONDS * 1000));
+}
+
+export function getUtcDayIndex(date: Date = new Date()): number {
+    return utcDay.getUtcDayIndex(date);
+}
+
+export function getUtcDayStart(dayIndex: number): Date {
+    return utcDay.getUtcDayStart(dayIndex);
 }
 
 export function isDailyGpLapCount(value: unknown): value is DailyGpLapCount {
@@ -147,20 +156,8 @@ export type DailyGpPlayerPreferences = {
     hideHudEnabled: boolean;
 };
 
-export function getUtcDayIndex(date = new Date()): number {
-    return Math.floor(Date.UTC(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate()
-    ) / DAY_MS);
-}
-
 export function formatUtcChallengeDate(date = new Date()): string {
     return date.toISOString().slice(0, 10);
-}
-
-function getUtcDayStart(dayIndex: number): Date {
-    return new Date(dayIndex * DAY_MS);
 }
 
 export function createDailyChallengeId(challengeDate: string): string {

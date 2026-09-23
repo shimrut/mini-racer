@@ -6,8 +6,8 @@ import {
 } from '../medals/medal-timing.js';
 import { hasTrack } from '../track/catalog.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
+import { DAY_MS } from '../shared/utc-day.js';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function toDateKey(timeMs) {
     return Number.isFinite(timeMs)

@@ -1,5 +1,5 @@
 import { getChallengeTimeMs } from '../shared/values.js';
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS } from '../shared/utc-day.js';
 const MINUTE_MS = 60 * 1000;
 
 export function isDailyChallengeLapCount(value) {

@@ -25,6 +25,7 @@ import {
 } from './storage.js';
 import { isDailyChallengeLapCount } from './labels.js';
 import { getChallengeTimeMs } from '../shared/values.js';
+import { DAY_MS, getUtcDayIndex, getUtcDayStart } from '../shared/utc-day.js';
 
 export {
     formatDailyChallengeBestLabel,
@@ -53,7 +54,7 @@ const ACTIVE_DAILY_CACHE_KEY = 'VectorGpActiveDailyChallengeCache';
 const DAILY_PLAYLIST_CACHE_KEY = 'VectorGpDailyChallengePlaylistCache';
 const DAILY_SNAPSHOT_CACHE_KEY = 'VectorGpDailyChallengeSnapshotCache';
 const DAILY_START_OVERRIDE_KEY = 'VectorGpDailyStartOverride';
-export const DAY_MS = 24 * 60 * 60 * 1000;
+export { DAY_MS };
 export const DAILY_PLAYLIST_DAYS = 7;
 let dailyPlaylistCache = {
     challenges: null,
@@ -163,18 +164,6 @@ export function toCachedActiveChallenge(challenge) {
         availableUntil: normalized.availableUntil,
         skin: normalized.skin,
     };
-}
-
-function getUtcDayIndex(date = new Date()) {
-    return Math.floor(Date.UTC(
-        date.getUTCFullYear(),
-        date.getUTCMonth(),
-        date.getUTCDate()
-    ) / DAY_MS);
-}
-
-function getUtcDayStart(dayIndex) {
-    return new Date(dayIndex * DAY_MS);
 }
 
 function getNextUtcDayStartMs(date = new Date()) {
