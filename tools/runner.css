@@ -452,15 +452,9 @@ select:focus {
     color: var(--runner-red);
 }
 
-.status-chip--stuck,
 .status-chip--timeout {
     background: rgba(251, 191, 36, 0.14);
     color: var(--runner-gold);
-}
-
-.status-chip--running {
-    background: rgba(56, 189, 248, 0.12);
-    color: var(--runner-blue);
 }
 
 @media (max-width: 1180px) {

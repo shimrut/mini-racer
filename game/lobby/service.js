@@ -229,7 +229,6 @@ export function normalizeChallengeLobbyState(state = {}) {
         available,
         beaten,
         gapMs,
-        gapLabel: formatLobbyGap(gapMs),
         winMarginLabel: gapMs === null ? null : formatLobbyGap(gapMs).slice(1),
         canAccept: canRace && available && !beaten && !challengeLoading,
         canRetry,
@@ -241,9 +240,6 @@ export function normalizeChallengeLobbyState(state = {}) {
         trackName: typeof state.trackName === 'string' && state.trackName.trim()
             ? state.trackName.trim()
             : null,
-        trackLabel: typeof state.trackName === 'string' && state.trackName.trim()
-            ? `${state.trackName.trim()} · ${laps} ${laps === 1 ? 'lap' : 'laps'}`
-            : 'Track unavailable',
         laps,
         targetTimeMs: available ? Math.round(targetTimeMs) : null,
         targetTimeLabel: available ? formatLobbyTime(targetTimeMs) : '--:--.---',

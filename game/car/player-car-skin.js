@@ -1,6 +1,5 @@
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from './sprite.js';
 import {
-    CAR_UNLOCK_REQUIREMENTS,
     DEFAULT_CAR_UNLOCK_SNAPSHOT,
     formatCarUnlockRequirement,
     getCarUnlockRequirementProgress,
@@ -68,7 +67,6 @@ export const PLAYER_CAR_SKINS = Object.freeze(
             label: skinLabelForAsset(assetName),
             series: skinSeriesIdForAsset(assetName),
             assetName,
-            unlockRequirement: CAR_UNLOCK_REQUIREMENTS[assetName] ?? null,
         })
     )
 );

@@ -321,8 +321,6 @@ export function bindPodiumReplay(documentRef, {
         get mode() { return controller.mode; },
         get loading() { return loading; },
         paint: () => controller.paint(),
-        prepareFromServer,
-        openReplays,
     };
 
     syncButton();

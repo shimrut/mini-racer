@@ -318,7 +318,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       "PAUSED",
       null,
       expect.objectContaining({
-        variant: "daily-pause",
         lapTime: 50.1,
         bestTime: 48.35,
         deltaToBest: 1.75,
@@ -922,9 +921,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       journeys: { startAttempt: vi.fn() },
     };
 
-    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, playlistChallenge, {
-      startSource: "track_modal",
-    });
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, playlistChallenge);
 
     expect(engine.lastPlayedDailyChallenge).toBe(playlistChallenge);
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(playlistChallenge);
@@ -935,9 +932,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     engine.loadTrack.mockClear();
     engine.journeys.startAttempt.mockClear();
 
-    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, null, {
-      startSource: "main_menu",
-    });
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, null);
 
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(playlistChallenge);
     expect(engine.applyDailyChallenge).not.toHaveBeenCalledWith(featured);
@@ -1258,9 +1253,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       prepareTrackPersonalBestGhost: vi.fn(() => ghostRequest),
     };
 
-    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
-      startSource: "track_modal",
-    });
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
 
     expect(engine.startSequence).toHaveBeenCalled();
     expect(engine.startButtonPending).toBe(false);
@@ -1424,9 +1417,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       prepareTrackPersonalBestGhost: vi.fn(),
     };
 
-    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge, {
-      startSource: "main_menu",
-    });
+    await RealTimeRacer.prototype.handleStartDailyChallenge.call(engine, challenge);
 
     expect(engine.pbGhost.clearTrack).not.toHaveBeenCalled();
     expect(engine.prepareTrackPersonalBestGhost).not.toHaveBeenCalled();

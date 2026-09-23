@@ -677,7 +677,6 @@ export const raceEngineMethods = {
       "PAUSED",
       null,
       {
-        variant: "daily-pause",
         lapTime: this.currentTime,
         bestTime,
         deltaToBest,

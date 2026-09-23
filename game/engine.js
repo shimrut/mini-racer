@@ -800,7 +800,6 @@ export class RealTimeRacer {
       "daily",
       "handleStartDailyChallenge",
       this.dailyCarousel.getSelectedChallenge(),
-      { startSource: "main_menu" },
     );
   }
 

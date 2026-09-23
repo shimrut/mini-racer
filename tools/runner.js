@@ -847,7 +847,6 @@ function simulateSwarm(prepared, settings) {
         finishers: 0,
         crashes: 0,
         scrapes: 0,
-        stuck: 0,
         timeouts: 0,
         finishCrosses: 0,
         suspiciousCollisions: 0,
@@ -865,9 +864,6 @@ function simulateSwarm(prepared, settings) {
         }
         if (result.status === 'crashed' || result.status === 'scrapedOut') {
             aggregate.crashes += result.crashes;
-        }
-        if (result.status === 'stuck') {
-            aggregate.stuck += 1;
         }
         if (result.status === 'timeout') {
             aggregate.timeouts += 1;
@@ -941,13 +937,6 @@ function deriveSimulationIssues(prepared, simulation) {
     if (crashRate >= 0.5) {
         issues.push(makeIssue('warning', 'Crash rate is unusually high', `${aggregate.crashes} crash events were recorded across ${aggregate.botCount} bots.`, {
             code: 'crash-rate-high',
-            source: 'simulation'
-        }));
-    }
-
-    if (aggregate.stuck >= Math.ceil(aggregate.botCount / 3)) {
-        issues.push(makeIssue('warning', 'Many bots became stuck', `${aggregate.stuck} bots stalled before completing the route.`, {
-            code: 'stuck-rate-high',
             source: 'simulation'
         }));
     }

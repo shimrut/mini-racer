@@ -219,10 +219,7 @@ describe('leaderboard race comparison target', () => {
     );
     expect(dailyEngine.handleStartDailyChallenge).toHaveBeenCalledWith(
       dailyChallenge,
-      {
-        preserveRaceComparisonTarget: true,
-        startSource: 'leaderboard_opponent',
-      },
+      { preserveRaceComparisonTarget: true },
     );
 
     const campaignStage = {
@@ -389,7 +386,7 @@ describe('leaderboard race comparison target', () => {
     await dailyChallengeEngineMethods.handleStartDailyChallenge.call(
       engine,
       challenge,
-      { preserveRaceComparisonTarget: true, startSource: 'leaderboard_opponent' },
+      { preserveRaceComparisonTarget: true },
     );
 
     expect(engine.clearRaceComparisonTarget).not.toHaveBeenCalled();

@@ -46,10 +46,6 @@ function normalizeResults(value) {
 export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null) {
     const normalized = normalizeResults(resultsByRaceId);
     const unlockedRaceIds = getCampaignUnlockedRaceIds(normalized);
-    const continueStage = CAMPAIGN_STAGES.find((stage) => (
-        unlockedRaceIds.includes(stage.raceId)
-        && !['gold', 'author'].includes(normalized[stage.raceId]?.medal)
-    )) ?? null;
     return {
         campaignId: CAMPAIGN_ID,
         startedAt: typeof startedAt === 'string' ? startedAt : null,
@@ -58,7 +54,6 @@ export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null) {
         complete: CAMPAIGN_STAGES.every((stage) => (
             ['gold', 'author'].includes(normalized[stage.raceId]?.medal)
         )),
-        continueRaceId: continueStage?.raceId ?? null,
     };
 }
 

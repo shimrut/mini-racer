@@ -17,8 +17,6 @@ import {
 import {
   formatDailyChallengeResultLabel,
   getDailyChallengeCopyLabels,
-  getDailyChallengeModifierBadges,
-  getDailyChallengeModifierLabel,
   getDailyChallengeObjectiveLabel,
   getDailyChallengeRequiredLaps,
 } from "./labels.js";
@@ -556,7 +554,6 @@ export const dailyChallengeEngineMethods = {
       ? trackPersonalBest.bestTime
       : null;
     this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
-    const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
 
     this.dailyChallengeUi.setDailyChallengeSummary({
       available: true,
@@ -565,9 +562,6 @@ export const dailyChallengeEngineMethods = {
       trackKey: challenge.trackKey,
       skin: challenge.skin,
       trackName: getDailyChallengeTrackName(challenge),
-      objectiveLabel,
-      modifierBadges: getDailyChallengeModifierBadges(challenge),
-      modifierLabel: getDailyChallengeModifierLabel(challenge),
       bestTime: this.bestLapTime,
       bestLabel: formatDailyChallengeResultLabel(challenge, trackPersonalBest),
       rankLabel: "--",
@@ -676,7 +670,6 @@ export const dailyChallengeEngineMethods = {
     this.syncTrackMedalFromChallengeBest(challenge, this.bestLapTime);
     const bestTime = this.bestLapTime;
     const rankLabel = snapshot?.playerRankLabel || "--";
-    const objectiveLabel = getDailyChallengeObjectiveLabel(challenge);
     this.dailyChallengeUi.setDailyChallengeSummary({
       available: true,
       challengeId: challenge.id,
@@ -684,9 +677,6 @@ export const dailyChallengeEngineMethods = {
       trackKey: challenge.trackKey,
       skin: challenge.skin,
       trackName: getDailyChallengeTrackName(challenge),
-      objectiveLabel,
-      modifierBadges: getDailyChallengeModifierBadges(challenge),
-      modifierLabel: getDailyChallengeModifierLabel(challenge),
       bestTime,
       bestLabel: formatDailyChallengeResultLabel(challenge, trackPersonalBest),
       rankLabel,
@@ -902,18 +892,7 @@ export const dailyChallengeEngineMethods = {
     let playlistRequestNeeded = false;
     const playlistActions = {
       onPlay: (challenge) => {
-        void this.handleStartDailyChallenge(challenge, {
-          startSource: "track_modal",
-        });
-      },
-      onLeaderboard: (challenge) => {
-        void this.leaderboards?.openDailyChallengeLeaderboardForChallenge?.(
-          challenge,
-          "close",
-          {
-            onClose: () => this.dailyChallengeUi.openPlaylistModal(loadedChallenges, playlistActions),
-          },
-        );
+        void this.handleStartDailyChallenge(challenge);
       },
     };
 
@@ -1394,7 +1373,6 @@ export const dailyChallengeEngineMethods = {
           isNewBest,
           primaryStatLabel:
             getDailyChallengeCopyLabels(challenge).primaryStatLabel,
-          variant: null,
           scoreboardSnapshot: isDailyBest
             ? optimisticVerificationSnapshot
             : existingScoreboardSnapshot,
@@ -1517,7 +1495,6 @@ export const dailyChallengeEngineMethods = {
     }
     await this.handleStartDailyChallenge(challenge, {
       preserveRaceComparisonTarget: true,
-      startSource: "leaderboard_opponent",
     });
     if (this.activeDailyChallenge?.id !== challenge.id) {
       this.clearRaceComparisonTarget?.();

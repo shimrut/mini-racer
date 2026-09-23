@@ -186,7 +186,6 @@ function enrichProgressSelection(selection, { guestOwnerId, accountOwnerId }) {
 }
 
 async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelectionRequired = null } = {}) {
-  let pauseReleaseFailed = false;
   setGuestPlayerToken(remoteState.guestToken);
   const guestOwnerId = toGuestOwnerId(getOrCreatePlayerId("guest progress selection"));
   const isSignedInAccount = Boolean(remoteState.redditUsername)
@@ -316,8 +315,7 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
     const { clearDailyChallengeClientCaches } = await import("./daily-challenge/service.js");
     clearDailyChallengeClientCaches();
     clearTrackLastLapMedals();
-    pauseReleaseFailed = !clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId);
-    if (pauseReleaseFailed) {
+    if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
       console.error("Could not release the transfer pause for", remoteState.leaderboardPlayerId);
     }
   }
@@ -349,14 +347,12 @@ async function finalizeHostedPlayerProgressState(remoteState, { onProgressSelect
   if (!hasKnownTransfer || alreadyReconciled) {
     confirmVerificationQueueTransferSafety();
     if (!clearVerificationQueueTransferBlock(remoteState.leaderboardPlayerId)) {
-      pauseReleaseFailed = true;
       console.error("Could not clear a stale transfer pause for", remoteState.leaderboardPlayerId);
     }
   }
   const authoritativeState = {
     ...remoteState,
     authoritative: true,
-    ...(pauseReleaseFailed ? { transferPauseReleaseFailed: true } : {}),
   };
   setActivePlayerOwnerId(remoteState.leaderboardPlayerId);
   writeCachedPlayerProfile(remoteState.leaderboardPlayerId, authoritativeState);

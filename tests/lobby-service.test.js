@@ -227,7 +227,8 @@ describe('lobby service', () => {
 
         expect(guest).toMatchObject({
             challengerName: 'u/RaceFan',
-            trackLabel: 'Number Three · 2 laps',
+            trackName: 'Number Three',
+            laps: 2,
             targetTimeLabel: '0:25.640',
             canAccept: true,
             statusMessage: '',
@@ -277,20 +278,20 @@ describe('lobby service', () => {
             canRace: true,
             targetTimeLabel: '0:25.640',
             gapMs: -472,
-            gapLabel: '−0.472',
+            winMarginLabel: '0.472',
         });
 
         expect(normalizeChallengeLobbyState({ ...base, outcome: 'won' })).toMatchObject({
             beaten: true,
             gapMs: null,
-            gapLabel: null,
+            winMarginLabel: null,
         });
 
         for (const outcome of ['lost', 'tie', null, undefined]) {
             const state = normalizeChallengeLobbyState({ ...base, outcome, bestTimeMs: 26000 });
             expect(state.beaten).toBe(false);
             expect(state.canAccept).toBe(true);
-            expect(state.gapLabel).toBeNull();
+            expect(state.winMarginLabel).toBeNull();
         }
     });
 

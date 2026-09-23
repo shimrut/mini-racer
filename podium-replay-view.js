@@ -635,6 +635,5 @@ export function createPodiumReplayController({
             tick((state.lastTs || now()) + Number(ms) || 0);
         },
         paint,
-        syncChrome,
     };
 }

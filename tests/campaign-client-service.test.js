@@ -21,7 +21,6 @@ describe('campaign client progress', () => {
     it('starts with only Number Zero unlocked', () => {
         const progress = deriveCampaignProgress();
         expect(progress.unlockedRaceIds).toEqual(['numbered-v1-00']);
-        expect(progress.continueRaceId).toBe('numbered-v1-00');
     });
 
     it('unlocks stages as the medal total climbs, one at a time', () => {

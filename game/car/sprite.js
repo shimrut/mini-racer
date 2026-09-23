@@ -1,6 +1,5 @@
 import { CONFIG } from "../config.js";
 import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from "./generated-player-selectable-car-assets.js";
-import { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
 export { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 

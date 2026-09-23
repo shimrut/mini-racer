@@ -82,7 +82,6 @@ function purgeExpiredQueueState(queueState, now = Date.now()) {
           submissionStage: VERIFICATION_STAGE_ERROR,
           statusText: CAMPAIGN_EXPIRY_MESSAGE,
           nextAttemptAt: null,
-          expiredAt: new Date(now).toISOString(),
         };
         changed = true;
         continue;

@@ -61,8 +61,6 @@ const CORNER_RADIUS_VALUES = CORNER_RADIUS_PRESETS.map((preset) => preset.value)
 
 const CAR_RADIUS = CONFIG.carRadius;
 const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
-const CAR_WIDTH = CAR_RADIUS * 2;
-const CAR_LENGTH = CAR_HALF_LENGTH * 2 + CAR_RADIUS * 2;
 
 function cloneTracks(source) {
     if (typeof structuredClone === 'function') {

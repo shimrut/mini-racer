@@ -1,7 +1,6 @@
 export {
     getGuestPlayerToken,
     getOrCreatePlayerId,
-    setGuestPlayerToken,
 } from './player-identity.js';
 
 const API_BASE_URL = '/api';

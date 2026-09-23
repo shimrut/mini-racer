@@ -226,10 +226,6 @@ export const headToHeadEngineMethods = {
                         bestTimeMs: challenge.targetTimeMs,
                         ghost: this.activeHeadToHead.frozenGhost,
                     });
-                    this.activeHeadToHead = {
-                        ...this.activeHeadToHead,
-                        frozenGhostPrepared: true,
-                    };
                 }
             } catch (error) {
                 console.error('Failed to prepare the Head to Head track:', error);

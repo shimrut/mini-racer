@@ -1,10 +1,7 @@
 import { RealTimeRacer } from './engine.js';
 import { setupVisibleViewportHeight } from './ui/visible-viewport.js';
 import { resolveGameLaunchTarget } from './modes/launch-target.js';
-import {
-    createModeRuntimeController,
-    clearModeRuntimeCacheForTests,
-} from './modes/runtime-loader.js';
+import { createModeRuntimeController } from './modes/runtime-loader.js';
 
 function setupMobileViewportGuards() {
     const hasTouchInput = window.matchMedia('(pointer: coarse)').matches
@@ -75,5 +72,3 @@ try {
     const loaderStatus = document.getElementById('loader-status');
     if (loaderStatus) loaderStatus.textContent = 'Unable to start. Reload to retry.';
 }
-
-export { clearModeRuntimeCacheForTests, modeRuntimeController };
