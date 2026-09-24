@@ -5,9 +5,9 @@ import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 // move fast at the center and slow at the ends when the wheel rolls. The top
 // of a rolling tire moves forward, so the grooves move toward the nose.
 //
-// The side wall is on the +y edge, with a light oval on it, as in the picture
-// that this car copies.
-export const wheel = {
+// The side wall is on the +y edge, as in the picture that this car copies.
+// The light oval on the side wall is the hub, which is its own part.
+export const tire = {
   moves: true,
   defaults: {
     length: 17.8,
@@ -54,10 +54,6 @@ export const wheel = {
       ctx.fillRect(-halfLength, faceBottom, length, side);
       ctx.fillStyle = colors.tireLine;
       ctx.fillRect(-halfLength, faceBottom - 0.25, length, 0.5);
-      ctx.beginPath();
-      ctx.ellipse(0, faceBottom + side * 0.5, halfLength - radius * 0.6, side * 0.26, 0, 0, Math.PI * 2);
-      ctx.fillStyle = colors.tireSide;
-      ctx.fill();
     });
 
     ctx.beginPath();

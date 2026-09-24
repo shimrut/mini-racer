@@ -93,18 +93,17 @@ describe('drawn car brake light', () => {
 describe('drawn car parts and skins', () => {
     const ids = (car) => car.placements.map((placement) => placement.id);
 
-    it('draws a mirrored part on the two sides and only the front wheels steer', () => {
+    it('draws a mirrored part on the two sides and only the front tires and their hubs steer', () => {
         const car = new DrawnCar();
         expect(ids(car).filter((id) => id === 'frontWing')).toHaveLength(2);
         expect(car.placements.filter((placement) => placement.steers).map((placement) => placement.id))
-            .toEqual(['frontWheelLeft', 'frontWheelRight']);
+            .toEqual(['frontTire', 'frontTire', 'frontHub', 'frontHub']);
     });
 
-    it('turns each front wheel on the middle of its inner edge, where its arms meet it', () => {
+    it('turns each front tire and its hub in place, on the center of the tire', () => {
         const car = new DrawnCar();
         for (const placement of car.placements.filter((p) => p.steers)) {
-            const towardCenter = -Math.sign(placement.at[1]);
-            expect(placement.pivot).toEqual([0, towardCenter * (placement.settings.width / 2)]);
+            expect(placement.pivot).toEqual([0, 0]);
         }
     });
 
@@ -168,32 +167,48 @@ describe('drawn car pictures', () => {
         expect(lit.r).toBeGreaterThan(220);
     });
 
-    it('turns the front wheel on its joint: the joint stays and the outer edge swings', () => {
+    it('turns the front tire in place: its center stays and its outer edge swings', () => {
+        const width = FORMULA_CAR.parts.find((part) => part.id === 'frontTire').settings.width;
         const probe = [];
         const recorder = {
             moves: true,
             defaults: {},
             draw(ctx) {
+                // A point of the part, in car units from the car center.
                 const m = ctx.getTransform();
+                const half = FORMULA_CAR.boxSize / 2;
                 const at = (x, y) => [
-                    (m.a * x + m.c * y + m.e) / PPU,
-                    (m.b * x + m.d * y + m.f) / PPU,
+                    (m.a * x + m.c * y + m.e) / PPU - half,
+                    (m.b * x + m.d * y + m.f) / PPU - half,
                 ];
-                const wheel = FORMULA_CAR.parts.find((part) => part.id === 'frontWheelLeft');
-                const halfWidth = wheel.settings.width / 2;
-                probe.push({ joint: at(0, halfWidth), outer: at(0, -halfWidth) });
+                probe.push({ center: at(0, 0), outer: at(0, -width / 2) });
             },
         };
-        const car = new DrawnCar(FORMULA_CAR, { parts: { frontWheelLeft: { part: recorder } } }, { pixelsPerUnit: PPU });
+        const car = new DrawnCar(FORMULA_CAR, { parts: { frontTire: { part: recorder } } }, { pixelsPerUnit: PPU });
         car.renderFrame();
         drive(car, 30, { steer: 1 });
         car.renderFrame();
 
-        const [straight, turned] = probe.slice(-2);
-        expect(turned.joint[0]).toBeCloseTo(straight.joint[0], 4);
-        expect(turned.joint[1]).toBeCloseTo(straight.joint[1], 4);
-        // Full right lock swings the outer edge forward by width * sin(angle).
-        const width = FORMULA_CAR.parts.find((part) => part.id === 'frontWheelLeft').settings.width;
-        expect(turned.outer[0] - straight.outer[0]).toBeCloseTo(width * Math.sin(FULL_LOCK), 2);
+        // The left tire is the one on the negative y side.
+        const [straight, turned] = probe.filter((entry) => entry.center[1] < 0).slice(-2);
+        expect(turned.center[0]).toBeCloseTo(straight.center[0], 4);
+        expect(turned.center[1]).toBeCloseTo(straight.center[1], 4);
+        // Full right lock swings the outer edge forward by half the width * sin(angle).
+        expect(turned.outer[0] - straight.outer[0]).toBeCloseTo((width / 2) * Math.sin(FULL_LOCK), 2);
+    });
+
+    it('turns the hub with its tire, and keeps the arms still', () => {
+        const car = new DrawnCar(FORMULA_CAR, {}, { pixelsPerUnit: PPU });
+        // The rear end of the hub oval of the left front tire, and a point on
+        // the front arm, clear of the tire.
+        const hubEnd = [21.5, -18.6];
+        const arm = [22, -12];
+        const straightArm = pixel(car.sprite, ...arm);
+        const straightHub = pixel(car.sprite, ...hubEnd);
+
+        drive(car, 30, { steer: 1 });
+        const frame = car.renderFrame();
+        expect(pixel(frame, ...arm)).toEqual(straightArm);
+        expect(pixel(frame, ...hubEnd)).not.toEqual(straightHub);
     });
 });

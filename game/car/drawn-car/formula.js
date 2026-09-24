@@ -3,11 +3,12 @@ import { brakeLight } from "./parts/brake-light.js";
 import { cockpit } from "./parts/cockpit.js";
 import { frontWing } from "./parts/front-wing.js";
 import { gearbox } from "./parts/gearbox.js";
+import { hub } from "./parts/hub.js";
 import { noseStripe } from "./parts/nose-stripe.js";
 import { rearWing } from "./parts/rear-wing.js";
 import { sideIntake } from "./parts/side-intake.js";
 import { suspensionArm } from "./parts/suspension-arm.js";
-import { wheel } from "./parts/wheel.js";
+import { tire } from "./parts/tire.js";
 
 // The Formula car: the red open-wheel car, seen from above, nose to the right.
 //
@@ -22,8 +23,12 @@ import { wheel } from "./parts/wheel.js";
 //   settings  changes to the part's own settings (sizes and shapes)
 //   mirror    true: the part is also drawn as a mirror copy on the right side
 //   steers    true: the part turns with the steering, around "pivot"
-//   pivot     the turn point, from the center of the part
+//   pivot     the turn point, from the center of the part (default: the
+//             center)
 //
+// A tire and its hub use the same sizes.
+const FRONT_TIRE = { length: 17, width: 9.5 };
+
 // "colors" are the named colors that all parts use. A skin can change them
 // for the whole car or for one part.
 export const FORMULA_CAR = {
@@ -63,26 +68,15 @@ export const FORMULA_CAR = {
     { id: "frontArmBack", part: suspensionArm, mirror: true, settings: { from: [26.3, -17.8], to: [19.1, -8] } },
     { id: "frontArmFront", part: suspensionArm, mirror: true, settings: { from: [27.3, -17.8], to: [31.8, -5.5] } },
 
-    { id: "rearWheelLeft", part: wheel, at: [-29.8, -23.6] },
-    { id: "rearWheelRight", part: wheel, at: [-29.8, 23.6] },
-    // A front tire turns on the joint where its arms meet it: the middle of
-    // its inner edge.
-    {
-      id: "frontWheelLeft",
-      part: wheel,
-      at: [26.8, -21.8],
-      settings: { length: 17, width: 9.5 },
-      steers: true,
-      pivot: [0, 4.75],
-    },
-    {
-      id: "frontWheelRight",
-      part: wheel,
-      at: [26.8, 21.8],
-      settings: { length: 17, width: 9.5 },
-      steers: true,
-      pivot: [0, -4.75],
-    },
+    { id: "rearTireLeft", part: tire, at: [-29.8, -23.6] },
+    { id: "rearTireRight", part: tire, at: [-29.8, 23.6] },
+    // A front tire and its hub turn in place, on the center of the tire. The
+    // arms stay still. The mirror copy puts the hub on the inner edge of the
+    // right tire too.
+    { id: "frontTire", part: tire, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
+    { id: "rearHubLeft", part: hub, at: [-29.8, -23.6] },
+    { id: "rearHubRight", part: hub, at: [-29.8, 23.6] },
+    { id: "frontHub", part: hub, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
 
     { id: "gearbox", part: gearbox },
     { id: "brakeLight", part: brakeLight },
