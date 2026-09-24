@@ -5,8 +5,9 @@ import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 // move fast at the center and slow at the ends when the wheel rolls. The top
 // of a rolling tire moves forward, so the grooves move toward the nose.
 //
-// The side wall is on the +y edge, as in the picture that this car copies.
-// The light oval on the side wall is the hub, which is its own part.
+// The side wall is on the +y edge. Place the left tire and mirror it, so the
+// side wall faces the body on both sides. The light oval on the side wall
+// is the hub, which is its own part.
 export const tire = {
   moves: true,
   defaults: {

@@ -64,8 +64,7 @@ export const RALLY_CAR = {
     formulaPart("frontArmFront"),
 
     { id: "mudFlap", part: mudFlap, mirror: true },
-    { id: "rearTireLeft", part: knobbyTire, at: [-29.8, REAR_TIRE_Y], settings: REAR_TIRE },
-    { id: "rearTireRight", part: knobbyTire, at: [-29.8, -REAR_TIRE_Y], settings: REAR_TIRE },
+    { id: "rearTire", part: knobbyTire, at: [-29.8, REAR_TIRE_Y], settings: REAR_TIRE, mirror: true },
     {
       id: "frontTire",
       part: knobbyTire,
@@ -74,8 +73,7 @@ export const RALLY_CAR = {
       mirror: true,
       steers: true,
     },
-    { id: "rearHubLeft", part: hub, at: [-29.8, REAR_TIRE_Y], settings: { ...REAR_TIRE, sideWidth: 0.26 } },
-    { id: "rearHubRight", part: hub, at: [-29.8, -REAR_TIRE_Y], settings: { ...REAR_TIRE, sideWidth: 0.26 } },
+    { id: "rearHub", part: hub, at: [-29.8, REAR_TIRE_Y], settings: { ...REAR_TIRE, sideWidth: 0.26 }, mirror: true },
     {
       id: "frontHub",
       part: hub,

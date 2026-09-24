@@ -101,6 +101,19 @@ describe('drawn car parts and skins', () => {
             .toEqual(['frontTire', 'frontTire', 'frontHub', 'frontHub']);
     });
 
+    it.each(['formula', 'rally'])('puts every hub of the %s car on the inner edge of its tire, facing the body', (model) => {
+        const car = new DrawnCar(DRAWN_CAR_MODELS[model]);
+        const hubs = car.placements.filter((placement) => placement.part === car.placements.find((p) => p.id === 'rearHub').part);
+        expect(hubs).toHaveLength(4);
+        for (const hub of hubs) {
+            const side = hub.flip ? -1 : 1;
+            const { width, sideWidth } = hub.settings;
+            const tireCenterY = hub.at[1] * side;
+            const ovalY = (hub.at[1] + width / 2 - (width * sideWidth) / 2) * side;
+            expect(Math.abs(ovalY)).toBeLessThan(Math.abs(tireCenterY));
+        }
+    });
+
     it('turns each front tire and its hub in place, on the center of the tire', () => {
         const car = new DrawnCar();
         for (const placement of car.placements.filter((p) => p.steers)) {

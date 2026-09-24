@@ -5,8 +5,9 @@ import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 // blocks go around the drum, so they roll with the speed like the grooves of
 // the road tire: fast at the center and slow at the ends.
 //
-// The side wall is on the +y edge. The light oval on it is the hub, which is
-// its own part.
+// The side wall is on the +y edge. Place the left tire and mirror it, so the
+// side wall faces the body on both sides. The light oval on it is the hub,
+// which is its own part.
 export const knobbyTire = {
   moves: true,
   defaults: {

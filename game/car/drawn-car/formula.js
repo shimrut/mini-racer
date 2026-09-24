@@ -88,14 +88,13 @@ export const FORMULA_CAR = {
     { id: "frontArmBack", part: suspensionArm, mirror: true, settings: { from: [26.3, -17.8], to: [19.1, -8] } },
     { id: "frontArmFront", part: suspensionArm, mirror: true, settings: { from: [27.3, -17.8], to: [31.8, -5.5] } },
 
-    { id: "rearTireLeft", part: tire, at: [-29.8, -23.6] },
-    { id: "rearTireRight", part: tire, at: [-29.8, 23.6] },
+    // Each tire is a mirror pair, so the side wall and the hub face the body
+    // on both sides of the car.
+    { id: "rearTire", part: tire, at: [-29.8, -23.6], mirror: true },
     // A front tire and its hub turn in place, on the center of the tire. The
-    // arms stay still. The mirror copy puts the hub on the inner edge of the
-    // right tire too.
+    // arms stay still.
     { id: "frontTire", part: tire, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
-    { id: "rearHubLeft", part: hub, at: [-29.8, -23.6] },
-    { id: "rearHubRight", part: hub, at: [-29.8, 23.6] },
+    { id: "rearHub", part: hub, at: [-29.8, -23.6], mirror: true },
     { id: "frontHub", part: hub, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
 
     { id: "gearbox", part: gearbox },
