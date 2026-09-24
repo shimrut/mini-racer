@@ -137,3 +137,21 @@ export function mix(fromHex, toHex, amount) {
   const channels = from.map((channel, index) => Math.round(channel + (to[index] - channel) * t));
   return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
+
+export function isHexColor(value) {
+  return typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+
+// The four tones of one paint color: the color itself, its shadow, its deep
+// shadow and its highlight. A color can also come as an object that gives
+// some tones by hand; the missing tones are made from the base.
+export function paintTones(color) {
+  const tones = typeof color === "string" ? { base: color } : { ...color };
+  if (!isHexColor(tones.base)) return null;
+  return {
+    base: tones.base,
+    shade: isHexColor(tones.shade) ? tones.shade : mix(tones.base, "#000000", 0.28),
+    deep: isHexColor(tones.deep) ? tones.deep : mix(tones.base, "#000000", 0.4),
+    light: isHexColor(tones.light) ? tones.light : mix(tones.base, "#ffffff", 0.22),
+  };
+}

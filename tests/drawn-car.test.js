@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCanvas } from '@napi-rs/canvas';
 import { DrawnCar } from '../game/car/drawn-car.js';
 import { FORMULA_CAR } from '../game/car/drawn-car/formula.js';
+import { paintTones } from '../game/car/drawn-car/paint.js';
 
 const FRAME = 1 / 60;
 const FULL_LOCK = (FORMULA_CAR.steering.maxAngleDeg * Math.PI) / 180;
@@ -107,19 +108,37 @@ describe('drawn car parts and skins', () => {
         }
     });
 
-    it('lets a skin change the colors of the car, the colors of one part, and hide a part', () => {
+    it('lets a skin change the livery, the paint of an area, the material of one part, and hide a part', () => {
         const car = new DrawnCar(FORMULA_CAR, {
-            colors: { paint: '#1e6fe8' },
+            livery: { main: '#1e6fe8' },
+            decals: { rearWingEnds: 'accent', frontWingTips: '#00ff00' },
             parts: {
-                rearWing: { colors: { paint: '#ffffff' } },
+                gearbox: { colors: { frame: '#ffffff' } },
                 noseStripe: { hidden: true },
             },
         });
         const byId = (id) => car.placements.find((placement) => placement.id === id);
-        expect(byId('body').colors.paint).toBe('#1e6fe8');
-        expect(byId('rearWing').colors.paint).toBe('#ffffff');
-        expect(byId('rearWing').colors.stripe).toBe(FORMULA_CAR.colors.stripe);
+        const paint = byId('body').paint;
+        expect(paint('body', 'main').base).toBe('#1e6fe8');
+        expect(paint('rearWingEnds').base).toBe(FORMULA_CAR.livery.accent);
+        expect(paint('frontWingTips').base).toBe('#00ff00');
+        expect(paint('centerStripe')).toBeNull();
+        expect(byId('gearbox').colors.frame).toBe('#ffffff');
+        expect(byId('rearWing').colors.frame).toBe(FORMULA_CAR.colors.frame);
         expect(byId('noseStripe')).toBeUndefined();
+    });
+
+    it('uses the default paint when a skin names a color that does not exist', () => {
+        const car = new DrawnCar(FORMULA_CAR, { decals: { rearWing: 'acent', rearWingEnds: 'acent' } });
+        const paint = car.placements[0].paint;
+        expect(paint('rearWing', 'main').base).toBe(FORMULA_CAR.livery.main.base);
+        expect(paint('rearWingEnds')).toBeNull();
+    });
+
+    it('makes the shadow, deep shadow and highlight tones from one color', () => {
+        expect(paintTones('#ff0000')).toEqual({ base: '#ff0000', shade: '#b80000', deep: '#990000', light: '#ff3838' });
+        expect(paintTones({ base: '#ff0000', shade: '#123456' }).shade).toBe('#123456');
+        expect(paintTones('red')).toBeNull();
     });
 
     it('keeps the parts that do not move together, and draws each moving part alone', () => {
@@ -156,6 +175,27 @@ describe('drawn car pictures', () => {
         const data = canvas.getContext('2d').getImageData(Math.round(center + x * PPU), Math.round(center + y * PPU), 1, 1).data;
         return { r: data[0], g: data[1], b: data[2], a: data[3] };
     }
+
+    it('paints each decal area with the color that the skin gives it', () => {
+        const hex = ({ r, g, b }) => `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+        const plain = new DrawnCar(FORMULA_CAR, {}, { pixelsPerUnit: PPU });
+        const skinned = new DrawnCar(FORMULA_CAR, {
+            livery: { main: '#1e6fe8', accent: '#ff6a00', tertiary: '#b6ff3a' },
+            decals: { rearWingEnds: 'accent', frontWingTips: '#00ff00', sidePodStripes: 'tertiary', noseStripe: null },
+        }, { pixelsPerUnit: PPU });
+        const rearWingEnd = [-45, -15.5];
+        const frontWingTip = [40, -17];
+        const sidePod = [-3, -15.6];
+        const noseStripe = [36.5, 0];
+
+        expect(hex(pixel(plain.sprite, ...rearWingEnd))).toBe(FORMULA_CAR.livery.main.base);
+        expect(hex(pixel(plain.sprite, ...noseStripe))).toBe(FORMULA_CAR.livery.accent);
+
+        expect(hex(pixel(skinned.sprite, ...rearWingEnd))).toBe('#ff6a00');
+        expect(hex(pixel(skinned.sprite, ...frontWingTip))).toBe('#00ff00');
+        expect(hex(pixel(skinned.sprite, ...sidePod))).toBe('#b6ff3a');
+        expect(hex(pixel(skinned.sprite, ...noseStripe))).toBe('#1e6fe8');
+    });
 
     it('shows the brake light dark at rest and bright red when the car brakes', () => {
         const car = new DrawnCar(FORMULA_CAR, {}, { pixelsPerUnit: PPU });

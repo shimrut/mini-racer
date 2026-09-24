@@ -15,6 +15,13 @@ import {
 // lower edges are dark and the upper edges are light, as if the light comes
 // from the -y side.
 //
+// Decal areas:
+//   body            the paint of the whole body
+//   centerStripe    a stripe along the center of the tub, from the rear to
+//                   the nose tip
+//   sidePodStripes  a thin stripe along each side pod and the nose
+//   noseTip         the front end of the nose
+//
 // All shapes give their left half (negative y), from the rear to the front.
 export const body = {
   defaults: {
@@ -40,34 +47,93 @@ export const body = {
     // The dark valley around the tub, and its light rim.
     valley: 1.2,
     rim: 1.1,
+
+    // The center stripe: its half width at the rear and at the nose tip.
+    centerStripe: { from: -34, to: 51, rearHalf: 2.4, noseHalf: 0.9 },
+    // The side pod stripe runs through these points, on the left side.
+    sidePodStripe: {
+      points: [[-11.5, -16.3], [-3, -15.6], [3, -12.9], [10, -9.7], [18, -7.7], [29, -6.1], [38, -4.4]],
+      width: 1.3,
+    },
+    // The nose tip starts here.
+    noseTipFrom: 44.5,
   },
 
-  draw(ctx, { settings, colors, outline }) {
+  draw(ctx, { settings, colors, paint, outline }) {
+    const main = paint("body", "main");
     const shape = mirrorHalf(settings.shape);
     const tub = mirrorHalf(settings.tub);
     const traceBody = (c) => traceSmooth(c, shape);
     const traceTub = (c) => traceSmooth(c, tub);
+    const traceChevrons = (c) => {
+      traceSmooth(c, mirrorHalf(settings.rearChevron));
+      traceSmooth(c, mirrorHalf(settings.noseChevron));
+    };
 
-    const sidePod = mix(colors.paint, colors.paintShade, 0.3);
-    fillWithOutline(ctx, traceBody, sidePod, { outline, outlineColor: colors.outline });
-    facingBand(ctx, traceBody, colors.paintLight, -settings.upperBand);
-    facingBand(ctx, traceBody, colors.paintDeep, settings.lowerBand);
+    fillWithOutline(ctx, traceBody, mix(main.base, main.shade, 0.3), { outline, outlineColor: colors.outline });
+    facingBand(ctx, traceBody, main.light, -settings.upperBand);
+    facingBand(ctx, traceBody, main.deep, settings.lowerBand);
 
     insideShape(ctx, traceBody, () => {
       ctx.beginPath();
       traceTub(ctx);
       ctx.lineWidth = settings.valley * 2;
       ctx.lineJoin = "round";
-      ctx.strokeStyle = colors.paintShade;
+      ctx.strokeStyle = main.shade;
       ctx.stroke();
 
-      fillShape(ctx, traceTub, colors.paint);
-      edgeBand(ctx, traceTub, colors.paintLight, settings.rim);
+      fillShape(ctx, traceTub, main.base);
+      edgeBand(ctx, traceTub, main.light, settings.rim);
+      drawSidePodStripes(ctx, settings.sidePodStripe, paint("sidePodStripes"));
       insideShape(ctx, traceTub, () => {
-        fillShape(ctx, (c) => traceSmooth(c, mirrorHalf(settings.rearChevron)), colors.paintShade);
-        fillShape(ctx, (c) => traceSmooth(c, mirrorHalf(settings.noseChevron)), colors.paintShade);
+        fillShape(ctx, traceChevrons, main.shade);
+        drawCenterStripe(ctx, settings.centerStripe, paint("centerStripe"), traceChevrons);
       });
-      facingBand(ctx, traceTub, colors.paintShade, settings.lowerBand * 0.6);
+      facingBand(ctx, traceTub, main.shade, settings.lowerBand * 0.6);
+      drawNoseTip(ctx, settings.noseTipFrom, paint("noseTip"), traceBody, settings.lowerBand);
     });
   },
 };
+
+// The stripe takes the shadow tone where the chevrons are dark.
+function drawCenterStripe(ctx, stripe, tones, traceChevrons) {
+  if (!tones) return;
+  const { from, to, rearHalf, noseHalf } = stripe;
+  const trace = (c) => {
+    c.moveTo(from, -rearHalf);
+    c.lineTo(to, -noseHalf);
+    c.lineTo(to, noseHalf);
+    c.lineTo(from, rearHalf);
+    c.closePath();
+  };
+  fillShape(ctx, trace, tones.base);
+  insideShape(ctx, trace, () => fillShape(ctx, traceChevrons, tones.shade));
+}
+
+function drawSidePodStripes(ctx, stripe, tones) {
+  if (!tones) return;
+  for (const side of [1, -1]) {
+    ctx.beginPath();
+    stripe.points.forEach(([x, y], index) => {
+      if (index === 0) ctx.moveTo(x, y * side);
+      else ctx.lineTo(x, y * side);
+    });
+    ctx.lineWidth = stripe.width;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = tones.base;
+    ctx.stroke();
+  }
+}
+
+function drawNoseTip(ctx, from, tones, traceBody, lowerBand) {
+  if (!tones) return;
+  const traceTip = (c) => {
+    c.rect(from, -20, 20, 40);
+  };
+  insideShape(ctx, traceTip, () => {
+    fillShape(ctx, traceBody, tones.base);
+    facingBand(ctx, traceBody, tones.light, -lowerBand * 0.6);
+    facingBand(ctx, traceBody, tones.deep, lowerBand * 0.8);
+  });
+}

@@ -1,5 +1,8 @@
-// The yellow stripe on the nose. It is wider at the rear and narrow at the
+// The short stripe on the nose. It is wider at the rear and narrow at the
 // front, with round ends.
+//
+// Decal area:
+//   noseStripe  the stripe; with no paint, the stripe is not drawn
 export const noseStripe = {
   defaults: {
     from: 32.8,
@@ -8,7 +11,9 @@ export const noseStripe = {
     frontWidth: 1.8,
   },
 
-  draw(ctx, { settings, colors }) {
+  draw(ctx, { settings, paint }) {
+    const tones = paint("noseStripe");
+    if (!tones) return;
     const { from, to, width, frontWidth } = settings;
     const rearHalf = width / 2;
     const frontHalf = frontWidth / 2;
@@ -18,7 +23,7 @@ export const noseStripe = {
     ctx.arc(to - frontHalf, 0, frontHalf, -Math.PI / 2, Math.PI / 2);
     ctx.lineTo(from + rearHalf, rearHalf);
     ctx.arc(from + rearHalf, 0, rearHalf, Math.PI / 2, Math.PI * 1.5);
-    ctx.fillStyle = colors.stripe;
+    ctx.fillStyle = tones.base;
     ctx.fill();
   },
 };

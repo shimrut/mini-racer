@@ -1,7 +1,10 @@
 import { fillWithOutline, insideShape } from "../paint.js";
 
-// The cockpit: a dark glass dome with a bright red rim around it. The glass
-// is darker at its lower rear side and has a curved shine on its upper side.
+// The cockpit: a dark glass dome with a painted rim around it. The glass is
+// darker at its lower rear side and has a curved shine on its upper side.
+//
+// Decal area:
+//   cockpitRim  the rim around the glass
 // Adds an oval as its own closed shape.
 function oval(ctx, cx, cy, rx, ry) {
   ctx.moveTo(cx + rx, cy);
@@ -17,7 +20,7 @@ export const cockpit = {
     rim: 1.6,
   },
 
-  draw(ctx, { settings, colors, outline }) {
+  draw(ctx, { settings, colors, paint, outline }) {
     const { x, length, width, rim } = settings;
     const rx = length / 2;
     const ry = width / 2;
@@ -25,7 +28,7 @@ export const cockpit = {
 
     ctx.beginPath();
     oval(ctx, x, 0, rx + rim, ry + rim);
-    ctx.fillStyle = colors.paint;
+    ctx.fillStyle = paint("cockpitRim", "main").base;
     ctx.fill();
 
     fillWithOutline(ctx, traceGlass, colors.glassShade, { outline, outlineColor: colors.outline });

@@ -29,19 +29,39 @@ import { tire } from "./parts/tire.js";
 // A tire and its hub use the same sizes.
 const FRONT_TIRE = { length: 17, width: 9.5 };
 
-// "colors" are the named colors that all parts use. A skin can change them
-// for the whole car or for one part.
+// "livery" gives the three paint colors, and "decals" gives the paint of
+// each decal area. game/car/drawn-car.js tells how they work. "colors" are
+// the materials that are not paint: glass, frame, tires, lights.
 export const FORMULA_CAR = {
   // The square that holds the car. The car is 100 units of it.
   boxSize: 110,
   outline: 1.3,
 
+  livery: {
+    // The tones of the red in the picture that this car copies.
+    main: { base: "#f90815", shade: "#b40106", deep: "#960000", light: "#ff3c40" },
+    accent: "#feed4c",
+    tertiary: "#ffffff",
+  },
+
+  // Each area takes "main", "accent", "tertiary", a color, or null.
+  decals: {
+    body: "main",
+    centerStripe: null,
+    sidePodStripes: null,
+    noseTip: null,
+    noseStripe: "accent",
+    cockpitRim: "main",
+    intakes: null,
+    rearWing: "main",
+    rearWingFlap: null,
+    rearWingEnds: null,
+    frontWing: "main",
+    frontWingTips: null,
+    frontWingEdge: null,
+  },
+
   colors: {
-    paint: "#f90815",
-    paintShade: "#b40106",
-    paintDeep: "#960000",
-    paintLight: "#ff3c40",
-    stripe: "#feed4c",
     glass: "#40515b",
     glassShade: "#2c3944",
     glassShine: "#8295a1",

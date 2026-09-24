@@ -1,4 +1,5 @@
 import { FORMULA_CAR } from "./drawn-car/formula.js";
+import { isHexColor, paintTones } from "./drawn-car/paint.js";
 
 // Draws a car in code from its parts. Each part is its own file in
 // game/car/drawn-car/parts/, and a car file such as
@@ -10,9 +11,23 @@ import { FORMULA_CAR } from "./drawn-car/formula.js";
 //   draw()      draws the part in car units
 //   drawGround() optional: draws on the ground below the car
 //
+// The paint of a car has three colors, the livery:
+//   main      the body color
+//   accent    the second color
+//   tertiary  the third color
+// Each color is one value, such as "#1e6fe8". The shadow, deep shadow and
+// highlight tones come from it. To set a tone by hand, give an object:
+//   { base: "#f90815", shade: "#b40106", deep: "#960000", light: "#ff3c40" }
+//
+// The decals are the areas of the car that take paint. Each area takes
+// "main", "accent", "tertiary", a color such as "#ffffff", or null for no
+// paint. The car file lists the areas and their default paint.
+//
 // A skin changes a car without a copy of it:
-//   colors            color changes for the whole car
-//   parts[id].colors  color changes for one part
+//   livery            new main, accent or tertiary colors
+//   decals            new paint for some areas
+//   colors            new colors for the materials: glass, tires, frame
+//   parts[id].colors  new material colors for one part
 //   parts[id].settings  size or shape changes for one part
 //   parts[id].part    a different part file in that place
 //   parts[id].hidden  true: the part is not drawn
@@ -187,6 +202,7 @@ export class DrawnCar {
 // part gets a second placement for the right side.
 function placeParts(car, skin = {}) {
   const carColors = { ...car.colors, ...(skin.colors || {}) };
+  const paint = makePaint(car, skin);
   const placements = [];
   for (const item of car.parts) {
     const change = skin.parts?.[item.id] || {};
@@ -201,11 +217,30 @@ function placeParts(car, skin = {}) {
       steers: item.steers === true,
       pivot: item.pivot || [0, 0],
       flip: false,
+      paint,
     };
     placements.push(placement);
     if (item.mirror) placements.push({ ...placement, flip: true });
   }
   return placements;
+}
+
+// Gives the paint of a decal area: the four tones of its color, or null when
+// the area has no paint. "fallback" is the paint when the area has no paint
+// or an unknown one, for the areas that always need paint.
+function makePaint(car, skin = {}) {
+  const livery = { ...car.livery, ...(skin.livery || {}) };
+  const decals = { ...car.decals, ...(skin.decals || {}) };
+  const tones = new Map();
+  const tonesOf = (value) => {
+    if (value === null || value === undefined) return null;
+    if (!tones.has(value)) {
+      const color = typeof value === "string" && Object.hasOwn(livery, value) ? livery[value] : value;
+      tones.set(value, isHexColor(color) || (color && typeof color === "object") ? paintTones(color) : null);
+    }
+    return tones.get(value);
+  };
+  return (area, fallback = null) => tonesOf(decals[area]) ?? tonesOf(fallback);
 }
 
 // Splits the parts into groups: parts that do not move and are next to each
@@ -237,6 +272,7 @@ function drawPlacement(ctx, placement, motion, outline, method = "draw") {
   placement.part[method](ctx, {
     settings: placement.settings,
     colors: placement.colors,
+    paint: placement.paint,
     motion,
     outline,
   });
