@@ -1,0 +1,69 @@
+import { fillShape, insideShape, traceRoundRect } from "../paint.js";
+
+// A tire seen from above. The tire is a drum: it is light at the center and
+// dark at the front and rear ends. The grooves go around the drum, so they
+// move fast at the center and slow at the ends when the wheel rolls. The top
+// of a rolling tire moves forward, so the grooves move toward the nose.
+//
+// The side wall is on the +y edge, with a light oval on it, as in the picture
+// that this car copies.
+export const wheel = {
+  moves: true,
+  defaults: {
+    length: 17.8,
+    width: 10.8,
+    // The side wall, as a part of the tire width.
+    sideWidth: 0.3,
+    // The number of grooves around the tire.
+    grooves: 16,
+    grooveWidth: 0.7,
+    grooveStrength: 0.2,
+  },
+
+  draw(ctx, { settings, colors, motion, outline }) {
+    const { length, width, sideWidth, grooves, grooveWidth, grooveStrength } = settings;
+    const halfLength = length / 2;
+    const halfWidth = width / 2;
+    const radius = Math.min(length, width) * 0.28;
+    const trace = (c) => traceRoundRect(c, -halfLength, -halfWidth, length, width, radius);
+
+    const drum = ctx.createLinearGradient(-halfLength, 0, halfLength, 0);
+    drum.addColorStop(0, colors.tire);
+    drum.addColorStop(0.35, colors.tireFace);
+    drum.addColorStop(0.65, colors.tireFace);
+    drum.addColorStop(1, colors.tire);
+    fillShape(ctx, trace, drum);
+
+    const side = width * sideWidth;
+    const faceBottom = halfWidth - side;
+    insideShape(ctx, trace, () => {
+      const step = (Math.PI * 2) / grooves;
+      const turn = ((motion.roll / halfLength) % step + step) % step;
+      const strength = grooveStrength * (1 - motion.rollBlur * 0.65);
+      ctx.fillStyle = colors.tireLine;
+      for (let angle = -Math.PI / 2 + turn; angle < Math.PI / 2; angle += step) {
+        const depth = Math.cos(angle);
+        const x = halfLength * Math.sin(angle);
+        const grooveLength = grooveWidth * depth;
+        ctx.globalAlpha = strength * depth;
+        ctx.fillRect(x - grooveLength / 2, -halfWidth, grooveLength, faceBottom + halfWidth);
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = colors.tire;
+      ctx.fillRect(-halfLength, faceBottom, length, side);
+      ctx.fillStyle = colors.tireLine;
+      ctx.fillRect(-halfLength, faceBottom - 0.25, length, 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, faceBottom + side * 0.5, halfLength - radius * 0.6, side * 0.26, 0, 0, Math.PI * 2);
+      ctx.fillStyle = colors.tireSide;
+      ctx.fill();
+    });
+
+    ctx.beginPath();
+    trace(ctx);
+    ctx.lineWidth = outline;
+    ctx.strokeStyle = colors.outline;
+    ctx.stroke();
+  },
+};
