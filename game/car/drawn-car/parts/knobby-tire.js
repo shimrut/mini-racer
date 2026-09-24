@@ -5,6 +5,8 @@ import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 // blocks go around the drum, so they roll with the speed like the grooves of
 // the road tire: fast at the center and slow at the ends.
 //
+// A winter tire has studs: a small metal dot on each block.
+//
 // The side wall is on the +y edge. Place the left tire and mirror it, so the
 // side wall faces the body on both sides. The light oval on it is the hub,
 // which is its own part.
@@ -20,10 +22,13 @@ export const knobbyTire = {
     blockLength: 2.6,
     // How far the blocks stick out past the edges of the tire.
     knob: 0.8,
+    // true: each block has a metal stud, in the "stud" color.
+    studs: false,
+    studSize: 0.45,
   },
 
   draw(ctx, { settings, colors, motion, outline }) {
-    const { length, width, sideWidth, blocks, blockLength, knob } = settings;
+    const { length, width, sideWidth, blocks, blockLength, knob, studs, studSize } = settings;
     const halfLength = length / 2;
     const halfWidth = width / 2;
     const radius = Math.min(length, width) * 0.22;
@@ -78,11 +83,18 @@ export const knobbyTire = {
         [outerRow, -halfWidth + 0.6, middle - 0.35],
         [innerRow, middle + 0.35, faceBottom - 0.5],
       ];
-      ctx.fillStyle = drum;
       for (const [row, top, bottom] of rows) {
         for (const [x, blockSize, depth] of row) {
           ctx.globalAlpha = Math.min(1, 0.35 + depth) * contrast + (1 - contrast) * 0.5;
+          ctx.fillStyle = drum;
           ctx.fillRect(x - blockSize / 2, top, blockSize, bottom - top);
+          if (studs && depth > 0.25) {
+            ctx.globalAlpha = depth * contrast;
+            ctx.fillStyle = colors.stud;
+            ctx.beginPath();
+            ctx.ellipse(x, (top + bottom) / 2, studSize * depth, studSize, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
       ctx.globalAlpha = 1;

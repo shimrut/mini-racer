@@ -1,16 +1,21 @@
 import { rgba } from "../paint.js";
 
-// Mud on the car: brown splashes with small drops around them. The mud goes
-// only where the car already has paint, so it never shows on the ground.
-// It must come after the parts it covers, in the same group of parts that do
-// not move.
+// Dirt on the car: splashes with small drops around them. The "mud" and
+// "mudLight" colors give the look: brown for mud, white for snow. The dirt
+// goes only where the car already has paint, so it never shows on the
+// ground. It must come after the parts it covers, in the same group of parts
+// that do not move.
 //
 // Each zone gives an area of the left side of the car, the number of
 // splashes and their size. The right side gets its own splashes, so the two
 // sides do not look the same. The seed makes the same splashes every time.
 //
-// A thin film of dust also covers the rear of the car. "dust" is its
-// strength at the rear edge, and "dustTo" is where it ends.
+// "lumps" is the number of blobs in one splash: more lumps give a soft clump,
+// as for snow. "drops" is the smallest and largest number of small drops
+// around a splash, and "opacity" the range of its strength.
+//
+// A thin film of dust, or frost, also covers the rear of the car. "dust" is
+// its strength at the rear edge, and "dustTo" is where it ends.
 export const mud = {
   defaults: {
     seed: 7,
@@ -21,6 +26,9 @@ export const mud = {
       { x: [14, 34], y: [-8, -4], count: 5, size: [0.6, 1.3] },
       { x: [37, 46], y: [-18, -8], count: 4, size: [0.6, 1.3] },
     ],
+    lumps: 1,
+    drops: [2, 4],
+    opacity: [0.6, 0.9],
     dust: 0.3,
     dustTo: -12,
   },
@@ -40,7 +48,7 @@ export const mud = {
     for (const zone of settings.zones) {
       for (const side of [1, -1]) {
         for (let i = 0; i < zone.count; i += 1) {
-          splash(ctx, between(zone.x), between(zone.y) * side, between(zone.size), colors, random);
+          splash(ctx, between(zone.x), between(zone.y) * side, between(zone.size), settings, colors, random);
         }
       }
     }
@@ -48,13 +56,24 @@ export const mud = {
   },
 };
 
-function splash(ctx, x, y, size, colors, random) {
-  ctx.globalAlpha = 0.6 + random() * 0.3;
+function splash(ctx, x, y, size, settings, colors, random) {
+  const [lowOpacity, highOpacity] = settings.opacity;
+  ctx.globalAlpha = lowOpacity + random() * (highOpacity - lowOpacity);
   ctx.fillStyle = colors.mud;
   ctx.beginPath();
-  ctx.ellipse(x, y, size * (0.8 + random() * 0.5), size * (0.6 + random() * 0.4), random() * Math.PI, 0, Math.PI * 2);
+  for (let i = 0; i < settings.lumps; i += 1) {
+    const lumpX = i === 0 ? x : x + (random() - 0.5) * size * 1.2;
+    const lumpY = i === 0 ? y : y + (random() - 0.5) * size * 0.9;
+    const scale = i === 0 ? 1 : 0.55 + random() * 0.35;
+    const rx = size * scale * (0.8 + random() * 0.5);
+    const ry = size * scale * (0.6 + random() * 0.4);
+    const turn = random() * Math.PI;
+    ctx.moveTo(lumpX + rx * Math.cos(turn), lumpY + rx * Math.sin(turn));
+    ctx.ellipse(lumpX, lumpY, rx, ry, turn, 0, Math.PI * 2);
+  }
   ctx.fill();
-  const drops = 2 + Math.floor(random() * 3);
+  const [fewestDrops, mostDrops] = settings.drops;
+  const drops = fewestDrops + Math.floor(random() * (mostDrops - fewestDrops + 1));
   for (let i = 0; i < drops; i += 1) {
     const angle = random() * Math.PI * 2;
     const distance = size * (1.3 + random() * 1.1);

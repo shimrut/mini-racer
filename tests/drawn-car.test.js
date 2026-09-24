@@ -285,6 +285,17 @@ describe('rally car', () => {
         return canvas.getContext('2d').getImageData(Math.round(center + x * PPU), Math.round(center + y * PPU), 1, 1).data[3];
     }
 
+    it('gives the snow car studded tires, four lamps and snow in the place of mud', () => {
+        const car = new DrawnCar(DRAWN_CAR_MODELS.snow);
+        const byId = (id) => car.placements.find((placement) => placement.id === id);
+        expect(byId('rearTire').settings.studs).toBe(true);
+        expect(byId('frontTire').settings.studs).toBe(true);
+        expect(byId('lightPod').settings.lamps).toBe(4);
+        expect(byId('mud')).toBeUndefined();
+        expect(byId('snow').settings.lumps).toBeGreaterThan(1);
+        expect(new DrawnCar(RALLY).placements.find((p) => p.id === 'rearTire').settings.studs).toBe(false);
+    });
+
     it('has the rugged parts, and steers its knobby front tires and their hubs', () => {
         const car = new DrawnCar(RALLY);
         const ids = new Set(car.placements.map((placement) => placement.id));
@@ -293,9 +304,9 @@ describe('rally car', () => {
             .toEqual(['frontTire', 'frontTire', 'frontHub', 'frontHub']);
     });
 
-    it('keeps the mud on the car, never on the ground around it', () => {
-        const plain = new DrawnCar(RALLY, { parts: { mud: { hidden: true } } }, { pixelsPerUnit: PPU });
-        const muddy = new DrawnCar(RALLY, {}, { pixelsPerUnit: PPU });
+    it.each([['rally', 'mud'], ['snow', 'snow']])('keeps the %s car dirt (%s) on the car, never on the ground around it', (model, dirtId) => {
+        const plain = new DrawnCar(DRAWN_CAR_MODELS[model], { parts: { [dirtId]: { hidden: true } } }, { pixelsPerUnit: PPU });
+        const muddy = new DrawnCar(DRAWN_CAR_MODELS[model], {}, { pixelsPerUnit: PPU });
         const size = plain.sprite.width;
         const a = plain.sprite.getContext('2d').getImageData(0, 0, size, size).data;
         const b = muddy.sprite.getContext('2d').getImageData(0, 0, size, size).data;
