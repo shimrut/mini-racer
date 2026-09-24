@@ -1,4 +1,5 @@
 import { FORMULA_CAR } from "./drawn-car/formula.js";
+import { RALLY_CAR } from "./drawn-car/rally.js";
 import { isHexColor, paintTones } from "./drawn-car/paint.js";
 
 // Draws a car in code from its parts. Each part is its own file in
@@ -36,7 +37,7 @@ import { isHexColor, paintTones } from "./drawn-car/paint.js";
 // with the speed, and the brake light comes on when the car loses speed
 // quickly. The parts that do not move are drawn one time and kept.
 
-export const DRAWN_CAR_MODELS = Object.freeze({ formula: FORMULA_CAR });
+export const DRAWN_CAR_MODELS = Object.freeze({ formula: FORMULA_CAR, rally: RALLY_CAR });
 
 const STILL = Object.freeze({ steerAngle: 0, roll: 0, rollBlur: 0, brake: 0 });
 

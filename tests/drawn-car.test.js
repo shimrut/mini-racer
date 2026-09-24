@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCanvas } from '@napi-rs/canvas';
-import { DrawnCar } from '../game/car/drawn-car.js';
+import { DRAWN_CAR_MODELS, DrawnCar } from '../game/car/drawn-car.js';
 import { FORMULA_CAR } from '../game/car/drawn-car/formula.js';
 import { paintTones } from '../game/car/drawn-car/paint.js';
 
@@ -250,5 +250,51 @@ describe('drawn car pictures', () => {
         const frame = car.renderFrame();
         expect(pixel(frame, ...arm)).toEqual(straightArm);
         expect(pixel(frame, ...hubEnd)).not.toEqual(straightHub);
+    });
+});
+
+describe('rally car', () => {
+    const RALLY = DRAWN_CAR_MODELS.rally;
+    const PPU = 4;
+    let savedDocument;
+
+    beforeAll(() => {
+        savedDocument = globalThis.document;
+        globalThis.document = { createElement: () => createCanvas(1, 1) };
+    });
+
+    afterAll(() => {
+        globalThis.document = savedDocument;
+    });
+
+    function alphaAt(canvas, x, y) {
+        const center = canvas.width / 2;
+        return canvas.getContext('2d').getImageData(Math.round(center + x * PPU), Math.round(center + y * PPU), 1, 1).data[3];
+    }
+
+    it('has the rugged parts, and steers its knobby front tires and their hubs', () => {
+        const car = new DrawnCar(RALLY);
+        const ids = new Set(car.placements.map((placement) => placement.id));
+        for (const id of ['mudFlap', 'lightPod', 'airScoop', 'louvers', 'mud']) expect(ids.has(id)).toBe(true);
+        expect(car.placements.filter((placement) => placement.steers).map((placement) => placement.id))
+            .toEqual(['frontTire', 'frontTire', 'frontHub', 'frontHub']);
+    });
+
+    it('keeps the mud on the car, never on the ground around it', () => {
+        const plain = new DrawnCar(RALLY, { parts: { mud: { hidden: true } } }, { pixelsPerUnit: PPU });
+        const muddy = new DrawnCar(RALLY, {}, { pixelsPerUnit: PPU });
+        const size = plain.sprite.width;
+        const a = plain.sprite.getContext('2d').getImageData(0, 0, size, size).data;
+        const b = muddy.sprite.getContext('2d').getImageData(0, 0, size, size).data;
+        let changed = 0;
+        let onGround = 0;
+        for (let i = 3; i < a.length; i += 4) {
+            if (b[i] > 0 && a[i] === 0) onGround += 1;
+            if (a[i - 3] !== b[i - 3]) changed += 1;
+        }
+        expect(onGround).toBe(0);
+        expect(changed).toBeGreaterThan(500);
+        // The mud flap stands behind the rear tire, clear of the rear wing.
+        expect(alphaAt(muddy.sprite, -40.3, -25)).toBe(255);
     });
 });
