@@ -225,7 +225,8 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
   after the lap count. The dirt engine is lower and rougher than the circuit
   car, with a hard bang and a bigger rev drop on each gear change. It crackles
   when the car slows down. Gravel stays quiet on a straight and gets louder in
-  a slide.
+  a slide, as a low roar of stones rather than a hiss. The dirt car is a
+  little louder than the circuit car.
 - **Snow** writes `ground: 'snow'`. On snow, the car has much less grip, a
   lower top speed, less acceleration, and it turns more slowly. A snow lap is
   about 38% slower than tarmac. The road is pale blue-white, with white and

@@ -215,6 +215,27 @@ describe('car sound per ground', () => {
         expect(bark(dirt.nodes).frequency.last).toBeLessThan(bark(tarmac.nodes).frequency.last);
     });
 
+    it('makes a dirt slide a low roar, and plays the dirt car louder than tarmac', () => {
+        const tarmac = createMockContext();
+        const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});
+        tarmacAudio.prepareOnUserGesture();
+        driveFrame(tarmacAudio, tarmac.ctx, 'tarmac');
+
+        const dirt = createMockContext();
+        const dirtAudio = createCarEffectsAudio(dirt.ctx, {});
+        dirtAudio.prepareOnUserGesture();
+        driveFrame(dirtAudio, dirt.ctx, 'dirt');
+
+        const slipBand = (nodes) => nodes.filters.find((filter) => filter.type === 'bandpass' && filter.frequency.value === 2200);
+        const slipHigh = (nodes) => nodes.filters.find((filter) => filter.type === 'highpass' && filter.frequency.value === 550);
+        expect(slipBand(dirt.nodes).frequency.last).toBeLessThan(700);
+        expect(slipHigh(dirt.nodes).frequency.last).toBeLessThan(250);
+        expect(slipBand(tarmac.nodes).frequency.last).toBeGreaterThan(2000);
+        const gravelBand = dirt.nodes.filters.find((filter) => filter.frequency.value === 1800);
+        expect(gravelBand.frequency.last).toBeLessThan(800);
+        expect(dirt.nodes.gains[0].gain.last).toBeGreaterThan(tarmac.nodes.gains[0].gain.last * 1.15);
+    });
+
     it('keeps gravel quieter on a dirt straight than in a slide', () => {
         const { ctx, nodes } = createMockContext();
         const audio = createCarEffectsAudio(ctx, {});

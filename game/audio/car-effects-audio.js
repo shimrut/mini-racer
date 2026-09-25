@@ -69,18 +69,23 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         thrumScale: 2,
         pulseScale: 1.8,
         rpmFloor: 0.16,
+        level: 1.3,
         gravelVol: 0.07,
         gravelCruise: 0.35,
         gravelSlip: 1.6,
-        gravelFreq: 1800,
-        rumbleVol: 0.05,
-        slipMax: 0.22,
-        slipScale: 0.75,
-        slipQBase: 0.8,
-        slipQPerSlip: 0.6,
-        slipFreqBase: 650,
-        slipFreqPerSlip: 900,
-        slipFreqPerSpeed: 500,
+        gravelFreq: 520,
+        gravelQ: 1.5,
+        gravelRate: 0.55,
+        rumbleVol: 0.07,
+        rumbleSlip: 2.2,
+        slipMax: 0.3,
+        slipScale: 0.85,
+        slipQBase: 0.9,
+        slipQPerSlip: 0.3,
+        slipFreqBase: 280,
+        slipFreqPerSlip: 260,
+        slipFreqPerSpeed: 140,
+        slipHighpass: 140,
         shiftCrackVol: 0.32,
         overrunPopVol: 0.1,
     }),
@@ -772,6 +777,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const slipDrive = slip * slip;
             const slipVol = Math.min(profile.slipMax, slipDrive * profile.slipScale) * (0.3 + speedNorm * 0.7);
             slipGain.gain.setTargetAtTime(slipVol, t, smooth);
+            slipHighpass.frequency.setTargetAtTime(profile.slipHighpass ?? 550, t, smooth);
             slipBandpass.Q.setTargetAtTime(profile.slipQBase + slip * profile.slipQPerSlip, t, smooth);
             slipBandpass.frequency.setTargetAtTime(
                 profile.slipFreqBase + slip * profile.slipFreqPerSlip + speedNorm * profile.slipFreqPerSpeed,
@@ -783,8 +789,13 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 const gravelVol = profile.gravelVol * speedNorm * ((profile.gravelCruise ?? 0.7) + slip * (profile.gravelSlip ?? 0.6));
                 gravelGain.gain.setTargetAtTime(gravelVol, t, smooth);
                 gravelBandpass.frequency.setTargetAtTime(profile.gravelFreq, t, smooth);
-                gravelSource.playbackRate?.setTargetAtTime?.(0.6 + speedNorm * 0.8, t, smooth);
-                rumbleGain.gain.setTargetAtTime(profile.rumbleVol * speedNorm, t, smooth);
+                gravelBandpass.Q.setTargetAtTime(profile.gravelQ ?? 0.9, t, smooth);
+                gravelSource.playbackRate?.setTargetAtTime?.((profile.gravelRate ?? 1) * (0.6 + speedNorm * 0.8), t, smooth);
+                rumbleGain.gain.setTargetAtTime(
+                    profile.rumbleVol * speedNorm * (1 + slip * (profile.rumbleSlip ?? 0)),
+                    t,
+                    smooth,
+                );
             }
 
             const exh = (0.012 + rpmNorm * 0.012 + speedNorm * 0.012) * (0.60 + load * 0.40);
@@ -796,7 +807,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             intakeBandpass.Q.setTargetAtTime(1.8, t, smooth);
             intakeBandpass.frequency.setTargetAtTime(800 + rpmNorm * 1800 + speedNorm * 500, t, smooth);
 
-            masterGain.gain.setTargetAtTime(0.42, t, smooth);
+            masterGain.gain.setTargetAtTime(0.42 * (profile.level ?? 1), t, smooth);
         },
 
         setEnabled(enabled) {
