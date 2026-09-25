@@ -231,7 +231,10 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
 - **Snow** writes `ground: 'snow'`. On snow, the car has much less grip, a
   lower top speed, less acceleration, and it turns more slowly. A snow lap is
   about 38% slower than tarmac. The road is pale blue-white, with white and
-  ice-blue kerbs. Snow suits short, tight tracks.
+  ice-blue kerbs. Snow suits short, tight tracks. The snow engine is a bit
+  lower and muffled, with a soft gear bang and quiet pops when the car slows
+  down. Packed snow crunches under the tyres, louder in a slide. A slide is a
+  low whoosh. The snow car is a little louder than the street car.
 - **Circuit** writes `ground: 'grip'`. It is a race-circuit road with three times
   the tarmac grip. The car holds its line and almost never slides: in corners,
   it slides about 3.5 degrees (9 degrees on tarmac). On tarmac, the slide makes

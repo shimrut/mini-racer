@@ -89,25 +89,43 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         shiftCrackVol: 0.32,
         overrunPopVol: 0.1,
     }),
-    // Snow soaks up sound: a softer, muffled engine, a low soft crunch under
-    // the tyres, and a breathy hiss instead of a squeal in a slide.
+    // Ice rally: snow soaks the highs, so the engine stays muffled and a bit
+    // lower, with a soft gear bang and quiet pops. Packed snow crunches under
+    // the tyres on a straight and louder in a slide. The slide is a low whoosh,
+    // not a thin hiss.
+    // Starting values. Listen on a snow track: the engine should stay quieter
+    // in the highs than tarmac, the crunch should be obvious at speed, and a
+    // slide should sound thick. If the slide is thin, lower slipFreqBase. If
+    // the car is buried, raise level.
     snow: Object.freeze({
-        shaperAmount: 7,
-        barkBoostDb: -2,
-        motorLowpassScale: 0.7,
-        pitchScale: 1,
-        whineScale: 1,
-        gravelVol: 0.06,
-        gravelFreq: 850,
-        rumbleVol: 0.03,
-        slipMax: 0.16,
-        slipScale: 0.6,
-        slipQBase: 0.7,
-        slipQPerSlip: 0.3,
-        slipFreqBase: 2400,
-        slipFreqPerSlip: 1400,
-        slipFreqPerSpeed: 700,
-        shiftCrackVol: 0,
+        shaperAmount: 12,
+        barkBoostDb: 1,
+        barkFreqScale: 0.75,
+        motorLowpassScale: 0.62,
+        pitchScale: 0.9,
+        whineScale: 0.45,
+        thrumScale: 1.5,
+        pulseScale: 1.3,
+        rpmFloor: 0.22,
+        level: 1.2,
+        gravelVol: 0.08,
+        gravelCruise: 0.7,
+        gravelSlip: 1.1,
+        gravelFreq: 420,
+        gravelQ: 1.1,
+        gravelRate: 0.7,
+        rumbleVol: 0.05,
+        rumbleSlip: 1.4,
+        slipMax: 0.22,
+        slipScale: 0.7,
+        slipQBase: 0.6,
+        slipQPerSlip: 0.2,
+        slipFreqBase: 500,
+        slipFreqPerSlip: 400,
+        slipFreqPerSpeed: 200,
+        slipHighpass: 180,
+        shiftCrackVol: 0.14,
+        overrunPopVol: 0.04,
     }),
     // A race circuit: an engine that turns faster. The note is a little
     // higher, brighter and cleaner, with more high whine. The tyres squeal

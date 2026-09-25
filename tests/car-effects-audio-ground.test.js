@@ -133,7 +133,7 @@ describe('car sound per ground', () => {
         expect(nodes.sources.length).toBe(sourcesBefore + 4);
     });
 
-    it('muffles the engine and adds a soft crunch and a high slide hiss on snow', () => {
+    it('muffles the engine and adds a low crunch and a thick slide whoosh on snow', () => {
         const tarmac = createMockContext();
         const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});
         tarmacAudio.prepareOnUserGesture();
@@ -146,13 +146,21 @@ describe('car sound per ground', () => {
 
         const motorLowpass = (nodes) => nodes.filters.find((filter) => filter.frequency.value === 2400);
         expect(motorLowpass(snow.nodes).frequency.last).toBeLessThan(motorLowpass(tarmac.nodes).frequency.last);
+        const enginePitch = (nodes) => nodes.oscillators[0].frequency.last;
+        expect(enginePitch(snow.nodes)).toBeLessThan(enginePitch(tarmac.nodes));
+        const whine = (nodes) => nodes.gains.find((gain) => gain.gain.value === 0.15);
+        expect(whine(snow.nodes).gain.last).toBeLessThan(whine(tarmac.nodes).gain.last);
+        expect(snow.nodes.gains[0].gain.last).toBeGreaterThan(tarmac.nodes.gains[0].gain.last);
+
         const { gravel } = groundGains(snow.nodes);
         expect(gravel.gain.last).toBeGreaterThan(0);
         const gravelBand = snow.nodes.filters.find((filter) => filter.frequency.value === 1800);
-        expect(gravelBand.frequency.last).toBeLessThan(1800);
-        const slipBand = snow.nodes.filters.find((filter) => filter.type === 'bandpass' && filter.frequency.value === 2200);
-        expect(slipBand.Q.last).toBeLessThan(2);
-        expect(slipBand.frequency.last).toBeGreaterThan(2400);
+        expect(gravelBand.frequency.last).toBeLessThan(600);
+        const slipBand = (nodes) => nodes.filters.find((filter) => filter.type === 'bandpass' && filter.frequency.value === 2200);
+        expect(slipBand(snow.nodes).Q.last).toBeLessThan(2);
+        expect(slipBand(snow.nodes).frequency.last).toBeLessThan(slipBand(tarmac.nodes).frequency.last);
+        const slipHigh = snow.nodes.filters.find((filter) => filter.type === 'highpass' && filter.frequency.value === 550);
+        expect(slipHigh.frequency.last).toBeLessThan(250);
     });
 
     it('plays a higher, brighter engine with more whine on grip, and the tarmac squeal', () => {
@@ -181,8 +189,8 @@ describe('car sound per ground', () => {
         expect(slipBand(grip.nodes).frequency.last).toBeCloseTo(slipBand(tarmac.nodes).frequency.last);
     });
 
-    it('plays a gear crack on dirt when the car shifts up, and not on tarmac or snow', () => {
-        for (const [ground, expectCrack] of [['dirt', true], ['tarmac', false], ['snow', false]]) {
+    it('plays a gear crack on dirt and snow when the car shifts up, and not on tarmac', () => {
+        for (const [ground, expectCrack] of [['dirt', true], ['tarmac', false], ['snow', true]]) {
             const { ctx, nodes } = createMockContext();
             const audio = createCarEffectsAudio(ctx, {});
             audio.prepareOnUserGesture();
@@ -246,8 +254,8 @@ describe('car sound per ground', () => {
         expect(groundGains(nodes).gravel.gain.last).toBeGreaterThan(straight * 2);
     });
 
-    it('crackles on dirt when the car slows down, and stays quiet on tarmac', () => {
-        for (const [ground, expectPops] of [['dirt', true], ['tarmac', false]]) {
+    it('crackles on dirt and snow when the car slows down, and stays quiet on tarmac', () => {
+        for (const [ground, expectPops] of [['dirt', true], ['snow', true], ['tarmac', false]]) {
             const { ctx, nodes } = createMockContext();
             const audio = createCarEffectsAudio(ctx, {});
             audio.prepareOnUserGesture();
