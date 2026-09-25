@@ -322,3 +322,78 @@ describe('rally car', () => {
         expect(alphaAt(muddy.sprite, -40.3, -25)).toBe(255);
     });
 });
+
+describe('drawn car race picture cost', () => {
+    let savedDocument;
+
+    beforeAll(() => {
+        savedDocument = globalThis.document;
+        globalThis.document = { createElement: () => createCanvas(1, 1) };
+    });
+
+    afterAll(() => {
+        globalThis.document = savedDocument;
+    });
+
+    // Drives the car for `frames` frames and counts the pictures it paints.
+    function countPaints(car, frames, state) {
+        let paints = 0;
+        const paint = car.paint.bind(car);
+        car.paint = (...args) => {
+            paints += 1;
+            return paint(...args);
+        };
+        for (let i = 0; i < frames; i += 1) {
+            car.update(FRAME, state);
+            car.renderFrame();
+        }
+        return paints;
+    }
+
+    it('paints the moving car every second frame, and less often on a slow device', () => {
+        const moving = { speedPx: 300, size: 52 };
+        expect(countPaints(new DrawnCar(), 10, moving)).toBe(5);
+        const slow = countPaints(new DrawnCar(), 60, { ...moving, lowQuality: true });
+        expect(slow).toBeGreaterThanOrEqual(12);
+        expect(slow).toBeLessThanOrEqual(16);
+    });
+
+    it('paints a car at rest at once when its pose changes, as the brake light on the grid', () => {
+        const car = new DrawnCar();
+        car.update(FRAME, { size: 52 });
+        car.renderFrame();
+        const dark = car.frameKey;
+        // The next frame is inside the repaint time, but the car does not move.
+        car.update(FRAME, { holding: true, size: 52 });
+        car.renderFrame();
+        expect(car.frameKey).not.toBe(dark);
+        expect(car.frameKey.endsWith('|1.00')).toBe(true);
+    });
+
+    it('rolls the tires by at most one step between two pictures', () => {
+        const car = new DrawnCar();
+        const step = FORMULA_CAR.wheelSpin.maxStepPerFrame;
+        const fast = { speedPx: 620, size: 52 };
+        let lastPainted = 0;
+        for (let i = 0; i < 12; i += 1) {
+            car.update(FRAME, fast);
+            car.renderFrame();
+            expect(car.paintedRoll - lastPainted).toBeLessThanOrEqual(step + 1e-9);
+            lastPainted = car.paintedRoll;
+        }
+        expect(lastPainted).toBeGreaterThan(0);
+    });
+
+    it('makes the race picture two times the size of the car on the screen, and never larger than the sprite', () => {
+        const car = new DrawnCar(FORMULA_CAR, {}, { pixelsPerUnit: 3 });
+        const at = (scale) => ({ getTransform: () => ({ a: scale, b: 0 }) });
+        // 52 px * 1.5 on the screen is 78 px; two times is 156 px of a 110 unit box.
+        expect(car.getFramePixelsPerUnit(at(1.5), 52)).toBe(1.5);
+        expect(car.getFramePixelsPerUnit(at(10), 52)).toBe(3);
+        expect(car.getFramePixelsPerUnit({}, 52)).toBe(3);
+
+        car.renderFrame(1.5);
+        expect(car.frame.width).toBe(Math.ceil(FORMULA_CAR.boxSize * 1.5));
+        expect(car.sprite.width).toBe(Math.ceil(FORMULA_CAR.boxSize * 3));
+    });
+});

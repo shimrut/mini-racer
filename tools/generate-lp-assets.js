@@ -63,6 +63,7 @@ export function renderLpTrackPreviewCanvas(canvas, {
     const presentation = resolveTrackPresentation(key, {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
         event: skin ? { key: 'daily-challenge', trackKey: key, skin } : null,
+        ground: geometry.ground,
     });
 
     renderTrackPreviewCanvas(canvas, {

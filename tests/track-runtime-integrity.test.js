@@ -10,6 +10,7 @@ import {
 import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { CONFIG } from '../game/config.js';
+import { DEFAULT_TRACK_GROUND_KEY, isTrackGroundKey } from '../game/track/grounds.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 
 function expectFinitePoint(point) {
@@ -313,6 +314,14 @@ describe('track runtime integrity', () => {
                 expect(Number.isFinite(segment.lenSq)).toBe(true);
                 expect(segment.lenSq).toBeGreaterThan(0);
             });
+        });
+    });
+
+    it('names only a known, non-tarmac ground in a track definition', () => {
+        Object.entries(TRACKS).forEach(([trackKey, track]) => {
+            if (!Object.hasOwn(track, 'ground')) return;
+            expect(isTrackGroundKey(track.ground), `${trackKey} has an unknown ground`).toBe(true);
+            expect(track.ground, `${trackKey} should omit the default ground`).not.toBe(DEFAULT_TRACK_GROUND_KEY);
         });
     });
 

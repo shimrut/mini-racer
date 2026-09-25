@@ -456,6 +456,7 @@
 }
 
 .speedometer {
+    --speedometer-lit: var(--accent-color);
     border: 1px solid var(--hud-panel-border);
     border-radius: var(--radius-md);
     background: var(--hud-panel-bg);
@@ -493,7 +494,23 @@
 }
 
 .speedometer-tick.active {
-    background: var(--accent-color);
+    background: var(--speedometer-lit);
+}
+
+/* Dirt and Snow: the rally speed bar. Fewer, wider, slanted lights in the
+   yellow of the Rally car's lamps. */
+.speedometer--rally {
+    --speedometer-lit: #ffd84a;
+}
+
+.speedometer--rally .speedometer-bar {
+    gap: 3px;
+    padding: 3px 4px;
+}
+
+.speedometer--rally .speedometer-tick {
+    width: 9px;
+    transform: skewX(-15deg);
 }
 
 .speedometer-text {
@@ -518,6 +535,15 @@
         min-width: 4.8rem;
     }
 
+    .speedometer--rally .speedometer-bar {
+        gap: 2px;
+        padding: 2px 3px;
+    }
+
+    .speedometer--rally .speedometer-tick {
+        width: 7px;
+    }
+
     .hud-pause-btn {
         padding: 0.4rem 0.75rem;
     }
@@ -535,7 +561,7 @@
 .speedometer-value {
     display: inline;
     margin-top: 0;
-    color: var(--accent-color);
+    color: var(--speedometer-lit);
     font-family: var(--mono-font);
     font-size: 1.4rem;
     font-weight: 800;

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as ghostFormat from '../../../game/shared/pb-ghost-format.js';
 import { createPbGhostPoseRecorder } from '../../../game/shared/pb-ghost-recorder.js';
+import { getStoredTrackGroundKey } from '../../../game/track/grounds.js';
 
 export const PB_GHOST_SCHEMA_VERSION = ghostFormat.PB_GHOST_SCHEMA_VERSION as 2;
 export const PB_GHOST_SAMPLE_RATE_HZ = ghostFormat.PB_GHOST_SAMPLE_RATE_HZ as 20;
@@ -96,6 +97,8 @@ function stableTrackShape(track: Record<string, any>) {
         startPos: track.startPos,
         startAngle: track.startAngle,
         checkpoints: track.checkpoints,
+        // Tarmac leaves this undefined, so JSON drops it and older hashes stay valid.
+        ground: getStoredTrackGroundKey(track) ?? undefined,
     };
 }
 

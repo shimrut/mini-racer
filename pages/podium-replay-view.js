@@ -492,6 +492,7 @@ export function createPodiumReplayController({
             trackGeometry: { outer: track.outer, inner: track.inner },
             presentation: resolveTrackPresentation(trackKey, {
                 surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+                ground: track.ground,
             }),
             startLine: track.startLine,
             startPos: track.startPos,

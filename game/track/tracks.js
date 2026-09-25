@@ -138,6 +138,10 @@ import anchorPark from './definitions/anchor-park.js';
 import puppetMaster from './definitions/puppet-master.js';
 import sunsetTerrace from './definitions/sunset-terrace.js';
 import anvilCircuit from './definitions/anvil-circuit.js';
+import countryRoad from './definitions/country-road.js';
+import snowCircuit from './definitions/snow-circuit.js';
+import gripCircuit from './definitions/grip-circuit.js';
+import middleWay from './definitions/middle-way.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -281,6 +285,10 @@ const TRACK_GEOMETRY = {
     puppetMaster,
     sunsetTerrace,
     anvilCircuit,
+    countryRoad,
+    snowCircuit,
+    gripCircuit,
+    middleWay,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

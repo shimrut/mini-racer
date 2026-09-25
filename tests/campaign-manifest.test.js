@@ -142,3 +142,36 @@ describe('Campaign manifest', () => {
         })).toBeNull();
     });
 });
+
+describe('Campaign series data', () => {
+    it('keeps the Numbers Redis key names that saved player records use', async () => {
+        const { createHash } = await import('node:crypto');
+        const { campaignProgressKey } = await import('../src/server/campaign/campaign-progress-key.ts');
+        const { toCampaignCompetition } = await import('../src/server/competition/competition.ts');
+        const playerHash = createHash('sha256').update('reddit:t2_racer', 'utf8').digest('base64url');
+        expect(campaignProgressKey('reddit:t2_racer', 'numbered-v1'))
+            .toBe(`campaign:numbered-v1:progress:${playerHash}`);
+        expect(campaignProgressKey('reddit:t2_racer')).toBe(`campaign:numbered-v1:progress:${playerHash}`);
+        const stage = getCampaignStage('numbered-v1-03');
+        expect(toCampaignCompetition(stage.seriesId, stage)).toMatchObject({
+            leaderboardKey: 'campaign:numbered-v1:leaderboard:numbered-v1-03',
+            entryHashKey: 'campaign:numbered-v1:leaderboard:numbered-v1-03:entries',
+            standingsRevisionKey: 'campaign:numbered-v1:leaderboard:numbered-v1-03:standings-revision',
+            pbHashKey: 'campaign:numbered-v1:pbs:numbered-v1-03',
+            guestExpiryKey: 'campaign:numbered-v1:guest-expiry',
+        });
+    });
+
+    it('gives every series stage a track with all four medal times', async () => {
+        const { CAMPAIGN_ALL_SERIES } = await import('../game/campaign/manifest.js');
+        const { getRaceMedalThresholds } = await import('../game/medals/medal-timing.js');
+        const { hasTrack } = await import('../game/track/catalog.js');
+        for (const series of CAMPAIGN_ALL_SERIES) {
+            for (const stage of series.stages) {
+                expect(hasTrack(stage.trackKey), `${stage.raceId} track`).toBe(true);
+                const thresholds = getRaceMedalThresholds(stage.trackKey, 1);
+                expect(thresholds?.author, `${stage.raceId} author time`).toBeGreaterThan(0);
+            }
+        }
+    });
+});

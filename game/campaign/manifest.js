@@ -4,57 +4,101 @@ import {
     RACE_MEDAL_SCALE_LINEAR_V1,
     RACE_SCORING_TOTAL_TIME,
 } from '../race/race-spec.js';
+import seriesData from './series.json' with { type: 'json' };
+import { CAMPAIGN_SERIES_MIN_STAGES, isCampaignSeriesLive } from './series-rules.js';
 
-export const CAMPAIGN_ID = 'numbered-v1';
+export { CAMPAIGN_SERIES_MIN_STAGES };
+
+// Numbers keeps this name for ever: every saved Numbers record and key uses it.
+export const CAMPAIGN_NUMBERS_SERIES_ID = 'numbered-v1';
 export const CAMPAIGN_RULES_REVISION = 1;
 
-const STAGE_DEFINITIONS = [
-    ['00', 'numberZero', 2, 0],
-    ['01', 'numberOne', 2, 1],
-    ['02', 'numberTwo', 1, 3],
-    ['03', 'numberThree', 1, 7],
-    ['04', 'numberFour', 2, 10],
-    ['05', 'numberFive', 1, 12],
-    ['06', 'numberSix', 1, 15],
-    ['07', 'numberSeven', 3, 17],
-    ['08', 'numberEight', 2, 20],
-    ['09', 'numberNine', 1, 22],
-    ['10', 'imaginaryNumber', 3, 25],
-    ['11', 'infinitePie', 1, 27],
-    ['12', 'eulersNumber', 2, 30],
-    ['13', 'goldenRatio', 2, 32],
-    ['14', 'squareRoot', 2, 35],
-    ['15', 'halfLife', 1, 37],
-];
+const SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
-export const CAMPAIGN_STAGES = Object.freeze(STAGE_DEFINITIONS.map(
-    ([stageNumber, trackKey, lapCount, requiredMedals], index) => {
+function stageNumberFor(index) {
+    return String(index).padStart(2, '0');
+}
+
+function buildSeries(definition) {
+    const id = definition?.id;
+    if (typeof id !== 'string' || !SERIES_ID_RE.test(id)) {
+        throw new Error(`Invalid Campaign series name: ${id}`);
+    }
+    const definitions = Array.isArray(definition.stages) ? definition.stages : [];
+    const stages = Object.freeze(definitions.map((stageDefinition, index) => {
+        const stageNumber = stageNumberFor(index);
         const raceSpec = normalizeRaceSpec({
-            raceId: `${CAMPAIGN_ID}-${stageNumber}`,
+            raceId: `${id}-${stageNumber}`,
             mode: 'campaign',
-            trackKey,
-            lapCount,
+            trackKey: stageDefinition?.trackKey,
+            lapCount: stageDefinition?.laps,
             scoring: RACE_SCORING_TOTAL_TIME,
             medalScale: RACE_MEDAL_SCALE_LINEAR_V1,
             rulesRevision: CAMPAIGN_RULES_REVISION,
         });
-        if (!raceSpec) throw new Error(`Invalid Campaign race specification at stage ${stageNumber}.`);
+        if (!raceSpec) throw new Error(`Invalid Campaign race specification at ${id} stage ${stageNumber}.`);
         return Object.freeze({
             stageIndex: index,
             stageNumber,
+            seriesId: id,
             ...raceSpec,
             unlock: index > 0
                 ? Object.freeze({
                     type: 'medal_total',
-                    requiredMedals,
-                    previousRaceId: `${CAMPAIGN_ID}-${STAGE_DEFINITIONS[index - 1][0]}`,
+                    requiredMedals: Number(stageDefinition.requiredMedals) || 0,
+                    previousRaceId: `${id}-${stageNumberFor(index - 1)}`,
                 })
                 : Object.freeze({ type: 'start' }),
         });
-    },
-));
+    }));
+    return Object.freeze({
+        id,
+        name: typeof definition.name === 'string' && definition.name.trim()
+            ? definition.name.trim()
+            : id,
+        ground: typeof definition.ground === 'string' ? definition.ground : 'tarmac',
+        live: isCampaignSeriesLive({ stages }),
+        stages,
+    });
+}
 
-const STAGE_BY_RACE_ID = new Map(CAMPAIGN_STAGES.map((stage) => [stage.raceId, stage]));
+// Every series in the data file, also the hidden ones. Only the Mapmaker and tests use this.
+export const CAMPAIGN_ALL_SERIES = Object.freeze(
+    (Array.isArray(seriesData?.series) ? seriesData.series : []).map(buildSeries),
+);
+
+if (new Set(CAMPAIGN_ALL_SERIES.map((series) => series.id)).size !== CAMPAIGN_ALL_SERIES.length) {
+    throw new Error('Campaign series names must be unique.');
+}
+
+// The series that players can see.
+export const CAMPAIGN_SERIES = Object.freeze(CAMPAIGN_ALL_SERIES.filter((series) => series.live));
+
+const SERIES_BY_ID = new Map(CAMPAIGN_SERIES.map((series) => [series.id, series]));
+
+export const CAMPAIGN_LIVE_STAGES = Object.freeze(CAMPAIGN_SERIES.flatMap((series) => series.stages));
+
+const STAGE_BY_RACE_ID = new Map(CAMPAIGN_LIVE_STAGES.map((stage) => [stage.raceId, stage]));
+
+if (!SERIES_BY_ID.has(CAMPAIGN_NUMBERS_SERIES_ID)) {
+    throw new Error('The Numbers Campaign series must stay live.');
+}
+
+// The Numbers series, under the names that the code used before there were series.
+export const CAMPAIGN_ID = CAMPAIGN_NUMBERS_SERIES_ID;
+export const CAMPAIGN_STAGES = SERIES_BY_ID.get(CAMPAIGN_NUMBERS_SERIES_ID).stages;
+
+export function getCampaignSeries(seriesId) {
+    return typeof seriesId === 'string' ? SERIES_BY_ID.get(seriesId) ?? null : null;
+}
+
+export function isCampaignSeriesId(value) {
+    return getCampaignSeries(value) !== null;
+}
+
+export function getCampaignSeriesStages(seriesId) {
+    return getCampaignSeries(seriesId)?.stages ?? Object.freeze([]);
+}
 
 export function getCampaignStage(raceId) {
     return typeof raceId === 'string' ? STAGE_BY_RACE_ID.get(raceId) ?? null : null;
@@ -65,26 +109,41 @@ export function getCampaignStageMedalCount(medal) {
     return rank === undefined ? 0 : rank + 1;
 }
 
-export function countCampaignMedals(resultsByRaceId = {}) {
+// Counts the medals of one series. Medals in other series do not count.
+export function countCampaignMedals(resultsByRaceId = {}, seriesId = CAMPAIGN_NUMBERS_SERIES_ID) {
     let total = 0;
-    for (const stage of CAMPAIGN_STAGES) {
+    for (const stage of getCampaignSeriesStages(seriesId)) {
         total += getCampaignStageMedalCount(resultsByRaceId?.[stage.raceId]?.medal);
     }
     return total;
 }
 
+// The open stages of every live series. Each series counts its own medals.
 export function getCampaignUnlockedRaceIds(resultsByRaceId = {}) {
-    const medalTotal = countCampaignMedals(resultsByRaceId);
-    return CAMPAIGN_STAGES
-        .filter((stage) => stage.unlock.type === 'start' || (
-            medalTotal >= stage.unlock.requiredMedals
-            && getCampaignStageMedalCount(
-                resultsByRaceId?.[stage.unlock.previousRaceId]?.medal,
-            ) > 0
-        ))
-        .map((stage) => stage.raceId);
+    const unlocked = [];
+    for (const series of CAMPAIGN_SERIES) {
+        const medalTotal = countCampaignMedals(resultsByRaceId, series.id);
+        for (const stage of series.stages) {
+            if (stage.unlock.type === 'start' || (
+                medalTotal >= stage.unlock.requiredMedals
+                && getCampaignStageMedalCount(
+                    resultsByRaceId?.[stage.unlock.previousRaceId]?.medal,
+                ) > 0
+            )) {
+                unlocked.push(stage.raceId);
+            }
+        }
+    }
+    return unlocked;
 }
 
 export function isCampaignStageUnlocked(raceId, resultsByRaceId = {}) {
     return getCampaignUnlockedRaceIds(resultsByRaceId).includes(raceId);
+}
+
+// A series is finished when its last stage has a medal.
+export function isCampaignSeriesFinished(seriesId, resultsByRaceId = {}) {
+    const lastStage = getCampaignSeriesStages(seriesId).at(-1);
+    return Boolean(lastStage)
+        && getCampaignStageMedalCount(resultsByRaceId?.[lastStage.raceId]?.medal) > 0;
 }

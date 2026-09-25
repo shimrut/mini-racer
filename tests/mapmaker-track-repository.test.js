@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+    applySeriesStageMove,
     applyTrackRepositoryUpdate,
     applyTrackRepositoryRemoval,
     buildTrackRepositoryRemoval,
@@ -39,14 +40,43 @@ const REMOVABLE_SOURCE = CATALOG_SOURCE
     .replace('    numberZero: { name: "Number Zero" },',
         '    numberZero: { name: "Number Zero" },\n    newHarborRun: { name: "New Harbor Run" },')
     .replace("    'sunlitTemple',", "    'sunlitTemple',\n    'newHarborRun',");
-const CAMPAIGN_SOURCE = "const STAGE_DEFINITIONS = [['00', 'numberZero', 2, 0]];";
+const MEDAL_ROW = { author: 9.5, gold: 9.74, silver: 10.02, bronze: 10.34 };
+
+function seriesSource(numbersStages = [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }], dirtStages = []) {
+    return `${JSON.stringify({
+        series: [
+            { id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', stages: numbersStages },
+            { id: 'dirt-v1', name: 'Dirt', ground: 'dirt', stages: dirtStages },
+        ],
+    }, null, 2)}\n`;
+}
+
+const SERIES_SOURCE = seriesSource();
+const MEDALS_SOURCE = `${JSON.stringify({ numberZero: MEDAL_ROW, circuit: MEDAL_ROW }, null, 2)}\n`;
+
+function buildUpdate(options) {
+    return buildTrackRepositoryUpdate({
+        catalogSource: CATALOG_SOURCE,
+        seriesSource: SERIES_SOURCE,
+        medalsSource: MEDALS_SOURCE,
+        ...options,
+    });
+}
+
+function tenStages(prefix = 'dirtTrack') {
+    return Array.from({ length: 10 }, (_, index) => ({
+        trackKey: index === 0 ? 'sunlitTemple' : `${prefix}${index}`,
+        laps: 1,
+        requiredMedals: index === 0 ? 0 : index * 2,
+    }));
+}
 const HISTORY_SOURCE = "export const PUBLISHED_DAILY_GP_TRACKS_BY_DATE = { '2026-06-02': 'albertGardens' };";
 
 function buildRemoval(catalogSource, trackKey) {
     return buildTrackRepositoryRemoval({
         catalogSource,
         trackKey,
-        campaignSource: CAMPAIGN_SOURCE,
+        seriesSource: SERIES_SOURCE,
         publishedHistorySource: HISTORY_SOURCE,
     });
 }
@@ -89,8 +119,7 @@ describe('Mapmaker track repository integration', () => {
     });
 
     it('appends a new Daily track as the final catalog and schedule entry', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+        const update = buildUpdate({
             trackKey: 'newHarborRun',
             trackName: 'New Harbor Run',
             destination: 'daily',
@@ -119,17 +148,25 @@ describe('Mapmaker track repository integration', () => {
         expect(update.tracksSource).toContain('    newHarborRun,');
     });
 
-    it('creates a Campaign-only track without adding it to the Daily schedule', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+    it('creates a series track without adding it to the Daily schedule', () => {
+        const update = buildUpdate({
             trackKey: 'numberTen',
             trackName: 'Number Ten',
-            destination: 'campaign',
+            destination: 'series:numbered-v1',
+            laps: 3,
+            medalRow: MEDAL_ROW,
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
         expect(update.action).toBe('created');
-        expect(update.destination).toBe('campaign');
+        expect(update.destination).toBe('series:numbered-v1');
+        expect(update.seriesId).toBe('numbered-v1');
+        expect(update.stageIndex).toBe(1);
+        expect(JSON.parse(update.seriesSource).series[0].stages).toEqual([
+            { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
+            { trackKey: 'numberTen', laps: 3, requiredMedals: 2 },
+        ]);
+        expect(JSON.parse(update.medalsSource).numberTen).toEqual(MEDAL_ROW);
         expect(update.scheduleIndex).toBe(-1);
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
         expect(parsed.catalogKeys).toContain('numberTen');
@@ -140,8 +177,7 @@ describe('Mapmaker track repository integration', () => {
     });
 
     it('updates an existing track without changing its schedule position', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+        const update = buildUpdate({
             trackKey: 'circuit',
             originalTrackKey: 'circuit',
             trackName: 'Classic Circuit Updated',
@@ -156,13 +192,13 @@ describe('Mapmaker track repository integration', () => {
         expect(parsed.namesByKey.circuit).toBe('Classic Circuit Updated');
     });
 
-    it('can move a scheduled track to Campaign only', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+    it('can move a scheduled track to a series', () => {
+        const update = buildUpdate({
             trackKey: 'sunlitTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunlit Temple',
-            destination: 'campaign',
+            destination: 'series:dirt-v1',
+            medalRow: MEDAL_ROW,
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -172,9 +208,8 @@ describe('Mapmaker track repository integration', () => {
         expect(parsed.catalogKeys).toContain('sunlitTemple');
     });
 
-    it('can add an existing Campaign-only track to the Daily schedule', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+    it('can move a track out of a series that is not live and onto the Daily schedule', () => {
+        const update = buildUpdate({
             trackKey: 'numberZero',
             originalTrackKey: 'numberZero',
             trackName: 'Number Zero',
@@ -185,11 +220,11 @@ describe('Mapmaker track repository integration', () => {
         expect(update.action).toBe('updated');
         expect(update.scheduleIndex).toBe(2);
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(JSON.parse(update.seriesSource).series[0].stages).toEqual([]);
     });
 
     it('renames a track in place and identifies the old module for removal', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+        const update = buildUpdate({
             trackKey: 'sunriseTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunrise Temple',
@@ -207,13 +242,12 @@ describe('Mapmaker track repository integration', () => {
         expect(update.tracksSource).toContain('numberZero');
     });
 
-    it('renames a Campaign-only track without putting it on the Daily schedule', () => {
-        const update = buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+    it('renames a series track without putting it on the Daily schedule', () => {
+        const update = buildUpdate({
             trackKey: 'numberNil',
             originalTrackKey: 'numberZero',
             trackName: 'Number Nil',
-            destination: 'campaign',
+            destination: 'series:numbered-v1',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -222,15 +256,22 @@ describe('Mapmaker track repository integration', () => {
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
         expect(parsed.catalogKeys).toContain('numberNil');
         expect(parsed.namesByKey).not.toHaveProperty('numberZero');
+        expect(JSON.parse(update.seriesSource).series[0].stages[0].trackKey).toBe('numberNil');
+        expect(JSON.parse(update.medalsSource)).toHaveProperty('numberNil');
+        expect(JSON.parse(update.medalsSource)).not.toHaveProperty('numberZero');
     });
 
     it('rejects an invalid destination', () => {
-        expect(() => buildTrackRepositoryUpdate({
-            catalogSource: CATALOG_SOURCE,
+        expect(() => buildUpdate({
             trackKey: 'newHarborRun',
             trackName: 'New Harbor Run',
             destination: 'challenge',
-        })).toThrow('Destination must be daily or campaign.');
+        })).toThrow('Destination must be daily or a Campaign series.');
+        expect(() => buildUpdate({
+            trackKey: 'newHarborRun',
+            trackName: 'New Harbor Run',
+            destination: 'series:snow-v1',
+        })).toThrow('Destination must be daily or a Campaign series.');
     });
 
     it('writes all repository files and deletes the old module on rename', () => {
@@ -242,6 +283,10 @@ describe('Mapmaker track repository integration', () => {
         writeFileSync(join(trackRoot, 'catalog.js'), CATALOG_SOURCE);
         writeFileSync(join(trackRoot, 'tracks.js'), '// old registry\n');
         writeFileSync(join(definitionsRoot, 'sunlit-temple.js'), '// old definition\n');
+        mkdirSync(join(root, 'game/campaign'), { recursive: true });
+        mkdirSync(join(root, 'game/medals'), { recursive: true });
+        writeFileSync(join(root, 'game/campaign/series.json'), SERIES_SOURCE);
+        writeFileSync(join(root, 'game/medals/medal-times.json'), MEDALS_SOURCE);
 
         const result = applyTrackRepositoryUpdate({
             rootDir: root,
@@ -285,7 +330,7 @@ describe('Mapmaker track repository integration', () => {
 
     it('refuses removal of the default, Campaign, and known published tracks', () => {
         expect(() => buildRemoval(CATALOG_SOURCE, 'circuit')).toThrow('default track');
-        expect(() => buildRemoval(CATALOG_SOURCE, 'numberZero')).toThrow('Campaign stage');
+        expect(() => buildRemoval(CATALOG_SOURCE, 'numberZero')).toThrow('Numbers uses it');
 
         const publishedSource = CATALOG_SOURCE.replace(
             '    sunlitTemple: { name: "Sunlit Temple" },',
@@ -324,7 +369,7 @@ describe('Mapmaker track repository integration', () => {
             circuit: { gold: 5 },
             newHarborRun: { gold: 9 },
         }, null, 2));
-        writeFileSync(join(campaignRoot, 'manifest.js'), CAMPAIGN_SOURCE);
+        writeFileSync(join(campaignRoot, 'series.json'), SERIES_SOURCE);
         writeFileSync(join(sharedRoot, 'daily-gp-history-backfill.js'), HISTORY_SOURCE);
 
         const result = applyTrackRepositoryRemoval({ rootDir: root, trackKey: 'newHarborRun' });
@@ -337,5 +382,111 @@ describe('Mapmaker track repository integration', () => {
         expect(readFileSync(join(trackRoot, 'tracks.js'), 'utf8')).not.toContain('newHarborRun');
         expect(JSON.parse(readFileSync(join(medalsRoot, 'medal-times.json'), 'utf8')))
             .toEqual({ circuit: { gold: 5 } });
+    });
+});
+
+describe('Mapmaker Campaign series rules', () => {
+    const liveSeries = seriesSource(
+        [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }],
+        tenStages(),
+    );
+
+    function buildLive(options) {
+        return buildUpdate({
+            seriesSource: liveSeries,
+            medalsSource: JSON.stringify({ numberZero: MEDAL_ROW, sunlitTemple: MEDAL_ROW }),
+            ...options,
+        });
+    }
+
+    it('adds a new track after the last stage of a live series', () => {
+        const update = buildLive({
+            trackKey: 'newHarborRun',
+            trackName: 'New Harbor Run',
+            destination: 'series:dirt-v1',
+            laps: 2,
+            requiredMedals: 21,
+            medalRow: MEDAL_ROW,
+        });
+        const dirt = JSON.parse(update.seriesSource).series[1];
+        expect(update.stageIndex).toBe(10);
+        expect(dirt.stages.at(-1)).toEqual({ trackKey: 'newHarborRun', laps: 2, requiredMedals: 21 });
+        expect(dirt.stages.slice(0, 10)).toEqual(tenStages());
+    });
+
+    it('keeps the stages of a live series fixed', () => {
+        const base = { trackKey: 'sunlitTemple', originalTrackKey: 'sunlitTemple', trackName: 'Sunlit Temple' };
+        expect(() => buildLive({ ...base, destination: 'daily' })).toThrow('Dirt is live');
+        expect(() => buildLive({ ...base, destination: 'series:numbered-v1', medalRow: MEDAL_ROW }))
+            .toThrow('Dirt is live');
+        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', laps: 3 })).toThrow('Dirt is live');
+        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', requiredMedals: 1 }))
+            .toThrow('Dirt is live');
+        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', laps: 1, requiredMedals: 0 }))
+            .not.toThrow();
+        expect(() => buildLive({
+            ...base,
+            trackKey: 'sunsetTemple',
+            destination: 'series:dirt-v1',
+        })).toThrow('Dirt is live');
+        expect(() => buildLive({
+            ...base,
+            destination: 'series:dirt-v1',
+            medalRow: { ...MEDAL_ROW, author: 9.4 },
+        })).toThrow('medal times of sunlitTemple are fixed');
+    });
+
+    it('needs all four medal times in order for a series stage', () => {
+        const base = { trackKey: 'newHarborRun', trackName: 'New Harbor Run', destination: 'series:dirt-v1' };
+        expect(() => buildUpdate(base)).toThrow('needs all four medal times');
+        expect(() => buildUpdate({ ...base, medalRow: { ...MEDAL_ROW, gold: 9.4 } }))
+            .toThrow('Medal times must go up');
+        expect(() => buildUpdate({ ...base, medalRow: MEDAL_ROW })).not.toThrow();
+    });
+
+    it('checks the medal target against its position', () => {
+        const base = {
+            trackKey: 'newHarborRun',
+            trackName: 'New Harbor Run',
+            destination: 'series:numbered-v1',
+            medalRow: MEDAL_ROW,
+        };
+        expect(() => buildUpdate({ ...base, requiredMedals: 0 })).toThrow('more than 0');
+        expect(() => buildUpdate({ ...base, requiredMedals: 4 })).toThrow('3 at most');
+        expect(() => buildUpdate({ ...base, requiredMedals: 3 })).not.toThrow();
+        expect(() => buildUpdate({ ...base, laps: 4 })).toThrow('Laps must be');
+    });
+
+    it('moves a stage in a series that is not live, and keeps each medal target in place', () => {
+        const root = mkdtempSync(join(tmpdir(), 'dailygp-mapmaker-series-'));
+        temporaryRoots.push(root);
+        mkdirSync(join(root, 'game/campaign'), { recursive: true });
+        writeFileSync(join(root, 'game/campaign/series.json'), seriesSource([
+            { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
+            { trackKey: 'numberOne', laps: 1, requiredMedals: 2 },
+            { trackKey: 'numberTwo', laps: 3, requiredMedals: 5 },
+        ]));
+
+        const result = applySeriesStageMove({
+            rootDir: root,
+            seriesId: 'numbered-v1',
+            trackKey: 'numberTwo',
+            direction: -1,
+        });
+        expect(result.trackKeys).toEqual(['numberZero', 'numberTwo', 'numberOne']);
+        expect(JSON.parse(readFileSync(join(root, 'game/campaign/series.json'), 'utf8')).series[0].stages)
+            .toEqual([
+                { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
+                { trackKey: 'numberTwo', laps: 3, requiredMedals: 2 },
+                { trackKey: 'numberOne', laps: 1, requiredMedals: 5 },
+            ]);
+
+        writeFileSync(join(root, 'game/campaign/series.json'), liveSeries);
+        expect(() => applySeriesStageMove({
+            rootDir: root,
+            seriesId: 'dirt-v1',
+            trackKey: 'dirtTrack3',
+            direction: 1,
+        })).toThrow('Dirt is live');
     });
 });

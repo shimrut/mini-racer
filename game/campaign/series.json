@@ -1,0 +1,109 @@
+{
+  "series": [
+    {
+      "id": "numbered-v1",
+      "name": "Numbers",
+      "ground": "tarmac",
+      "stages": [
+        {
+          "trackKey": "numberZero",
+          "laps": 2,
+          "requiredMedals": 0
+        },
+        {
+          "trackKey": "numberOne",
+          "laps": 2,
+          "requiredMedals": 1
+        },
+        {
+          "trackKey": "numberTwo",
+          "laps": 1,
+          "requiredMedals": 3
+        },
+        {
+          "trackKey": "numberThree",
+          "laps": 1,
+          "requiredMedals": 7
+        },
+        {
+          "trackKey": "numberFour",
+          "laps": 2,
+          "requiredMedals": 10
+        },
+        {
+          "trackKey": "numberFive",
+          "laps": 1,
+          "requiredMedals": 12
+        },
+        {
+          "trackKey": "numberSix",
+          "laps": 1,
+          "requiredMedals": 15
+        },
+        {
+          "trackKey": "numberSeven",
+          "laps": 3,
+          "requiredMedals": 17
+        },
+        {
+          "trackKey": "numberEight",
+          "laps": 2,
+          "requiredMedals": 20
+        },
+        {
+          "trackKey": "numberNine",
+          "laps": 1,
+          "requiredMedals": 22
+        },
+        {
+          "trackKey": "imaginaryNumber",
+          "laps": 3,
+          "requiredMedals": 25
+        },
+        {
+          "trackKey": "infinitePie",
+          "laps": 1,
+          "requiredMedals": 27
+        },
+        {
+          "trackKey": "eulersNumber",
+          "laps": 2,
+          "requiredMedals": 30
+        },
+        {
+          "trackKey": "goldenRatio",
+          "laps": 2,
+          "requiredMedals": 32
+        },
+        {
+          "trackKey": "squareRoot",
+          "laps": 2,
+          "requiredMedals": 35
+        },
+        {
+          "trackKey": "halfLife",
+          "laps": 1,
+          "requiredMedals": 37
+        }
+      ]
+    },
+    {
+      "id": "dirt-v1",
+      "name": "Mini Rally",
+      "ground": "dirt",
+      "stages": []
+    },
+    {
+      "id": "snow-v1",
+      "name": "Sliders",
+      "ground": "snow",
+      "stages": []
+    },
+    {
+      "id": "grip-v1",
+      "name": "Formula Mini",
+      "ground": "grip",
+      "stages": []
+    }
+  ]
+}

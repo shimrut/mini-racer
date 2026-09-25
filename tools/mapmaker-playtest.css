@@ -8,7 +8,9 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; }
+/* foundation.css shapes the game page body; this page scrolls like a normal page. */
+html, body { height: auto; }
+body { display: block; margin: 0; min-height: 100vh; overflow: auto; user-select: auto; -webkit-user-select: auto; background: #060c1a; color: #e2e8f0; font-family: "Segoe UI", system-ui, sans-serif; }
 button, a.button { font: inherit; }
 .drive-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid #26344d; background: #0b1425; }
 .eyebrow { margin: 0 0 .35rem; color: #38bdf8; font-size: .72rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
@@ -23,12 +25,18 @@ h1 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.04em; }
 #drive-canvas { display: block; width: 100%; height: 100%; min-height: min(76vh, 850px); }
 .stage-note { position: absolute; inset: auto 1rem 1rem; width: fit-content; max-width: calc(100% - 2rem); padding: .55rem .8rem; border-radius: .6rem; background: #07101fdd; color: #e2e8f0; font-size: .85rem; }
 .stage-note[hidden] { display: none; }
+/* The race HUD sits on the drive view, as it sits on the race view in the game. */
+.stage .hud-bar { position: absolute; top: 12px; }
+.stage .mobile-hud-bar { position: absolute; width: min(560px, calc(100% - 2rem)); }
 .drive-panel { align-self: start; padding: 1rem; border: 1px solid #34465f; border-radius: 18px; background: #101b2e; }
 .panel-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; }
 .panel-heading strong { color: #fbbf24; }
 .metric { display: flex; justify-content: space-between; gap: .8rem; padding: .72rem 0; border-top: 1px solid #26344d; }
 .metric span { color: #94a3b8; }
 .metric strong { text-align: right; }
+.flow-drive { margin: .9rem 0 .4rem; }
+.flow-drive[hidden] { display: none; }
+.flow-drive .metric strong[data-flow="miss"] { color: #38bdf8; }
 .drive-feedback { min-height: 3.2em; padding: .8rem; border-radius: .6rem; background: #17283d; line-height: 1.5; }
 .controls { display: flex; flex-wrap: wrap; gap: .45rem; }
 .steer-buttons { display: flex; gap: .6rem; margin-top: 1rem; }

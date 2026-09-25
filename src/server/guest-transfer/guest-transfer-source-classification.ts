@@ -1,5 +1,5 @@
 import {
-    CAMPAIGN_ID,
+    CAMPAIGN_NUMBERS_SERIES_ID,
     getCampaignStage,
 } from '../../../game/campaign/manifest.js';
 
@@ -76,13 +76,14 @@ export type ClassifiedCampaignProgress = {
 
 export function classifyStoredCampaignProgress(
     raw: string | null | undefined,
+    seriesId: string = CAMPAIGN_NUMBERS_SERIES_ID,
 ): StoredRecordClassification<ClassifiedCampaignProgress> {
     const json = readJson(raw);
     if (json.ok === 'empty') return { state: 'absent' };
     if (json.ok === 'damaged') return { state: 'malformed', reason: json.reason };
 
     const value = json.value;
-    if (value.campaignId !== CAMPAIGN_ID) {
+    if (value.campaignId !== seriesId) {
         return { state: 'malformed', reason: 'wrong_campaign' };
     }
 
@@ -94,7 +95,7 @@ export function classifyStoredCampaignProgress(
             return { state: 'malformed', reason: 'missing_fields' };
         }
         for (const [raceId, candidate] of Object.entries(results as Record<string, unknown>)) {
-            const row = classifyCampaignResultRow(raceId, candidate);
+            const row = classifyCampaignResultRow(raceId, candidate, seriesId);
             if (row.state === 'malformed') return { state: 'malformed', reason: row.reason };
             if (row.state === 'obsolete') {
                 obsoleteRaceIds.push(raceId);
@@ -118,6 +119,7 @@ export function classifyStoredCampaignProgress(
 function classifyCampaignResultRow(
     raceId: string,
     candidate: unknown,
+    seriesId: string,
 ): StoredRecordClassification<CampaignProgressRow> {
     if (candidate === null || candidate === undefined) {
         return { state: 'malformed', reason: 'missing_fields' };
@@ -151,7 +153,7 @@ function classifyCampaignResultRow(
     }
 
     const stage = getCampaignStage(raceId);
-    if (!stage) return { state: 'obsolete', reason: 'stage_retired', updatedAt };
+    if (!stage || stage.seriesId !== seriesId) return { state: 'obsolete', reason: 'stage_retired', updatedAt };
     if (
         row.trackKey !== stage.trackKey
         || row.lapCount !== stage.lapCount

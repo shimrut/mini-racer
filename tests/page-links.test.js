@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { getCarAssetUrlCandidates, PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
 import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
+import { isDrawnCarAsset } from '../game/car/drawn-car-skins.js';
 
 // Every page link must point at a real file, wherever the page lives. A broken link does not
 // fail the build: the player sees a missing style, font, or car.
@@ -86,11 +87,12 @@ describe('page links', () => {
 });
 
 describe('car picture links', () => {
+    // A car drawn in code has no picture file.
     const carAssets = [...new Set([
         STOCK_CAR_ASSET_NAME,
         ...PLAYER_SELECTABLE_CAR_ASSETS,
         ...Object.values(EXTRA_CAR_ASSETS),
-    ])];
+    ])].filter((assetName) => !isDrawnCarAsset(assetName));
 
     it.each(carAssets)('%s loads from the site root on any page', (assetName) => {
         const [primary] = getCarAssetUrlCandidates(assetName);

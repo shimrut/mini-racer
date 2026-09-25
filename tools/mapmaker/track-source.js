@@ -1,5 +1,6 @@
 import { CONFIG } from '../../game/config.js';
 import { clamp } from '../geometry.js';
+import { getStoredTrackGroundKey } from '../../game/track/grounds.js';
 
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
@@ -119,6 +120,10 @@ export function generateTrackGeometrySource(track, indent = '') {
             MAX_LINE_SMOOTHING
         );
         lines.push(`${indent}    lineSmoothing: ${formatTrackNumber(lineSmoothing)},`);
+    }
+    const groundKey = getStoredTrackGroundKey(track);
+    if (groundKey !== null) {
+        lines.push(`${indent}    ground: '${groundKey}',`);
     }
     lines.push(`${indent}    outer: [`);
     track.outer.forEach((point, index) => {

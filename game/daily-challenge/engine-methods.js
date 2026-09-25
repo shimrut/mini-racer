@@ -428,6 +428,7 @@ export const dailyChallengeEngineMethods = {
       const presentation = resolveTrackPresentation(challenge.trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.RACE,
         event: createDailyChallengePresentationEvent(challenge),
+        ground: track.ground,
       });
       getTrackCanvasAsset(challenge.trackKey, track, {
         qualityLevel: this.qualityLevel,

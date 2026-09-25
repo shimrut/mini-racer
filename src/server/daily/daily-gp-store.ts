@@ -103,13 +103,14 @@ import {
     getCampaignProgressForSelection,
     mergeGuestCampaignProgress,
 } from '../campaign/campaign-store.js';
-import { campaignProgressKey } from '../campaign/campaign-progress-key.js';
+import { campaignProgressKey, campaignProgressKeys } from '../campaign/campaign-progress-key.js';
 import {
-    CAMPAIGN_ID,
-    CAMPAIGN_STAGES,
+    CAMPAIGN_LIVE_STAGES,
+    CAMPAIGN_NUMBERS_SERIES_ID,
+    CAMPAIGN_SERIES,
     getCampaignUnlockedRaceIds,
 } from '../../../game/campaign/manifest.js';
-import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from '../../../game/car/generated-player-selectable-car-assets.js';
+import { PLAYER_SELECTABLE_CAR_ASSETS } from '../../../game/car/car-unlock-policy.js';
 import {
     guestProgressSelectionAccountPendingKey,
     guestProgressTransferReceiptKey,
@@ -178,11 +179,11 @@ function unavailableProgressSummary({
         hasDailyResults,
         campaignResults,
         campaignUnlockedTracks: null,
-        campaignTotalStages: CAMPAIGN_STAGES.length,
+        campaignTotalStages: CAMPAIGN_LIVE_STAGES.length,
         dailySavedResults: null,
         dailyPlaylistSize: null,
         carsUnlocked: null,
-        carsTotal: GENERATED_PLAYER_SELECTABLE_CAR_ASSETS.length,
+        carsTotal: PLAYER_SELECTABLE_CAR_ASSETS.length,
         unlocks,
     };
 }
@@ -224,7 +225,11 @@ type GuestTransferDailyChallengeSpec = {
 };
 
 type GuestTransferSourceInventory = {
+    // The Numbers progress record. It keeps this name so that transfers that
+    // started before there were series still compare.
     campaignProgress: string;
+    // The progress records of the other series. Older transfers have none.
+    campaignSeriesProgress?: Record<string, string>;
     campaignStages: Record<string, string>;
     daily: Record<string, string>;
     unlocks: string;
@@ -267,8 +272,8 @@ async function captureCampaignStageEvidence(
     guestPlayerId: string,
 ): Promise<Record<string, string>> {
     const playerField = playerFieldHash(guestPlayerId);
-    const rows = await Promise.all(CAMPAIGN_STAGES.map(async (stage) => {
-        const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
+    const rows = await Promise.all(CAMPAIGN_LIVE_STAGES.map(async (stage) => {
+        const competition = toCampaignCompetition(stage.seriesId, stage);
         const [entry, pb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
             redisCompressed.hGet(competition.pbHashKey, playerField),
@@ -282,6 +287,19 @@ async function captureCampaignStageEvidence(
         ] as const;
     }));
     return Object.fromEntries(rows);
+}
+
+async function captureCampaignSeriesProgressEvidence(
+    playerId: string,
+): Promise<Record<string, string>> {
+    const series = CAMPAIGN_SERIES.filter((entry) => entry.id !== CAMPAIGN_NUMBERS_SERIES_ID);
+    const values = await Promise.all(
+        series.map((entry) => redis.get(campaignProgressKey(playerId, entry.id))),
+    );
+    return Object.fromEntries(series.map((entry, index) => [
+        entry.id,
+        stableFingerprint(values[index] ?? null),
+    ]));
 }
 
 async function captureDailyEvidence(
@@ -310,14 +328,16 @@ async function captureGuestTransferSourceInventory(
     guestPlayerId: string,
     challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
 ): Promise<GuestTransferSourceInventory> {
-    const [campaignProgress, campaignStages, daily, unlocks] = await Promise.all([
+    const [campaignProgress, campaignSeriesProgress, campaignStages, daily, unlocks] = await Promise.all([
         redis.get(campaignProgressKey(guestPlayerId)),
+        captureCampaignSeriesProgressEvidence(guestPlayerId),
         captureCampaignStageEvidence(guestPlayerId),
         captureDailyEvidence(guestPlayerId, challengeSpecs),
         redis.hGetAll(carUnlockHashKey(guestPlayerId)),
     ]);
     return {
         campaignProgress: stableFingerprint(campaignProgress ?? null),
+        campaignSeriesProgress,
         campaignStages,
         daily,
         unlocks: stableFingerprint(unlocks ?? null),
@@ -338,6 +358,7 @@ function changedInventoryDomains(
     );
     const changed: string[] = [];
     if (rowsChanged(expected.campaignStages, observed.campaignStages)
+        || rowsChanged(expected.campaignSeriesProgress ?? {}, observed.campaignSeriesProgress)
         || (observed.campaignProgress !== undefined
             && observed.campaignProgress !== expected.campaignProgress)) {
         changed.push('campaign');
@@ -350,6 +371,7 @@ function changedInventoryDomains(
 function isValidSourceInventory(value: unknown): value is GuestTransferSourceInventory {
     return isRecordObject(value)
         && typeof value.campaignProgress === 'string'
+        && (value.campaignSeriesProgress === undefined || isRecordObject(value.campaignSeriesProgress))
         && isRecordObject(value.campaignStages)
         && isRecordObject(value.daily)
         && typeof value.unlocks === 'string'
@@ -1564,11 +1586,11 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
     return {
         campaignResults,
         campaignUnlockedTracks,
-        campaignTotalStages: CAMPAIGN_STAGES.length,
+        campaignTotalStages: CAMPAIGN_LIVE_STAGES.length,
         dailySavedResults,
         dailyPlaylistSize: dailyPlaylist.length,
         carsUnlocked: carUnlocks.unlockedAssets.length,
-        carsTotal: GENERATED_PLAYER_SELECTABLE_CAR_ASSETS.length,
+        carsTotal: PLAYER_SELECTABLE_CAR_ASSETS.length,
         hasDailyResults: Boolean(profile?.hasAnyData),
         unlocks,
         hasProgress: Boolean(
@@ -1584,8 +1606,9 @@ async function guestHoldsTransferableProgress(
     guestPlayerId: string,
     dailyPlaylist: readonly DailyGpChallenge[],
 ): Promise<boolean> {
-    const rawProgress = await redis.get(campaignProgressKey(guestPlayerId));
-    if (rawProgress) {
+    for (const key of campaignProgressKeys(guestPlayerId)) {
+        const rawProgress = await redis.get(key);
+        if (!rawProgress) continue;
         try {
             const progress = JSON.parse(rawProgress) as { startedAt?: unknown; resultsByRaceId?: unknown };
             const results = progress?.resultsByRaceId;
@@ -1602,7 +1625,7 @@ async function guestHoldsTransferableProgress(
     if (await hasCarUnlockProgress(guestPlayerId)) return true;
     if ((await readPlayerProfile(guestPlayerId))?.hasAnyData) return true;
     const competitions = [
-        ...CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage)),
+        ...CAMPAIGN_LIVE_STAGES.map((stage) => toCampaignCompetition(stage.seriesId, stage)),
         ...dailyPlaylist.map((challenge) => toDailyCompetition(challenge)),
     ];
     const holds = await Promise.all(competitions.map((competition) => (
@@ -1921,6 +1944,7 @@ export async function getGuestProgressTransferDiagnostic({
         survivingSource = await captureGuestTransferSourceInventory(guestId, specs);
         destinationEvidence = {
             campaignProgress: stableFingerprint(await redis.get(campaignProgressKey(accountId)) ?? null),
+            campaignSeriesProgress: await captureCampaignSeriesProgressEvidence(accountId),
             campaignStages: await captureCampaignStageEvidence(accountId),
             daily: await captureDailyEvidence(accountId, specs),
             unlocks: stableFingerprint(await redis.hGetAll(carUnlockHashKey(accountId)) ?? null),
@@ -2393,6 +2417,7 @@ export async function selectGuestProgress({
         type ObservedSource = {
             unlocks?: Record<string, string>;
             campaignProgress?: string | null;
+            campaignSeriesProgress?: Record<string, string | null>;
             campaignStages?: Record<
                 string,
                 { entry: string | null; pb: string | null; rank: number | null }
@@ -2427,6 +2452,12 @@ export async function selectGuestProgress({
                 } else if (raw?.campaignStages) {
                     evidence = {
                         campaignProgress: stableFingerprint(raw.campaignProgress ?? null),
+                        campaignSeriesProgress: Object.fromEntries(
+                            Object.entries(raw.campaignSeriesProgress ?? {}).map(([seriesId, value]) => [
+                                seriesId,
+                                stableFingerprint(value ?? null),
+                            ]),
+                        ),
                         campaignStages: Object.fromEntries(
                             Object.entries(raw.campaignStages).map(([raceId, row]) => [
                                 raceId,
@@ -2443,6 +2474,7 @@ export async function selectGuestProgress({
                         campaignProgress: stableFingerprint(
                             await redis.get(campaignProgressKey(guestPlayerId)) ?? null,
                         ),
+                        campaignSeriesProgress: await captureCampaignSeriesProgressEvidence(guestPlayerId),
                         campaignStages: await captureCampaignStageEvidence(guestPlayerId),
                     };
                 } else if (domain === 'daily') {

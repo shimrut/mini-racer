@@ -31,10 +31,11 @@ export function registerCampaignRoutes(
 ): void {
     app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
-            const { playerId, guestToken } = req.query ?? {};
+            const { playerId, guestToken, seriesId } = req.query ?? {};
             send(res, await dependencies.getServerCampaignBootstrap({
                 playerId,
                 guestToken,
+                seriesId,
                 redditUsername: dependencies.getRequestUsername(),
             }));
         } catch (error) {

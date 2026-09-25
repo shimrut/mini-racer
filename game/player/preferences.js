@@ -1,5 +1,6 @@
 import {
     readPlayerCarSkinAssetName,
+    readPlayerGroundCarSkinChoice,
     writePlayerCarSkinAssetName,
 } from '../car/player-car-skin.js';
 import {
@@ -42,8 +43,13 @@ import { isLocalEnvironment } from '../track/environment.js';
 let saveTimer = null;
 
 export function readPlayerPreferences() {
+    const carSkinDirt = readPlayerGroundCarSkinChoice('dirt');
+    const carSkinSnow = readPlayerGroundCarSkinChoice('snow');
     return {
         carSkin: readPlayerCarSkinAssetName(),
+        // Sent only once the player picks a dirt or snow skin.
+        ...(carSkinDirt ? { carSkinDirt } : {}),
+        ...(carSkinSnow ? { carSkinSnow } : {}),
         trailId: readPlayerTrailId(),
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
@@ -61,7 +67,9 @@ export function applyPlayerPreferences(value) {
         return false;
     }
 
-    writePlayerCarSkinAssetName(value.carSkin);
+    writePlayerCarSkinAssetName(value.carSkin, 'tarmac');
+    writePlayerCarSkinAssetName(value.carSkinDirt, 'dirt');
+    writePlayerCarSkinAssetName(value.carSkinSnow, 'snow');
     writePlayerTrailId(value.trailId);
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);

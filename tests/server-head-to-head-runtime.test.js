@@ -392,7 +392,7 @@ describe('the best a challenge viewer already holds', () => {
             expect.objectContaining({ mode: 'campaign', id: 'numbered-v1-03' }),
             'reddit:racer',
         );
-        expect(mockRepairStandings).toHaveBeenCalledWith('reddit:racer');
+        expect(mockRepairStandings).toHaveBeenCalledWith('reddit:racer', 'numbered-v1');
     });
 
     it('keeps the stored time when the rank read fails', async () => {

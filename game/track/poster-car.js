@@ -1,4 +1,6 @@
 import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from '../car/sprite.js';
+import { getDefaultCarAssetForGround } from '../car/car-skin-grounds.js';
+import { getTrackGround } from './grounds.js';
 
 const POSTER_CAR_ENTRANCE_MS = 480;
 
@@ -13,13 +15,19 @@ export function prefersReducedPosterMotion() {
     return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 }
 
-export function loadPosterCar() {
+// A post shows the default car of the track's ground, or the stock car.
+export function getPosterCarAssetName(track) {
+    return getDefaultCarAssetForGround(getTrackGround(track).key) ?? STOCK_CAR_ASSET_NAME;
+}
+
+export function loadPosterCar(track = null) {
+    const assetName = getPosterCarAssetName(track);
     const loader = new CarSpriteLoader();
     return new Promise((resolve) => {
-        loader.load(STOCK_CAR_ASSET_NAME, {
+        loader.load(assetName, {
             onLoaded: resolve,
             onError: () => {
-                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the custom post preview.`);
+                console.warn(`Unable to load ${assetName} in the custom post preview.`);
                 resolve(null);
             },
         });

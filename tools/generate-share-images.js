@@ -6,6 +6,7 @@ import { TRACK_SCHEDULE_KEYS, getTrackName } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { ensurePath2D, isMainModule } from './node-script.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, '..');
@@ -87,7 +88,10 @@ export function renderShareImageJpeg(trackKey, track = TRACKS[trackKey]) {
     const trackCanvas = createCanvas(panelW - 48, panelH - 48);
     renderTrackPreviewCanvas(trackCanvas, {
         trackGeometry: { outer: track.outer, inner: track.inner },
-        presentation: {},
+        presentation: resolveTrackPresentation(trackKey, {
+            surface: TRACK_PRESENTATION_SURFACES.SHARE,
+            ground: track.ground,
+        }),
         startLine: track.startLine,
         startPos: track.startPos,
         startAngle: track.startAngle ?? 0,

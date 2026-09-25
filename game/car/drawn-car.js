@@ -42,16 +42,28 @@ export const DRAWN_CAR_MODELS = Object.freeze({ formula: FORMULA_CAR, rally: RAL
 
 const STILL = Object.freeze({ steerAngle: 0, roll: 0, rollBlur: 0, brake: 0 });
 
+// The race picture of the car is this many times larger than the car on the
+// screen. A high quality shrink of it keeps the thin lines from breaking up.
+const FRAME_OVERSAMPLE = 2;
+// While the car moves, the race picture is painted again at most once in
+// this time: every second frame at 60 frames each second.
+const REPAINT_INTERVAL_SEC = 1 / 40;
+// On a slow device, the race picture is painted 15 times each second.
+const SLOW_REPAINT_INTERVAL_SEC = 1 / 15;
+
 export class DrawnCar {
   constructor(car = FORMULA_CAR, skin = {}, { pixelsPerUnit = 3 } = {}) {
     this.car = car;
     this.pixelsPerUnit = pixelsPerUnit;
     this.placements = placeParts(car, skin);
     this.runs = groupRuns(this.placements);
-    this.layers = null;
+    // The layers of each picture size, by pixels per car unit.
+    this.layerSets = new Map();
     this.frame = null;
     this.frameKey = "";
+    this.framePixelsPerUnit = pixelsPerUnit;
     this.staticSprite = null;
+    this.repaintIntervalSec = REPAINT_INTERVAL_SEC;
     this.resetMotion();
   }
 
@@ -62,6 +74,9 @@ export class DrawnCar {
     this.brake = 0;
     this.brakeHoldSec = 0;
     this.lastSpeedKph = null;
+    this.moving = false;
+    this.paintedRoll = 0;
+    this.sincePaintSec = Infinity;
   }
 
   // dt: seconds since the last frame. 0 stops all motion.
@@ -70,15 +85,24 @@ export class DrawnCar {
   // steer: -1 is full left, 1 is full right.
   // holding: true keeps the brake light on, as on the start grid.
   // size: the drawn size of the car box in world pixels.
-  update(dt, { speedKph = 0, speedPx = 0, steer = 0, holding = false, size = 52 } = {}) {
-    if (!(dt > 0)) return;
+  // lowQuality: true paints the race picture less often, for a slow device.
+  update(dt, {
+    speedKph = 0, speedPx = 0, steer = 0, holding = false, size = 52, lowQuality = false,
+  } = {}) {
+    if (!(dt > 0)) {
+      this.moving = false;
+      return;
+    }
     const { steering, wheelSpin, brakes, boxSize } = this.car;
+    this.sincePaintSec += dt;
+    this.repaintIntervalSec = lowQuality ? SLOW_REPAINT_INTERVAL_SEC : REPAINT_INTERVAL_SEC;
 
     const steerTarget = clamp(steer, -1, 1) * steering.maxAngleDeg * (Math.PI / 180);
     this.steerAngle += (steerTarget - this.steerAngle)
       * (1 - Math.exp(-dt / Math.max(0.001, steering.responseSec)));
 
     const rolled = Math.max(0, Number(speedPx) || 0) * dt * (boxSize / Math.max(1, size));
+    this.moving = rolled > 0;
     this.roll += Math.min(rolled, wheelSpin.maxStepPerFrame);
     const blurTarget = clamp(rolled / wheelSpin.blurStep, 0, 1);
     this.rollBlur += (blurTarget - this.rollBlur) * Math.min(1, dt * 10);
@@ -112,7 +136,7 @@ export class DrawnCar {
   // Draws the car at the origin, with the nose on the +x axis. The box of the
   // car is size x size pixels.
   draw(ctx, size) {
-    const frame = this.renderFrame();
+    const frame = this.renderFrame(this.getFramePixelsPerUnit(ctx, size));
     if (!frame) return;
     // The frame is larger than the car on screen. A high quality shrink keeps
     // the thin lines from breaking up.
@@ -137,24 +161,48 @@ export class DrawnCar {
     }
   }
 
-  // The car in its current pose. The frame is drawn again only when the pose
-  // changes.
-  renderFrame() {
+  // The size of the race picture: FRAME_OVERSAMPLE times the car on the
+  // screen, and never larger than the sprite.
+  getFramePixelsPerUnit(ctx, size) {
+    const transform = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
+    const screenScale = transform ? Math.hypot(transform.a, transform.b) : 0;
+    if (!(screenScale > 0)) return this.pixelsPerUnit;
+    const wanted = (size * screenScale * FRAME_OVERSAMPLE) / this.car.boxSize;
+    // Quarter steps, so a small change of scale does not make a new size.
+    return Math.min(this.pixelsPerUnit, Math.max(0.5, Math.ceil(wanted * 4) / 4));
+  }
+
+  // The car in its current pose. The frame is painted again only when the
+  // pose changes. While the car moves, it is painted at most once in each
+  // repaint interval, and the tires roll by at most one step between two
+  // pictures, so a fast wheel does not look like it turns backward.
+  renderFrame(pixelsPerUnit = this.pixelsPerUnit) {
+    if (pixelsPerUnit !== this.framePixelsPerUnit) {
+      this.frame = null;
+      this.framePixelsPerUnit = pixelsPerUnit;
+    }
+    if (this.frame && this.moving && this.sincePaintSec < this.repaintIntervalSec) {
+      return this.frame;
+    }
+    const maxStep = this.car.wheelSpin.maxStepPerFrame;
+    if (this.roll - this.paintedRoll > maxStep) this.roll = this.paintedRoll + maxStep;
     const key = `${this.steerAngle.toFixed(3)}|${this.roll.toFixed(2)}|`
       + `${this.rollBlur.toFixed(2)}|${this.brake.toFixed(2)}`;
     if (this.frame && key === this.frameKey) return this.frame;
-    const frame = this.paint(this.frame, this);
+    const frame = this.paint(this.frame, this, pixelsPerUnit);
     if (frame) {
       this.frame = frame;
       this.frameKey = key;
+      this.paintedRoll = this.roll;
+      this.sincePaintSec = 0;
     }
     return frame;
   }
 
-  paint(target, motion) {
-    const layers = this.getLayers();
+  paint(target, motion, pixelsPerUnit = this.pixelsPerUnit) {
+    const layers = this.getLayers(pixelsPerUnit);
     if (!layers) return null;
-    const canvas = target || createCanvas(layers.pixels, layers.pixels);
+    const canvas = target?.width === layers.pixels ? target : createCanvas(layers.pixels, layers.pixels);
     const ctx = canvas?.getContext("2d");
     if (!ctx) return null;
     const center = layers.pixels / 2;
@@ -166,7 +214,7 @@ export class DrawnCar {
         ctx.drawImage(layers.canvases[index], 0, 0);
         return;
       }
-      ctx.setTransform(this.pixelsPerUnit, 0, 0, this.pixelsPerUnit, center, center);
+      ctx.setTransform(pixelsPerUnit, 0, 0, pixelsPerUnit, center, center);
       for (const placement of run.placements) {
         drawPlacement(ctx, placement, motion, this.car.outline);
       }
@@ -175,11 +223,12 @@ export class DrawnCar {
     return canvas;
   }
 
-  // Each group of parts that do not move is drawn one time, on its own
-  // layer.
-  getLayers() {
-    if (this.layers) return this.layers;
-    const pixels = Math.ceil(this.car.boxSize * this.pixelsPerUnit);
+  // Each group of parts that do not move is drawn one time for each picture
+  // size, on its own layer.
+  getLayers(pixelsPerUnit = this.pixelsPerUnit) {
+    const cached = this.layerSets.get(pixelsPerUnit);
+    if (cached) return cached;
+    const pixels = Math.ceil(this.car.boxSize * pixelsPerUnit);
     const canvases = [];
     for (const run of this.runs) {
       if (!run.still) {
@@ -189,14 +238,15 @@ export class DrawnCar {
       const canvas = createCanvas(pixels, pixels);
       const ctx = canvas?.getContext("2d");
       if (!ctx) return null;
-      ctx.setTransform(this.pixelsPerUnit, 0, 0, this.pixelsPerUnit, pixels / 2, pixels / 2);
+      ctx.setTransform(pixelsPerUnit, 0, 0, pixelsPerUnit, pixels / 2, pixels / 2);
       for (const placement of run.placements) {
         drawPlacement(ctx, placement, STILL, this.car.outline);
       }
       canvases.push(canvas);
     }
-    this.layers = { pixels, canvases };
-    return this.layers;
+    const layers = { pixels, canvases };
+    this.layerSets.set(pixelsPerUnit, layers);
+    return layers;
   }
 }
 

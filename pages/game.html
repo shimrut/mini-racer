@@ -134,6 +134,16 @@
                             <span class="lobby-mode-selection__track"></span>
                             <span class="lobby-mode-selection__laps" hidden></span>
                         </p>
+                        <div class="campaign-series" data-campaign-series hidden>
+                            <button id="campaign-series-btn" class="campaign-series__btn" type="button"
+                                aria-haspopup="listbox" aria-expanded="false"
+                                aria-controls="campaign-series-menu">
+                                <span class="campaign-series__name"></span>
+                                <span class="campaign-series__medals"></span>
+                            </button>
+                            <div id="campaign-series-menu" class="campaign-series__menu" role="listbox"
+                                aria-label="Campaign series" tabindex="-1" hidden></div>
+                        </div>
                     </div>
                 </header>
 
@@ -208,6 +218,8 @@
 
                     <section id="lobby-campaign-pane" class="lobby-pane lobby-pane--campaign main-menu"
                         data-lobby-pane="campaign" aria-label="Campaign" hidden>
+                        <div id="campaign-series-list" class="campaign-series-list" role="list"
+                            aria-label="Campaign series" hidden></div>
                         <div id="campaign-carousel" class="track-carousel track-carousel--lobby" role="group"
                             aria-roledescription="carousel" aria-label="Campaign stages" tabindex="-1">
                             <div id="campaign-carousel-viewport" class="track-carousel__viewport">

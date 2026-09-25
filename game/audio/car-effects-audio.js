@@ -5,6 +5,8 @@ import { registerAudioPrepareOnFirstUserGesture } from './first-user-gesture-unl
 
 let registeredApi = null;
 const PARAMETER_SYNC_INTERVAL_SEC = 1 / 30;
+// The volume of the high engine whine (the sixth harmonic) on tarmac.
+const ORDER_GAIN = 0.15;
 const IDLE_AUDIO_SUSPEND_MS = 250;
 
 export function userGesturePrepareCarEffects() {
@@ -19,6 +21,107 @@ function createLoopingNoiseBuffer(audioCtx, seconds = 2) {
         data[i] = Math.random() * 2 - 1;
     }
     return buffer;
+}
+
+// Sparse clicks over a quiet hiss: stones hitting the car body.
+function createGravelNoiseBuffer(audioCtx, seconds = 2) {
+    const bufferLength = Math.floor(audioCtx.sampleRate * seconds);
+    const buffer = audioCtx.createBuffer(1, bufferLength, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferLength; i++) {
+        const click = Math.random() < 0.004 ? Math.random() * 2 - 1 : 0;
+        data[i] = click + (Math.random() * 2 - 1) * 0.08;
+    }
+    return buffer;
+}
+
+// Each ground has its own sound. Tarmac values are the original sound.
+const GROUND_SOUND_PROFILES = Object.freeze({
+    tarmac: Object.freeze({
+        shaperAmount: 10,
+        barkBoostDb: 0,
+        motorLowpassScale: 1,
+        pitchScale: 1,
+        whineScale: 1,
+        gravelVol: 0,
+        gravelFreq: 1800,
+        rumbleVol: 0,
+        slipMax: 0.18,
+        slipScale: 0.5,
+        slipQBase: 5.0,
+        slipQPerSlip: 8.0,
+        slipFreqBase: 1000,
+        slipFreqPerSlip: 3000,
+        slipFreqPerSpeed: 1200,
+        shiftCrackVol: 0,
+    }),
+    // Rally: a rougher engine, gravel under the tyres, a wide gravel spray
+    // instead of a tyre squeal in a slide, and a crack at each gear change.
+    dirt: Object.freeze({
+        shaperAmount: 26,
+        barkBoostDb: 2.5,
+        motorLowpassScale: 1,
+        pitchScale: 1,
+        whineScale: 1,
+        gravelVol: 0.08,
+        gravelFreq: 1800,
+        rumbleVol: 0.05,
+        slipMax: 0.22,
+        slipScale: 0.75,
+        slipQBase: 0.8,
+        slipQPerSlip: 0.6,
+        slipFreqBase: 650,
+        slipFreqPerSlip: 900,
+        slipFreqPerSpeed: 500,
+        shiftCrackVol: 0.14,
+    }),
+    // Snow soaks up sound: a softer, muffled engine, a low soft crunch under
+    // the tyres, and a breathy hiss instead of a squeal in a slide.
+    snow: Object.freeze({
+        shaperAmount: 7,
+        barkBoostDb: -2,
+        motorLowpassScale: 0.7,
+        pitchScale: 1,
+        whineScale: 1,
+        gravelVol: 0.06,
+        gravelFreq: 850,
+        rumbleVol: 0.03,
+        slipMax: 0.16,
+        slipScale: 0.6,
+        slipQBase: 0.7,
+        slipQPerSlip: 0.3,
+        slipFreqBase: 2400,
+        slipFreqPerSlip: 1400,
+        slipFreqPerSpeed: 700,
+        shiftCrackVol: 0,
+    }),
+    // A race circuit: an engine that turns faster. The note is a little
+    // higher, brighter and cleaner, with more high whine. The tyres squeal
+    // as on tarmac.
+    grip: Object.freeze({
+        shaperAmount: 8,
+        barkBoostDb: 1,
+        motorLowpassScale: 1.2,
+        pitchScale: 1.1,
+        whineScale: 1.5,
+        gravelVol: 0,
+        gravelFreq: 1800,
+        rumbleVol: 0,
+        slipMax: 0.18,
+        slipScale: 0.5,
+        slipQBase: 5.0,
+        slipQPerSlip: 8.0,
+        slipFreqBase: 1000,
+        slipFreqPerSlip: 3000,
+        slipFreqPerSpeed: 1200,
+        shiftCrackVol: 0,
+    }),
+});
+
+function getGroundSoundProfile(ground) {
+    return Object.hasOwn(GROUND_SOUND_PROFILES, ground)
+        ? GROUND_SOUND_PROFILES[ground]
+        : GROUND_SOUND_PROFILES.tarmac;
 }
 
 function makeDistortionCurve(amount) {
@@ -48,6 +151,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
     let sawB = null;
     let sawC = null;
     let orderOsc = null;
+    let orderGain = null;
     let subOsc = null;
     let motorBus = null;
     let motorHighpass = null;
@@ -70,6 +174,17 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
     let intakeBandpass = null;
     let intakeGain = null;
 
+    let noiseBuffer = null;
+    let gravelNoiseBuffer = null;
+    let gravelSource = null;
+    let gravelBandpass = null;
+    let gravelGain = null;
+    let rumbleSource = null;
+    let rumbleLowpass = null;
+    let rumbleGain = null;
+    let activeShaperAmount = 10;
+    let lastGearIndex = null;
+
     let combustionPulseOsc = null;
     let motorPulseMod = null;
     let exhaustPulseMod = null;
@@ -87,7 +202,8 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         speed: 0,
         maxSpeedKph: 220,
         slipRatio: 0,
-        throttleBlocked: false
+        throttleBlocked: false,
+        ground: 'tarmac'
     };
 
     function buildGraph() {
@@ -165,8 +281,8 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         sawGainB.gain.value = 0.22;
         const sawGainC = ctx.createGain();
         sawGainC.gain.value = 0.18;
-        const orderGain = ctx.createGain();
-        orderGain.gain.value = 0.15;
+        orderGain = ctx.createGain();
+        orderGain.gain.value = ORDER_GAIN;
         const subGain = ctx.createGain();
         subGain.gain.value = 0.35;
 
@@ -221,6 +337,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         thrumLFO.start();
 
         const noiseBuf = createLoopingNoiseBuffer(ctx, 2);
+        noiseBuffer = noiseBuf;
 
         slipSource = ctx.createBufferSource();
         slipSource.buffer = noiseBuf;
@@ -273,6 +390,62 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         graphBuilt = true;
     }
 
+    // The gravel and rumble sounds run only on a ground that uses them, so
+    // a tarmac race does not play two silent sounds.
+    function startGroundNoise() {
+        if (gravelSource || !ctx || !masterGain || !compressor || !noiseBuffer) return;
+        if (!gravelNoiseBuffer) gravelNoiseBuffer = createGravelNoiseBuffer(ctx, 2);
+
+        gravelSource = ctx.createBufferSource();
+        gravelSource.buffer = gravelNoiseBuffer;
+        gravelSource.loop = true;
+        gravelBandpass = ctx.createBiquadFilter();
+        gravelBandpass.type = 'bandpass';
+        gravelBandpass.frequency.value = 1800;
+        gravelBandpass.Q.value = 0.9;
+        gravelGain = ctx.createGain();
+        gravelGain.gain.value = 0;
+        gravelSource.connect(gravelBandpass);
+        gravelBandpass.connect(gravelGain);
+        gravelGain.connect(masterGain);
+        gravelSource.start();
+
+        rumbleSource = ctx.createBufferSource();
+        rumbleSource.buffer = noiseBuffer;
+        rumbleSource.loop = true;
+        rumbleLowpass = ctx.createBiquadFilter();
+        rumbleLowpass.type = 'lowpass';
+        rumbleLowpass.frequency.value = 180;
+        rumbleLowpass.Q.value = 0.7;
+        rumbleGain = ctx.createGain();
+        rumbleGain.gain.value = 0;
+        rumbleSource.connect(rumbleLowpass);
+        rumbleLowpass.connect(rumbleGain);
+        rumbleGain.connect(compressor);
+        rumbleSource.start();
+    }
+
+    // Call only while the two sounds are silent, as at the start of a
+    // tarmac race: the ground noise goes to 0 when a race stops.
+    function stopGroundNoise() {
+        if (!gravelSource) return;
+        for (const source of [gravelSource, rumbleSource]) {
+            try {
+                source.stop();
+            } catch {
+                // The source was already stopped.
+            }
+        }
+        gravelGain.disconnect?.();
+        rumbleGain.disconnect?.();
+        gravelSource = null;
+        gravelBandpass = null;
+        gravelGain = null;
+        rumbleSource = null;
+        rumbleLowpass = null;
+        rumbleGain = null;
+    }
+
     function clearIdleSuspendTimer() {
         if (idleSuspendTimer === null) return;
         clearTimeout(idleSuspendTimer);
@@ -295,6 +468,28 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         if (ctx && ctx.state === 'suspended') {
             void ctx.resume();
         }
+    }
+
+    // A short burst through a mid band, like a rally gearbox and exhaust crack.
+    function scheduleShiftCrack(volume) {
+        if (!ctx || !masterGain || !noiseBuffer || !(volume > 0)) return;
+        const t = ctx.currentTime;
+        const burst = ctx.createBufferSource();
+        burst.buffer = noiseBuffer;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.setValueAtTime(700 + Math.random() * 300, t);
+        band.Q.setValueAtTime(1.4, t);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(volume, t + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+        burst.connect(band);
+        band.connect(gain);
+        gain.connect(masterGain);
+        keepAlive(burst);
+        burst.start(t, Math.random() * 1.5);
+        burst.stop(t + 0.1);
     }
 
     const api = {
@@ -401,8 +596,9 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             maxSpeedKph,
             slipRatio,
             throttleBlocked,
+            ground = 'tarmac',
         }) {
-            lastFrame = { status, speed, maxSpeedKph, slipRatio, throttleBlocked };
+            lastFrame = { status, speed, maxSpeedKph, slipRatio, throttleBlocked, ground };
             const enabled = enabledCache;
             if (!graphBuilt && !externalCtx) return;
             buildGraph();
@@ -413,6 +609,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 || !sawB
                 || !sawC
                 || !orderOsc
+                || !orderGain
                 || !subOsc
                 || !motorGain
                 || !motorLowpass
@@ -446,6 +643,9 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 slipGain.gain.setTargetAtTime(0, t, smooth);
                 exhaustGain.gain.setTargetAtTime(0, t, smooth);
                 intakeGain.gain.setTargetAtTime(0, t, smooth);
+                gravelGain?.gain.setTargetAtTime(0, t, smooth);
+                rumbleGain?.gain.setTargetAtTime(0, t, smooth);
+                lastGearIndex = null;
                 motorPulseMod.gain.setTargetAtTime(0, t, smooth);
                 exhaustPulseMod.gain.setTargetAtTime(0, t, smooth);
                 lastParameterSyncTime = t;
@@ -474,15 +674,27 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const gearStart = gearIndex / gearCount;
             const gearEnd = (gearIndex + 1) / gearCount;
             const gearProgress = clamp((shiftedSpeed - gearStart) / (gearEnd - gearStart), 0, 1);
+            const profile = getGroundSoundProfile(ground);
+            if (profile.gravelVol > 0 || profile.rumbleVol > 0) startGroundNoise();
+            else stopGroundNoise();
+            if (profile.shaperAmount !== activeShaperAmount && motorShaper) {
+                motorShaper.curve = makeDistortionCurve(profile.shaperAmount);
+                activeShaperAmount = profile.shaperAmount;
+            }
+            if (lastGearIndex !== null && gearIndex > lastGearIndex) {
+                scheduleShiftCrack(profile.shiftCrackVol);
+            }
+            lastGearIndex = gearIndex;
             const rpmNorm = 0.34 + gearProgress * 0.66;
             const powerCurve = clamp(0.16 + rpmNorm * 0.60 + speedNorm * 0.24, 0, 1);
             const shimmer = 1 + Math.sin(t * 94) * 0.004 + Math.sin(t * 151) * 0.003;
-            const f0 = (32 + (rpmNorm ** 1.3) * 105 + speedNorm * 18) * shimmer;
+            const f0 = (32 + (rpmNorm ** 1.3) * 105 + speedNorm * 18) * shimmer * profile.pitchScale;
 
             sawA.frequency.setTargetAtTime(f0, t, smooth);
             sawB.frequency.setTargetAtTime(f0 * 2.0, t, smooth);
             sawC.frequency.setTargetAtTime(f0 * 3.0, t, smooth);
             orderOsc.frequency.setTargetAtTime(f0 * 6.0, t, smooth);
+            orderGain.gain.setTargetAtTime(ORDER_GAIN * profile.whineScale, t, smooth);
             subOsc.frequency.setTargetAtTime(f0 * 0.5, t, smooth);
             combustionPulseOsc.frequency.setTargetAtTime(35 + rpmNorm * 90, t, smooth);
 
@@ -492,11 +704,11 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             thrumLFO.frequency.setTargetAtTime(4 + rpmNorm * 8, t, smooth);
             thrumLFOMod.gain.setTargetAtTime(0.5 + rpmNorm * 3.0, t, smooth);
 
-            const filterBase = 450 + (powerCurve ** 1.3) * 1850;
+            const filterBase = (450 + (powerCurve ** 1.3) * 1850) * profile.motorLowpassScale;
             motorLowpass.frequency.setTargetAtTime(filterBase, t, smooth);
             motorLowpass.Q.setTargetAtTime(0.8 + powerCurve * 0.4, t, smooth);
 
-            const barkDb = clamp(1.5 + rpmNorm * 5.5 + speedNorm * 2.0, 1.5, 9.0);
+            const barkDb = clamp(1.5 + rpmNorm * 5.5 + speedNorm * 2.0, 1.5, 9.0) + profile.barkBoostDb;
             motorPeaking.gain.setTargetAtTime(barkDb, t, smooth);
             motorPeaking.frequency.setTargetAtTime(400 + rpmNorm * 1600, t, smooth);
 
@@ -507,10 +719,22 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             motorGain.gain.setTargetAtTime(engineVol, t, smooth);
 
             const slipDrive = slip * slip;
-            const slipVol = Math.min(0.18, slipDrive * 0.5) * (0.3 + speedNorm * 0.7);
+            const slipVol = Math.min(profile.slipMax, slipDrive * profile.slipScale) * (0.3 + speedNorm * 0.7);
             slipGain.gain.setTargetAtTime(slipVol, t, smooth);
-            slipBandpass.Q.setTargetAtTime(5.0 + slip * 8.0, t, smooth);
-            slipBandpass.frequency.setTargetAtTime(1000 + slip * 3000 + speedNorm * 1200, t, smooth);
+            slipBandpass.Q.setTargetAtTime(profile.slipQBase + slip * profile.slipQPerSlip, t, smooth);
+            slipBandpass.frequency.setTargetAtTime(
+                profile.slipFreqBase + slip * profile.slipFreqPerSlip + speedNorm * profile.slipFreqPerSpeed,
+                t,
+                smooth,
+            );
+
+            if (gravelSource) {
+                const gravelVol = profile.gravelVol * speedNorm * (0.7 + slip * 0.6);
+                gravelGain.gain.setTargetAtTime(gravelVol, t, smooth);
+                gravelBandpass.frequency.setTargetAtTime(profile.gravelFreq, t, smooth);
+                gravelSource.playbackRate?.setTargetAtTime?.(0.6 + speedNorm * 0.8, t, smooth);
+                rumbleGain.gain.setTargetAtTime(profile.rumbleVol * speedNorm, t, smooth);
+            }
 
             const exh = (0.012 + rpmNorm * 0.012 + speedNorm * 0.012) * (0.60 + load * 0.40);
             exhaustGain.gain.setTargetAtTime(exh, t, smooth);

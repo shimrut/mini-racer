@@ -75,7 +75,7 @@
     "author": 9.08,
     "gold": 9.23,
     "silver": 9.41,
-    "bronze": 9.80
+    "bronze": 9.8
   },
   "twinRise": {
     "author": 18.35,
@@ -99,7 +99,7 @@
     "author": 17.65,
     "gold": 18.03,
     "silver": 18.77,
-    "bronze": 19.60
+    "bronze": 19.6
   },
   "templeStraight": {
     "author": 10.15,
@@ -156,7 +156,7 @@
     "bronze": 10.64
   },
   "speedAltar": {
-    "author": 10.00,
+    "author": 10,
     "gold": 10.23,
     "silver": 10.49,
     "bronze": 10.77
@@ -192,7 +192,7 @@
     "bronze": 10.72
   },
   "ironHook": {
-    "author": 13.80,
+    "author": 13.8,
     "gold": 13.98,
     "silver": 14.21,
     "bronze": 14.43
@@ -216,7 +216,7 @@
     "bronze": 17.05
   },
   "turboShell": {
-    "author": 19.20,
+    "author": 19.2,
     "gold": 19.42,
     "silver": 19.63,
     "bronze": 19.89
@@ -229,7 +229,7 @@
   },
   "obsidianRidge": {
     "author": 11.95,
-    "gold": 12.10,
+    "gold": 12.1,
     "silver": 12.23,
     "bronze": 12.41
   },
@@ -294,7 +294,7 @@
     "bronze": 15.91
   },
   "numberThree": {
-    "author": 12.70,
+    "author": 12.7,
     "gold": 12.99,
     "silver": 13.48,
     "bronze": 14.05
@@ -318,19 +318,19 @@
     "bronze": 14.93
   },
   "numberSeven": {
-    "author": 13.60,
+    "author": 13.6,
     "gold": 13.91,
     "silver": 14.29,
     "bronze": 14.62
   },
   "numberEight": {
-    "author": 10.10,
+    "author": 10.1,
     "gold": 10.33,
     "silver": 10.71,
     "bronze": 10.93
   },
   "numberNine": {
-    "author": 13.50,
+    "author": 13.5,
     "gold": 13.73,
     "silver": 13.98,
     "bronze": 14.31
@@ -342,7 +342,7 @@
     "bronze": 14.74
   },
   "imaginaryNumber": {
-    "author": 11.40,
+    "author": 11.4,
     "gold": 11.72,
     "silver": 12.01,
     "bronze": 12.35
@@ -366,13 +366,13 @@
     "bronze": 11.09
   },
   "furiousFast": {
-    "author": 10.80,
+    "author": 10.8,
     "gold": 11.28,
     "silver": 12.21,
     "bronze": 13.05
   },
   "titanTown": {
-    "author": 10.50,
+    "author": 10.5,
     "gold": 11.26,
     "silver": 12.52,
     "bronze": 13.13
@@ -408,7 +408,7 @@
     "bronze": 16.93
   },
   "roadRage": {
-    "author": 12.20,
+    "author": 12.2,
     "gold": 12.61,
     "silver": 12.98,
     "bronze": 13.37
@@ -426,7 +426,7 @@
     "bronze": 10.21
   },
   "goldenRatio": {
-    "author": 16.20,
+    "author": 16.2,
     "gold": 16.51,
     "silver": 16.99,
     "bronze": 17.42
@@ -468,7 +468,7 @@
     "bronze": 13.67
   },
   "darkMatter": {
-    "author": 10.00,
+    "author": 10,
     "gold": 10.35,
     "silver": 10.79,
     "bronze": 11.22
@@ -510,7 +510,7 @@
     "bronze": 9.39
   },
   "squareDeal": {
-    "author": 7.40,
+    "author": 7.4,
     "gold": 7.79,
     "silver": 8.01,
     "bronze": 8.28
@@ -522,7 +522,7 @@
     "bronze": 13.88
   },
   "doubleCrest": {
-    "author": 9.70,
+    "author": 9.7,
     "gold": 10.05,
     "silver": 10.49,
     "bronze": 10.94
@@ -576,34 +576,34 @@
     "bronze": 14.15
   },
   "mountainPeak": {
-    "author": 9.18,
-    "gold": 9.54,
-    "silver": 10.02,
-    "bronze": 10.61
+    "author": 10.42,
+    "gold": 10.79,
+    "silver": 11.02,
+    "bronze": 11.34
   },
   "sharkFin": {
-    "author": 15.71,
-    "gold": 16.09,
-    "silver": 16.48,
-    "bronze": 16.82
+    "author": 10.07,
+    "gold": 10.26,
+    "silver": 10.43,
+    "bronze": 10.8
   },
   "twistedClover": {
-    "author": 7.75,
-    "gold": 7.99,
-    "silver": 8.23,
-    "bronze": 8.51
+    "author": 7.5,
+    "gold": 7.69,
+    "silver": 7.83,
+    "bronze": 7.99
   },
   "hookLoop": {
-    "author": 6.85,
-    "gold": 7.06,
-    "silver": 7.25,
-    "bronze": 7.51
+    "author": 6.75,
+    "gold": 6.96,
+    "silver": 7.15,
+    "bronze": 7.41
   },
   "crookedArrow": {
-    "author": 10.87,
-    "gold": 11.08,
-    "silver": 11.37,
-    "bronze": 11.72
+    "author": 10.75,
+    "gold": 10.99,
+    "silver": 11.27,
+    "bronze": 11.52
   },
   "windingRoad": {
     "author": 8.89,
@@ -618,7 +618,7 @@
     "bronze": 10.03
   },
   "lightningHook": {
-    "author": 12.70,
+    "author": 12.7,
     "gold": 12.95,
     "silver": 13.21,
     "bronze": 13.55
@@ -672,10 +672,10 @@
     "bronze": 8.23
   },
   "crakowBoot": {
-    "author": 11.20,
+    "author": 11.2,
     "gold": 11.45,
     "silver": 11.75,
-    "bronze": 12.10
+    "bronze": 12.1
   },
   "slingshotRun": {
     "author": 8.41,
@@ -765,13 +765,13 @@
     "author": 7.51,
     "gold": 7.69,
     "silver": 7.83,
-    "bronze": 8.00
+    "bronze": 8
   },
   "ravenRock": {
     "author": 6.57,
     "gold": 6.72,
     "silver": 6.85,
-    "bronze": 7.00
+    "bronze": 7
   },
   "sharkBite": {
     "author": 9.07,
@@ -780,16 +780,16 @@
     "bronze": 9.95
   },
   "puzzlePiece": {
-    "author": 8.00,
+    "author": 8,
     "gold": 8.15,
     "silver": 8.35,
-    "bronze": 8.70
+    "bronze": 8.7
   },
   "castleWall": {
     "author": 7.15,
     "gold": 7.32,
     "silver": 7.56,
-    "bronze": 7.90
+    "bronze": 7.9
   },
   "blasterLoop": {
     "author": 10.42,
@@ -805,7 +805,7 @@
   },
   "whistleRidge": {
     "author": 8.01,
-    "gold": 8.20,
+    "gold": 8.2,
     "silver": 8.37,
     "bronze": 8.72
   },
@@ -822,7 +822,7 @@
     "bronze": 11.65
   },
   "puppetMaster": {
-    "author": 9.60,
+    "author": 9.6,
     "gold": 9.81,
     "silver": 9.95,
     "bronze": 10.17
@@ -838,5 +838,23 @@
     "gold": 10.18,
     "silver": 10.42,
     "bronze": 10.77
+  },
+  "countryRoad": {
+    "author": 12.7,
+    "gold": 12.87,
+    "silver": 13.08,
+    "bronze": 13.32
+  },
+  "gripCircuit": {
+    "author": 17.95,
+    "gold": 18.3,
+    "silver": 18.74,
+    "bronze": 19.13
+  },
+  "middleWay": {
+    "author": 17.55,
+    "gold": 17.89,
+    "silver": 18.32,
+    "bronze": 18.71
   }
 }

@@ -1,6 +1,6 @@
 import { redis } from '@devvit/redis';
 import { createHash } from 'node:crypto';
-import { campaignProgressKey } from '../campaign/campaign-progress-key.js';
+import { campaignProgressKeys } from '../campaign/campaign-progress-key.js';
 import { readGuestPromotionTarget } from './car-unlock-store.js';
 
 export type GuestIdentityStatus = 'active' | 'guest_promotion_pending' | 'guest_identity_retired';
@@ -66,10 +66,11 @@ export async function resolveGuestIdentityStatus(
         };
     }
 
-    const migrationPending = Boolean(
-        await redis.get(campaignProgressKey(canonicalGuestPlayerId))
-        || selectionPending,
+    // A guest is retired only when no Campaign series still holds its progress.
+    const progressValues = await Promise.all(
+        campaignProgressKeys(canonicalGuestPlayerId).map((key) => redis.get(key)),
     );
+    const migrationPending = Boolean(progressValues.some(Boolean) || selectionPending);
     return {
         status: migrationPending ? 'guest_promotion_pending' : 'guest_identity_retired',
         promotedPlayerId,

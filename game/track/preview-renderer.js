@@ -331,15 +331,14 @@ function drawSchematicTrackPreview(ctx, width, height, trackGeometry, mapPoint, 
     trackScale = null,
     hideStartArrow = false,
     cars = [],
+    roadColor = '#475569',
+    edgeColor = '#f8fafc',
 }) {
     const outer = trackGeometry.outer;
     const inner = trackGeometry.inner;
     const outerPath = buildMappedPath(outer, mapPoint);
     const innerPath = buildMappedPath(inner, mapPoint);
     const roadClipPath = buildMappedRingPath(outer, inner, mapPoint);
-
-    const roadColor = '#475569';
-    const edgeColor = '#f8fafc';
 
     ctx.save();
     ctx.lineJoin = 'round';
@@ -476,6 +475,8 @@ export function renderTrackPreviewCanvas(canvas, payload) {
             trackScale: boundsLayout.scale,
             hideStartArrow: payload.hideSchematicStartArrow === true,
             cars: Array.isArray(payload.schematicCars) ? payload.schematicCars : [],
+            roadColor: presentation?.schematicRoadColor,
+            edgeColor: presentation?.schematicEdgeColor,
         });
         return;
     }

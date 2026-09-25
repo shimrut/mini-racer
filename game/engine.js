@@ -6,6 +6,7 @@ import {
   TRACK_PRESENTATION_SURFACES,
 } from "./track/presentation.js";
 import { RingBuffer } from "./race/ring-buffer.js";
+import { createTyreTrackBuffer } from "./race/ground-effects.js";
 import {
   getPlayerProgressState,
 } from "./player/progress-state.js";
@@ -22,7 +23,8 @@ import { getCarRearAxleWorldPoint } from "./race/simulation.js";
 import { createCarSprite } from "./car/sprite.js";
 import { CarSpriteLoader } from "./car/sprite.js";
 import { normalizePhysicsConfig } from "./car/handling.js";
-import { setPlayerCarUnlockSnapshot } from "./car/player-car-skin.js";
+import { getTrackGround, getTrackGroundMaxSpeedKph } from "./track/grounds.js";
+import { readPlayerCarSkinAssetName, setPlayerCarUnlockSnapshot } from "./car/player-car-skin.js";
 import { TrackLayerRenderer } from "./track/layer.js";
 import { RaceHud } from "./race/ui-hud.js";
 import { StartOverlay } from "./race/ui-start-overlay.js";
@@ -129,6 +131,7 @@ export class RealTimeRacer {
     this.carSprite = createCarSprite();
     this.carSpriteDrawWidth = 64;
     this.carSpriteDrawHeight = 32;
+    this.drawnCar = null;
     this.carSpriteLoader = new CarSpriteLoader();
     this.carAssetPromise = Promise.resolve(this.carSprite);
     this.opponentCarSprite = createCarSprite();
@@ -147,6 +150,7 @@ export class RealTimeRacer {
     this.currentTrackKey = DEFAULT_TRACK_KEY;
     this.currentTrackPresentation = resolveTrackPresentation(DEFAULT_TRACK_KEY, {
       surface: TRACK_PRESENTATION_SURFACES.RACE,
+      ground: this.currentTrack.ground,
     });
     this.pos = { ...this.currentTrack.startPos };
     this.velocity = { x: 0, y: 0 };
@@ -242,6 +246,7 @@ export class RealTimeRacer {
       cos: 0,
       sin: 0,
     }));
+    this.tyreTracks = createTyreTrackBuffer();
     this.routeTrace = new RingBuffer(480, () => ({ x: 0, y: 0 }));
     this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
     this.particles = [];
@@ -257,14 +262,15 @@ export class RealTimeRacer {
     this.carEffectsAudio?.syncFrame?.({
       status: this.status,
       speed: 0,
-      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      maxSpeedKph: getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack),
       slipRatio: 0,
       throttleBlocked: false,
     });
     this.proceduralMusic?.syncFrame?.({
       status: this.status,
       speed: 0,
-      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      maxSpeedKph: getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack),
+      ground: getTrackGround(this.currentTrack).key,
     });
 
     this.camera = { x: 0, y: 0 };
@@ -332,10 +338,8 @@ export class RealTimeRacer {
     });
     this.selectedDailyChallengeId = null;
     const previewCarOptions = {
-      getPreviewCarImage: () => (
-        this.carSpriteAssetKey ? this.carSprite : null
-      ),
-      getPreviewCarAssetKey: () => this.carSpriteAssetKey || "loading",
+      getPreviewCarImage: (card) => this.getPreviewCar(card?.trackKey).image,
+      getPreviewCarAssetKey: (card) => this.getPreviewCar(card?.trackKey).key,
       getPreviewCarWorldSize: () => ({
         width: (
           this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
@@ -373,7 +377,18 @@ export class RealTimeRacer {
           ? this.campaignCarousel.handleNavDirection(direction)
           : this.dailyCarousel.handleNavDirection(direction)
       ),
-      onSelectCampaign: () => void this.activateMode("campaign"),
+      onSelectCampaign: () => void this.activateMode("campaign", { view: "series" }),
+      onOpenCampaignSeries: (seriesId) => void this.invokeModeMethod(
+        "campaign",
+        "openCampaignSeries",
+        seriesId,
+      ),
+      onBackToCampaignSeries: () => void this.invokeModeMethod("campaign", "backToCampaignSeries"),
+      onSelectCampaignSeries: (seriesId) => void this.invokeModeMethod(
+        "campaign",
+        "selectCampaignSeries",
+        seriesId,
+      ),
       onBack: () => this.showHomeLobby(),
       onOpenStandings: (mode) => this.openVisibleLobbyStandings(mode),
       onOpenTracks: (mode) => {
@@ -403,8 +418,8 @@ export class RealTimeRacer {
         return fitTrackPreviewCanvas(canvas, card, {
           ...options,
           cacheNamespace: "challenge-poster",
-          carImage: this.carSpriteAssetKey ? this.carSprite : null,
-          carAssetKey: this.carSpriteAssetKey || "loading",
+          carImage: this.getPreviewCar(card?.trackKey).image,
+          carAssetKey: this.getPreviewCar(card?.trackKey).key,
           carWorldSize: {
             width: (
               this.carSpriteDrawWidth * (CONFIG.carSpriteRenderScale ?? 1)
@@ -501,7 +516,8 @@ export class RealTimeRacer {
         this.proceduralMusic?.syncFrame?.({
           status: this.status,
           speed: this.cachedSpeed,
-          maxSpeedKph: this.runtimeConfig.maxSpeed,
+          maxSpeedKph: getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack),
+          ground: getTrackGround(this.currentTrack).key,
         });
       },
       onPausePlacementChanged: () => {
@@ -639,11 +655,42 @@ export class RealTimeRacer {
     return this.carSpriteLoader.currentAssetKey;
   }
 
+  // The car a track card shows: the player's skin for that track's ground.
+  // Skins other than the one in the race load once and then repaint cards.
+  getPreviewCar(trackKey) {
+    const track = trackKey === this.currentTrackKey
+      ? this.currentTrack
+      : getLoadedClientTrack(trackKey);
+    const assetName = readPlayerCarSkinAssetName(getTrackGround(track).key);
+    if (assetName === this.carSpriteAssetKey) {
+      return { image: this.carSprite, key: assetName };
+    }
+    if (!this.previewCarSprites) this.previewCarSprites = new Map();
+    let entry = this.previewCarSprites.get(assetName);
+    if (!entry) {
+      entry = { image: null };
+      this.previewCarSprites.set(assetName, entry);
+      new CarSpriteLoader().load(assetName, {
+        onLoaded: (image) => {
+          entry.image = image;
+          this.dailyCarousel?.refreshPreviews?.();
+          this.campaignCarousel?.refreshPreviews?.();
+        },
+        onError: () => {
+          this.previewCarSprites.delete(assetName);
+        },
+      });
+    }
+    return entry.image
+      ? { image: entry.image, key: assetName }
+      : { image: null, key: "loading" };
+  }
+
   async displayInitialModeReady(mode) {
     if (mode === "daily") {
       this.showDailyLobby();
     } else if (mode === "campaign") {
-      this.showCampaignLobby({ refresh: false });
+      this.showCampaignLobby({ refresh: false, view: "series" });
     } else if (mode !== "challenge") {
       this.showHomeLobby();
     }
@@ -894,8 +941,9 @@ export class RealTimeRacer {
     };
     this.syncCarSpriteAsset();
     if (this.hud && this.runtimeConfig.maxSpeed) {
-      this.hud.setMaxSpeed(this.runtimeConfig.maxSpeed);
+      this.hud.setMaxSpeed(getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack));
     }
+    this.hud?.setGround?.(getTrackGround(this.currentTrack).key);
   }
 
   syncCurrentRunPolicy() {

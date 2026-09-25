@@ -1,6 +1,7 @@
 import { KPH_PER_WORLD_UNIT } from '../car/handling.js';
 import { clamp } from '../shared/clamp.js';
 import { getCrossingFraction, getIntersection } from '../track/geometry.js';
+import { getTrackGround } from '../track/grounds.js';
 import {
     handleFinishCrossing,
     resolveRunPolicy
@@ -502,7 +503,6 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
     return candidates.length > 0 ? candidates : collisionData.segments;
 }
 
-const SKID_MARK_MIN_SLIP_RATIO = 0.28;
 const SKID_MARK_MIN_SPEED = 2.5;
 
 export {
@@ -551,8 +551,10 @@ export function getCarRearAxleWorldPoint(pos, angle, config) {
     };
 }
 
+// groundOverride: only tests give it, to try other ground numbers. The game
+// and the server always drive the ground of the track.
 export function updateSimulation(
-    state, dt, config, currentTrack, collisionSegments
+    state, dt, config, currentTrack, collisionSegments, groundOverride = null
 ) {
     resetEvents();
     const runPolicy = resolveRunPolicy(state);
@@ -571,28 +573,41 @@ export function updateSimulation(
         } else {
             state.currentTime += dt;
 
+            const ground = groundOverride || getTrackGround(currentTrack);
             const steerInput = (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
-            const accel = Number(config.accel) || 0;
-            const safeMaxSpeed = Math.max(0.001, (Number(config.maxSpeed) || 220) / KPH_PER_WORLD_UNIT);
-            const gripBase = Math.max(0, Number(config.grip) || 0);
+            const accel = (Number(config.accel) || 0) * ground.accel;
+            const safeMaxSpeed = Math.max(
+                0.001,
+                ((Number(config.maxSpeed) || 220) * ground.maxSpeed) / KPH_PER_WORLD_UNIT
+            );
+            const gripBase = Math.max(0, (Number(config.grip) || 0) * ground.grip);
             const brakePower = Number(config.brakePower) || 20;
             const currentSpeed = Math.sqrt(state.velocity.x ** 2 + state.velocity.y ** 2);
             const speedRatio = clamp(currentSpeed / safeMaxSpeed, 0, 1);
 
-            const steerTrim = Number(config.highSpeedSteerTrim);
+            const steerTrim = Number(config.highSpeedSteerTrim) * ground.highSpeedSteerTrim;
             const steerSpeedFactor = (Number.isFinite(steerTrim) && steerTrim > 0)
                 ? 1 - steerTrim * speedRatio * speedRatio
                 : 1;
-            const desiredAngularVelocity = steerInput * (Number(config.turnRate) || 0) * steerSpeedFactor;
+            const desiredAngularVelocity = steerInput * ((Number(config.turnRate) || 0) * ground.turnRate) * steerSpeedFactor;
 
             const angularResponse = Number.isFinite(Number(config.angularResponse))
-                ? clamp(Number(config.angularResponse), 4, 48)
-                : 14;
+                ? clamp(Number(config.angularResponse) * ground.angularResponse, 4, 48)
+                : 14 * ground.angularResponse;
 
             state.angularVelocity = Number.isFinite(state.angularVelocity) ? state.angularVelocity : 0;
-            state.angularVelocity += (desiredAngularVelocity - state.angularVelocity) * Math.min(1, angularResponse * dt);
-            if (steerInput === 0) {
-                state.angularVelocity *= Math.exp(-6 * dt);
+            // A ground with yaw carry lets the car keep turning after the
+            // player lets go. Tarmac has none and keeps the original steps.
+            const yawCarry = steerInput === 0 ? ground.yawCarry : 0;
+            if (yawCarry > 0) {
+                state.angularVelocity += (desiredAngularVelocity - state.angularVelocity)
+                    * Math.min(1, angularResponse * (1 - yawCarry) * dt);
+                state.angularVelocity *= Math.exp(-6 * (1 - yawCarry) * dt);
+            } else {
+                state.angularVelocity += (desiredAngularVelocity - state.angularVelocity) * Math.min(1, angularResponse * dt);
+                if (steerInput === 0) {
+                    state.angularVelocity *= Math.exp(-6 * dt);
+                }
             }
             state.angle += state.angularVelocity * dt;
 
@@ -635,10 +650,16 @@ export function updateSimulation(
                 : 0;
             const effectiveGrip = gripBase + gripFromDownforce;
             const steerGripScale = Number.isFinite(Number(config.steerGripScale))
-                ? clamp(Number(config.steerGripScale), 0.05, 1.5)
-                : 0.45;
+                ? clamp(Number(config.steerGripScale) * ground.steerGripScale, 0.05, 1.5)
+                : 0.45 * ground.steerGripScale;
             const activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
             lateralSpeed *= Math.exp(-activeGrip * dt);
+            // A ground with slide scrub takes forward speed while the car
+            // slides. Tarmac has none.
+            if (ground.slideScrub > 0 && currentSpeed > 0.001) {
+                const slideShare = Math.min(1, Math.abs(lateralSpeed) / currentSpeed);
+                forwardSpeed *= Math.exp(-ground.slideScrub * slideShare * dt);
+            }
 
             state.velocity.x = (headingX * forwardSpeed) + (sideX * lateralSpeed);
             state.velocity.y = (headingY * forwardSpeed) + (sideY * lateralSpeed);
@@ -765,7 +786,7 @@ export function updateSimulation(
             const sideSlip = Math.abs((-vy * state.velocity.x) + (vx * state.velocity.y));
             const slipRatio = state.cachedSpeed > 0.001 ? sideSlip / state.cachedSpeed : 0;
 
-            if (slipRatio > SKID_MARK_MIN_SLIP_RATIO && state.cachedSpeed > SKID_MARK_MIN_SPEED) {
+            if (slipRatio > ground.skidMarkMinSlipRatio && state.cachedSpeed > SKID_MARK_MIN_SPEED) {
                 const slot = state.skidMarks.write();
                 slot.x = rearX;
                 slot.y = rearY;

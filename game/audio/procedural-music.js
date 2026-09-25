@@ -52,6 +52,71 @@ const LOBBY_CHORDS = [
     }
 ];
 
+// The dirt song: a D minor rally-rock riff over D, C, B flat and A.
+// Each chord lists its bass root and a pentatonic riff scale.
+const DIRT_CHORDS = [
+    { name: 'D minor', root: 38, notes: [62, 65, 67, 69, 72, 74] },
+    { name: 'C Major', root: 36, notes: [60, 62, 64, 67, 69, 72] },
+    { name: 'B flat Major', root: 34, notes: [58, 62, 65, 67, 70, 74] },
+    { name: 'A minor', root: 33, notes: [57, 60, 62, 64, 67, 69] }
+];
+
+// The snow song: a cold B minor synth track over B minor 9, G major 7,
+// E minor 9 and F sharp sus 4. Each chord lists its bass root and the
+// notes for the glassy plucks and the pad.
+const SNOW_CHORDS = [
+    { name: 'B minor 9', root: 35, notes: [59, 62, 66, 69, 73, 74] },
+    { name: 'G Major 7', root: 31, notes: [55, 59, 62, 66, 69, 71] },
+    { name: 'E minor 9', root: 28, notes: [55, 59, 62, 64, 66, 71] },
+    { name: 'F sharp sus 4', root: 30, notes: [54, 59, 61, 66, 71, 73] }
+];
+
+// The space song: a low synth drive over F sharp minor, D, A and E. No
+// ground plays it yet. It is kept for a future space track. Each chord
+// lists its bass root and the notes for the arp.
+const SPACE_CHORDS = [
+    { name: 'F sharp minor', root: 30, notes: [54, 57, 61, 66, 69] },
+    { name: 'D Major', root: 26, notes: [54, 57, 62, 66, 69] },
+    { name: 'A Major', root: 33, notes: [52, 57, 61, 64, 69] },
+    { name: 'E Major', root: 28, notes: [52, 56, 59, 64, 68] }
+];
+
+// Grip keeps the tarmac song's driving synth sound and sixteenth-note
+// momentum, with its own E minor, G, D and A progression and melody.
+const GRIP_CHORDS = [
+    { name: 'E minor', root: 28, notes: [52, 55, 59, 62, 64, 67, 71, 74] },
+    { name: 'G Major', root: 31, notes: [55, 59, 62, 64, 67, 71, 74, 79] },
+    { name: 'D Major', root: 38, notes: [50, 54, 57, 62, 66, 69, 74, 78] },
+    { name: 'A Major', root: 33, notes: [52, 57, 61, 64, 69, 73, 76, 81] }
+];
+
+const RACE_SONGS = Object.freeze({
+    tarmac: Object.freeze({ key: 'tarmac', bpm: 122, chords: RACE_CHORDS }),
+    dirt: Object.freeze({ key: 'dirt', bpm: 134, chords: DIRT_CHORDS }),
+    snow: Object.freeze({ key: 'snow', bpm: 120, chords: SNOW_CHORDS }),
+    space: Object.freeze({ key: 'space', bpm: 126, chords: SPACE_CHORDS }),
+    grip: Object.freeze({ key: 'grip', bpm: 128, chords: GRIP_CHORDS })
+});
+
+function getRaceSong(ground) {
+    return Object.hasOwn(RACE_SONGS, ground) ? RACE_SONGS[ground] : RACE_SONGS.tarmac;
+}
+
+// Scale steps of the dirt riff, one per sixteenth; null is a rest.
+const DIRT_RIFF_PATTERN = [0, null, 1, 2, null, 2, 1, null, 0, null, 3, null, 2, 1, null, 0];
+
+// Glassy pluck notes of the snow song, one per sixteenth; null is a rest.
+// The notes fall every three steps, across the beat, to feel restless.
+const SNOW_PLUCK_PATTERN = [0, null, null, 3, null, null, 5, null, 4, null, null, 2, null, null, 1, null];
+
+// Two alternating grip melodies rise and answer across every sixteenth.
+// Their contour differs from the tarmac arp even though they share its drive.
+const GRIP_ARP_A = [0, 2, 4, 6, 4, 2, 5, 3, 1, 3, 5, 7, 5, 3, 2, 4];
+const GRIP_ARP_B = [2, 4, 6, 4, 3, 5, 7, 5, 2, 4, 6, 5, 4, 3, 1, 0];
+
+// Arp notes of the space song, one per sixteenth, as for the tarmac arp.
+const SPACE_ARP_PATTERN = [0, 1, 2, 1, 3, 2, 1, 2, 0, 2, 3, 2, 4, 3, 2, 1];
+
 const CHORD_PROGRESSION_LENGTH = RACE_CHORDS.length;
 
 let registeredApi = null;
@@ -81,7 +146,9 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         status: 'ready',
         speed: 0,
         maxSpeedKph: 220,
+        ground: 'tarmac',
     };
+    let activeSong = RACE_SONGS.tarmac;
 
     let schedulerIntervalId = null;
     let idleSuspendTimer = null;
@@ -89,9 +156,8 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     const scheduleAheadTime = 0.18;
     const lookaheadInterval = 60;
 
-    const bpm = 122;
-    const secondsPerBeat = 60.0 / bpm;
-    const secondsPerStep = secondsPerBeat / 4.0;
+    let secondsPerBeat = 60.0 / RACE_SONGS.tarmac.bpm;
+    let secondsPerStep = secondsPerBeat / 4.0;
 
     let currentStep = 0;
     let currentMeasure = 0;
@@ -302,8 +368,372 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         osc2.stop(time + duration + 0.05);
     }
 
+    // Root and fifth together, like a palm-muted guitar chug.
+    function playChug(time, pitch, velocity = 0.22, duration = 0.1) {
+        if (!ctx) return;
+
+        const root = ctx.createOscillator();
+        const fifth = ctx.createOscillator();
+        const cGain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        root.type = 'sawtooth';
+        root.frequency.setValueAtTime(pitch, time);
+        fifth.type = 'square';
+        fifth.frequency.setValueAtTime(pitch * 1.5, time);
+        fifth.detune.setValueAtTime(6, time);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1100, time);
+        filter.frequency.exponentialRampToValueAtTime(260, time + duration);
+        filter.Q.setValueAtTime(1.6, time);
+
+        cGain.gain.setValueAtTime(0, time);
+        cGain.gain.linearRampToValueAtTime(velocity, time + 0.004);
+        cGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+        root.connect(filter);
+        fifth.connect(filter);
+        filter.connect(cGain);
+        cGain.connect(musicFilter);
+
+        root.start(time);
+        root.stop(time + duration + 0.05);
+        fifth.start(time);
+        fifth.stop(time + duration + 0.05);
+    }
+
+    // An open power chord (root, fifth, octave) that rings a little.
+    function playStab(time, rootMidi, velocity = 0.1, duration = 0.32) {
+        if (!ctx) return;
+
+        const sGain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(2600, time);
+        filter.frequency.exponentialRampToValueAtTime(700, time + duration);
+        filter.Q.setValueAtTime(1.2, time);
+
+        sGain.gain.setValueAtTime(0, time);
+        sGain.gain.linearRampToValueAtTime(velocity, time + 0.006);
+        sGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+        for (const [offset, detune] of [[0, -7], [7, 5], [12, 9]]) {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(midiToFreq(rootMidi + offset), time);
+            osc.detune.setValueAtTime(detune, time);
+            osc.connect(filter);
+            osc.start(time);
+            osc.stop(time + duration + 0.05);
+        }
+
+        filter.connect(sGain);
+        sGain.connect(musicFilter);
+        sGain.connect(delayNode);
+    }
+
+    function scheduleDirtStep(step, time, status) {
+        const isPlaying = status === 'playing';
+        const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
+        const chord = DIRT_CHORDS[chordIndex];
+
+        if (step % 2 === 0) {
+            const bassMidi = chord.root + (step === 14 ? 12 : 0);
+            playChug(time, midiToFreq(bassMidi), isPlaying ? 0.17 : 0.12, isPlaying ? 0.1 : 0.2);
+        }
+
+        if (isPlaying) {
+            if ((step === 0 || step === 6 || step === 8) && speedNorm > 0.02) {
+                playKick(time, 0.38 + speedNorm * 0.06);
+            }
+            if (step === 10 && speedNorm > 0.6) {
+                playKick(time, 0.28);
+            }
+            if ((step === 4 || step === 12) && speedNorm > 0.2) {
+                playSnare(time, 0.26 + speedNorm * 0.05);
+            }
+            if (step % 2 === 0 && speedNorm > 0.1) {
+                playHihat(time, (step % 4 === 2 ? 0.1 : 0.06) + speedNorm * 0.03);
+            }
+            if ((step === 0 || step === 7) && speedNorm > 0.15) {
+                playStab(time, chord.root + 24, 0.05 + speedNorm * 0.03);
+            }
+        }
+
+        // The riff plays in every second measure, so it answers the chords.
+        if (status !== 'starting' && currentMeasure % 2 === 1) {
+            const scaleStep = DIRT_RIFF_PATTERN[step];
+            if (scaleStep !== null) {
+                const pitch = midiToFreq(chord.notes[scaleStep]);
+                playArp(time, pitch, 0.08 + speedNorm * 0.05, 0.09, 0.35 + speedNorm * 0.5);
+            }
+        }
+    }
+
+    // A deep sine pulse with a little saw edge, pumping like a sidechained bass.
+    function playSub(time, pitch, velocity = 0.3, duration = 0.2) {
+        if (!ctx) return;
+
+        const sub = ctx.createOscillator();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(pitch, time);
+        const edge = ctx.createOscillator();
+        edge.type = 'sawtooth';
+        edge.frequency.setValueAtTime(pitch, time);
+
+        const edgeFilter = ctx.createBiquadFilter();
+        edgeFilter.type = 'lowpass';
+        edgeFilter.frequency.setValueAtTime(320, time);
+        edgeFilter.Q.setValueAtTime(0.8, time);
+        const edgeGain = ctx.createGain();
+        edgeGain.gain.setValueAtTime(0.25, time);
+
+        const sGain = ctx.createGain();
+        sGain.gain.setValueAtTime(0, time);
+        sGain.gain.linearRampToValueAtTime(velocity, time + 0.02);
+        sGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+        sub.connect(sGain);
+        edge.connect(edgeFilter);
+        edgeFilter.connect(edgeGain);
+        edgeGain.connect(sGain);
+        sGain.connect(musicFilter);
+
+        sub.start(time);
+        sub.stop(time + duration + 0.05);
+        edge.start(time);
+        edge.stop(time + duration + 0.05);
+    }
+
+    // A short glassy pluck that rings on in the echo.
+    function playGlassPluck(time, pitch, velocity = 0.08, brightness = 0.5) {
+        if (!ctx) return;
+
+        const body = ctx.createOscillator();
+        body.type = 'triangle';
+        body.frequency.setValueAtTime(pitch, time);
+        const shine = ctx.createOscillator();
+        shine.type = 'sine';
+        shine.frequency.setValueAtTime(pitch * 2, time);
+        shine.detune.setValueAtTime(7, time);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1800 + brightness * 3200, time);
+        filter.frequency.exponentialRampToValueAtTime(700, time + 0.16);
+        filter.Q.setValueAtTime(2.0, time);
+
+        const pGain = ctx.createGain();
+        pGain.gain.setValueAtTime(0, time);
+        pGain.gain.linearRampToValueAtTime(velocity, time + 0.003);
+        pGain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
+
+        body.connect(filter);
+        shine.connect(filter);
+        filter.connect(pGain);
+        pGain.connect(musicFilter);
+        pGain.connect(delayNode);
+
+        body.start(time);
+        body.stop(time + 0.2);
+        shine.start(time);
+        shine.stop(time + 0.2);
+    }
+
+    // A dark, slow pad that swells in over one bar.
+    function playColdPad(time, notes, velocity = 0.03, duration = 2) {
+        if (!ctx) return;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(900, time);
+        filter.Q.setValueAtTime(0.7, time);
+
+        const pGain = ctx.createGain();
+        pGain.gain.setValueAtTime(0, time);
+        pGain.gain.linearRampToValueAtTime(velocity, time + duration * 0.4);
+        pGain.gain.linearRampToValueAtTime(0, time + duration);
+
+        for (const [midi, detune] of notes) {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(midiToFreq(midi), time);
+            osc.detune.setValueAtTime(detune, time);
+            osc.connect(filter);
+            osc.start(time);
+            osc.stop(time + duration + 0.05);
+        }
+
+        filter.connect(pGain);
+        pGain.connect(musicFilter);
+    }
+
+    function scheduleSnowStep(step, time, status) {
+        const isPlaying = status === 'playing';
+        const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
+        const chord = SNOW_CHORDS[chordIndex];
+
+        if (step % 2 === 0) {
+            const accent = step % 4 === 0 ? 1 : 0.7;
+            playSub(time, midiToFreq(chord.root), (isPlaying ? 0.3 : 0.2) * accent, 0.2);
+        }
+
+        // Half-time drums: the snare lands once a bar, so the song feels
+        // wide and cold even at speed.
+        if (isPlaying) {
+            if ((step === 0 || step === 10) && speedNorm > 0.02) {
+                playKick(time, 0.4 + speedNorm * 0.06);
+            }
+            if (step === 6 && speedNorm > 0.6) {
+                playKick(time, 0.26);
+            }
+            if (step === 8 && speedNorm > 0.25) {
+                playSnare(time, 0.26 + speedNorm * 0.05);
+            }
+            if (step % 2 === 0 && speedNorm > 0.1) {
+                playHihat(time, (step % 4 === 2 ? 0.07 : 0.04) + speedNorm * 0.02);
+            }
+        }
+
+        if (step === 0 && currentMeasure % 2 === 0) {
+            const [first, , third, , fifth] = chord.notes;
+            playColdPad(
+                time,
+                [[first, -9], [third, 6], [fifth, -4]],
+                0.025 + speedNorm * 0.015,
+                secondsPerBeat * 8,
+            );
+        }
+
+        if (status !== 'starting') {
+            const noteIndex = SNOW_PLUCK_PATTERN[step];
+            // At low speed only the notes on the beat play.
+            if (noteIndex !== null && (speedNorm > 0.35 || step % 4 === 0)) {
+                const pitch = midiToFreq(chord.notes[noteIndex] + 12);
+                playGlassPluck(time, pitch, 0.07 + speedNorm * 0.04, speedNorm);
+            }
+        }
+    }
+
+    // A warm arp note: a saw with a triangle an octave below, through a
+    // low, round filter with little resonance.
+    function playWarmArp(time, pitch, velocity = 0.12, duration = 0.1, openFilterAmount = 0.5) {
+        if (!ctx) return;
+
+        const saw = ctx.createOscillator();
+        saw.type = 'sawtooth';
+        saw.frequency.setValueAtTime(pitch, time);
+        saw.detune.setValueAtTime(-5, time);
+        const low = ctx.createOscillator();
+        low.type = 'triangle';
+        low.frequency.setValueAtTime(pitch / 2, time);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(350 + openFilterAmount * 1500, time);
+        filter.frequency.exponentialRampToValueAtTime(220, time + duration);
+        filter.Q.setValueAtTime(1, time);
+
+        const aGain = ctx.createGain();
+        aGain.gain.setValueAtTime(0, time);
+        aGain.gain.linearRampToValueAtTime(velocity, time + 0.004);
+        aGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+        saw.connect(filter);
+        low.connect(filter);
+        filter.connect(aGain);
+        aGain.connect(musicFilter);
+        aGain.connect(delayNode);
+
+        saw.start(time);
+        saw.stop(time + duration + 0.05);
+        low.start(time);
+        low.stop(time + duration + 0.05);
+    }
+
+    function scheduleSpaceStep(step, time, status) {
+        const isPlaying = status === 'playing';
+        const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
+        const chord = SPACE_CHORDS[chordIndex];
+
+        if (step % 2 === 0) {
+            const isOctaveStep = step % 4 === 2;
+            let bassVol = isPlaying ? 0.34 : 0.22;
+            if (isOctaveStep) bassVol *= 0.85;
+            playBass(time, midiToFreq(chord.root + (isOctaveStep ? 12 : 0)), bassVol, isPlaying ? 0.12 : 0.25);
+        }
+
+        if (isPlaying) {
+            if (step % 4 === 0 && speedNorm > 0.02) {
+                playKick(time, 0.42 + speedNorm * 0.08);
+            }
+            if ((step === 4 || step === 12) && speedNorm > 0.25) {
+                playSnare(time, 0.26 + speedNorm * 0.06);
+            }
+            if (step % 4 === 2 && speedNorm > 0.1) {
+                playHihat(time, 0.08 + speedNorm * 0.04);
+            }
+        }
+
+        if (status !== 'starting') {
+            const noteIndex = SPACE_ARP_PATTERN[step];
+            playWarmArp(
+                time,
+                midiToFreq(chord.notes[noteIndex]),
+                0.1 + speedNorm * 0.06,
+                0.09 + (1 - speedNorm) * 0.05,
+                speedNorm,
+            );
+        }
+    }
+
+    function scheduleGripStep(step, time, status) {
+        const isPlaying = status === 'playing';
+        const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
+        const chord = GRIP_CHORDS[chordIndex];
+
+        // The tarmac eighth-note bass and four-on-the-floor beat supply the
+        // momentum the earlier sparse grip arrangement was missing.
+        if (step % 2 === 0) {
+            const octave = step % 4 === 2;
+            const velocity = (isPlaying ? 0.32 : 0.22) * (octave ? 0.85 : 1);
+            playBass(time, midiToFreq(chord.root + (octave ? 12 : 0)), velocity, isPlaying ? 0.12 : 0.25);
+        }
+
+        if (isPlaying) {
+            if (step % 4 === 0 && speedNorm > 0.02) {
+                playKick(time, 0.42 + speedNorm * 0.08);
+            }
+            if ((step === 4 || step === 12) && speedNorm > 0.25) {
+                playSnare(time, 0.26 + speedNorm * 0.06);
+            }
+            if (step % 4 === 2 && speedNorm > 0.1) {
+                playHihat(time, 0.08 + speedNorm * 0.04);
+            }
+        }
+
+        if (status === 'starting') return;
+
+        const pattern = currentMeasure % 2 === 0 ? GRIP_ARP_A : GRIP_ARP_B;
+        const pitch = midiToFreq(chord.notes[pattern[step]]);
+        playArp(time, pitch, 0.09 + speedNorm * 0.06, 0.08 + (1 - speedNorm) * 0.05, speedNorm);
+    }
+
+    const SONG_STEPS = {
+        dirt: scheduleDirtStep,
+        snow: scheduleSnowStep,
+        space: scheduleSpaceStep,
+        grip: scheduleGripStep,
+    };
+
     function scheduleStep(step, time) {
         const status = gameState.status;
+        const songStep = SONG_STEPS[activeSong.key];
+        if (status !== 'ready' && songStep) {
+            songStep(step, time, status);
+            return;
+        }
         const isLobby = status === 'ready';
         const isPlaying = status === 'playing';
         const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
@@ -408,6 +838,9 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         if (!ctx) return;
         clearIdleSuspendTimer();
 
+        activeSong = getRaceSong(gameState.ground);
+        secondsPerBeat = 60.0 / activeSong.bpm;
+        secondsPerStep = secondsPerBeat / 4.0;
         nextStepTime = ctx.currentTime + 0.05;
         currentStep = 0;
         currentMeasure = 0;
@@ -494,7 +927,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
     }
 
     const api = {
-        syncFrame({ status, speed, maxSpeedKph }) {
+        syncFrame({ status, speed, maxSpeedKph, ground = 'tarmac' }) {
             if (!graphBuilt && !externalCtx) return;
             buildGraph();
             if (!ctx) return;
@@ -505,6 +938,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             gameState.status = status;
             gameState.speed = speed;
             gameState.maxSpeedKph = maxSpeedKph || 220;
+            gameState.ground = ground;
 
             if (shouldRunScheduler(status, enabled)) {
                 ensureSchedulerRunning();

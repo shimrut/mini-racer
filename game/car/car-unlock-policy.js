@@ -1,6 +1,13 @@
 import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from './generated-player-selectable-car-assets.js';
+import { DRAWN_CAR_ASSET_NAMES } from './drawn-car-skins.js';
 
 export const STOCK_CAR_ASSET_NAME = 'assets/cars/mr_mr_red.webp';
+
+// Every car a player can pick: the image cars, then the cars drawn in code.
+export const PLAYER_SELECTABLE_CAR_ASSETS = Object.freeze([
+    ...GENERATED_PLAYER_SELECTABLE_CAR_ASSETS,
+    ...DRAWN_CAR_ASSET_NAMES,
+]);
 
 export const EXTRA_CAR_ASSETS = Object.freeze({
     arctic: 'assets/cars/mr_extra_arctic.webp',
@@ -63,7 +70,7 @@ export const CAR_UNLOCK_REQUIREMENTS = Object.freeze({
     }),
 });
 
-const PLAYER_ASSET_SET = new Set(GENERATED_PLAYER_SELECTABLE_CAR_ASSETS);
+const PLAYER_ASSET_SET = new Set(PLAYER_SELECTABLE_CAR_ASSETS);
 
 function normalizeCount(value, max = Number.MAX_SAFE_INTEGER) {
     const count = Number(value);
@@ -117,7 +124,7 @@ export function buildCarUnlockSnapshot({
         headToHeadTracksPosted: new Set(postedTrackKeys).size,
         headToHeadWins: new Set(wonChallengeIds).size,
     });
-    const unlockedAssets = GENERATED_PLAYER_SELECTABLE_CAR_ASSETS.filter((assetName) => {
+    const unlockedAssets = PLAYER_SELECTABLE_CAR_ASSETS.filter((assetName) => {
         const requirement = CAR_UNLOCK_REQUIREMENTS[assetName];
         return !requirement || progress[requirement.progressKey] >= requirement.required;
     });
@@ -133,11 +140,11 @@ export function normalizeCarUnlockSnapshot(value) {
             ? value.unlockedAssets.filter((assetName) => PLAYER_ASSET_SET.has(assetName))
             : [],
     );
-    for (const assetName of GENERATED_PLAYER_SELECTABLE_CAR_ASSETS) {
+    for (const assetName of PLAYER_SELECTABLE_CAR_ASSETS) {
         if (!CAR_UNLOCK_REQUIREMENTS[assetName]) unlocked.add(assetName);
     }
     return {
-        unlockedAssets: GENERATED_PLAYER_SELECTABLE_CAR_ASSETS.filter((assetName) => unlocked.has(assetName)),
+        unlockedAssets: PLAYER_SELECTABLE_CAR_ASSETS.filter((assetName) => unlocked.has(assetName)),
         progress: normalizeCarUnlockProgress(value?.progress),
     };
 }

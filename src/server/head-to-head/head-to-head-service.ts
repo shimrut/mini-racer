@@ -7,7 +7,6 @@ import {
 } from '../moderator/analytics-store.js';
 import { getTrackName } from '../../../game/track/catalog.js';
 import {
-    CAMPAIGN_ID,
     HEAD_TO_HEAD_POST_TYPE,
     getHeadToHeadOrigin,
     isHeadToHeadMedal,
@@ -163,7 +162,7 @@ type PreviewTokenRecord = Omit<PreviewRecord, 'source'> & {
         sourceId: string;
         originMode: HeadToHeadOrigin['mode'];
         originId: string;
-        campaignId?: typeof CAMPAIGN_ID;
+        campaignId?: string;
         raceId?: string;
         trackKey: string;
         lapCount: 1 | 2 | 3;

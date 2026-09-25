@@ -1,8 +1,9 @@
 import { API_ROUTES } from '../scoreboard/api-client.js';
 import {
     CAMPAIGN_ID,
-    CAMPAIGN_STAGES,
+    getCampaignSeriesStages,
     getCampaignUnlockedRaceIds,
+    isCampaignSeriesId,
 } from './manifest.js';
 import {
     clearCampaignVerification,
@@ -17,15 +18,37 @@ function requestJson(url, options = {}) {
 }
 
 const LEGACY_PENDING_RESULTS_KEY = `MiniRacerCampaignPending:${CAMPAIGN_ID}`;
+// The series this device showed last. Only a convenience: the server keeps no choice.
+const SELECTED_SERIES_KEY = 'MiniRacerCampaignSeries:v1';
+
+export function readSelectedCampaignSeriesId() {
+    try {
+        const value = globalThis.localStorage?.getItem(SELECTED_SERIES_KEY);
+        return isCampaignSeriesId(value) ? value : CAMPAIGN_ID;
+    } catch {
+        return CAMPAIGN_ID;
+    }
+}
+
+export function writeSelectedCampaignSeriesId(seriesId) {
+    if (!isCampaignSeriesId(seriesId)) return;
+    try {
+        globalThis.localStorage?.setItem(SELECTED_SERIES_KEY, seriesId);
+    } catch {}
+}
 
 function emptyResults() {
     return Object.create(null);
 }
 
-function normalizeResults(value) {
+function normalizeSeriesId(value) {
+    return isCampaignSeriesId(value) ? value : CAMPAIGN_ID;
+}
+
+function normalizeResults(value, seriesId) {
     const source = value && typeof value === 'object' ? value : {};
     const results = emptyResults();
-    for (const stage of CAMPAIGN_STAGES) {
+    for (const stage of getCampaignSeriesStages(seriesId)) {
         const raw = source[stage.raceId];
         if (!raw || typeof raw !== 'object') continue;
         const bestTimeMs = Number(raw.bestTimeMs);
@@ -43,24 +66,29 @@ function normalizeResults(value) {
     return results;
 }
 
-export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null) {
-    const normalized = normalizeResults(resultsByRaceId);
-    const unlockedRaceIds = getCampaignUnlockedRaceIds(normalized);
+// The progress of one series. Each series counts only its own medals.
+export function deriveCampaignProgress(resultsByRaceId = {}, startedAt = null, seriesId = CAMPAIGN_ID) {
+    const series = normalizeSeriesId(seriesId);
+    const stages = getCampaignSeriesStages(series);
+    const seriesRaceIds = new Set(stages.map((stage) => stage.raceId));
+    const normalized = normalizeResults(resultsByRaceId, series);
+    const unlockedRaceIds = getCampaignUnlockedRaceIds(normalized)
+        .filter((raceId) => seriesRaceIds.has(raceId));
     return {
-        campaignId: CAMPAIGN_ID,
+        campaignId: series,
         startedAt: typeof startedAt === 'string' ? startedAt : null,
         resultsByRaceId: normalized,
         unlockedRaceIds,
-        complete: CAMPAIGN_STAGES.every((stage) => (
+        complete: stages.every((stage) => (
             ['gold', 'author'].includes(normalized[stage.raceId]?.medal)
         )),
     };
 }
 
-export function normalizeCampaignStandings(value) {
+export function normalizeCampaignStandings(value, seriesId = CAMPAIGN_ID) {
     const source = value && typeof value === 'object' ? value : {};
     const standings = Object.create(null);
-    for (const stage of CAMPAIGN_STAGES) {
+    for (const stage of getCampaignSeriesStages(normalizeSeriesId(seriesId))) {
         const raw = source[stage.raceId];
         if (!raw || typeof raw !== 'object') continue;
         const rank = Number(raw.rank);
@@ -73,16 +101,16 @@ export function normalizeCampaignStandings(value) {
     return standings;
 }
 
-function unavailableCampaignBootstrap() {
+function unavailableCampaignBootstrap(seriesId = CAMPAIGN_ID) {
     return {
         availability: 'unavailable',
         authoritative: false,
-        campaignId: CAMPAIGN_ID,
+        campaignId: seriesId,
         ranked: false,
         signedIn: false,
-        stages: CAMPAIGN_STAGES,
-        progress: deriveCampaignProgress(),
-        standingsByRaceId: normalizeCampaignStandings(null),
+        stages: getCampaignSeriesStages(seriesId),
+        progress: deriveCampaignProgress({}, null, seriesId),
+        standingsByRaceId: normalizeCampaignStandings(null, seriesId),
         carUnlocks: null,
     };
 }
@@ -93,33 +121,39 @@ function clearLegacyPendingCampaignResults() {
     } catch {}
 }
 
-export async function getCampaignBootstrap() {
+export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
     clearLegacyPendingCampaignResults();
-    if (typeof fetch !== 'function') return unavailableCampaignBootstrap();
+    const requestedSeriesId = normalizeSeriesId(seriesId);
+    if (typeof fetch !== 'function') return unavailableCampaignBootstrap(requestedSeriesId);
     try {
-        const response = await requestJson(playerRequestUrl(API_ROUTES.campaignBootstrapUrl).toString());
+        const url = playerRequestUrl(API_ROUTES.campaignBootstrapUrl);
+        if (requestedSeriesId !== CAMPAIGN_ID) url.searchParams.set('seriesId', requestedSeriesId);
+        const response = await requestJson(url.toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         const ranked = response.body.ranked === true;
         const authoritative = ranked
             && response.body.campaignProgressPromotionPending !== true;
+        const seriesId = normalizeSeriesId(response.body.campaignId);
         const progress = deriveCampaignProgress(
             response.body.progress?.resultsByRaceId,
             response.body.progress?.startedAt ?? response.body.progress?.updatedAt,
+            seriesId,
         );
         clearSettledCampaignVerificationMarkers(progress.resultsByRaceId);
         return {
             availability: authoritative ? 'available' : 'unavailable',
             authoritative,
-            campaignId: CAMPAIGN_ID,
+            campaignId: seriesId,
             ranked,
             signedIn: response.body.signedIn === true,
-            stages: Array.isArray(response.body.stages) ? response.body.stages : CAMPAIGN_STAGES,
+            stages: Array.isArray(response.body.stages) ? response.body.stages : getCampaignSeriesStages(seriesId),
+            series: Array.isArray(response.body.series) ? response.body.series : [],
             progress,
-            standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId),
+            standingsByRaceId: normalizeCampaignStandings(response.body.standingsByRaceId, seriesId),
             carUnlocks: response.body.carUnlocks ?? null,
         };
     } catch {
-        return unavailableCampaignBootstrap();
+        return unavailableCampaignBootstrap(requestedSeriesId);
     }
 }
 

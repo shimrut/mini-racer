@@ -188,6 +188,7 @@ export function renderTrackPreviewCanvas(canvas, card, {
             event: card.skin
                 ? { key: 'daily-challenge', trackKey: card.trackKey, skin: card.skin }
                 : null,
+            ground: track.ground,
         }),
         startLine: track.startLine,
         startPos: track.startPos,
@@ -691,10 +692,18 @@ export class TrackCarousel {
     }
 
     renderPreview(canvas, card, { force = false } = {}) {
+        // The car on the card depends on the track's ground, so load the
+        // track first and pick the car after.
+        if (card?.trackKey && !getLoadedClientTrack(card.trackKey) && !legacyPreviewTracks?.[card.trackKey]) {
+            void loadClientTrack(card.trackKey).then(() => {
+                if (canvas.isConnected !== false) this.renderPreview(canvas, card, { force: true });
+            }).catch(() => {});
+            return;
+        }
         renderTrackPreviewCanvas(canvas, card, {
             cacheNamespace: this.previewCacheNamespace,
-            carImage: this.getPreviewCarImage?.() || null,
-            carAssetKey: this.getPreviewCarAssetKey?.() || 'fallback',
+            carImage: this.getPreviewCarImage?.(card) || null,
+            carAssetKey: this.getPreviewCarAssetKey?.(card) || 'fallback',
             carWorldSize: this.getPreviewCarWorldSize?.() || null,
             force,
         });

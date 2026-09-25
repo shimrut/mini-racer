@@ -15,8 +15,18 @@ import {
     getCampaignSnapshot,
     startServerCampaignRace,
     submitCampaignRun,
+    readSelectedCampaignSeriesId,
+    writeSelectedCampaignSeriesId,
 } from './service.js';
-import { CAMPAIGN_ID, CAMPAIGN_STAGES, getCampaignStage } from './manifest.js';
+import {
+    CAMPAIGN_ID,
+    CAMPAIGN_SERIES,
+    countCampaignMedals,
+    getCampaignSeriesStages,
+    getCampaignStage,
+    isCampaignSeriesFinished,
+    isCampaignSeriesId,
+} from './manifest.js';
 import { buildCampaignCarouselCards } from './carousel-model.js';
 import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 import {
@@ -167,10 +177,12 @@ function requestCampaignLeaderboardSessionRefresh(raceId, refreshSession) {
 }
 
 function getCampaignNextStageTarget(engine, stage) {
-    const stageIndex = CAMPAIGN_STAGES.findIndex(
+    // Next goes to the next stage of the same series.
+    const seriesStages = getCampaignSeriesStages(getCampaignStage(stage?.raceId)?.seriesId);
+    const stageIndex = seriesStages.findIndex(
         (candidate) => candidate.raceId === stage?.raceId,
     );
-    const nextStage = stageIndex < 0 ? null : CAMPAIGN_STAGES[stageIndex + 1] ?? null;
+    const nextStage = stageIndex < 0 ? null : seriesStages[stageIndex + 1] ?? null;
     if (!nextStage) return null;
 
     const verifiedUnlockIds = engine.campaignVerifiedBootstrap?.progress?.unlockedRaceIds
@@ -194,6 +206,23 @@ function getDefaultCampaignLobbyStage(lobbyState) {
     return lobbyState?.nextStage || unlockedStages.at(-1) || null;
 }
 
+// The series line of each live series. Without a server summary (no connection,
+// or an older server), the stage list gives it, with the medals of the series
+// on screen only.
+function campaignSeriesSummaries(bootstrap) {
+    if (Array.isArray(bootstrap?.series) && bootstrap.series.length) return bootstrap.series;
+    const seriesId = bootstrap?.campaignId ?? CAMPAIGN_ID;
+    const results = bootstrap?.progress?.resultsByRaceId ?? {};
+    return CAMPAIGN_SERIES.map((series) => ({
+        id: series.id,
+        name: series.name,
+        ground: series.ground,
+        stageCount: series.stages.length,
+        medalCount: series.id === seriesId ? countCampaignMedals(results, series.id) : 0,
+        finished: series.id === seriesId && isCampaignSeriesFinished(series.id, results),
+    }));
+}
+
 function decorateCampaignState(bootstrap) {
     const progress = bootstrap?.progress || {};
     const verifiedProgress = bootstrap?.verifiedProgress || progress;
@@ -205,6 +234,8 @@ function decorateCampaignState(bootstrap) {
     return {
         ranked: bootstrap?.ranked === true,
         signedIn: bootstrap?.signedIn === true,
+        seriesId: bootstrap?.campaignId ?? CAMPAIGN_ID,
+        series: campaignSeriesSummaries(bootstrap),
         startedAt: progress.startedAt || null,
         complete: progress.complete === true,
         standingsResolved,
@@ -255,15 +286,17 @@ function campaignResultFromVerificationEntry(stage, entry) {
 }
 
 function buildDisplayedCampaignBootstrap(bootstrap) {
-    const verifiedProgress = bootstrap?.progress || deriveCampaignProgress();
+    const seriesId = bootstrap?.campaignId ?? CAMPAIGN_ID;
+    const verifiedProgress = bootstrap?.progress || deriveCampaignProgress({}, null, seriesId);
     const verifiedDerived = deriveCampaignProgress(
         verifiedProgress.resultsByRaceId || {},
         verifiedProgress.startedAt ?? null,
+        seriesId,
     );
     const resultsByRaceId = { ...(verifiedProgress.resultsByRaceId || {}) };
     const verificationErrors = Object.create(null);
     const entries = getCampaignVerificationEntries();
-    for (const stage of CAMPAIGN_STAGES) {
+    for (const stage of getCampaignSeriesStages(seriesId)) {
         const entry = entries[stage.raceId];
         if (!entry) continue;
         if (entry.progressConfirmed) continue;
@@ -282,6 +315,7 @@ function buildDisplayedCampaignBootstrap(bootstrap) {
     const displayDerived = deriveCampaignProgress(
         resultsByRaceId,
         verifiedProgress.startedAt ?? null,
+        seriesId,
     );
     return {
         ...bootstrap,
@@ -300,14 +334,16 @@ function buildDisplayedCampaignBootstrap(bootstrap) {
 }
 
 function buildProvisionalCampaignBootstrap(previous = null) {
+    const seriesId = previous?.campaignId ?? CAMPAIGN_ID;
     return {
         availability: 'loading',
         authoritative: false,
-        campaignId: CAMPAIGN_ID,
+        campaignId: seriesId,
         ranked: previous?.ranked === true,
         signedIn: previous?.signedIn === true,
-        stages: CAMPAIGN_STAGES,
-        progress: previous?.progress || deriveCampaignProgress(),
+        series: Array.isArray(previous?.series) ? previous.series : [],
+        stages: getCampaignSeriesStages(seriesId),
+        progress: previous?.progress || deriveCampaignProgress({}, null, seriesId),
     };
 }
 
@@ -370,7 +406,35 @@ function responseConfirmsCampaignResult(response, entry) {
         && confirmedBestTimeMs <= submittedBestTimeMs;
 }
 
+// The series on the Campaign screen: the last one this device showed, or Numbers.
+function selectedCampaignSeriesId(engine) {
+    if (!isCampaignSeriesId(engine.campaignSeriesId)) {
+        engine.campaignSeriesId = readSelectedCampaignSeriesId();
+    }
+    return engine.campaignSeriesId;
+}
+
 export const campaignEngineMethods = {
+    // Shows another series on the Campaign screen. Its stages paint at once from
+    // the stage list, and its progress arrives with the next bootstrap.
+    selectCampaignSeries(seriesId) {
+        if (!isCampaignSeriesId(seriesId) || seriesId === selectedCampaignSeriesId(this)) return;
+        this.campaignSeriesId = seriesId;
+        writeSelectedCampaignSeriesId(seriesId);
+        this.selectedCampaignStageId = null;
+        this.lobbyUi?.setCampaignSelectedStage?.(null);
+        this._campaignBootstrapRequestId = (this._campaignBootstrapRequestId || 0) + 1;
+        this._campaignBootstrapPromise = null;
+        this._campaignBootstrapReady = false;
+        this.campaignBootstrap = buildProvisionalCampaignBootstrap({
+            ...this.campaignBootstrap,
+            campaignId: seriesId,
+            progress: null,
+        });
+        this.campaignVerifiedBootstrap = null;
+        this.showCampaignLobby({ refresh: true, view: 'stages' });
+    },
+
     applyCampaignLobbyBootstrap(bootstrap, { paint = false } = {}) {
         this.campaignVerifiedBootstrap = bootstrap;
         const displayedBootstrap = buildDisplayedCampaignBootstrap(bootstrap);
@@ -384,7 +448,10 @@ export const campaignEngineMethods = {
         });
         this.campaignBootstrap = displayedBootstrap;
         this._campaignBootstrapReady = bootstrapReady;
-        this.campaignLobbyState = normalizeCampaignLobbyState(decorateCampaignState(displayedBootstrap));
+        this.campaignLobbyState = normalizeCampaignLobbyState({
+            ...decorateCampaignState(displayedBootstrap),
+            view: this.campaignLobbyView ?? 'stages',
+        });
         if (
             paint
             && this.activeRaceMode === 'campaign'
@@ -420,6 +487,7 @@ export const campaignEngineMethods = {
         this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
         this.campaignLobbyState = normalizeCampaignLobbyState({
             ...state,
+            view: this.campaignLobbyView ?? 'stages',
             resolved: Boolean(bootstrapReady),
         });
         this._campaignBootstrapReady = Boolean(bootstrapReady);
@@ -445,7 +513,7 @@ export const campaignEngineMethods = {
 
         const requestId = (this._campaignBootstrapRequestId || 0) + 1;
         this._campaignBootstrapRequestId = requestId;
-        const promise = getCampaignBootstrap()
+        const promise = getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) })
             .then((bootstrap) => {
                 if (requestId !== this._campaignBootstrapRequestId) {
                     return this.campaignBootstrap;
@@ -525,7 +593,10 @@ export const campaignEngineMethods = {
         return this.campaignLobbyState;
     },
 
-    showCampaignLobby({ refresh = true } = {}) {
+    // `view` is 'series' (the list of series) or 'stages' (the stages of one series).
+    // Entering the Campaign shows the series; a return from a race shows the stages.
+    showCampaignLobby({ refresh = true, view = 'stages' } = {}) {
+        this.campaignLobbyView = view === 'series' ? 'series' : 'stages';
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
         this.activeHeadToHead = null;
@@ -549,13 +620,31 @@ export const campaignEngineMethods = {
         if (this.campaignCarousel?.isEmpty?.()) {
             this.campaignCarousel.renderStatus?.({ loading: true });
         }
-        deferLobbyWorkUntilAfterPaint(this, 'campaign', () => {
-            this._campaignCarouselPaintReady = true;
-            this.paintCampaignCarousel();
-        });
+        // A hidden carousel measures zero, so the stages paint only when they show.
+        if (this.campaignLobbyView === 'stages') {
+            deferLobbyWorkUntilAfterPaint(this, 'campaign', () => {
+                this._campaignCarouselPaintReady = true;
+                this.paintCampaignCarousel();
+            });
+        }
         if (refresh) {
             void this.ensureCampaignBootstrap({ forceRefresh: true });
         }
+    },
+
+    // A series row on the series screen: show the stages of that series.
+    openCampaignSeries(seriesId) {
+        if (!isCampaignSeriesId(seriesId)) return;
+        if (seriesId !== selectedCampaignSeriesId(this)) {
+            this.campaignLobbyView = 'stages';
+            this.selectCampaignSeries(seriesId);
+            return;
+        }
+        this.showCampaignLobby({ view: 'stages', refresh: !this._campaignBootstrapReady });
+    },
+
+    backToCampaignSeries() {
+        this.showCampaignLobby({ view: 'series', refresh: false });
     },
 
     paintCampaignCarousel() {
@@ -777,7 +866,11 @@ export const campaignEngineMethods = {
                     this.campaignVerifiedBootstrap = {
                         ...this.campaignVerifiedBootstrap,
                         progress: {
-                            ...(this.campaignVerifiedBootstrap.progress || deriveCampaignProgress()),
+                            ...(this.campaignVerifiedBootstrap.progress || deriveCampaignProgress(
+                                {},
+                                null,
+                                this.campaignVerifiedBootstrap.campaignId,
+                            )),
                             startedAt,
                         },
                     };
@@ -1215,7 +1308,10 @@ export const campaignEngineMethods = {
             }
             this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
             const ghostRecovery = this.settleCampaignGhostPersistence(raceId, response);
-            if (this.campaignVerifiedBootstrap && response.body.progress) {
+            // A run in another series than the one on screen does not change this screen.
+            const sameSeries = (response.body.progress?.campaignId ?? CAMPAIGN_ID)
+                === (this.campaignVerifiedBootstrap?.campaignId ?? CAMPAIGN_ID);
+            if (this.campaignVerifiedBootstrap && response.body.progress && sameSeries) {
                 this.applyCampaignLobbyBootstrap({
                     ...this.campaignVerifiedBootstrap,
                     progress: response.body.progress,

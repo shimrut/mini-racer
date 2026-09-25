@@ -86,6 +86,9 @@ export type CampaignStageLike = {
 };
 
 export const CAMPAIGN_GUEST_TTL_SECONDS = 365 * 24 * 60 * 60;
+// One guest expiry list for every Campaign series, so play in any series keeps
+// all of a guest's Campaign records. It keeps the key of the first series.
+export const CAMPAIGN_GUEST_EXPIRY_KEY = 'campaign:numbered-v1:guest-expiry';
 
 export function toCampaignCompetition(
     campaignId: string,
@@ -104,7 +107,7 @@ export function toCampaignCompetition(
         standingsRevisionKey: `campaign:${campaignId}:leaderboard:${stage.raceId}:standings-revision`,
         pbHashKey: `campaign:${campaignId}:pbs:${stage.raceId}`,
         ttlSeconds: null,
-        guestExpiryKey: `campaign:${campaignId}:guest-expiry`,
+        guestExpiryKey: CAMPAIGN_GUEST_EXPIRY_KEY,
         guestRetentionSeconds: CAMPAIGN_GUEST_TTL_SECONDS,
         allowGuests: true,
     };

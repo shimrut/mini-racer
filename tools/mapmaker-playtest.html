@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mapmaker Draft Drive</title>
+    <link rel="stylesheet" href="../styles/fonts.css">
+    <link rel="stylesheet" href="../styles/foundation.css">
+    <link rel="stylesheet" href="../styles/race-hud-and-medals.css">
+    <link rel="stylesheet" href="../styles/race-controls-and-feedback.css">
     <link rel="stylesheet" href="mapmaker-playtest.css">
 </head>
 <body>
@@ -18,6 +22,34 @@
     <main class="drive-layout">
         <section class="stage" aria-label="Draft track drive">
             <canvas id="drive-canvas" aria-label="Draft track and car"></canvas>
+            <!-- The race HUD, as in pages/game.html. -->
+            <div class="hud-bar">
+                <div class="hud-left-cluster"></div>
+                <div class="hud-right-cluster">
+                    <div class="hud-lap-cluster">
+                        <button id="hud-stats-btn" class="hud-stats" type="button" aria-label="Race time" disabled>
+                            <div class="hud-stat">
+                                <span id="hud-timer-pause-icon" class="hud-pause-icon" hidden></span>
+                                <span id="time-val" class="hud-value">0.000</span>
+                            </div>
+                            <div class="hud-stat" id="best-time-display" style="display: none;">
+                                <span id="best-time-val" class="hud-value">--</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="mobile-hud-bar">
+                <div id="speedometer" class="speedometer" aria-live="off" aria-label="Current speed">
+                    <div class="speedometer-content">
+                        <div id="speed-bar" class="speedometer-bar"></div>
+                        <div class="speedometer-text">
+                            <span id="speed-val" class="speedometer-value">0</span>
+                            <span class="speedometer-label">KPH</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="stage-note" id="stage-note" role="status">Loading draft…</div>
         </section>
 
@@ -31,6 +63,14 @@
             <div class="metric"><span>Speed</span><strong id="speed-value">0 km/h</strong></div>
             <div class="metric"><span>Wall contacts</span><strong id="contact-value">0</strong></div>
             <div class="metric"><span>Lap</span><strong id="lap-value">Not finished</strong></div>
+            <div class="metric"><span>Best laps saved</span><strong id="saved-laps-value">0 / 10</strong></div>
+            <section class="flow-drive" id="flow-drive" aria-labelledby="flow-drive-title" hidden>
+                <p class="eyebrow" id="flow-drive-title">Flow on this lap</p>
+                <div class="metric"><span>Slowest speed</span><strong id="flow-slowest">—</strong></div>
+                <div class="metric"><span>Longest without steering</span><strong id="flow-gap">—</strong></div>
+                <div class="metric"><span>Steering beat</span><strong id="flow-beat">—</strong></div>
+                <div class="metric"><span>Left-right changes</span><strong id="flow-switch">—</strong></div>
+            </section>
             <p class="drive-feedback" id="drive-feedback">Steer through the checkpoints, then cross the finish line.</p>
             <div class="controls">
                 <button id="pause-button" type="button">Pause</button>
@@ -43,6 +83,7 @@
             </div>
             <p class="help">Steer: ← / → or A / D. The car accelerates automatically, as in the race. Space pauses, R resets, M changes view.</p>
             <p class="help">This drive uses the current browser draft. It does not save or integrate a track.</p>
+            <p class="help">Drive Draft keeps your 10 best laps on this layout. In Mapmaker, Medal Times lets you pick one of them, or their average, as the author time. A change to the layout starts a new list.</p>
         </aside>
     </main>
     <script type="module" src="mapmaker-playtest.js"></script>

@@ -112,6 +112,19 @@ describe('Mapmaker draft recovery', () => {
         expect(loadDraftRecovery(storage)).toBeNull();
     });
 
+    it('keeps a known ground and rejects an unknown ground', () => {
+        const storage = memoryStorage();
+        const draft = recovery();
+        draft.drafts[0].track.ground = 'dirt';
+        expect(saveDraftRecovery(storage, draft)).toBe(true);
+        expect(loadDraftRecovery(storage).drafts[0].track.ground).toBe('dirt');
+
+        draft.drafts[0].track.ground = 'lava';
+        expect(saveDraftRecovery(storage, draft)).toBe(false);
+        storage.setItem('dailygp:mapmaker:drafts:v1', JSON.stringify({ version: 1, ...draft }));
+        expect(loadDraftRecovery(storage)).toBeNull();
+    });
+
     it('rejects malformed, oversized, and invalid data safely', () => {
         const storage = memoryStorage();
         storage.setItem('dailygp:mapmaker:drafts:v1', '{broken json');

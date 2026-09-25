@@ -73,7 +73,7 @@ export async function bootDailyPreview() {
         await applyTimeToBeat(timeToBeatEl, currentTrackKey, lapCount);
         renderChallengeStatus(challenge);
         posterDrive.paintCurrent();
-        void loadPosterCar().then(posterDrive.drive);
+        void loadPosterCar(currentTrack).then(posterDrive.drive);
     } catch (error) {
         console.error('Error loading daily challenge preview:', error);
         setTrackName(trackNameEl, 'Challenge active');
@@ -200,7 +200,8 @@ function renderChallengeStatus(challenge) {
 function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage = null, carTravel = 1) {
     const presentation = resolveTrackPresentation(trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-        event: skin ? { key: 'daily-challenge', trackKey, skin } : null
+        event: skin ? { key: 'daily-challenge', trackKey, skin } : null,
+        ground: track.ground
     });
 
     const rect = canvas.getBoundingClientRect();

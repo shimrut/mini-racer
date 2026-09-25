@@ -2,6 +2,12 @@ import { CAMPAIGN_ID, getCampaignStage } from '../../../game/campaign/manifest.j
 
 export { CAMPAIGN_ID };
 
+// A Campaign origin names the series and one of its stages. Posts made before
+// there were series name Numbers.
+export function isCampaignStageOfSeries(campaignId: unknown, raceId: unknown): boolean {
+    return typeof campaignId === 'string' && getCampaignStage(raceId)?.seriesId === campaignId;
+}
+
 export const HEAD_TO_HEAD_POST_TYPE = 'head-to-head';
 
 export type HeadToHeadMedal = 'author' | 'gold' | 'silver' | 'bronze' | null;
@@ -9,7 +15,7 @@ export type HeadToHeadSourceKind = 'campaign' | 'daily';
 
 export type HeadToHeadOrigin = {
     mode: 'campaign';
-    campaignId: typeof CAMPAIGN_ID;
+    campaignId: string;
     raceId: string;
 } | {
     mode: 'daily';
@@ -20,7 +26,7 @@ export type HeadToHeadSource = {
     sourceKind: HeadToHeadSourceKind;
     sourceId: string;
     origin?: HeadToHeadOrigin;
-    campaignId?: typeof CAMPAIGN_ID;
+    campaignId?: string;
     raceId?: string;
     trackKey: string;
     lapCount: 1 | 2 | 3;
@@ -35,7 +41,7 @@ export type HeadToHeadPostData = {
     postType: typeof HEAD_TO_HEAD_POST_TYPE;
     challengeId: string;
     origin?: HeadToHeadOrigin;
-    campaignId?: typeof CAMPAIGN_ID;
+    campaignId?: string;
     raceId?: string;
     challengerUsername: string;
     challengerUserId?: string;
@@ -67,8 +73,7 @@ export function isHeadToHeadOrigin(value: unknown): value is HeadToHeadOrigin {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const origin = value as Record<string, unknown>;
     if (origin.mode === 'campaign') {
-        return origin.campaignId === CAMPAIGN_ID
-            && isHeadToHeadRaceId(origin.raceId);
+        return isCampaignStageOfSeries(origin.campaignId, origin.raceId);
     }
     return origin.mode === 'daily'
         && typeof origin.challengeId === 'string'
@@ -83,11 +88,11 @@ export function getHeadToHeadOrigin(
     },
 ): HeadToHeadOrigin | null {
     if (isHeadToHeadOrigin(value.origin)) return value.origin;
-    if (value.campaignId === CAMPAIGN_ID && isHeadToHeadRaceId(value.raceId)) {
+    if (isCampaignStageOfSeries(value.campaignId, value.raceId)) {
         return {
             mode: 'campaign',
-            campaignId: CAMPAIGN_ID,
-            raceId: value.raceId,
+            campaignId: value.campaignId as string,
+            raceId: value.raceId as string,
         };
     }
     return null;

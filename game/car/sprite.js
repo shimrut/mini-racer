@@ -1,9 +1,23 @@
 import { CONFIG } from "../config.js";
-import { GENERATED_PLAYER_SELECTABLE_CAR_ASSETS } from "./generated-player-selectable-car-assets.js";
+import { DRAWN_CAR_MODELS, DrawnCar } from "./drawn-car.js";
+import { DRAWN_CAR_SKINS, isDrawnCarAsset } from "./drawn-car-skins.js";
 
-export { STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
+export { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from "./car-unlock-policy.js";
 
-export const PLAYER_SELECTABLE_CAR_ASSETS = GENERATED_PLAYER_SELECTABLE_CAR_ASSETS;
+const drawnCars = new Map();
+
+// The car for a skin that is drawn in code, or null for an image skin. There
+// is one car for each skin name. Its sprite is the car at rest.
+export function getDrawnCar(assetName) {
+  if (!isDrawnCarAsset(assetName)) return null;
+  let car = drawnCars.get(assetName);
+  if (!car) {
+    const skin = DRAWN_CAR_SKINS[assetName];
+    car = new DrawnCar(DRAWN_CAR_MODELS[skin.car], skin, { pixelsPerUnit: 3 });
+    drawnCars.set(assetName, car);
+  }
+  return car;
+}
 
 export function getCarAssetUrlCandidates(assetName) {
   const primary = assetName.startsWith("public/")
@@ -18,6 +32,12 @@ export function getCarAssetUrlCandidates(assetName) {
 
 export function setCarAssetImageWithFallbacks(image, assetName) {
   if (!image || !assetName) return;
+  if (isDrawnCarAsset(assetName)) {
+    const sprite = getDrawnCar(assetName).sprite;
+    image.onerror = null;
+    if (sprite?.toDataURL) image.src = sprite.toDataURL("image/png");
+    return;
+  }
   const candidates = getCarAssetUrlCandidates(assetName);
   let index = 0;
   image.onerror = () => {
@@ -145,6 +165,11 @@ export function sanitizeCarSpriteAsset(image) {
   return canvas;
 }
 
+// A drawn car has clean edges, so only image skins need the clean-up.
+function prepareSprite(assetName, image) {
+  return isDrawnCarAsset(assetName) ? image : sanitizeCarSpriteAsset(image);
+}
+
 export class CarSpriteLoader {
   #cache = new Map();
   #loadToken = 0;
@@ -163,6 +188,18 @@ export class CarSpriteLoader {
 
     const cached = this.#cache.get(assetName);
     if (cached) return cached;
+
+    if (isDrawnCarAsset(assetName)) {
+      const sprite = getDrawnCar(assetName).sprite;
+      if (!sprite) {
+        const promise = Promise.reject(new Error(`Unable to draw ${assetName}`));
+        promise.catch(() => {});
+        return { image: null, status: "error", promise };
+      }
+      const record = { image: sprite, status: "loaded", promise: Promise.resolve(sprite) };
+      this.#cache.set(assetName, record);
+      return record;
+    }
 
     const image = new Image();
     image.decoding = "async";
@@ -204,7 +241,7 @@ export class CarSpriteLoader {
     if (this.#currentAssetKey === assetName) {
       const cached = this.#cache.get(assetName);
       if (cached?.status === "loaded" && cached.image) {
-        onLoaded?.(sanitizeCarSpriteAsset(cached.image));
+        onLoaded?.(prepareSprite(assetName, cached.image));
       }
       return;
     }
@@ -247,7 +284,7 @@ export class CarSpriteLoader {
         this.#inFlightAssetName = null;
       }
       this.#currentAssetKey = assetName;
-      onLoaded?.(sanitizeCarSpriteAsset(image));
+      onLoaded?.(prepareSprite(assetName, image));
     };
 
     if (cachedAsset.status === "loaded") {

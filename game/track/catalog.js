@@ -139,6 +139,10 @@ export const TRACK_CATALOG = {
     puppetMaster: { name: "Puppet Master" },
     sunsetTerrace: { name: "Sunset Terrace" },
     anvilCircuit: { name: "Anvil Circuit" },
+    countryRoad: { name: "Country Road" },
+    snowCircuit: { name: "Snow Circuit" },
+    gripCircuit: { name: "Grip Circuit" },
+    middleWay: { name: "Middle Way" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -266,6 +270,10 @@ export const TRACK_SCHEDULE_KEYS = [
     'puppetMaster',
     'sunsetTerrace',
     'anvilCircuit',
+    'countryRoad',
+    'snowCircuit',
+    'gripCircuit',
+    'middleWay',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

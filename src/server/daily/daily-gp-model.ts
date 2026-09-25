@@ -145,6 +145,9 @@ export type DailyGpPlayerProfile = {
 
 export type DailyGpPlayerPreferences = {
     carSkin: string;
+    // The skin picked for dirt and for snow tracks. Absent until picked.
+    carSkinDirt?: string;
+    carSkinSnow?: string;
     trailId: string;
     musicEnabled: boolean;
     carAudioEnabled: boolean;

@@ -1,7 +1,8 @@
 import { TRACKS } from '../game/track/tracks.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
-import { CarSpriteLoader, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
+import { CarSpriteLoader } from '../game/car/sprite.js';
 import { requestFeaturedDailyChallengeStart } from '../game/daily-challenge/service.js';
 import { applyAvatar, GENERIC_SNOO_URL, resolveAvatarUrl } from '../game/ui/avatar.js';
 import {
@@ -357,14 +358,15 @@ export function bindPodiumReplay(documentRef, {
     return activeReplay;
 }
 
-function loadTrackCar() {
+function loadTrackCar(track = null) {
     if (trackCarPromise) return trackCarPromise;
     const loader = new CarSpriteLoader();
+    const assetName = getPosterCarAssetName(track);
     trackCarPromise = new Promise((resolve) => {
-        loader.load(STOCK_CAR_ASSET_NAME, {
+        loader.load(assetName, {
             onLoaded: resolve,
             onError: () => {
-                console.warn(`Unable to load ${STOCK_CAR_ASSET_NAME} in the podium post.`);
+                console.warn(`Unable to load ${assetName} in the podium post.`);
                 resolve(null);
             },
         });
@@ -397,6 +399,7 @@ function renderPodiumTrack(trackName, documentRef = typeof document !== 'undefin
 
     const presentation = resolveTrackPresentation(trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+        ground: track.ground,
     });
 
     const paint = (carImage = null) => {
@@ -417,7 +420,7 @@ function renderPodiumTrack(trackName, documentRef = typeof document !== 'undefin
     };
 
     paint(null);
-    loadTrackCar().then((carImage) => {
+    loadTrackCar(track).then((carImage) => {
         if (carImage) paint(carImage);
     });
 }

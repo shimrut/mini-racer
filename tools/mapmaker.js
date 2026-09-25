@@ -6,6 +6,7 @@ import {
     fillTrackPresentation,
 } from '../game/track/canvas.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
+import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
@@ -13,6 +14,7 @@ import {
 } from './mapmaker/lane-gate.js';
 import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
 import { validateTrackQuality } from './mapmaker/track-quality.js';
+import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/track-flow.js';
 import {
     clearDraftRecovery,
     createEditHistory,
@@ -30,8 +32,35 @@ import {
     isValidTrackKey
 } from './mapmaker/track-source.js';
 import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geometry.js';
+import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
+import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
+import {
+    CAMPAIGN_SERIES_MIN_STAGES,
+    isCampaignSeriesLive,
+} from '../game/campaign/series-rules.js';
+import {
+    applyTrackSeriesUpdate,
+    DAILY_DESTINATION,
+    findTrackStage,
+    moveSeriesStage,
+    normalizeCampaignSeriesData,
+    parseTrackDestination,
+    seriesDestination,
+    suggestRequiredMedals,
+    UNUSED_DESTINATION,
+} from './mapmaker/campaign-series.js';
+import {
+    averageDraftLap,
+    BRONZE_WARNING_SEC,
+    draftLapsStorageKey,
+    getMedalRowError,
+    lapToAuthorTime,
+    MEDAL_TIERS,
+    normalizeMedalRow,
+    readDraftLaps,
+    suggestMedalTimes,
+} from './mapmaker/medal-times.js';
 
-const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
 const TOOL_LABELS = {
@@ -270,7 +299,21 @@ class MapmakerApp {
         this.trackNameInput = document.getElementById('track-name-input');
         this.trackDestinationSelect = document.getElementById('track-destination-select');
         this.trackDestinationHint = document.getElementById('track-destination-hint');
+        this.seriesStageFields = document.getElementById('series-stage-fields');
+        this.seriesStageLabel = document.getElementById('series-stage-label');
+        this.seriesLapsSelect = document.getElementById('series-laps-select');
+        this.seriesTargetInput = document.getElementById('series-target-input');
+        this.seriesStageHint = document.getElementById('series-stage-hint');
+        this.seriesStageList = document.getElementById('series-stage-list');
+        this.medalTimesState = document.getElementById('medal-times-state');
+        this.draftLapsList = document.getElementById('draft-laps-list');
+        this.medalTimesHint = document.getElementById('medal-times-hint');
+        this.medalInputs = Object.fromEntries(MEDAL_TIERS.map((tier) => [
+            tier,
+            document.getElementById(`medal-${tier}-input`),
+        ]));
         this.cornerRadiusSelect = document.getElementById('corner-radius-select');
+        this.groundSelect = document.getElementById('ground-select');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
         this.selectedXInput = document.getElementById('selected-x-input');
@@ -303,6 +346,9 @@ class MapmakerApp {
         this.qualityCount = document.getElementById('quality-count');
         this.qualitySummary = document.getElementById('quality-summary');
         this.qualityIssues = document.getElementById('quality-issues');
+        this.flowCount = document.getElementById('flow-count');
+        this.flowSummary = document.getElementById('flow-summary');
+        this.flowRules = document.getElementById('flow-rules');
 
         const initialTrackKey = Object.keys(TRACKS)[0];
         this.state = {
@@ -338,12 +384,20 @@ class MapmakerApp {
         this.activeHistoryEditKey = null;
         this.draftLoopsByKey = new Map();
         this.destinationByKey = new Map();
+        this.seriesData = normalizeCampaignSeriesData(seriesFileData);
+        this.medalTimes = { ...medalTimesFileData };
+        this.stageSettingsByKey = new Map();
+        this.medalRowByKey = new Map();
         this.autoRoadGuideByKey = new Map();
         this.recoveryTimer = null;
         this.skipBeforeUnload = false;
         this.qualityTimer = null;
         this.qualityReport = null;
         this.qualityTrackKey = null;
+        this.flowTimer = null;
+        this.flowReport = null;
+        this.flowTrackKey = null;
+        this.flowSignature = null;
         this.baselineQualityCodesByKey = new Map();
         this.baselineGeometryByKey = new Map();
 
@@ -498,6 +552,8 @@ class MapmakerApp {
         this.qualityTimer = null;
         const key = this.state.selectedTrackKey;
         const report = validateTrackQuality(this.track);
+        this.syncMedalTimesPanel();
+        this.syncSeriesStageFields();
         this.qualityReport = report;
         this.qualityTrackKey = key;
         const errors = report.issues.filter((issue) => issue.severity === 'error');
@@ -527,8 +583,68 @@ class MapmakerApp {
             }
             this.qualityIssues.appendChild(item);
         }
+        this.scheduleFlowCheck();
         this.draw();
         return report;
+    }
+
+    scheduleFlowCheck() {
+        if (this.flowTimer) clearTimeout(this.flowTimer);
+        this.flowTimer = setTimeout(() => this.refreshFlowCheck(), 260);
+    }
+
+    refreshFlowCheck() {
+        if (this.flowTimer) clearTimeout(this.flowTimer);
+        this.flowTimer = null;
+        const key = this.state.selectedTrackKey;
+        let blockedReason = null;
+        if (!this.hasTrackGeometry()) {
+            blockedReason = 'Draw a closed road to check how it flows.';
+        } else if (this.qualityReport?.hasErrors) {
+            blockedReason = 'Fix the errors above to check how the road flows.';
+        }
+        const signature = blockedReason ? null : geometrySignature(this.track);
+        if (!blockedReason && key === this.flowTrackKey && signature === this.flowSignature) {
+            return this.flowReport;
+        }
+        this.flowReport = blockedReason ? null : analyzeTrackFlow(this.track);
+        this.flowTrackKey = key;
+        this.flowSignature = signature;
+        this.renderFlowReport(blockedReason ?? 'This road cannot be measured for flow.');
+        this.draw();
+        return this.flowReport;
+    }
+
+    renderFlowReport(unavailableReason) {
+        this.flowRules.replaceChildren();
+        const report = this.flowReport;
+        if (!report) {
+            this.flowCount.textContent = 'Not checked';
+            this.flowCount.className = 'pill';
+            this.flowSummary.textContent = unavailableReason;
+            return;
+        }
+        const total = report.rules.length;
+        this.flowCount.textContent = `${report.passed} of ${total} rules`;
+        this.flowCount.className = `pill${report.passed === total ? ' pill-ok' : ''}`;
+        this.flowSummary.textContent = report.passed === total
+            ? `The road meets all flow rules. Approx. lap ${report.lapSeconds.toFixed(1)} s on the fast line.`
+            : `Blue markers show where the flow breaks. These are hints, not errors. Approx. lap ${report.lapSeconds.toFixed(1)} s on the fast line.`;
+        report.rules.forEach((rule, index) => {
+            const item = document.createElement('li');
+            item.dataset.flow = rule.pass ? 'pass' : 'miss';
+            const text = `F${index + 1}. ${rule.message}`;
+            if (rule.hotspot) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = text;
+                button.addEventListener('click', () => this.focusQualityIssue(rule));
+                item.appendChild(button);
+            } else {
+                item.textContent = text;
+            }
+            this.flowRules.appendChild(item);
+        });
     }
 
     focusQualityIssue(issue) {
@@ -557,6 +673,30 @@ class MapmakerApp {
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(String(index + 1), screen.x, screen.y);
+            this.ctx.restore();
+        });
+    }
+
+    drawFlowMarkers(viewport) {
+        if (!this.flowReport || this.flowTrackKey !== this.state.selectedTrackKey) return;
+        // Hide markers while an edit waits for its flow check, so none point at a moved wall.
+        if (geometrySignature(this.track) !== this.flowSignature) return;
+        this.flowReport.rules.forEach((rule, index) => {
+            if (!rule.hotspot) return;
+            const screen = this.worldToScreen(rule.hotspot, viewport);
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.roundRect(screen.x - 12, screen.y - 9, 24, 18, 5);
+            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.fill();
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = '#0b1020';
+            this.ctx.stroke();
+            this.ctx.fillStyle = '#0b1020';
+            this.ctx.font = 'bold 10px system-ui';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(`F${index + 1}`, screen.x, screen.y);
             this.ctx.restore();
         });
     }
@@ -605,6 +745,31 @@ class MapmakerApp {
         }
     }
 
+    syncGroundControl() {
+        if (!this.groundSelect) {
+            return;
+        }
+        if (this.groundSelect.options.length === 0) {
+            TRACK_GROUND_KEYS.forEach((key) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = TRACK_GROUNDS[key].label;
+                this.groundSelect.appendChild(option);
+            });
+        }
+        this.groundSelect.value = getTrackGround(this.track).key;
+    }
+
+    setGround(key) {
+        this.track.ground = key;
+        const storedKey = getStoredTrackGroundKey(this.track);
+        if (storedKey === null) {
+            delete this.track.ground;
+        }
+        this.syncGroundControl();
+        this.markDirty(`Set ground to ${getTrackGround(this.track).label}.`);
+    }
+
     syncDrawWidthControls() {
         this.track.drawWidth = FIXED_DRAW_WIDTH;
         this.updateDrawMetricsLabel();
@@ -618,8 +783,60 @@ class MapmakerApp {
 
     updateDrawMetricsLabel() {
         if (this.drawMetricsLabel) {
-            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u. Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.`;
+            const straights = this.getDraftStraights(this.state.draftLoop, false);
+            const longest = straights.reduce((best, run) => Math.max(best, run.length), 0);
+            const straightNote = straights.length
+                ? ` Longest straight ${Math.round(longest)}u (flow guide: ${FLOW_DRAW_GUIDE.maxStraight}u or less).`
+                : '';
+            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u.${straightNote} Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.`;
         }
+    }
+
+    getDraftStraights(points, closed) {
+        if (points.length < 2) return [];
+        const smoothing = this.getLineSmoothing();
+        const path = closed
+            ? smoothLoopPoints(dedupeStrokePoints(points, 0.35), smoothing)
+            : smoothOpenPoints(points, smoothing);
+        return measureStraights(path, { closed, halfWidth: this.getDrawWidth() / 2 })
+            .map((run) => ({ ...run, path }));
+    }
+
+    drawLongStraights(points, closed, viewport) {
+        const runs = this.getDraftStraights(points, closed)
+            .filter((run) => run.length > FLOW_DRAW_GUIDE.maxStraight);
+        if (!runs.length) return;
+        this.ctx.save();
+        this.ctx.lineCap = 'round';
+        this.ctx.font = 'bold 12px system-ui';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        for (const run of runs) {
+            const { path } = run;
+            const indices = [run.from];
+            for (let index = (run.from + 1) % path.length; ; index = (index + 1) % path.length) {
+                indices.push(index);
+                if (index === run.to) break;
+            }
+            const screens = indices.map((index) => this.worldToScreen(path[index], viewport));
+            this.ctx.beginPath();
+            screens.forEach((screen, order) => (order ? this.ctx.lineTo(screen.x, screen.y) : this.ctx.moveTo(screen.x, screen.y)));
+            this.ctx.setLineDash([10, 7]);
+            this.ctx.strokeStyle = '#38bdf8';
+            this.ctx.lineWidth = 3;
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+            const a = screens[Math.floor((screens.length - 1) / 2)];
+            const b = screens[Math.ceil((screens.length - 1) / 2)];
+            const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+            const label = `${Math.round(run.length)}u straight`;
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = '#0b1020';
+            this.ctx.strokeText(label, middle.x, middle.y - 14);
+            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.fillText(label, middle.x, middle.y - 14);
+        }
+        this.ctx.restore();
     }
 
     bindEvents() {
@@ -639,17 +856,47 @@ class MapmakerApp {
         });
 
         this.trackDestinationSelect.addEventListener('change', () => {
-            this.destinationByKey.set(this.state.selectedTrackKey, this.getSelectedDestination());
+            const destination = this.getSelectedDestination();
+            this.destinationByKey.set(this.state.selectedTrackKey, destination);
+            this.stageSettingsByKey.delete(this.state.selectedTrackKey);
             this.syncDestinationHint();
+            this.syncSeriesStageFields();
+            const series = this.getDestinationSeries(destination);
             this.markDirty(
-                this.getSelectedDestination() === 'daily'
-                    ? 'Marked track for Daily Challenge.'
-                    : 'Marked track as Campaign only.',
+                series
+                    ? `Marked track for the ${series.name} series.`
+                    : destination === DAILY_DESTINATION
+                        ? 'Marked track for Daily Challenge.'
+                        : 'Marked track as not used.',
             );
+        });
+
+        this.seriesLapsSelect.addEventListener('change', () => this.updateStageSettings());
+        this.seriesTargetInput.addEventListener('change', () => this.updateStageSettings());
+        this.seriesStageList.addEventListener('click', (event) => {
+            const button = event.target.closest?.('button[data-direction]');
+            if (!button) return;
+            void this.moveStage(button.dataset.trackKey, Number(button.dataset.direction));
+        });
+
+        this.medalInputs.author.addEventListener('change', () => {
+            this.setAuthorTime(Number(this.medalInputs.author.value));
+        });
+        for (const tier of ['gold', 'silver', 'bronze']) {
+            this.medalInputs[tier].addEventListener('change', () => this.updateMedalRowFromInputs());
+        }
+        this.draftLapsList.addEventListener('click', (event) => {
+            const button = event.target.closest?.('button[data-lap]');
+            if (!button) return;
+            this.setAuthorTime(lapToAuthorTime(Number(button.dataset.lap)));
         });
 
         this.cornerRadiusSelect.addEventListener('change', () => {
             this.setCornerRadius(Number(this.cornerRadiusSelect.value));
+        });
+
+        this.groundSelect?.addEventListener('change', () => {
+            this.setGround(this.groundSelect.value);
         });
 
         this.lineSmoothingInput.addEventListener('input', () => {
@@ -849,40 +1096,288 @@ class MapmakerApp {
             : track.name;
     }
 
-    getDestinationForTrackKey(trackKey) {
-        if (this.destinationByKey.has(trackKey)) {
-            return this.destinationByKey.get(trackKey);
-        }
+    // The saved stage of a track: { series, stageIndex }, or null.
+    getSavedStage(trackKey = this.state.selectedTrackKey) {
+        const savedKey = this.state.originalTrackKeyByKey.get(trackKey);
+        return savedKey ? findTrackStage(this.seriesData, savedKey) : null;
+    }
+
+    getSavedDestination(trackKey) {
+        const stage = this.getSavedStage(trackKey);
+        if (stage) return seriesDestination(stage.series.id);
         const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
-        if (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey)) {
-            return 'daily';
-        }
-        if (SCHEDULED_TRACK_KEYS.has(trackKey)) {
-            return 'daily';
-        }
-        if (!originalTrackKey) {
-            return 'daily';
-        }
-        return 'campaign';
+        if (!originalTrackKey || SCHEDULED_TRACK_KEYS.has(originalTrackKey)) return DAILY_DESTINATION;
+        return UNUSED_DESTINATION;
+    }
+
+    getDestinationForTrackKey(trackKey) {
+        const saved = this.getSavedDestination(trackKey);
+        const chosen = this.destinationByKey.get(trackKey);
+        return chosen && parseTrackDestination(chosen, this.seriesData) ? chosen : saved;
+    }
+
+    getDestinationSeries(destination) {
+        const parsed = parseTrackDestination(destination, this.seriesData);
+        return parsed?.type === 'series'
+            ? this.seriesData.series.find((series) => series.id === parsed.seriesId) ?? null
+            : null;
     }
 
     getSelectedDestination() {
         const value = this.trackDestinationSelect.value;
-        return TRACK_DESTINATIONS.has(value) ? value : 'daily';
+        return parseTrackDestination(value, this.seriesData) ? value : DAILY_DESTINATION;
+    }
+
+    syncDestinationOptions(trackKey) {
+        const select = this.trackDestinationSelect;
+        select.replaceChildren();
+        const addOption = (value, label) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            select.appendChild(option);
+        };
+        addOption(DAILY_DESTINATION, 'Daily Challenge');
+        for (const series of this.seriesData.series) {
+            const state = isCampaignSeriesLive(series)
+                ? 'live'
+                : `hidden, ${series.stages.length}/${CAMPAIGN_SERIES_MIN_STAGES} stages`;
+            addOption(seriesDestination(series.id), `Campaign · ${series.name} (${state})`);
+        }
+        if (this.getSavedDestination(trackKey) === UNUSED_DESTINATION) {
+            addOption(UNUSED_DESTINATION, 'Not used');
+        }
+        const savedStage = this.getSavedStage(trackKey);
+        const locked = Boolean(savedStage && isCampaignSeriesLive(savedStage.series));
+        select.disabled = locked;
+        select.title = locked
+            ? `${savedStage.series.name} is live, so this track stays in it.`
+            : '';
     }
 
     syncDestinationControl(trackKey = this.state.selectedTrackKey) {
+        this.syncDestinationOptions(trackKey);
         this.trackDestinationSelect.value = this.getDestinationForTrackKey(trackKey);
         this.syncDestinationHint();
+        this.syncSeriesStageFields();
     }
 
     syncDestinationHint() {
         if (!this.trackDestinationHint) {
             return;
         }
-        this.trackDestinationHint.textContent = this.getSelectedDestination() === 'daily'
-            ? 'Adds this track to the future Daily GP rotation when you Save & Integrate.'
-            : 'Keeps this track out of Daily. Wire it into Campaign stages in the Campaign manifest.';
+        const destination = this.getSelectedDestination();
+        const series = this.getDestinationSeries(destination);
+        this.trackDestinationHint.textContent = series
+            ? `Keeps this track out of Daily and makes it a stage of ${series.name}.`
+            : destination === DAILY_DESTINATION
+                ? 'Adds this track to the future Daily GP rotation when you Save & Integrate.'
+                : 'Keeps this track out of Daily and out of every Campaign series.';
+    }
+
+    // The stage that the selected track has, or gets when it is saved.
+    getPlannedStage(trackKey = this.state.selectedTrackKey) {
+        const series = this.getDestinationSeries(this.getDestinationForTrackKey(trackKey));
+        if (!series) return null;
+        const saved = this.getSavedStage(trackKey);
+        const existing = saved?.series.id === series.id ? saved : null;
+        const stageIndex = existing ? existing.stageIndex : series.stages.length;
+        const savedStage = existing ? series.stages[stageIndex] : null;
+        const settings = this.stageSettingsByKey.get(trackKey) ?? {};
+        return {
+            series,
+            stageIndex,
+            isNew: !existing,
+            fixed: Boolean(existing) && isCampaignSeriesLive(series),
+            laps: settings.laps ?? savedStage?.laps ?? 1,
+            requiredMedals: settings.requiredMedals ?? savedStage?.requiredMedals ?? suggestRequiredMedals(series),
+        };
+    }
+
+    syncSeriesStageFields() {
+        const planned = this.getPlannedStage();
+        this.seriesStageFields.hidden = !planned;
+        if (!planned) return;
+        const { series, stageIndex, fixed } = planned;
+        const stageNumber = String(stageIndex).padStart(2, '0');
+        const live = isCampaignSeriesLive(series);
+        this.seriesStageLabel.textContent = `${series.name} · Stage ${stageNumber}${planned.isNew ? ' (new)' : ''}`;
+        this.seriesLapsSelect.value = String(planned.laps);
+        this.seriesTargetInput.value = String(planned.requiredMedals);
+        this.seriesLapsSelect.disabled = fixed;
+        this.seriesTargetInput.disabled = fixed || stageIndex === 0;
+        const notes = [];
+        if (fixed) {
+            notes.push(`${series.name} is live, so this stage is fixed.`);
+        } else if (live) {
+            notes.push(`${series.name} is live. New tracks go after the last stage.`);
+        } else {
+            notes.push(`${series.name} stays hidden until it has ${CAMPAIGN_SERIES_MIN_STAGES} stages.`);
+        }
+        notes.push('Medal Target: the medals from this series that a player needs to open this stage.');
+        const ground = getTrackGround(this.track).key;
+        const groundWarning = ground !== series.ground
+            ? `This track is ${TRACK_GROUNDS[ground]?.label ?? ground}, but ${series.name} is a ${TRACK_GROUNDS[series.ground]?.label ?? series.ground} series.`
+            : null;
+        if (groundWarning) notes.unshift(groundWarning);
+        this.seriesStageHint.textContent = notes.join(' ');
+        this.seriesStageHint.classList.toggle('series-stage-hint-warn', Boolean(groundWarning));
+        this.renderSeriesStageList(series, planned);
+    }
+
+    renderSeriesStageList(series, planned) {
+        const list = this.seriesStageList;
+        list.replaceChildren();
+        const live = isCampaignSeriesLive(series);
+        const trackKeys = series.stages.map((stage) => stage.trackKey);
+        if (planned.isNew) trackKeys.push(this.state.selectedTrackKey);
+        const savedKey = this.state.originalTrackKeyByKey.get(this.state.selectedTrackKey);
+        trackKeys.forEach((trackKey, index) => {
+            const item = document.createElement('li');
+            const isCurrent = trackKey === savedKey || (planned.isNew && index === trackKeys.length - 1);
+            item.dataset.current = String(isCurrent);
+            const number = document.createElement('span');
+            number.textContent = String(index).padStart(2, '0');
+            const name = document.createElement('span');
+            name.textContent = this.state.tracks[trackKey]?.name ?? TRACKS[trackKey]?.name ?? trackKey;
+            item.append(number, name);
+            const canMove = !live && !(planned.isNew && index === trackKeys.length - 1);
+            for (const [direction, label] of [[-1, 'Up'], [1, 'Down']]) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'ghost-btn';
+                button.textContent = label;
+                button.dataset.trackKey = trackKey;
+                button.dataset.direction = String(direction);
+                const target = index + direction;
+                button.disabled = !canMove || target < 0 || target >= series.stages.length;
+                item.appendChild(button);
+            }
+            list.appendChild(item);
+        });
+    }
+
+    updateStageSettings() {
+        const trackKey = this.state.selectedTrackKey;
+        const laps = Number(this.seriesLapsSelect.value);
+        const requiredMedals = Number(this.seriesTargetInput.value);
+        this.stageSettingsByKey.set(trackKey, { laps, requiredMedals });
+        this.syncSeriesStageFields();
+        this.markDirty(`Set the stage to ${laps} lap${laps === 1 ? '' : 's'} and a target of ${requiredMedals} medals.`);
+    }
+
+    async moveStage(trackKey, direction) {
+        const series = this.getPlannedStage()?.series;
+        if (!series) return;
+        try {
+            const response = await fetch('/__mapmaker/move-stage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ seriesId: series.id, trackKey, direction }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || `Move failed with status ${response.status}.`);
+            this.seriesData = moveSeriesStage(this.seriesData, series.id, trackKey, direction);
+            this.syncSeriesStageFields();
+            this.setStatus(`Moved ${trackKey} ${direction < 0 ? 'up' : 'down'} in ${series.name}.`);
+        } catch (error) {
+            console.error(error);
+            this.setStatus(`${error.message} Run Mapmaker through the local Vite server.`, true);
+        }
+    }
+
+    getSavedMedalRow(trackKey = this.state.selectedTrackKey) {
+        const savedKey = this.state.originalTrackKeyByKey.get(trackKey) ?? trackKey;
+        return normalizeMedalRow(this.medalTimes[savedKey]);
+    }
+
+    getMedalRow(trackKey = this.state.selectedTrackKey) {
+        return this.medalRowByKey.get(trackKey) ?? this.getSavedMedalRow(trackKey);
+    }
+
+    medalTimesFixed(trackKey = this.state.selectedTrackKey) {
+        const stage = this.getSavedStage(trackKey);
+        return Boolean(stage && isCampaignSeriesLive(stage.series) && this.getSavedMedalRow(trackKey));
+    }
+
+    syncMedalTimesPanel() {
+        const trackKey = this.state.selectedTrackKey;
+        const row = this.medalRowByKey.get(trackKey)
+            ?? this.medalTimes[this.state.originalTrackKeyByKey.get(trackKey) ?? trackKey]
+            ?? null;
+        const fixed = this.medalTimesFixed(trackKey);
+        for (const tier of MEDAL_TIERS) {
+            const value = Number(row?.[tier]);
+            this.medalInputs[tier].value = Number.isFinite(value) && value > 0 ? value.toFixed(2) : '';
+            this.medalInputs[tier].disabled = fixed;
+        }
+
+        const laps = this.track ? readDraftLaps(getBrowserStorage('localStorage'), draftLapsStorageKey(trackKey, this.track)) : [];
+        this.draftLapsList.replaceChildren();
+        const addLapButton = (lap, label, kind) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ghost-btn';
+            button.dataset.lap = String(lap);
+            button.dataset.kind = kind;
+            button.textContent = label;
+            button.disabled = fixed;
+            button.title = `Use ${lapToAuthorTime(lap).toFixed(2)} s as the author time.`;
+            this.draftLapsList.appendChild(button);
+        };
+        laps.forEach((lap, index) => addLapButton(lap, `${index + 1}. ${lap.toFixed(3)} s`, 'lap'));
+        const average = averageDraftLap(laps);
+        if (average !== null) addLapButton(average, `Average ${average.toFixed(3)} s`, 'average');
+        if (!laps.length) {
+            const note = document.createElement('p');
+            note.className = 'field-hint';
+            note.textContent = 'No Drive Draft laps on this layout yet.';
+            this.draftLapsList.appendChild(note);
+        }
+
+        const edited = this.medalRowByKey.has(trackKey);
+        const error = row ? getMedalRowError(row) : 'Set all four medal times.';
+        const bronze = Number(row?.bronze);
+        const notes = [];
+        if (fixed) {
+            notes.push('This track is a stage of a live series, so its medal times are fixed.');
+        } else if (row && error) {
+            notes.push(error);
+        } else if (!row) {
+            notes.push('Times are for one lap. A Campaign stage needs all four times.');
+        } else {
+            notes.push('Times are for one lap. A new author time fills gold, silver and bronze with the usual gaps.');
+        }
+        if (Number.isFinite(bronze) && bronze >= BRONZE_WARNING_SEC) {
+            notes.push(`Keep a bronze lap under ${BRONZE_WARNING_SEC} s, because the server refuses very long laps.`);
+        }
+        this.medalTimesHint.textContent = notes.join(' ');
+        this.medalTimesHint.classList.toggle(
+            'medal-times-hint-warn',
+            Boolean(row && error) || (Number.isFinite(bronze) && bronze >= BRONZE_WARNING_SEC),
+        );
+        this.medalTimesState.textContent = fixed ? 'Fixed' : !row ? 'Not set' : error ? 'Check' : edited ? 'Unsaved' : 'Set';
+        this.medalTimesState.className = `pill${!row || error ? ' pill-warn' : edited ? ' pill-warn' : ' pill-ok'}`;
+    }
+
+    setAuthorTime(authorSec) {
+        if (this.medalTimesFixed()) return;
+        const row = suggestMedalTimes(authorSec);
+        if (!row) {
+            this.setStatus('The author time must be more than 0 s.', true);
+            return;
+        }
+        this.medalRowByKey.set(this.state.selectedTrackKey, row);
+        this.syncMedalTimesPanel();
+        this.markDirty(`Set the author time to ${row.author.toFixed(2)} s.`);
+    }
+
+    updateMedalRowFromInputs() {
+        if (this.medalTimesFixed()) return;
+        const row = Object.fromEntries(MEDAL_TIERS.map((tier) => [tier, Number(this.medalInputs[tier].value)]));
+        this.medalRowByKey.set(this.state.selectedTrackKey, row);
+        this.syncMedalTimesPanel();
+        this.markDirty('Changed the medal times.');
     }
 
     syncTrackSelectText() {
@@ -918,7 +1413,9 @@ class MapmakerApp {
         this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
         this.syncDestinationControl(trackKey);
+        this.syncMedalTimesPanel();
         this.syncCornerRadiusControl();
+        this.syncGroundControl();
         this.syncLineSmoothingControl();
         this.syncDrawWidthControls();
         this.state.draftLoop = cloneTracks(this.draftLoopsByKey.get(trackKey) ?? []);
@@ -1017,6 +1514,11 @@ class MapmakerApp {
         const destination = this.getDestinationForTrackKey(currentKey);
         this.destinationByKey.delete(currentKey);
         this.destinationByKey.set(nextKey, destination);
+        for (const byKey of [this.stageSettingsByKey, this.medalRowByKey]) {
+            const value = byKey.get(currentKey);
+            byKey.delete(currentKey);
+            if (value) byKey.set(nextKey, value);
+        }
         const originalTrackKey = this.state.originalTrackKeyByKey.get(currentKey) ?? null;
         this.state.originalTrackKeyByKey.delete(currentKey);
         if (originalTrackKey) {
@@ -1127,6 +1629,8 @@ class MapmakerApp {
             this.editHistories.delete(selectedKey);
             this.draftLoopsByKey.delete(selectedKey);
             this.destinationByKey.delete(selectedKey);
+            this.stageSettingsByKey.delete(selectedKey);
+            this.medalRowByKey.delete(selectedKey);
             this.baselineQualityCodesByKey.delete(selectedKey);
             this.baselineGeometryByKey.delete(selectedKey);
             this.autoRoadGuideByKey.delete(selectedKey);
@@ -2327,6 +2831,8 @@ class MapmakerApp {
         this.syncTrackSelectText();
         this.syncDirtyBadge();
         this.setStatus(message);
+        this.syncDestinationControl();
+        this.syncMedalTimesPanel();
         this.scheduleDraftRecovery();
         this.scheduleQualityCheck();
     }
@@ -2406,7 +2912,7 @@ class MapmakerApp {
             return;
         }
 
-        const presentation = resolveTrackPresentation(this.state.selectedTrackKey);
+        const presentation = resolveTrackPresentation(this.state.selectedTrackKey, { ground: this.track.ground });
         const outerPath = this.buildScreenPath(geometry.outer, viewport);
         const innerPath = this.buildScreenPath(geometry.inner, viewport);
         const surfacePath = new Path2D();
@@ -2547,6 +3053,7 @@ class MapmakerApp {
             this.ctx.lineWidth = this.getDrawWidth() * viewport.scale;
             this.ctx.stroke(openPath);
         }
+        this.drawLongStraights(roadPreview ? points : previewPoints, Boolean(roadPreview), viewport);
 
         points.forEach((point, index) => {
             const screen = this.worldToScreen(point, viewport);
@@ -2742,6 +3249,7 @@ class MapmakerApp {
             this.drawCheckpointLabels(viewport);
         }
 
+        this.drawFlowMarkers(viewport);
         this.drawQualityMarkers(viewport);
 
         this.drawDraftLoop(viewport);
@@ -2856,11 +3364,32 @@ class MapmakerApp {
         ) {
             return;
         }
+        const plannedStage = this.getPlannedStage(trackKey);
+        const medalRow = this.medalRowByKey.get(trackKey) ?? null;
+        if (plannedStage) {
+            const rowError = getMedalRowError(this.getMedalRow(trackKey));
+            if (rowError) {
+                this.setStatus(`Cannot save ${this.track.name} as a ${plannedStage.series.name} stage: ${rowError}`, true);
+                return;
+            }
+        } else if (medalRow && getMedalRowError(medalRow)) {
+            this.setStatus(`Cannot save ${this.track.name}: ${getMedalRowError(medalRow)}`, true);
+            return;
+        }
         if (
-            destination === 'campaign'
+            destination !== DAILY_DESTINATION
             && currentlyScheduled
             && !window.confirm(
-                `Move ${trackKey} off the Daily Challenge schedule? It will stay in the track catalog for Campaign use, but will not appear in future Daily GP days.`,
+                `Move ${trackKey} off the Daily Challenge schedule? It will stay in the track catalog, but will not appear in future Daily GP days.`,
+            )
+        ) {
+            return;
+        }
+        if (
+            plannedStage?.isNew
+            && isCampaignSeriesLive(plannedStage.series)
+            && !window.confirm(
+                `${plannedStage.series.name} is live. After this save, ${trackKey} is fixed as Stage ${String(plannedStage.stageIndex).padStart(2, '0')}: you cannot move it, remove it, or change its laps, medal target or medal times. Continue?`,
             )
         ) {
             return;
@@ -2877,6 +3406,9 @@ class MapmakerApp {
                     originalTrackKey,
                     trackName: this.track.name,
                     destination,
+                    laps: plannedStage && !plannedStage.fixed ? plannedStage.laps : null,
+                    requiredMedals: plannedStage && !plannedStage.fixed ? plannedStage.requiredMedals : null,
+                    medalRow,
                     track: this.track,
                 }),
             });
@@ -2885,8 +3417,23 @@ class MapmakerApp {
                 throw new Error(result.error || `Save failed with status ${response.status}.`);
             }
 
+            this.seriesData = applyTrackSeriesUpdate(this.seriesData, {
+                trackKey,
+                originalTrackKey,
+                destination,
+                laps: plannedStage && !plannedStage.fixed ? plannedStage.laps : null,
+                requiredMedals: plannedStage && !plannedStage.fixed ? plannedStage.requiredMedals : null,
+            }).data;
+            if (originalTrackKey && originalTrackKey !== trackKey && this.medalTimes[originalTrackKey]) {
+                this.medalTimes[trackKey] = this.medalTimes[originalTrackKey];
+                delete this.medalTimes[originalTrackKey];
+            }
+            if (medalRow) this.medalTimes[trackKey] = normalizeMedalRow(medalRow);
+            this.medalRowByKey.delete(trackKey);
+            this.stageSettingsByKey.delete(trackKey);
+            this.destinationByKey.delete(trackKey);
             this.state.originalTrackKeyByKey.set(trackKey, trackKey);
-            if (destination === 'daily') {
+            if (destination === DAILY_DESTINATION) {
                 SCHEDULED_TRACK_KEYS.add(trackKey);
                 if (originalTrackKey && originalTrackKey !== trackKey) {
                     SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
@@ -2897,13 +3444,16 @@ class MapmakerApp {
                     SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
                 }
             }
-            const scheduleText = destination === 'daily'
+            const savedSeries = this.getDestinationSeries(destination);
+            const scheduleText = destination === DAILY_DESTINATION
                 ? (
                     Number.isInteger(result.scheduleIndex) && result.scheduleIndex >= 0
                         ? ` Added to Daily Challenge at schedule position ${result.scheduleIndex + 1}.`
                         : ' Marked for Daily Challenge.'
                 )
-                : ' Saved as Campaign only (not on the Daily schedule).';
+                : savedSeries
+                    ? ` Saved as ${savedSeries.name} Stage ${String(result.stageIndex).padStart(2, '0')}.`
+                    : ' Saved as not used (not on the Daily schedule).';
             const renameText = result.removedFilename
                 ? ` Removed ${result.removedFilename}.`
                 : '';

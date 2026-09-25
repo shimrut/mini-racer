@@ -1,10 +1,16 @@
-import { applyTrackRepositoryRemoval, applyTrackRepositoryUpdate } from './track-repository.js';
+import {
+    applySeriesStageMove,
+    applyTrackRepositoryRemoval,
+    applyTrackRepositoryUpdate,
+} from './track-repository.js';
 import { isValidTrackKey } from './track-source.js';
+import { parseTrackDestination } from './campaign-series.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
 const REMOVE_ENDPOINT = '/__mapmaker/remove-track';
+const MOVE_STAGE_ENDPOINT = '/__mapmaker/move-stage';
+const ENDPOINTS = new Set([ENDPOINT, REMOVE_ENDPOINT, MOVE_STAGE_ENDPOINT]);
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
-const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
 
 function isLocalHost(host = '') {
     return /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
@@ -78,9 +84,15 @@ function normalizeSavePayload(payload) {
     const destination = typeof payload.destination === 'string'
         ? payload.destination
         : 'daily';
-    if (!TRACK_DESTINATIONS.has(destination)) {
-        throw new Error('Destination must be daily or campaign.');
+    if (!parseTrackDestination(destination)) {
+        throw new Error('Destination must be daily or a Campaign series.');
     }
+    const optionalInteger = (value, label) => {
+        if (value == null || value === '') return null;
+        const number = Number(value);
+        if (!Number.isInteger(number)) throw new Error(`${label} must be a whole number.`);
+        return number;
+    };
 
     if (!payload.track || typeof payload.track !== 'object') {
         throw new Error('Track geometry payload is required.');
@@ -91,6 +103,9 @@ function normalizeSavePayload(payload) {
         originalTrackKey,
         trackName,
         destination,
+        laps: optionalInteger(payload.laps, 'Laps'),
+        requiredMedals: optionalInteger(payload.requiredMedals, 'The medal target'),
+        medalRow: payload.medalRow && typeof payload.medalRow === 'object' ? payload.medalRow : null,
         track: payload.track,
     };
 }
@@ -102,7 +117,7 @@ export function mapmakerTrackAuthoringPlugin() {
         configureServer(server) {
             server.middlewares.use(async (request, response, next) => {
                 const pathname = new URL(request.url || '/', 'http://localhost').pathname;
-                if (pathname !== ENDPOINT && pathname !== REMOVE_ENDPOINT) {
+                if (!ENDPOINTS.has(pathname)) {
                     next();
                     return;
                 }
@@ -132,6 +147,16 @@ export function mapmakerTrackAuthoringPlugin() {
                         }));
                         return;
                     }
+                    if (pathname === MOVE_STAGE_ENDPOINT) {
+                        const payload = await readJsonBody(request);
+                        writeJson(response, 200, applySeriesStageMove({
+                            rootDir: server.config.root,
+                            seriesId: typeof payload?.seriesId === 'string' ? payload.seriesId : '',
+                            trackKey: typeof payload?.trackKey === 'string' ? payload.trackKey.trim() : '',
+                            direction: Number(payload?.direction) < 0 ? -1 : 1,
+                        }));
+                        return;
+                    }
                     const payload = normalizeSavePayload(await readJsonBody(request));
                     const result = applyTrackRepositoryUpdate({
                         rootDir: server.config.root,
@@ -139,6 +164,9 @@ export function mapmakerTrackAuthoringPlugin() {
                         originalTrackKey: payload.originalTrackKey,
                         trackName: payload.trackName,
                         destination: payload.destination,
+                        laps: payload.laps,
+                        requiredMedals: payload.requiredMedals,
+                        medalRow: payload.medalRow,
                         track: payload.track,
                     });
                     writeJson(response, 200, result);

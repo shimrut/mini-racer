@@ -161,4 +161,62 @@ describe('track presentation resolver', () => {
 
         expect(presentation.key).toBe('track:kettleRun:default');
     });
+
+    it('gives a dirt track its own look and picture cache key', () => {
+        const tarmac = resolveTrackPresentation('circuit');
+        const dirt = resolveTrackPresentation('circuit', { ground: 'dirt' });
+
+        expect(dirt.key).toBe('track:circuit:ground:dirt');
+        expect(dirt.trackColor).not.toBe(tarmac.trackColor);
+        expect(dirt.skidColor).not.toBe(tarmac.skidColor);
+        expect(dirt.schematicRoadColor).not.toBe(tarmac.schematicRoadColor);
+        expect(dirt.showCurbs).toBe(true);
+        expect(dirt.curbRed).not.toBe(tarmac.curbRed);
+        expect(dirt.curbWhite).not.toBe(tarmac.curbWhite);
+        expect(dirt.speckleColors.length).toBeGreaterThan(0);
+        expect(dirt.speckleAreaPerDot).toBeGreaterThan(0);
+        expect(tarmac.speckleColors).toBeUndefined();
+    });
+
+    it('gives snow its own light road, blue kerbs and longer tyre tracks', () => {
+        const tarmac = resolveTrackPresentation('circuit');
+        const dirt = resolveTrackPresentation('circuit', { ground: 'dirt' });
+        const snow = resolveTrackPresentation('circuit', { ground: 'snow' });
+
+        expect(snow.key).toBe('track:circuit:ground:snow');
+        expect(snow.trackColor).not.toBe(tarmac.trackColor);
+        expect(snow.trackColor).not.toBe(dirt.trackColor);
+        expect(snow.curbRed).not.toBe(tarmac.curbRed);
+        expect(snow.tyreTrackSeconds).toBeGreaterThan(3);
+        expect(snow.dustColor).toBeTruthy();
+    });
+
+    it('gives grip a darker road, and keeps the tarmac kerbs', () => {
+        const tarmac = resolveTrackPresentation('circuit');
+        const grip = resolveTrackPresentation('circuit', { ground: 'grip' });
+
+        expect(grip.key).toBe('track:circuit:ground:grip');
+        expect(grip.trackColor).not.toBe(tarmac.trackColor);
+        expect(grip.schematicRoadColor).not.toBe(tarmac.schematicRoadColor);
+        expect(grip.curbRed).toBe(tarmac.curbRed);
+    });
+
+    it('keeps the default look for tarmac, a missing ground and an unknown ground', () => {
+        const tarmac = resolveTrackPresentation('circuit');
+
+        expect(resolveTrackPresentation('circuit', { ground: 'tarmac' })).toEqual(tarmac);
+        expect(resolveTrackPresentation('circuit', { ground: 'lava' })).toEqual(tarmac);
+        expect(tarmac.key).toBe('track:circuit:default');
+    });
+
+    it('lets an event look win over the ground look', () => {
+        const presentation = resolveTrackPresentation('kettleRun', {
+            surface: TRACK_PRESENTATION_SURFACES.RACE,
+            event: { key: 'daily-challenge', trackKey: 'kettleRun', skin: 'desert' },
+            ground: 'dirt'
+        });
+
+        expect(presentation.key).toBe('event:daily-challenge:kettleRun:desert');
+        expect(presentation.trackColor).toBe('#5b4127');
+    });
 });

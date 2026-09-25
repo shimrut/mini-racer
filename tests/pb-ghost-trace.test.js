@@ -630,6 +630,23 @@ describe('pb-ghost-trace validation and recording edges', () => {
         })).not.toBe(createTrackFingerprint(base));
     });
 
+    it('hashes a non-tarmac ground and ignores an explicit or unknown tarmac', () => {
+        const base = {
+            outer: [{ x: 0, y: 0 }],
+            inner: [{ x: 1, y: 1 }],
+            startLine: { p1: { x: 0, y: 0 }, p2: { x: 1, y: 0 } },
+            startPos: { x: 0, y: -1 },
+            startAngle: 0,
+            checkpoints: [{ x: 2, y: 2 }],
+        };
+        const baseFingerprint = createTrackFingerprint(base);
+        expect(createTrackFingerprint({ ...base, ground: 'tarmac' })).toBe(baseFingerprint);
+        expect(createTrackFingerprint({ ...base, ground: 'lava' })).toBe(baseFingerprint);
+        expect(createTrackFingerprint({ ...base, ground: 'dirt' })).not.toBe(baseFingerprint);
+        expect(createTrackFingerprint({ ...TRACKS.cobaltRun, ground: 'dirt' }))
+            .not.toBe(createTrackFingerprint(TRACKS.cobaltRun));
+    });
+
     it('keeps published Daily geometry fingerprints stable for PB continuity', () => {
         expect(createTrackFingerprint(TRACKS.pretzelArena))
             .toBe('y3lf9P0rGLuJ4-Lj3_TJvTTvW2sjdIGqj4PMyQjhV_8');

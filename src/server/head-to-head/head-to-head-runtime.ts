@@ -19,7 +19,6 @@ import {
     type Competition,
 } from '../competition/competition.js';
 import {
-    CAMPAIGN_ID,
     getHeadToHeadOrigin,
     type HeadToHeadRecord,
     type HeadToHeadSource,
@@ -41,8 +40,8 @@ export async function resolveHeadToHeadSource(
         : null;
     const race = stage
         ? {
-            competition: toCampaignCompetition(CAMPAIGN_ID, stage),
-            id: { sourceKind: 'campaign' as const, sourceId: stage.raceId, campaignId: CAMPAIGN_ID, raceId: stage.raceId },
+            competition: toCampaignCompetition(stage.seriesId, stage),
+            id: { sourceKind: 'campaign' as const, sourceId: stage.raceId, campaignId: stage.seriesId, raceId: stage.raceId },
         }
         : daily
             ? {
@@ -198,7 +197,7 @@ export async function recordHeadToHeadBest(
             mode: 'campaign',
             medal: getMedalForRaceTime(stage.trackKey, best.bestTimeMs / 1000, stage.lapCount),
             rank: await readBestEffortRank(
-                toCampaignCompetition(CAMPAIGN_ID, stage),
+                toCampaignCompetition(stage.seriesId, stage),
                 context.canonicalPlayerId,
             ),
         };
@@ -237,7 +236,7 @@ async function challengeCompetition(
         const stage = getCampaignStage(origin.raceId);
         return stage
             ? {
-                competition: toCampaignCompetition(CAMPAIGN_ID, stage),
+                competition: toCampaignCompetition(stage.seriesId, stage),
                 trackKey: stage.trackKey,
                 lapCount: stage.lapCount,
             }
@@ -284,7 +283,7 @@ export async function readHeadToHeadViewerBest(
     if (!target) return null;
     if (origin?.mode === 'campaign') {
         try {
-            await repairCampaignStandingsFromEntries(playerId);
+            await repairCampaignStandingsFromEntries(playerId, getCampaignStage(origin.raceId)?.seriesId ?? null);
         } catch (error) {
             console.error('Head to Head campaign standings repair failed:', error);
         }

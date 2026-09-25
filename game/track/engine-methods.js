@@ -2,7 +2,8 @@ import {
   getTrackCanvasAsset,
   getTrackRuntimeAsset,
 } from "./assets.js";
-import { loadClientTrack } from "./client-registry.js";
+import { getLoadedClientTrack, loadClientTrack } from "./client-registry.js";
+import { getTrackGround, getTrackGroundMaxSpeedKph } from "./grounds.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -21,9 +22,13 @@ export const trackEngineMethods = {
     trackKey = this.currentTrackKey,
     { surface = TRACK_PRESENTATION_SURFACES.RACE } = {},
   ) {
+    const track = trackKey === this.currentTrackKey
+      ? this.currentTrack
+      : getLoadedClientTrack(trackKey);
     return resolveTrackPresentation(trackKey, {
       surface,
       event: createDailyChallengePresentationEvent(this.activeDailyChallenge),
+      ground: track?.ground,
     });
   },
 
@@ -120,6 +125,14 @@ export const trackEngineMethods = {
     if (requestId !== this.trackLoadRequestId) return;
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
+    if (this.hud && this.runtimeConfig?.maxSpeed) {
+      this.hud.setMaxSpeed(getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, nextTrack));
+    }
+    this.hud?.setGround?.(getTrackGround(nextTrack).key);
+    // Each ground has its own car skin, so a new ground can need a new car.
+    if (this.getSelectedCarAssetName?.() !== this.carSpriteAssetKey) {
+      void this.syncCarSpriteAsset?.();
+    }
     this.pbGhost?.clearTrack?.();
     this.preparedPbGhostChallengeId = null;
     if (!preserveDailyChallengeContext) {

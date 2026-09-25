@@ -15,7 +15,11 @@ import {
 import { applyAvatar } from '../ui/avatar.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
+import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { TRACK_GROUNDS, getStoredTrackGroundKey } from '../track/grounds.js';
 import { setText } from '../ui/dom.js';
+import { CampaignSeriesPicker } from './campaign-series-picker.js';
+import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
 const TOGGLE_MODES = ['daily', 'campaign'];
@@ -30,11 +34,16 @@ function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
 }
 
-function setSubheadSelection(element, trackName, laps) {
+// "2 Laps", or "2 Laps · Dirt" on a track that is not tarmac.
+function formatLapsAndGroundLabel(laps, groundLabel, separator = ' · ') {
+    return [formatLapsLabel(laps), groundLabel].filter(Boolean).join(separator);
+}
+
+function setSubheadSelection(element, trackName, laps, groundLabel = null) {
     if (!element) return;
     const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
     const safeLaps = Number.isInteger(laps) && laps > 0 ? laps : null;
-    const lapsLabel = safeLaps === null ? '' : formatLapsLabel(safeLaps);
+    const lapsLabel = safeLaps === null ? '' : formatLapsAndGroundLabel(safeLaps, groundLabel);
     element.hidden = !safeTrackName;
 
     const trackElement = element.querySelector?.('.lobby-mode-selection__track');
@@ -48,11 +57,14 @@ function setSubheadSelection(element, trackName, laps) {
     lapsElement.textContent = lapsElement.hidden ? '' : lapsLabel;
 }
 
-function setRaceBriefText(element, trackName, laps) {
+function setRaceBriefText(element, trackName, laps, groundLabel = null) {
     if (!element) return;
     const safeTrackName = typeof trackName === 'string' ? trackName.trim() : '';
     const safeLaps = Number.isInteger(laps) && laps > 0 ? laps : null;
-    const lapsLabel = safeLaps === null ? '' : formatLapsLabel(safeLaps);
+    // En spaces match the gap around the separator after the track name.
+    const lapsLabel = safeLaps === null
+        ? ''
+        : formatLapsAndGroundLabel(safeLaps, groundLabel, '\u2002·\u2002');
 
     const trackElement = element.querySelector?.('.main-menu__race-brief-track');
     const separatorElement = element.querySelector?.('.main-menu__race-brief-separator');
@@ -94,6 +106,9 @@ export class LobbyUi {
         onSelectDaily = null,
         onCarouselNavigate = null,
         onSelectCampaign = null,
+        onSelectCampaignSeries = null,
+        onOpenCampaignSeries = null,
+        onBackToCampaignSeries = null,
         onBack = null,
         onOpenStandings = null,
         onOpenTracks = null,
@@ -106,6 +121,11 @@ export class LobbyUi {
         this.onSelectDaily = onSelectDaily;
         this.onCarouselNavigate = onCarouselNavigate;
         this.onSelectCampaign = onSelectCampaign;
+        this._openCampaignSeries = (seriesId) => onOpenCampaignSeries?.(seriesId);
+        this.onBackToCampaignSeries = onBackToCampaignSeries;
+        this.seriesPicker = new CampaignSeriesPicker({
+            onSelect: (seriesId) => onSelectCampaignSeries?.(seriesId),
+        });
         this.onBack = onBack;
         this.onOpenStandings = onOpenStandings;
         this.onOpenTracks = onOpenTracks;
@@ -121,6 +141,8 @@ export class LobbyUi {
         this._campaignSelectedStage = null;
         this._dailySelectedTrackName = null;
         this._dailySelectedLaps = null;
+        this._dailySelectedTrackKey = null;
+        this._groundLabelLoads = new Set();
         this._campaignSelectedBillingLabel = null;
         this._dailyStartError = null;
         this._campaignStartError = null;
@@ -135,6 +157,12 @@ export class LobbyUi {
     get activePane() { return document.getElementById(`lobby-${this.mode}-pane`); }
     get dailyPrimaryBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get campaignPrimaryBtn() { return document.getElementById('campaign-primary-btn'); }
+    get campaignSeriesList() { return document.getElementById('campaign-series-list'); }
+
+    // The Campaign screen shows the series list first, then the stages of one series.
+    isCampaignSeriesView() {
+        return this.mode === 'campaign' && this.campaignState?.view === 'series';
+    }
     get challengeAcceptBtn() { return document.getElementById('challenge-accept-btn'); }
 
     bind() {
@@ -179,6 +207,7 @@ export class LobbyUi {
             if (!this.challengeState.canAccept) return;
             this.onAcceptChallenge?.(this.challengeState);
         });
+        this.seriesPicker.bind();
         document.addEventListener('keydown', this._keydownHandler, true);
         document.addEventListener('pointermove', this._pointerMoveHandler, true);
         globalThis.addEventListener?.('resize', () => {
@@ -199,6 +228,7 @@ export class LobbyUi {
         this.campaignState = normalizeCampaignLobbyState(state);
         this.renderCampaign();
         this.showPane('campaign');
+        this.renderCampaignView();
     }
 
     showChallenge(state = this.challengeState) {
@@ -251,6 +281,7 @@ export class LobbyUi {
             }
             if (document.body?.dataset) {
                 document.body.dataset.lobbyMode = mode;
+                if (mode !== 'campaign') delete document.body.dataset.campaignView;
                 if (previousMode !== mode) {
                     document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
                 }
@@ -323,6 +354,11 @@ export class LobbyUi {
     }
 
     syncLobbySubheadDetail() {
+        // On the Campaign screen the series choice takes the place of the track name,
+        // which the Start Race button also shows.
+        const seriesShown = this.seriesPicker.sync(
+            this.mode === 'campaign' && !this.isCampaignSeriesView() ? this.campaignState : null,
+        );
         const querySelector = document.querySelector?.bind(document);
         const track = querySelector?.('[data-lobby-mode-track]') || null;
         const selection = querySelector?.('[data-lobby-mode-selection]') || null;
@@ -345,13 +381,43 @@ export class LobbyUi {
                 : this.mode === 'challenge'
                     ? this.challengeState?.laps ?? null
                     : null;
+        const billingTrackKey = this.mode === 'daily'
+            ? this._dailySelectedTrackKey
+            : this.mode === 'campaign'
+                ? this.getCampaignPrimaryTrackKey()
+                : this.mode === 'challenge'
+                    ? this.challengeState?.trackKey ?? null
+                    : null;
         if (this.mode === 'home') {
             if (rule) rule.hidden = true;
             setSubheadSelection(selection, null, null);
             return;
         }
         if (rule) rule.hidden = false;
-        setSubheadSelection(selection, billingLabel, billingLaps);
+        setSubheadSelection(selection, billingLabel, billingLaps, this.getGroundLabel(billingTrackKey));
+        if ((seriesShown || this.isCampaignSeriesView()) && selection) selection.hidden = true;
+    }
+
+    // The ground name of a non-tarmac track, or null. The name lives in the
+    // track definition, so an unloaded track loads first and then repaints.
+    getGroundLabel(trackKey) {
+        if (typeof trackKey !== 'string' || !trackKey) return null;
+        const track = getLoadedClientTrack(trackKey);
+        if (!track) {
+            if (!this._groundLabelLoads.has(trackKey)) {
+                this._groundLabelLoads.add(trackKey);
+                void loadClientTrack(trackKey).then((loaded) => {
+                    if (!loaded || getStoredTrackGroundKey(loaded) === null) return;
+                    this.syncLobbySubheadDetail();
+                    if (this.mode === 'daily') this.renderDaily();
+                    if (this.mode === 'campaign') this.renderCampaign();
+                    if (this.mode === 'challenge') this.renderChallenge();
+                }).catch(() => {});
+            }
+            return null;
+        }
+        const groundKey = getStoredTrackGroundKey(track);
+        return groundKey === null ? null : TRACK_GROUNDS[groundKey].label;
     }
 
     getMode() {
@@ -374,6 +440,7 @@ export class LobbyUi {
     }
 
     getPrimaryAction() {
+        if (this.isCampaignSeriesView()) return null;
         const button = this.mode === 'daily'
             ? this.dailyPrimaryBtn
             : this.mode === 'campaign'
@@ -385,6 +452,7 @@ export class LobbyUi {
 
     getCarouselAction() {
         if (this.mode !== 'daily' && this.mode !== 'campaign') return null;
+        if (this.isCampaignSeriesView()) return null;
         const carousel = document.getElementById(`${this.mode}-carousel`);
         if (!carousel || carousel.hidden) return null;
         return carousel;
@@ -399,6 +467,16 @@ export class LobbyUi {
             document.querySelector?.('[data-lobby-mode-switch]'),
             '[data-lobby-action]',
         );
+        const seriesButton = this.mode === 'campaign' ? this.seriesPicker.button : null;
+        if (seriesButton && !seriesButton.disabled && this.seriesPicker.root?.hidden === false) {
+            toggle.push(seriesButton);
+        }
+        if (this.isCampaignSeriesView()) {
+            const seriesRows = collectVisibleActionButtons(this.campaignSeriesList, '[data-lobby-action]')
+                .filter((button) => !button.disabled)
+                .map((button) => [button]);
+            return [toolbar, toggle, ...seriesRows].filter((row) => row.length);
+        }
         const carousel = this.getCarouselAction();
         const start = this.getPrimaryAction();
         return [
@@ -424,6 +502,13 @@ export class LobbyUi {
 
     getPreferredIndex(buttons = this.getVisibleActions()) {
         if (this.mode === 'home') return 0;
+        if (this.isCampaignSeriesView()) {
+            const list = this.campaignSeriesList;
+            const current = list?.querySelector?.('.campaign-series-row.is-current:not(:disabled)')
+                ?? list?.querySelector?.('.campaign-series-row:not(:disabled)');
+            const index = buttons.indexOf(current);
+            if (index >= 0) return index;
+        }
         const preferredIndex = buttons.indexOf(this.getPrimaryAction());
         if (preferredIndex >= 0) return preferredIndex;
         return buttons.findIndex((button) => !button.disabled);
@@ -543,9 +628,17 @@ export class LobbyUi {
 
     handleKeydown(event) {
         if (!this.overlay || this.overlay.style.display === 'none' || this.isKeyboardNavBlocked()) return;
+        if (this.seriesPicker.isOpen()) {
+            this.seriesPicker.handleKeydown(event);
+            return;
+        }
         if (event.key === 'Escape' && this.mode !== 'home') {
             event.preventDefault?.();
             event.stopPropagation?.();
+            if (this.mode === 'campaign' && !this.isCampaignSeriesView() && this.onBackToCampaignSeries) {
+                this.onBackToCampaignSeries();
+                return;
+            }
             this.onBack?.(this.mode);
             return;
         }
@@ -592,6 +685,9 @@ export class LobbyUi {
         this._dailySelectedLaps = Number.isInteger(card?.laps)
             ? card.laps
             : (Number.isInteger(challenge?.laps) ? challenge.laps : null);
+        this._dailySelectedTrackKey = typeof card?.trackKey === 'string'
+            ? card.trackKey
+            : (typeof challenge?.trackKey === 'string' ? challenge.trackKey : null);
         this.syncLobbySubheadDetail();
         this.renderDaily();
     }
@@ -613,6 +709,7 @@ export class LobbyUi {
             this.dailyPrimaryBtn?.querySelector('.main-menu__race-brief'),
             this._dailySelectedTrackName,
             this._dailySelectedLaps,
+            this.getGroundLabel(this._dailySelectedTrackKey),
         );
     }
 
@@ -637,12 +734,37 @@ export class LobbyUi {
         return stage?.laps ?? stage?.lapCount ?? null;
     }
 
+    getCampaignPrimaryTrackKey() {
+        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
+        return typeof stage?.trackKey === 'string' ? stage.trackKey : null;
+    }
+
     getCampaignPrimaryTrackName() {
         const stage = this._campaignSelectedStage || this.campaignState.nextStage;
         return typeof stage?.trackName === 'string' ? stage.trackName : null;
     }
 
+    renderCampaignView() {
+        const seriesView = this.isCampaignSeriesView();
+        if (document.body?.dataset) {
+            if (this.mode === 'campaign') document.body.dataset.campaignView = seriesView ? 'series' : 'stages';
+            else delete document.body.dataset.campaignView;
+        }
+        const list = this.campaignSeriesList;
+        const carousel = document.getElementById('campaign-carousel');
+        const primaryRow = this.campaignPrimaryBtn?.closest?.('.lobby-primary-row') ?? null;
+        if (list) list.hidden = !seriesView;
+        if (carousel) carousel.hidden = seriesView;
+        if (primaryRow) primaryRow.hidden = seriesView;
+        if (seriesView) {
+            renderCampaignSeriesList(list, buildCampaignSeriesRows(this.campaignState), {
+                onChoose: this._openCampaignSeries,
+            });
+        }
+    }
+
     renderCampaign() {
+        this.renderCampaignView();
         this.renderRaceStartMessage('campaign-start-message', this._campaignStartError);
         if (!this.campaignPrimaryBtn) return;
         const stage = this._campaignSelectedStage;
@@ -660,6 +782,7 @@ export class LobbyUi {
             this.campaignPrimaryBtn.querySelector('.main-menu__race-brief'),
             this.getCampaignPrimaryTrackName(),
             this.getCampaignPrimaryLaps(),
+            this.getGroundLabel(this.getCampaignPrimaryTrackKey()),
         );
     }
 
@@ -749,6 +872,7 @@ export class LobbyUi {
             this.challengeAcceptBtn?.querySelector('.main-menu__race-brief'),
             this.challengeState.trackName,
             this.challengeState.laps,
+            this.getGroundLabel(this.challengeState.trackKey),
         );
         setText(document.getElementById('challenge-target-time'), this.challengeState.targetTimeLabel);
         setText(

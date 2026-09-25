@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.19">
+    <link rel="stylesheet" href="mapmaker.css?v=2.20">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -52,15 +52,32 @@
 
                 <label class="field">
                     <span>Use For</span>
-                    <select id="track-destination-select">
-                        <option value="daily">Daily Challenge</option>
-                        <option value="campaign">Campaign only</option>
-                    </select>
+                    <select id="track-destination-select"></select>
                     <p class="field-hint" id="track-destination-hint">
                         Daily Challenge adds this track to the future Daily GP rotation.
-                        Campaign only keeps it out of Daily; stage wiring stays in the Campaign manifest.
+                        A Campaign series adds it as a stage of that series.
                     </p>
                 </label>
+
+                <div id="series-stage-fields" class="series-stage-fields" hidden>
+                    <p id="series-stage-label" class="panel-note"></p>
+                    <div class="button-row">
+                        <label class="field">
+                            <span>Laps</span>
+                            <select id="series-laps-select">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Medal Target</span>
+                            <input id="series-target-input" type="number" min="0" step="1">
+                        </label>
+                    </div>
+                    <p id="series-stage-hint" class="field-hint"></p>
+                    <ol id="series-stage-list" class="series-stage-list"></ol>
+                </div>
 
                 <label class="field">
                     <span>Wall Corners</span>
@@ -71,6 +88,12 @@
                         <option value="5">Soft</option>
                     </select>
                     <p class="field-hint">How rounded wall corners look in race. Does not change how wide the lane is.</p>
+                </label>
+
+                <label class="field">
+                    <span>Ground</span>
+                    <select id="ground-select"></select>
+                    <p class="field-hint">Changes how the car drives on the whole track, and how the road looks.</p>
                 </label>
             </section>
 
@@ -124,6 +147,34 @@
                 <p id="selection-label" class="panel-note">No point selected.</p>
             </section>
 
+            <section class="maker-panel" aria-labelledby="medal-times-title">
+                <div class="panel-head">
+                    <h2 id="medal-times-title">Medal Times</h2>
+                    <span id="medal-times-state" class="pill">Not set</span>
+                </div>
+                <p id="draft-laps-note" class="panel-note">Drive Draft keeps your 10 best laps on this layout. Pick one, or the average, as the author time.</p>
+                <div id="draft-laps-list" class="draft-laps-list"></div>
+                <div class="medal-time-grid">
+                    <label class="field">
+                        <span>Author</span>
+                        <input id="medal-author-input" type="number" min="0" step="0.01">
+                    </label>
+                    <label class="field">
+                        <span>Gold</span>
+                        <input id="medal-gold-input" type="number" min="0" step="0.01">
+                    </label>
+                    <label class="field">
+                        <span>Silver</span>
+                        <input id="medal-silver-input" type="number" min="0" step="0.01">
+                    </label>
+                    <label class="field">
+                        <span>Bronze</span>
+                        <input id="medal-bronze-input" type="number" min="0" step="0.01">
+                    </label>
+                </div>
+                <p id="medal-times-hint" class="field-hint">Times are for one lap. A new author time fills gold, silver and bronze with the usual gaps. You can change each one.</p>
+            </section>
+
             <section class="maker-panel" aria-labelledby="quality-title">
                 <div class="panel-head">
                     <h2 id="quality-title">Track Checks</h2>
@@ -131,6 +182,12 @@
                 </div>
                 <p id="quality-summary" class="panel-note">Draw a closed road to check its walls, start, and lap gates.</p>
                 <ul id="quality-issues" class="quality-issues"></ul>
+                <div class="panel-head flow-head">
+                    <h3 id="flow-title">Flow</h3>
+                    <span id="flow-count" class="pill">Draw a track</span>
+                </div>
+                <p id="flow-summary" class="panel-note">Draw a closed road to check how it flows.</p>
+                <ul id="flow-rules" class="quality-issues flow-rules" aria-labelledby="flow-title"></ul>
             </section>
 
             <section class="maker-panel">
@@ -157,7 +214,7 @@
                 </div>
                 <p id="status-text" class="panel-note">Ready.</p>
                 <ul class="shortcut-list">
-                    <li><kbd>Save &amp; Integrate</kbd> writes the selected definition and updates the catalog, schedule, and registry. New tracks are appended to the schedule.</li>
+                    <li><kbd>Save &amp; Integrate</kbd> writes the selected definition and updates the catalog, schedule, registry, Campaign series and medal times. New Daily tracks are appended to the schedule. New series tracks go after the last stage of the series.</li>
                     <li><kbd>Remove Track</kbd> discards an unsaved track or permanently removes a saved track from the repository after confirmation. Published race records can depend on saved tracks.</li>
                     <li><kbd>Line Build</kbd> keeps the road open as you add points and previews each new bend. Hover over the first point to see the closed result, then click it to finish. Reframe fits the result on screen.</li>
                     <li>The ghost car at the finished start position matches its race collision size.</li>
@@ -249,6 +306,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.18"></script>
+    <script type="module" src="mapmaker.js?v=2.19"></script>
 </body>
 </html>

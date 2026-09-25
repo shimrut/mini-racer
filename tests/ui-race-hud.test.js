@@ -227,6 +227,46 @@ describe('ui race hud helpers', () => {
         expect(timeVal.textContent).toBe('9.876');
     });
 
+    it('shows the rally speed bar on dirt and snow, and the circuit bar on tarmac and grip', () => {
+        const speedBar = {
+            ticks: [],
+            set innerHTML(_value) { this.ticks = []; },
+            appendChild(tick) { this.ticks.push(tick); },
+        };
+        const speedometer = { classList: { toggle: vi.fn() }, setAttribute: vi.fn() };
+        const speedVal = { textContent: '' };
+        document.createElement = vi.fn(() => {
+            const tick = { className: '', active: false };
+            tick.classList = { toggle: (_name, on) => { tick.active = on; } };
+            return tick;
+        });
+        vi.spyOn(document, 'getElementById').mockImplementation((id) => ({
+            'speed-bar': speedBar,
+            speedometer,
+            'speed-val': speedVal,
+        }[id] || null));
+        const litTicks = () => speedBar.ticks.filter((tick) => tick.active).length;
+
+        const hud = new RaceHud();
+        hud.setMaxSpeed(200);
+        hud.syncHud({ time: 0, speed: 5, force: true });
+        expect(speedBar.ticks).toHaveLength(20);
+        expect(litTicks()).toBe(10);
+
+        hud.setGround('dirt');
+        expect(speedometer.classList.toggle).toHaveBeenLastCalledWith('speedometer--rally', true);
+        expect(speedBar.ticks).toHaveLength(10);
+        expect(litTicks()).toBe(5);
+
+        hud.setGround('snow');
+        expect(speedBar.ticks).toHaveLength(10);
+
+        hud.setGround('grip');
+        expect(speedometer.classList.toggle).toHaveBeenLastCalledWith('speedometer--rally', false);
+        expect(speedBar.ticks).toHaveLength(20);
+        expect(litTicks()).toBe(10);
+    });
+
     it('persists a best lap to the selected track card and reveals the best metric', () => {
         const persistTrackPersonalBest = vi.fn();
         const bestTimeDisplay = { style: {} };

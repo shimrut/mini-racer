@@ -11,10 +11,21 @@ import {
     getTrackModuleFilename,
     isValidTrackKey,
 } from './track-source.js';
+import {
+    applyTrackSeriesUpdate,
+    findTrackStage,
+    moveSeriesStage,
+    parseCampaignSeriesSource,
+    parseTrackDestination,
+    serializeCampaignSeries,
+} from './campaign-series.js';
+import { isCampaignSeriesLive } from '../../game/campaign/series-rules.js';
+import { getMedalRowError, normalizeMedalRow, sameMedalRow } from './medal-times.js';
 
 const CATALOG_BLOCK_RE = /export const TRACK_CATALOG = \{\n[\s\S]*?\n\};/;
 const SCHEDULE_BLOCK_RE = /export const TRACK_SCHEDULE_KEYS = \[\n[\s\S]*?\n\];/;
-const TRACK_DESTINATIONS = new Set(['daily', 'campaign']);
+const SERIES_FILE = 'game/campaign/series.json';
+const MEDALS_FILE = 'game/medals/medal-times.json';
 
 function assertTrackKey(trackKey, label = 'Track key') {
     if (!isValidTrackKey(trackKey)) {
@@ -22,10 +33,56 @@ function assertTrackKey(trackKey, label = 'Track key') {
     }
 }
 
-function assertDestination(destination) {
-    if (!TRACK_DESTINATIONS.has(destination)) {
-        throw new Error('Destination must be daily or campaign.');
+function assertDestination(destination, seriesData = null) {
+    const parsed = parseTrackDestination(destination, seriesData);
+    if (!parsed) {
+        throw new Error('Destination must be daily or a Campaign series.');
     }
+    return parsed;
+}
+
+function parseMedalTimesSource(source) {
+    const medalTimes = JSON.parse(source);
+    if (!medalTimes || typeof medalTimes !== 'object' || Array.isArray(medalTimes)) {
+        throw new Error('Track medal times are invalid.');
+    }
+    return medalTimes;
+}
+
+function serializeMedalTimes(medalTimes) {
+    return `${JSON.stringify(medalTimes, null, 2)}\n`;
+}
+
+// Works out the medal row after a save. A track in a live series keeps its
+// times, because players' saved medals were worked out with them.
+function applyMedalTimesUpdate(medalTimes, {
+    trackKey,
+    originalTrackKey,
+    medalRow,
+    seriesStage,
+}) {
+    const next = { ...medalTimes };
+    const previousKey = originalTrackKey ?? trackKey;
+    const existing = next[previousKey] ?? null;
+    if (previousKey !== trackKey) {
+        delete next[previousKey];
+        if (existing) next[trackKey] = existing;
+    }
+    if (medalRow) {
+        const error = getMedalRowError(medalRow);
+        if (error) throw new Error(error);
+        const liveStage = seriesStage && isCampaignSeriesLive(seriesStage.series);
+        if (liveStage && existing && !sameMedalRow(existing, medalRow)) {
+            throw new Error(
+                `${seriesStage.series.name} is live, so the medal times of ${trackKey} are fixed.`,
+            );
+        }
+        next[trackKey] = normalizeMedalRow(medalRow);
+    }
+    if (seriesStage && getMedalRowError(next[trackKey])) {
+        throw new Error(`A Campaign stage needs all four medal times. Set them for ${trackKey}.`);
+    }
+    return next;
 }
 
 export function parseTrackCatalogSource(source) {
@@ -113,7 +170,7 @@ export function generateTracksRegistrySource(catalogKeys) {
 
 function applyScheduleDestination(scheduleKeys, trackKey, destination) {
     const scheduleIndex = scheduleKeys.indexOf(trackKey);
-    if (destination === 'daily') {
+    if (destination.type === 'daily') {
         if (scheduleIndex === -1) {
             scheduleKeys.push(trackKey);
         }
@@ -150,13 +207,19 @@ function assertPathInsideDirectory(filePath, directoryPath, label) {
 
 export function buildTrackRepositoryUpdate({
     catalogSource,
+    seriesSource,
+    medalsSource,
     trackKey,
     originalTrackKey = null,
     trackName,
     destination = 'daily',
+    laps = null,
+    requiredMedals = null,
+    medalRow = null,
 }) {
     assertTrackKey(trackKey);
-    assertDestination(destination);
+    const seriesData = parseCampaignSeriesSource(seriesSource);
+    const parsedDestination = assertDestination(destination, seriesData);
     if (originalTrackKey !== null) {
         assertTrackKey(originalTrackKey, 'Original track key');
     }
@@ -203,7 +266,23 @@ export function buildTrackRepositoryUpdate({
     }
 
     namesByKey[trackKey] = normalizedName;
-    applyScheduleDestination(nextScheduleKeys, trackKey, destination);
+    applyScheduleDestination(nextScheduleKeys, trackKey, parsedDestination);
+    const seriesUpdate = applyTrackSeriesUpdate(seriesData, {
+        trackKey,
+        originalTrackKey: originalExists ? originalTrackKey : null,
+        destination,
+        laps,
+        requiredMedals,
+    });
+    const seriesStage = seriesUpdate.series
+        ? { series: seriesUpdate.series, stageIndex: seriesUpdate.stageIndex }
+        : null;
+    const medalTimes = applyMedalTimesUpdate(parseMedalTimesSource(medalsSource), {
+        trackKey,
+        originalTrackKey: originalExists ? originalTrackKey : null,
+        medalRow,
+        seriesStage,
+    });
 
     const orderedNamesByKey = Object.fromEntries(
         nextCatalogKeys.map((key) => [key, namesByKey[key]]),
@@ -217,11 +296,34 @@ export function buildTrackRepositoryUpdate({
         destination,
         scheduleIndex: nextScheduleKeys.indexOf(trackKey),
         scheduleLength: nextScheduleKeys.length,
+        seriesId: seriesStage?.series.id ?? null,
+        stageIndex: seriesStage?.stageIndex ?? -1,
         filename: getTrackModuleFilename(trackKey),
         removedFilename,
         catalogSource: nextCatalogSource,
         tracksSource: generateTracksRegistrySource(nextCatalogKeys),
+        seriesSource: serializeCampaignSeries(seriesUpdate.data),
+        medalsSource: serializeMedalTimes(medalTimes),
     };
+}
+
+function writeFilesWithRollback(files) {
+    const originals = files.map(({ path }) => ({
+        path,
+        source: existsSync(path) ? readFileSync(path, 'utf8') : null,
+    }));
+    try {
+        for (const { path, source } of files) writeFileSync(path, source, 'utf8');
+    } catch (error) {
+        for (const { path, source } of originals) {
+            if (source === null) {
+                if (existsSync(path)) rmSync(path);
+            } else {
+                writeFileSync(path, source, 'utf8');
+            }
+        }
+        throw error;
+    }
 }
 
 export function applyTrackRepositoryUpdate({
@@ -230,19 +332,29 @@ export function applyTrackRepositoryUpdate({
     originalTrackKey = null,
     trackName,
     destination = 'daily',
+    laps = null,
+    requiredMedals = null,
+    medalRow = null,
     track,
 }) {
     const resolvedRoot = resolve(rootDir);
     const catalogPath = join(resolvedRoot, 'game/track/catalog.js');
     const tracksPath = join(resolvedRoot, 'game/track/tracks.js');
+    const seriesPath = join(resolvedRoot, SERIES_FILE);
+    const medalsPath = join(resolvedRoot, MEDALS_FILE);
     const definitionsPath = join(resolvedRoot, 'game/track/definitions');
     const catalogSource = readFileSync(catalogPath, 'utf8');
     const update = buildTrackRepositoryUpdate({
         catalogSource,
+        seriesSource: readFileSync(seriesPath, 'utf8'),
+        medalsSource: readFileSync(medalsPath, 'utf8'),
         trackKey,
         originalTrackKey,
         trackName,
         destination,
+        laps,
+        requiredMedals,
+        medalRow,
     });
     const definitionFilename = getTrackModuleFilename(trackKey);
     assertSafeDefinitionFilename(definitionFilename);
@@ -279,9 +391,13 @@ export function applyTrackRepositoryUpdate({
     }
 
     mkdirSync(definitionsPath, { recursive: true });
-    writeFileSync(definitionPath, generateTrackModuleSource(track), 'utf8');
-    writeFileSync(catalogPath, update.catalogSource, 'utf8');
-    writeFileSync(tracksPath, update.tracksSource, 'utf8');
+    writeFilesWithRollback([
+        { path: definitionPath, source: generateTrackModuleSource(track) },
+        { path: catalogPath, source: update.catalogSource },
+        { path: tracksPath, source: update.tracksSource },
+        { path: seriesPath, source: update.seriesSource },
+        { path: medalsPath, source: update.medalsSource },
+    ]);
 
     if (oldDefinitionPath) {
         rmSync(oldDefinitionPath);
@@ -294,13 +410,30 @@ export function applyTrackRepositoryUpdate({
         removedFilename: update.removedFilename,
         scheduleIndex: update.scheduleIndex,
         scheduleLength: update.scheduleLength,
+        seriesId: update.seriesId,
+        stageIndex: update.stageIndex,
     };
+}
+
+// Moves a stage up or down in a series that is not live.
+export function applySeriesStageMove({ rootDir, seriesId, trackKey, direction }) {
+    assertTrackKey(trackKey);
+    const seriesPath = join(resolve(rootDir), SERIES_FILE);
+    const next = moveSeriesStage(
+        parseCampaignSeriesSource(readFileSync(seriesPath, 'utf8')),
+        seriesId,
+        trackKey,
+        direction,
+    );
+    writeFileSync(seriesPath, serializeCampaignSeries(next), 'utf8');
+    const series = next.series.find((entry) => entry.id === seriesId);
+    return { seriesId, trackKeys: series.stages.map((stage) => stage.trackKey) };
 }
 
 export function buildTrackRepositoryRemoval({
     catalogSource,
     trackKey,
-    campaignSource,
+    seriesSource,
     publishedHistorySource,
 }) {
     assertTrackKey(trackKey);
@@ -309,14 +442,17 @@ export function buildTrackRepositoryRemoval({
         throw new Error(`Track ${trackKey} is not present in the catalog.`);
     }
     const defaultTrackKey = catalogSource.match(/export const DEFAULT_TRACK_KEY = '([^']+)';/)?.[1];
-    if (!defaultTrackKey || typeof campaignSource !== 'string' || typeof publishedHistorySource !== 'string') {
+    if (!defaultTrackKey || typeof seriesSource !== 'string' || typeof publishedHistorySource !== 'string') {
         throw new Error('Track removal dependencies could not be checked.');
     }
     if (trackKey === defaultTrackKey) {
         throw new Error('Cannot remove the default track.');
     }
-    if (campaignSource.includes(`'${trackKey}'`)) {
-        throw new Error(`Cannot remove ${trackKey} because a Campaign stage uses it.`);
+    const stage = findTrackStage(parseCampaignSeriesSource(seriesSource), trackKey);
+    if (stage) {
+        throw new Error(
+            `Cannot remove ${trackKey} because ${stage.series.name} uses it. Set Use For to Daily Challenge first.`,
+        );
     }
     if (publishedHistorySource.includes(`'${trackKey}'`)) {
         throw new Error(`Cannot remove ${trackKey} because published Daily GP history uses it.`);
@@ -348,8 +484,8 @@ export function applyTrackRepositoryRemoval({ rootDir, trackKey }) {
     const resolvedRoot = resolve(rootDir);
     const catalogPath = join(resolvedRoot, 'game/track/catalog.js');
     const tracksPath = join(resolvedRoot, 'game/track/tracks.js');
-    const medalsPath = join(resolvedRoot, 'game/medals/medal-times.json');
-    const campaignPath = join(resolvedRoot, 'game/campaign/manifest.js');
+    const medalsPath = join(resolvedRoot, MEDALS_FILE);
+    const seriesPath = join(resolvedRoot, SERIES_FILE);
     const publishedHistoryPath = join(resolvedRoot, 'game/shared/daily-gp-history-backfill.js');
     const definitionsPath = join(resolvedRoot, 'game/track/definitions');
     const catalogSource = readFileSync(catalogPath, 'utf8');
@@ -358,7 +494,7 @@ export function applyTrackRepositoryRemoval({ rootDir, trackKey }) {
     const update = buildTrackRepositoryRemoval({
         catalogSource,
         trackKey,
-        campaignSource: readFileSync(campaignPath, 'utf8'),
+        seriesSource: readFileSync(seriesPath, 'utf8'),
         publishedHistorySource: readFileSync(publishedHistoryPath, 'utf8'),
     });
     assertSafeDefinitionFilename(update.filename);
@@ -368,16 +504,13 @@ export function applyTrackRepositoryRemoval({ rootDir, trackKey }) {
         throw new Error(`Cannot remove ${trackKey} because ${update.filename} does not exist.`);
     }
 
-    const medalTimes = JSON.parse(medalsSource);
-    if (!medalTimes || typeof medalTimes !== 'object' || Array.isArray(medalTimes)) {
-        throw new Error('Track medal times are invalid.');
-    }
+    const medalTimes = parseMedalTimesSource(medalsSource);
     delete medalTimes[trackKey];
 
     try {
         writeFileSync(catalogPath, update.catalogSource, 'utf8');
         writeFileSync(tracksPath, update.tracksSource, 'utf8');
-        writeFileSync(medalsPath, `${JSON.stringify(medalTimes, null, 2)}\n`, 'utf8');
+        writeFileSync(medalsPath, serializeMedalTimes(medalTimes), 'utf8');
         rmSync(definitionPath);
     } catch (error) {
         writeFileSync(catalogPath, catalogSource, 'utf8');

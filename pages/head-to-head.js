@@ -19,6 +19,17 @@ import { cleanText } from '../game/shared/values.js';
 
 export const readHeadToHeadPostData = readHeadToHeadPosterPost;
 
+const CAMPAIGN_SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+// A Campaign stage ID starts with its series name, for example numbered-v1-03.
+function isCampaignStageOfSeries(campaignId, raceId) {
+    return typeof campaignId === 'string'
+        && CAMPAIGN_SERIES_ID_RE.test(campaignId)
+        && typeof raceId === 'string'
+        && /^\d{2}$/.test(raceId.slice(campaignId.length + 1))
+        && raceId.startsWith(`${campaignId}-`);
+}
+
 export function normalizeHeadToHeadPostData(value) {
     const input = value && typeof value === 'object' ? value : {};
     const lapCount = input.lapCount === 2 || input.lapCount === 3 ? input.lapCount : 1;
@@ -27,14 +38,13 @@ export function normalizeHeadToHeadPostData(value) {
         && typeof input.origin.challengeId === 'string'
         ? { mode: 'daily', challengeId: input.origin.challengeId }
         : input.origin?.mode === 'campaign'
-            && input.origin.campaignId === 'numbered-v1'
-            && typeof input.origin.raceId === 'string'
+            && isCampaignStageOfSeries(input.origin.campaignId, input.origin.raceId)
             ? {
                 mode: 'campaign',
                 campaignId: input.origin.campaignId,
                 raceId: input.origin.raceId,
             }
-            : input.campaignId === 'numbered-v1' && typeof input.raceId === 'string'
+            : isCampaignStageOfSeries(input.campaignId, input.raceId)
                 ? {
                     mode: 'campaign',
                     campaignId: input.campaignId,
@@ -44,7 +54,9 @@ export function normalizeHeadToHeadPostData(value) {
     return {
         postType: HEAD_TO_HEAD_POST_TYPE,
         challengeId: cleanText(input.challengeId),
-        campaignId: input.campaignId === 'numbered-v1' ? input.campaignId : '',
+        campaignId: typeof input.campaignId === 'string' && CAMPAIGN_SERIES_ID_RE.test(input.campaignId)
+            ? input.campaignId
+            : '',
         raceId: cleanText(input.raceId),
         origin,
         challengerUsername: cleanText(input.challengerUsername) || 'A racer',
@@ -172,6 +184,7 @@ function renderChallengeTrack(documentRef, trackKey, carImage = null, carTravel 
         trackGeometry: { outer: track.outer, inner: track.inner },
         presentation: resolveTrackPresentation(trackKey, {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            ground: track.ground,
         }),
         startLine: track.startLine,
         startPos: track.startPos,
@@ -208,7 +221,7 @@ export function bootHeadToHead(documentRef = document, root = globalThis) {
         lastPosterCar = { image, travel };
         renderChallengeTrack(documentRef, challenge.trackKey, image, travel);
     });
-    if (challenge.trackKey) void loadPosterCar().then(posterCarDrive.drive);
+    if (challenge.trackKey) void loadPosterCar(TRACKS[challenge.trackKey]).then(posterCarDrive.drive);
 }
 
 if (typeof document !== 'undefined') {

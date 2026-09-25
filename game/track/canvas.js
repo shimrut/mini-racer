@@ -251,6 +251,80 @@ export function fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, wi
     ctx.fill(innerPath);
 }
 
+// Soft flat patches of lighter and darker soil, so the road colour is uneven.
+function drawSurfacePatches(ctx, width, height, presentation) {
+    const colors = presentation.patchColors;
+    const areaPerPatch = Number(presentation.patchAreaPerDot);
+    if (!Array.isArray(colors) || colors.length === 0 || !(areaPerPatch > 0)) return;
+
+    const random = createSeededRandom(`${presentation.key || 'track'}:patches`);
+    const paths = colors.map(() => new Path2D());
+    const count = Math.round((width * height) / areaPerPatch);
+    for (let i = 0; i < count; i += 1) {
+        const x = random() * width;
+        const y = random() * height;
+        const radiusX = 10 + random() * 22;
+        const radiusY = radiusX * (0.45 + random() * 0.35);
+        const rotation = random() * Math.PI;
+        const path = paths[Math.floor(random() * paths.length)];
+        path.moveTo(x + radiusX * Math.cos(rotation), y + radiusX * Math.sin(rotation));
+        path.ellipse(x, y, radiusX, radiusY, rotation, 0, Math.PI * 2);
+    }
+    paths.forEach((path, index) => {
+        ctx.fillStyle = colors[index];
+        ctx.fill(path);
+    });
+}
+
+// A band of loose soil that the cars push to each edge of the road.
+function drawSurfaceEdgeBands(ctx, outerPath, innerPath, presentation) {
+    const color = presentation.edgeBandColor;
+    const bandWidth = Number(presentation.edgeBandWidth);
+    if (!color || !(bandWidth > 0)) return;
+
+    ctx.strokeStyle = color;
+    ctx.lineJoin = 'round';
+    // Two strokes give the band a soft inner side. The clip keeps the half on the road.
+    for (const lineWidth of [bandWidth * 2, bandWidth]) {
+        ctx.lineWidth = lineWidth;
+        ctx.stroke(outerPath);
+        ctx.stroke(innerPath);
+    }
+}
+
+// Sparse flat specks, so a ground reads as loose soil and not as painted tarmac.
+function drawSurfaceSpeckles(ctx, width, height, presentation) {
+    const colors = presentation.speckleColors;
+    const areaPerSpeckle = Number(presentation.speckleAreaPerDot);
+    if (!Array.isArray(colors) || colors.length === 0 || !(areaPerSpeckle > 0)) return;
+
+    const random = createSeededRandom(`${presentation.key || 'track'}:speckles`);
+    const paths = colors.map(() => new Path2D());
+    const count = Math.round((width * height) / areaPerSpeckle);
+    for (let i = 0; i < count; i += 1) {
+        const x = random() * width;
+        const y = random() * height;
+        const radius = 1 + random() * 1.5;
+        const path = paths[Math.floor(random() * paths.length)];
+        path.moveTo(x + radius, y);
+        path.arc(x, y, radius, 0, Math.PI * 2);
+    }
+    paths.forEach((path, index) => {
+        ctx.fillStyle = colors[index];
+        ctx.fill(path);
+    });
+}
+
+// The texture of a ground: patches, edge bands and specks, only on the road.
+function drawSurfaceTexture(ctx, surfacePath, outerPath, innerPath, width, height, presentation) {
+    ctx.save();
+    ctx.clip(surfacePath, 'evenodd');
+    drawSurfacePatches(ctx, width, height, presentation);
+    drawSurfaceEdgeBands(ctx, outerPath, innerPath, presentation);
+    drawSurfaceSpeckles(ctx, width, height, presentation);
+    ctx.restore();
+}
+
 export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}) {
     if (presentation.trackStyle === 'canyon') {
         ctx.save();
@@ -482,6 +556,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     const innerPath = buildClosedPath(inner, mapTrackPoint);
 
     fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, canvas.width, canvas.height, presentation);
+    drawSurfaceTexture(ctx, surfacePath, outerPath, innerPath, canvas.width, canvas.height, presentation);
 
     const startLine = track.startLine;
     ctx.save();

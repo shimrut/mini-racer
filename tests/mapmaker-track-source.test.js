@@ -95,6 +95,15 @@ describe('Mapmaker track source serializer', () => {
         expect(source).not.toContain('lineSmoothing:');
     });
 
+    it('writes a non-tarmac ground and omits tarmac', () => {
+        const dirtSource = generateTrackModuleSource({ ...TRACK, ground: 'dirt' });
+        expect(dirtSource).toContain("    ground: 'dirt',\n    outer: [");
+
+        expect(generateTrackModuleSource(TRACK)).not.toContain('ground:');
+        expect(generateTrackModuleSource({ ...TRACK, ground: 'tarmac' })).not.toContain('ground:');
+        expect(generateTrackModuleSource({ ...TRACK, ground: "x', evil: '" })).not.toContain('ground:');
+    });
+
     it('emits the three integration lines needed by catalog and tracks registry', () => {
         const snippet = generateTrackIntegrationSnippet('sunlitTemple', 'Sunlit Temple');
 

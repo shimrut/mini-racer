@@ -139,8 +139,8 @@ describe("guest progress selection", () => {
       campaignTotalStages: 16,
       dailySavedResults: 0,
       dailyPlaylistSize: 7,
-      carsUnlocked: 14,
-      carsTotal: 23,
+      carsUnlocked: 28,
+      carsTotal: 37,
       unlocks: false,
     });
   });
@@ -216,8 +216,8 @@ describe("guest progress selection", () => {
     expect(selection.accountSummary.campaignTotalStages).toBe(16);
     expect(selection.accountSummary.dailySavedResults).toBe(0);
     expect(selection.accountSummary.dailyPlaylistSize).toBe(7);
-    expect(selection.accountSummary.carsUnlocked).toBe(15);
-    expect(selection.accountSummary.carsTotal).toBe(23);
+    expect(selection.accountSummary.carsUnlocked).toBe(29);
+    expect(selection.accountSummary.carsTotal).toBe(37);
   });
 
   it("repairs an account Campaign result before counting the selection summary", async () => {

@@ -324,10 +324,17 @@ export class GarageUi {
         this.modal?.resetGarageMenuKeyboardNav?.();
     }
 
+    // Each ground keeps its own pick, so each ground shows one selected car.
     syncSkinSelection() {
-        const current = readPlayerCarSkinAssetName();
+        const currentByGround = new Map();
+        for (const skin of PLAYER_CAR_SKINS) {
+            if (!currentByGround.has(skin.ground)) {
+                currentByGround.set(skin.ground, readPlayerCarSkinAssetName(skin.ground));
+            }
+        }
         for (const [assetName, btn] of this.skinOptionButtons) {
-            const selected = assetName === current;
+            const ground = PLAYER_CAR_SKINS.find((skin) => skin.assetName === assetName)?.ground ?? 'tarmac';
+            const selected = assetName === currentByGround.get(ground);
             btn.classList.toggle('is-selected', selected);
             btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         }

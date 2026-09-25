@@ -1,10 +1,9 @@
 import { reddit } from '@devvit/web/server';
 import {
-    CAMPAIGN_ID,
     HEAD_TO_HEAD_POST_TYPE,
     getHeadToHeadOrigin,
+    isCampaignStageOfSeries,
     isHeadToHeadMedal,
-    isHeadToHeadRaceId,
     isHeadToHeadOrigin,
     type HeadToHeadPostData,
     type HeadToHeadRecord,
@@ -59,7 +58,7 @@ function postDataProblem(value: unknown, challengeId: string): string | null {
         ['challengeId', value.challengeId === challengeId],
         ['origin', origin !== null && (
             isHeadToHeadOrigin(value.origin)
-            || (value.campaignId === CAMPAIGN_ID && isHeadToHeadRaceId(value.raceId))
+            || isCampaignStageOfSeries(value.campaignId, value.raceId)
         )],
         ['challengerUsername', typeof value.challengerUsername === 'string' && Boolean(value.challengerUsername)],
         ['challengerUserId', value.challengerUserId === undefined || (

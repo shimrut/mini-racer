@@ -14,6 +14,7 @@ import {
     buildCarUnlockSnapshot,
 } from '../game/car/car-unlock-policy.js';
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
+import { DRAWN_CAR_ASSET_NAMES, isDrawnCarAsset } from '../game/car/drawn-car-skins.js';
 
 describe('player car skin', () => {
     const store = new Map();
@@ -92,14 +93,59 @@ describe('player car skin', () => {
         expect(names).toHaveLength(PLAYER_SELECTABLE_CAR_ASSETS.length);
     });
 
-    it('includes every mr_ variant from the car assets folder', () => {
+    it('includes every mr_ variant from the car assets folder, then the cars drawn in code', () => {
         const carAssetDir = new URL('../public/assets/cars/', import.meta.url);
         const mrAssets = readdirSync(carAssetDir)
             .filter((fileName) => /^mr_.+\.webp$/.test(fileName))
             .map((fileName) => `assets/cars/${fileName}`)
             .sort();
 
-        expect([...PLAYER_SELECTABLE_CAR_ASSETS].sort()).toEqual(mrAssets);
+        const imageAssets = PLAYER_SELECTABLE_CAR_ASSETS.filter((assetName) => !isDrawnCarAsset(assetName));
+        expect([...imageAssets].sort()).toEqual(mrAssets);
+        expect(PLAYER_SELECTABLE_CAR_ASSETS.slice(imageAssets.length)).toEqual(DRAWN_CAR_ASSET_NAMES);
+    });
+
+    it('offers the Formula cars drawn in code as unlocked tarmac skins in the first garage section', () => {
+        const [first] = PLAYER_CAR_SKIN_SECTIONS;
+        expect(first).toMatchObject({ id: 'formula', title: 'Formula cars' });
+        expect(first.skins.map((s) => s.label)).toEqual(['Red', 'Gold', 'Lime', 'Arctic']);
+
+        for (const skin of first.skins) {
+            expect(skin.ground).toBe('tarmac');
+            expect(writePlayerCarSkinAssetName(skin.assetName)).toBe(skin.assetName);
+            expect(readPlayerCarSkinAssetName()).toBe(skin.assetName);
+        }
+    });
+
+    it('offers the Snow cars drawn in code as snow skins, and drives the white one by default', () => {
+        const snow = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === 'snow');
+        expect(snow.title).toBe('Snow cars');
+        expect(snow.skins.map((s) => s.label)).toEqual(['White', 'Red', 'Black', 'Teal', 'Purple']);
+        for (const skin of snow.skins) {
+            expect(DRAWN_CAR_ASSET_NAMES).toContain(skin.assetName);
+            expect(skin.ground).toBe('snow');
+        }
+        expect(readPlayerCarSkinAssetName('snow')).toBe(snow.skins[0].assetName);
+
+        const teal = snow.skins[3].assetName;
+        expect(writePlayerCarSkinAssetName(teal)).toBe(teal);
+        expect(readPlayerCarSkinAssetName('snow')).toBe(teal);
+        expect(readPlayerCarSkinAssetName('dirt')).not.toBe(teal);
+    });
+
+    it('offers only the Rally cars drawn in code as dirt skins, and drives the red one by default', () => {
+        const dirt = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === 'dirt');
+        expect(dirt.skins.map((s) => s.label)).toEqual(['Red', 'Blue', 'White', 'Green', 'Black']);
+        for (const skin of dirt.skins) {
+            expect(DRAWN_CAR_ASSET_NAMES).toContain(skin.assetName);
+            expect(skin.ground).toBe('dirt');
+        }
+        expect(readPlayerCarSkinAssetName('dirt')).toBe(dirt.skins[0].assetName);
+
+        const black = dirt.skins[4].assetName;
+        expect(writePlayerCarSkinAssetName(black)).toBe(black);
+        expect(readPlayerCarSkinAssetName('dirt')).toBe(black);
+        expect(readPlayerCarSkinAssetName('tarmac')).toBe(STOCK_CAR_ASSET_NAME);
     });
 
     it('shows car labels without family prefixes', () => {
@@ -111,8 +157,8 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    it('groups skins into Extra, MR, Cyberpunk, and Steampunk garage sections without gaps', () => {
-        const expectedIds = ['extra', 'mini', 'cyberpunk', 'steampunk'].filter((id) =>
+    it('groups skins into Formula, Extra, MR, Cyberpunk, Steampunk, Dirt and Snow garage sections without gaps', () => {
+        const expectedIds = ['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'dirt', 'snow'].filter((id) =>
             PLAYER_CAR_SKINS.some((s) => s.series === id)
         );
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id)).toEqual(expectedIds);

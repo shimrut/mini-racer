@@ -12,6 +12,13 @@ import {
 const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
+// Tarmac and Grip show the race-circuit speed bar: many thin red lights.
+// Dirt and Snow show the rally speed bar: fewer wide slanted lights, in the
+// yellow of the Rally car's lamps.
+const RALLY_SPEEDOMETER_GROUNDS = new Set(['dirt', 'snow']);
+const CIRCUIT_SPEED_TICKS = 20;
+const RALLY_SPEED_TICKS = 10;
+
 export class RaceHud {
     constructor({
         getTrackPersonalBest = () => null,
@@ -30,6 +37,7 @@ export class RaceHud {
         this._lapFlashTimer = null;
         this._hudAnchorResizeObserver = null;
         this._maxSpeed = 240;
+        this._rallySpeedometer = false;
         this._speedTicks = [];
         this._lastActiveSpeedTicks = -1;
         this.elements = {
@@ -104,11 +112,12 @@ export class RaceHud {
     }
 
     initSpeedBars() {
+        const tickCount = this._rallySpeedometer ? RALLY_SPEED_TICKS : CIRCUIT_SPEED_TICKS;
         const createBar = (container) => {
             if (!container || typeof document.createElement !== 'function') return [];
             container.innerHTML = '';
             const ticks = [];
-            for (let t = 0; t < 20; t++) {
+            for (let t = 0; t < tickCount; t++) {
                 const tick = document.createElement('div');
                 tick.className = 'speedometer-tick';
                 container.appendChild(tick);
@@ -167,7 +176,7 @@ export class RaceHud {
     }
 
     updateSpeedTicks(speedKph) {
-        const totalTicks = 20;
+        const totalTicks = this._speedTicks.length;
         const maxSpeed = this._maxSpeed || 240;
         const activeTicks = Math.min(totalTicks, Math.ceil((speedKph / maxSpeed) * totalTicks));
         if (activeTicks === this._lastActiveSpeedTicks) return;
@@ -180,6 +189,16 @@ export class RaceHud {
 
     setMaxSpeed(speedKph) {
         this._maxSpeed = speedKph;
+    }
+
+    setGround(groundKey) {
+        const rally = RALLY_SPEEDOMETER_GROUNDS.has(groundKey);
+        if (rally === this._rallySpeedometer) return;
+        this._rallySpeedometer = rally;
+        this.speedometer?.classList?.toggle('speedometer--rally', rally);
+        this.initSpeedBars();
+        this._lastActiveSpeedTicks = -1;
+        this.updateSpeedTicks(Number(this._lastSpeedText));
     }
 
     resetHud() {

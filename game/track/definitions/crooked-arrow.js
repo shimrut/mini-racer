@@ -2,10 +2,10 @@ import { Point } from '../geometry.js';
 
 export default {
     cornerRadius: 1.5,
-    drawWidth: 4,
+    drawWidth: 3.85,
     lineSmoothing: 0.35,
     outer: [
-        Point(15.835, 36.622),
+        Point(16.21, 41.739),
         Point(37.649, 35.742),
         Point(38.919, 35.481),
         Point(40.038, 34.828),
@@ -50,16 +50,14 @@ export default {
         Point(6.889, 38.46),
         Point(8.029, 39.383),
         Point(9.425, 39.833),
-        Point(10.89, 39.75),
-        Point(12.226, 39.144)
+        Point(10.924, 40.362)
     ],
     inner: [
-        Point(13.544, 33.343),
-        Point(14.557, 32.831),
-        Point(15.674, 32.625),
+        Point(15.881, 37.786),
         Point(37.488, 31.746),
         Point(44.981, 25.548),
-        Point(41.963, 18.967),
+        Point(42.48, 19.377),
+        Point(41.525, 19.312),
         Point(39.43, 22.372),
         Point(38.446, 23.308),
         Point(37.205, 23.861),
@@ -84,9 +82,9 @@ export default {
         Point(10.06, 31.919),
         Point(9.934, 35.866)
     ],
-    startLine: { p1: Point(21.365, 37.149), p2: Point(21.144, 31.654) },
-    startPos: Point(20.005, 34.452),
-    startAngle: -0.04,
+    startLine: { p1: Point(30.066, 38.642), p2: Point(28.613, 33.448) },
+    startPos: Point(28.136, 36.382),
+    startAngle: -0.273,
     checkpoints: [
         { p1: Point(46.241, 30.67), p2: Point(42.735, 26.432) },
         { p1: Point(30.391, 11.094), p2: Point(24.926, 11.707) },

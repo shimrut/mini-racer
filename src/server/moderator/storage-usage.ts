@@ -1,5 +1,5 @@
 import { redis } from '@devvit/redis';
-import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../../../game/campaign/manifest.js';
+import { CAMPAIGN_LIVE_STAGES } from '../../../game/campaign/manifest.js';
 import {
     analyticsRetentionWindow,
     analyticsScope,
@@ -13,7 +13,7 @@ import {
     monthPlayersKey,
     summaryKey,
 } from './analytics-store.js';
-import { campaignProgressKey } from '../campaign/campaign-progress-key.js';
+import { campaignProgressKeys } from '../campaign/campaign-progress-key.js';
 import { carUnlockHashKey } from '../player/car-unlock-store.js';
 import { createRedisPlayerProfileKey } from '../competition/competition-identity.js';
 import { toCampaignCompetition } from '../competition/competition.js';
@@ -252,7 +252,7 @@ async function measurePlayerRecords(scope: string): Promise<StorageUsageGroup> {
         ...PLAYER_RECORDS_GROUP,
         strings: playerIds.flatMap((playerId) => [
             createRedisPlayerProfileKey(playerId),
-            campaignProgressKey(playerId),
+            ...campaignProgressKeys(playerId),
         ]),
         hashes: playerIds.map((playerId) => carUnlockHashKey(playerId)),
         sortedSets: [],
@@ -286,7 +286,7 @@ function buildKeyGroups({
     const scope = analyticsScope(subredditName);
     const { dates, months } = analyticsRetentionWindow(now);
     const challengeIds = dates.map((date) => createDailyChallengeId(date));
-    const campaigns = CAMPAIGN_STAGES.map((stage) => toCampaignCompetition(CAMPAIGN_ID, stage));
+    const campaigns = CAMPAIGN_LIVE_STAGES.map((stage) => toCampaignCompetition(stage.seriesId, stage));
     const guestExpiryKeys = [...new Set(
         campaigns.flatMap((competition) => (competition.guestExpiryKey ? [competition.guestExpiryKey] : [])),
     )];

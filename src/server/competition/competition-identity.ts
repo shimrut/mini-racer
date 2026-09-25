@@ -51,6 +51,13 @@ function readCarSkinPreference(value: unknown): string | null {
     return carSkin && carSkin.length <= MAX_CAR_SKIN_LENGTH ? carSkin : null;
 }
 
+function withGroundCarSkins(fields: { carSkinDirt: string | null; carSkinSnow: string | null }) {
+    return {
+        ...(fields.carSkinDirt ? { carSkinDirt: fields.carSkinDirt } : {}),
+        ...(fields.carSkinSnow ? { carSkinSnow: fields.carSkinSnow } : {}),
+    };
+}
+
 function readTrailIdPreference(value: unknown): string | null {
     const trailId = typeof value === 'string' ? value.trim() : '';
     return trailId && trailId.length <= MAX_TRAIL_ID_LENGTH ? trailId : null;
@@ -91,6 +98,8 @@ function readPausePlacement(preferences: Record<string, unknown>): 'separate' | 
 
 function readPlayerPreferenceFields(value: unknown): {
     carSkin: string | null;
+    carSkinDirt: string | null;
+    carSkinSnow: string | null;
     trailId: string | null;
     musicEnabled: boolean | null;
     carAudioEnabled: boolean | null;
@@ -107,6 +116,8 @@ function readPlayerPreferenceFields(value: unknown): {
     const preferences = value as Record<string, unknown>;
     return {
         carSkin: readCarSkinPreference(preferences.carSkin),
+        carSkinDirt: readCarSkinPreference(preferences.carSkinDirt),
+        carSkinSnow: readCarSkinPreference(preferences.carSkinSnow),
         trailId: readTrailIdPreference(preferences.trailId),
         musicEnabled: readBooleanPreference(preferences.musicEnabled),
         carAudioEnabled: readBooleanPreference(preferences.carAudioEnabled),
@@ -162,6 +173,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
 
     return {
         carSkin,
+        ...withGroundCarSkins(fields),
         trailId,
         musicEnabled,
         carAudioEnabled,
@@ -180,6 +192,7 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
     const pausePlacement = fields.pausePlacement ?? DEFAULT_PLAYER_PREFERENCES.pausePlacement;
     return {
         carSkin: fields.carSkin ?? DEFAULT_PLAYER_PREFERENCES.carSkin,
+        ...withGroundCarSkins(fields),
         trailId: fields.trailId ?? DEFAULT_PLAYER_PREFERENCES.trailId,
         musicEnabled: fields.musicEnabled ?? DEFAULT_PLAYER_PREFERENCES.musicEnabled,
         carAudioEnabled: fields.carAudioEnabled ?? DEFAULT_PLAYER_PREFERENCES.carAudioEnabled,

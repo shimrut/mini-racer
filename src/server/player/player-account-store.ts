@@ -37,6 +37,7 @@ import {
     STOCK_CAR_ASSET_NAME,
     isCarAssetUnlocked,
 } from '../../../game/car/car-unlock-policy.js';
+import { getCarAssetGround } from '../../../game/car/car-skin-grounds.js';
 import { verifyGuestPlayerToken } from './player-token.js';
 import {
     isGuestProgressSelectionPending,
@@ -72,17 +73,38 @@ type PlayerBootstrapPayload = {
 
 const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 
+function isAllowedGroundCarSkin(
+    assetName: string | undefined,
+    ground: 'tarmac' | 'dirt' | 'snow',
+    carUnlocks: CarUnlockSnapshot,
+): assetName is string {
+    return typeof assetName === 'string'
+        && getCarAssetGround(assetName) === ground
+        && isCarAssetUnlocked(assetName, carUnlocks);
+}
+
+// Each skin must be unlocked and belong to its own ground. A bad tarmac skin
+// falls back to the stock car; a bad dirt or snow skin is dropped.
 function preferencesAllowedByCarUnlocks(
     preferences: DailyGpPlayerPreferences | null,
     carUnlocks: CarUnlockSnapshot,
 ): DailyGpPlayerPreferences | null {
     if (!preferences) return null;
+    const { carSkinDirt, carSkinSnow, ...rest } = preferences;
     return {
-        ...preferences,
-        carSkin: isCarAssetUnlocked(preferences.carSkin, carUnlocks)
+        ...rest,
+        carSkin: isAllowedGroundCarSkin(preferences.carSkin, 'tarmac', carUnlocks)
             ? preferences.carSkin
             : STOCK_CAR_ASSET_NAME,
+        ...(isAllowedGroundCarSkin(carSkinDirt, 'dirt', carUnlocks) ? { carSkinDirt } : {}),
+        ...(isAllowedGroundCarSkin(carSkinSnow, 'snow', carUnlocks) ? { carSkinSnow } : {}),
     };
+}
+
+function carSkinsDiffer(a: DailyGpPlayerPreferences, b: DailyGpPlayerPreferences): boolean {
+    return a.carSkin !== b.carSkin
+        || a.carSkinDirt !== b.carSkinDirt
+        || a.carSkinSnow !== b.carSkinSnow;
 }
 
 export async function selectServerGuestProgress({
@@ -527,7 +549,7 @@ export async function getServerPlayerBootstrap({
     if (
         playerPreferences
         && profile.preferences
-        && playerPreferences.carSkin !== profile.preferences.carSkin
+        && carSkinsDiffer(playerPreferences, profile.preferences)
     ) {
         profile = await upsertPlayerProfile({
             playerId: identity.canonicalPlayerId,

@@ -415,7 +415,8 @@ export class DailyChallengeUi {
         }
         const presentation = resolveTrackPresentation(challenge.trackKey, {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
-            event: challenge.skin ? { key: 'daily-challenge', trackKey: challenge.trackKey, skin: challenge.skin } : null
+            event: challenge.skin ? { key: 'daily-challenge', trackKey: challenge.trackKey, skin: challenge.skin } : null,
+            ground: track.ground
         });
         renderCachedTrackPreviewCanvas(canvas, {
             cacheKey: `daily-row:${challenge.trackKey}:${challenge.skin || 'default'}`,

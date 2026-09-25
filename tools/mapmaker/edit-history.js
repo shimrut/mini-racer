@@ -1,3 +1,5 @@
+import { isTrackGroundKey } from '../../game/track/grounds.js';
+
 // A history instance belongs to one selected track. Keep only authored data in
 // snapshots; pointer/canvas state is rebuilt by the editor after restoration.
 function copySnapshot(value) {
@@ -105,7 +107,8 @@ function validTrack(track) {
         && track.checkpoints.every(validGate)
         && ['cornerRadius', 'drawWidth', 'lineSmoothing'].every(
             (key) => track[key] === undefined || Number.isFinite(track[key]),
-        );
+        )
+        && (track.ground === undefined || isTrackGroundKey(track.ground));
 }
 
 function normalizeRecovery(recovery) {

@@ -5,12 +5,24 @@ import {
   updateSimulation,
 } from "./simulation.js";
 import { getScoreboardReplayMaxFrames } from "./replay.js";
-import { createModalActions } from "./result-flow.js";
+import { getTrackGround, getTrackGroundMaxSpeedKph } from "../track/grounds.js";
 import {
-  PLAYER_SELECTABLE_CAR_ASSETS,
-  STOCK_CAR_ASSET_NAME,
-} from "../car/sprite.js";
+  addMarkSide,
+  drawTyreTracks,
+  recordGroundEffects,
+  strokeSkidMarks,
+} from "./ground-effects.js";
+import { createModalActions } from "./result-flow.js";
+import { getDrawnCar, STOCK_CAR_ASSET_NAME } from "../car/sprite.js";
+import {
+  getCameraZoom,
+  getDesiredLookAhead,
+  getLookAheadLerpFactor,
+  isMobileCameraMode,
+} from "./race-camera.js";
+import { KPH_PER_WORLD_UNIT } from "../car/handling.js";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
+import { getCarAssetsForGround } from "../car/car-skin-grounds.js";
 import {
   getDailyChallengeCopyLabels,
 } from "../daily-challenge/labels.js";
@@ -26,9 +38,6 @@ import {
 import { normalizeLapCompletionTimesSec } from "../shared/lap-completion-times.js";
 import { isVerificationQueueSubmissionBlocked } from "../scoreboard/verification-queue.js";
 
-const CAMERA_DT_MIN_S = 1 / 120;
-const CAMERA_DT_MAX_S = 1 / 45;
-const SKID_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const COMPARISON_TIE_EPSILON_SEC = 0.005;
 export const MAX_SIMULATED_FRAME_DT = 0.1;
 export const RANKED_RUN_STALL_FRAME_MS = 250;
@@ -39,17 +48,17 @@ function finitePositive(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+// A rival gets a random skin of the track's ground that differs from the
+// player's. When the ground has no other skin, the rival uses the player's.
 export function chooseOpponentCarAsset({
   playerAssetName = STOCK_CAR_ASSET_NAME,
+  ground = "tarmac",
   random = Math.random,
 } = {}) {
-  const alternatives = PLAYER_SELECTABLE_CAR_ASSETS.filter(
+  const choices = getCarAssetsForGround(ground).filter(
     (assetName) => assetName !== playerAssetName,
   );
-  const choices = alternatives.length > 0
-    ? alternatives
-    : PLAYER_SELECTABLE_CAR_ASSETS;
-  if (choices.length === 0) return STOCK_CAR_ASSET_NAME;
+  if (choices.length === 0) return playerAssetName || STOCK_CAR_ASSET_NAME;
   const sample = Number(random?.());
   const index = Number.isFinite(sample)
     ? Math.min(choices.length - 1, Math.max(0, Math.floor(sample * choices.length)))
@@ -59,6 +68,7 @@ export function chooseOpponentCarAsset({
 
 export function normalizeRaceComparisonTarget(rawTarget, {
   playerAssetName = STOCK_CAR_ASSET_NAME,
+  ground = "tarmac",
   random = Math.random,
   lapCount = 1,
 } = {}) {
@@ -87,7 +97,7 @@ export function normalizeRaceComparisonTarget(rawTarget, {
     rawTarget.lapCompletionTimesSec,
     lapCount,
   ) ?? [];
-  const carAssetName = chooseOpponentCarAsset({ playerAssetName, random });
+  const carAssetName = chooseOpponentCarAsset({ playerAssetName, ground, random });
   return Object.freeze({
     kind: "leaderboard-opponent",
     displayName,
@@ -119,19 +129,7 @@ function getSkidMarkStartIndex(skidMarks, frameSkip) {
 }
 
 function addSkidMarkSidePath(path, skidMarks, startIdx, gs, side) {
-  const tw = 0.17;
-  const m0 = skidMarks.get(startIdx);
-  path.moveTo((m0.x + side * m0.sin * tw) * gs, (m0.y - side * m0.cos * tw) * gs);
-  for (let i = startIdx + 1; i < skidMarks.length; i++) {
-    const prev = skidMarks.get(i - 1);
-    const mark = skidMarks.get(i);
-    const dx = mark.x - prev.x;
-    const dy = mark.y - prev.y;
-    const x = (mark.x + side * mark.sin * tw) * gs;
-    const y = (mark.y - side * mark.cos * tw) * gs;
-    if (dx * dx + dy * dy > SKID_GAP_BREAK_DIST_SQ) path.moveTo(x, y);
-    else path.lineTo(x, y);
-  }
+  addMarkSide(path, skidMarks, startIdx, skidMarks.length - 1, gs, side);
 }
 
 function drawSkidMarksImmediate(ctx, skidMarks, startIdx, gs) {
@@ -187,7 +185,8 @@ export const raceEngineMethods = {
       lapCompletionTimesSec: paceBaseline?.lapCompletionTimesSec
         ?? rawTarget?.lapCompletionTimesSec,
     }, {
-      playerAssetName: this.getSelectedCarAssetName?.() || STOCK_CAR_ASSET_NAME,
+      playerAssetName: this.getSelectedCarAssetName?.(track) || STOCK_CAR_ASSET_NAME,
+      ground: getTrackGround(track).key,
       random,
       lapCount,
     });
@@ -238,9 +237,10 @@ export const raceEngineMethods = {
     this.carEffectsAudio?.syncFrame?.({
       status: this.status,
       speed: cs,
-      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      maxSpeedKph: getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack),
       slipRatio,
       throttleBlocked: this.relaunchDelayRemaining > 0,
+      ground: getTrackGround(this.currentTrack).key,
     });
   },
 
@@ -380,6 +380,8 @@ export const raceEngineMethods = {
     this.recordRunPoint(getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig));
     this.startOverlay.hideStartOverlay();
     this.hud.showStartLights();
+    // One frame to show the brake lights of a drawn car on the grid.
+    if (this.drawnCar) this.requestRender();
 
     this.activeTimers.push(
       setTimeout(() => {
@@ -511,7 +513,9 @@ export const raceEngineMethods = {
     this.armRelaunchDelay(relaunchDelay);
     this.nextCheckpointIndex = 0;
     this.skidMarks.clear();
+    this.tyreTracks?.clear();
     this._resetLapTrailAfterIntermediateLap();
+    this.drawnCar?.resetMotion();
   },
 
   getLapCheckpointTimesSec() {
@@ -548,8 +552,9 @@ export const raceEngineMethods = {
     });
   },
 
-  getSelectedCarAssetName() {
-    return readPlayerCarSkinAssetName();
+  // The skin the player picked for the ground of this track.
+  getSelectedCarAssetName(track = this.currentTrack) {
+    return readPlayerCarSkinAssetName(getTrackGround(track).key);
   },
 
   syncCarSpriteAsset() {
@@ -561,6 +566,10 @@ export const raceEngineMethods = {
       this.carSpriteLoader.load(assetName, {
         onLoaded: (image) => {
           this.carSprite = image;
+          // A skin drawn in code moves in the race. The sprite is only the car
+          // at rest, for the ghost car and the track cards.
+          this.drawnCar = getDrawnCar(assetName);
+          this.drawnCar?.resetMotion();
           this.carSpriteDrawWidth = 52;
           this.carSpriteDrawHeight = 52;
           this.dailyCarousel?.refreshPreviews?.();
@@ -740,6 +749,7 @@ export const raceEngineMethods = {
       this.currentTrack,
       this.collisionSegments,
     );
+    recordGroundEffects(this, this.currentTrackPresentation, this.runtimeConfig);
 
     this.pbGhostSizeCapture?.sample?.({
       timeSec: this.currentTime,
@@ -823,6 +833,8 @@ export const raceEngineMethods = {
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
     this.skidMarks.clear();
+    this.tyreTracks?.clear();
+    this.drawnCar?.resetMotion();
     this.routeTrace.clear();
     this.runHistory.clear();
     this.runHistoryTimer = 0;
@@ -887,27 +899,29 @@ export const raceEngineMethods = {
   },
 
   getDesiredLookAhead(speed, cw, ch, mobileCameraMode) {
-    const out = this._desiredLookAhead;
-    out.x = 0;
-    out.y = 0;
+    return getDesiredLookAhead(
+      this._desiredLookAhead,
+      this.velocity,
+      speed,
+      cw,
+      ch,
+      mobileCameraMode,
+    );
+  },
 
-    if (speed > 1) {
-      const multiplier = mobileCameraMode ? 12 : 5;
-      const maxOffset = mobileCameraMode
-        ? Math.min(cw, ch) / 2.5
-        : Math.min(cw, ch) / 5;
-
-      out.x = this.velocity.x * multiplier;
-      out.y = this.velocity.y * multiplier;
-
-      const magnitude = Math.hypot(out.x, out.y);
-      if (magnitude > maxOffset) {
-        out.x = (out.x / magnitude) * maxOffset;
-        out.y = (out.y / magnitude) * maxOffset;
-      }
-    }
-
-    return out;
+  // Moves the wheels and the brake lights of a drawn car. The car is still
+  // when the race is not running, but it holds its brakes in the countdown.
+  updateDrawnCar(dt, size) {
+    const running = this.status === "playing";
+    const holding = this.status === "starting";
+    this.drawnCar.update(running || holding ? dt : 0, {
+      speedKph: this.cachedSpeed * KPH_PER_WORLD_UNIT,
+      speedPx: running ? this.cachedSpeed * CONFIG.gridSize : 0,
+      steer: (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0),
+      holding,
+      size,
+      lowQuality: this.frameSkip > 0 || this.qualityLevel > 0,
+    });
   },
 
   render(dt, alpha = 1) {
@@ -934,8 +948,11 @@ export const raceEngineMethods = {
     ctx.clearRect(0, 0, cw, ch);
 
     const speed = this.cachedSpeed;
-    const mobileCameraMode = this.isCoarsePointer || this.isNarrowViewport;
-    this.zoom = mobileCameraMode ? 0.75 : 1.0;
+    const mobileCameraMode = isMobileCameraMode({
+      coarsePointer: this.isCoarsePointer,
+      narrowViewport: this.isNarrowViewport,
+    });
+    this.zoom = getCameraZoom(mobileCameraMode);
 
     const desiredLookAhead = this.getDesiredLookAhead(
       speed,
@@ -944,10 +961,7 @@ export const raceEngineMethods = {
       mobileCameraMode,
     );
 
-    const smoothSpeed = mobileCameraMode ? 2 : 4;
-    const cameraDt =
-      dt > 0 ? Math.min(Math.max(dt, CAMERA_DT_MIN_S), CAMERA_DT_MAX_S) : 0;
-    const lerpFactor = cameraDt > 0 ? 1 - Math.exp(-cameraDt * smoothSpeed) : 0;
+    const lerpFactor = getLookAheadLerpFactor(dt, mobileCameraMode);
 
     this._lookAheadX += (desiredLookAhead.x - this._lookAheadX) * lerpFactor;
     this._lookAheadY += (desiredLookAhead.y - this._lookAheadY) * lerpFactor;
@@ -961,30 +975,28 @@ export const raceEngineMethods = {
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-this.camera.x, -this.camera.y);
 
+    drawTyreTracks(
+      ctx,
+      this.tyreTracks,
+      this.currentTrackPresentation,
+      gs,
+      this.zoom,
+      this.frameSkip > 0 || this.qualityLevel > 0,
+    );
+
     if (this.skidMarks.length > 0) {
       const startIdx = getSkidMarkStartIndex(this.skidMarks, this.frameSkip);
-      const z = this.zoom;
-
-      ctx.save();
-      ctx.strokeStyle = CONFIG.skidColor;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.lineWidth = Math.max(3.4, 4.2 / z);
-
-      if (typeof Path2D === "function") {
-        const skidPathCache = getSkidMarkPathCache(
-          this,
-          this.skidMarks,
-          this.frameSkip,
-          gs,
-          startIdx,
-        );
-        ctx.stroke(skidPathCache.leftPath);
-        ctx.stroke(skidPathCache.rightPath);
-      } else {
-        drawSkidMarksImmediate(ctx, this.skidMarks, startIdx, gs);
-      }
-      ctx.restore();
+      const skidPathCache = typeof Path2D === "function"
+        ? getSkidMarkPathCache(this, this.skidMarks, this.frameSkip, gs, startIdx)
+        : null;
+      strokeSkidMarks(ctx, this.currentTrackPresentation, this.zoom, () => {
+        if (skidPathCache) {
+          ctx.stroke(skidPathCache.leftPath);
+          ctx.stroke(skidPathCache.rightPath);
+        } else {
+          drawSkidMarksImmediate(ctx, this.skidMarks, startIdx, gs);
+        }
+      });
     }
 
     if (this.routeTraceStrokeStyle !== null && this.routeTrace.length > 1) {
@@ -1072,19 +1084,28 @@ export const raceEngineMethods = {
     ctx.translate(px, py);
     ctx.rotate(displayAngle);
 
-    if (this.qualityLevel <= 0) {
-      ctx.shadowColor = CONFIG.carSpriteShadowColor;
-      ctx.shadowBlur = CONFIG.carSpriteShadowBlur;
-      ctx.shadowOffsetX = CONFIG.carSpriteShadowOffsetX;
-      ctx.shadowOffsetY = CONFIG.carSpriteShadowOffsetY;
+    if (this.drawnCar) {
+      this.updateDrawnCar(dt, drawWidth);
+      this.drawnCar.drawGround(ctx, drawWidth);
     }
-    ctx.drawImage(
-      this.carSprite,
-      -drawWidth / 2,
-      -drawHeight / 2,
-      drawWidth,
-      drawHeight,
-    );
+    if (this.qualityLevel <= 0) {
+      const look = this.currentTrackPresentation;
+      ctx.shadowColor = look?.carShadowColor ?? CONFIG.carSpriteShadowColor;
+      ctx.shadowBlur = look?.carShadowBlur ?? CONFIG.carSpriteShadowBlur;
+      ctx.shadowOffsetX = look?.carShadowOffsetX ?? CONFIG.carSpriteShadowOffsetX;
+      ctx.shadowOffsetY = look?.carShadowOffsetY ?? CONFIG.carSpriteShadowOffsetY;
+    }
+    if (this.drawnCar) {
+      this.drawnCar.draw(ctx, drawWidth);
+    } else {
+      ctx.drawImage(
+        this.carSprite,
+        -drawWidth / 2,
+        -drawHeight / 2,
+        drawWidth,
+        drawHeight,
+      );
+    }
 
     ctx.restore();
     ctx.restore();
@@ -1156,7 +1177,8 @@ export const raceEngineMethods = {
     this.proceduralMusic?.syncFrame?.({
       status: this.status,
       speed: this.cachedSpeed,
-      maxSpeedKph: this.runtimeConfig.maxSpeed,
+      maxSpeedKph: getTrackGroundMaxSpeedKph(this.runtimeConfig.maxSpeed, this.currentTrack),
+      ground: getTrackGround(this.currentTrack).key,
     });
 
     if (shouldUpdate || this.particles.length > 0 || this._needsRender) {

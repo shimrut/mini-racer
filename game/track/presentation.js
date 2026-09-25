@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import { isTrackGroundKey } from './grounds.js';
 
 export const TRACK_PRESENTATION_SURFACES = Object.freeze({
     RACE: 'race',
@@ -22,7 +23,67 @@ const DEFAULT_TRACK_PRESENTATION = Object.freeze({
     tireWallColor: '#111827',
     tireWallInnerStrokeColor: 'rgba(248, 250, 252, 0.14)',
     tireWallCoreColor: '#020617',
-    tireWallTreadColor: 'rgba(248, 250, 252, 0.1)'
+    tireWallTreadColor: 'rgba(248, 250, 252, 0.1)',
+    skidColor: CONFIG.skidColor,
+    schematicRoadColor: '#475569',
+    schematicEdgeColor: '#f8fafc'
+});
+
+// The look of each non-tarmac ground. An event look still wins over it.
+const GROUND_TRACK_PRESENTATIONS = Object.freeze({
+    dirt: Object.freeze({
+        trackColor: '#634833',
+        patchColors: Object.freeze(['rgba(146, 112, 78, 0.1)', 'rgba(60, 42, 28, 0.14)']),
+        patchAreaPerDot: 1400,
+        edgeBandColor: 'rgba(150, 118, 84, 0.2)',
+        edgeBandWidth: 16,
+        speckleColors: Object.freeze(['#735a43', '#4f3a29', '#86694e']),
+        speckleAreaPerDot: 200,
+        outerStrokeColor: '#f1e4cc',
+        innerStrokeColor: '#d8c3a0',
+        curbRed: '#b07a4c',
+        curbWhite: '#f1e4cc',
+        skidColor: 'rgba(30, 16, 6, 0.62)',
+        skidEdgeColor: 'rgba(168, 134, 96, 0.5)',
+        skidEdgeWidth: 1.5,
+        tyreTrackColor: 'rgba(40, 26, 14, 0.32)',
+        dustColor: 'rgba(222, 192, 150, 0.75)',
+        carShadowColor: 'rgba(24, 14, 6, 0.55)',
+        carShadowBlur: 6,
+        carShadowOffsetX: 2,
+        carShadowOffsetY: 3,
+        schematicRoadColor: '#7a5c42',
+        schematicEdgeColor: '#f1e4cc'
+    }),
+    snow: Object.freeze({
+        trackColor: '#a9bbcc',
+        speckleColors: Object.freeze(['#c4d3e1', '#94a8bc']),
+        speckleAreaPerDot: 320,
+        outerStrokeColor: '#f8fafc',
+        innerStrokeColor: '#cfe0ee',
+        curbRed: '#6fa8d6',
+        curbWhite: '#f8fafc',
+        skidColor: 'rgba(70, 92, 118, 0.42)',
+        tyreTrackColor: 'rgba(66, 88, 116, 0.55)',
+        tyreTrackEdgeColor: 'rgba(236, 243, 250, 0.7)',
+        tyreTrackEdgeWidth: 1.5,
+        tyreTrackSeconds: 5,
+        tyreTrackWidth: 5,
+        dustColor: '#f8fbff',
+        dustEdgeColor: 'rgba(96, 120, 148, 0.55)',
+        dustSizeScale: 1.3,
+        carShadowColor: 'rgba(28, 42, 62, 0.3)',
+        carShadowBlur: 4,
+        carShadowOffsetX: 1,
+        carShadowOffsetY: 2,
+        schematicRoadColor: '#b7c7d6',
+        schematicEdgeColor: '#f8fafc'
+    }),
+    // Race asphalt: a little darker than tarmac.
+    grip: Object.freeze({
+        trackColor: '#2d3644',
+        schematicRoadColor: '#3b4554'
+    })
 });
 
 const EVENT_TRACK_PRESENTATION_OVERRIDES = Object.freeze({
@@ -125,12 +186,22 @@ export function createDailyChallengePresentationEvent(challenge) {
 
 export function resolveTrackPresentation(trackKey, {
     surface = TRACK_PRESENTATION_SURFACES.RACE,
-    event = null
+    event = null,
+    ground = null
 } = {}) {
-    const basePresentation = {
-        ...DEFAULT_TRACK_PRESENTATION,
-        key: getDefaultPresentationKey(trackKey || 'default')
-    };
+    const groundPresentation = isTrackGroundKey(ground)
+        ? GROUND_TRACK_PRESENTATIONS[ground]
+        : null;
+    const basePresentation = groundPresentation
+        ? {
+            ...DEFAULT_TRACK_PRESENTATION,
+            ...groundPresentation,
+            key: `track:${trackKey || 'default'}:ground:${ground}`
+        }
+        : {
+            ...DEFAULT_TRACK_PRESENTATION,
+            key: getDefaultPresentationKey(trackKey || 'default')
+        };
 
     if (!trackKey || !event || event.trackKey !== trackKey) {
         return basePresentation;
