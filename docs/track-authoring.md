@@ -172,10 +172,10 @@ its own stages. `game/campaign/series.json` holds them, and
   `numbered-v1-03` or `dirt-v1-00`. The Redis keys of a stage use its series
   name. Numbers keeps the name `numbered-v1`, because every saved Numbers
   record uses it. Do not rename a series, and do not change its stage order.
-- A series stays hidden from players until it has 10 stages
+- A series stays hidden from players until it has 1 stage
   (`CAMPAIGN_SERIES_MIN_STAGES` in `game/campaign/series-rules.js`). Before
   that, you can add, move and remove its stages freely.
-- A live series (10 stages or more) is fixed. A track cannot leave it, and its
+- A live series (1 stage or more) is fixed. A track cannot leave it, and its
   position, laps, medal target and medal times cannot change. Players' saved
   results were checked against them. New tracks go after the last stage.
 - The first stage of every series is open. Each later stage needs any medal on
@@ -185,7 +185,7 @@ its own stages. `game/campaign/series.json` holds them, and
   on every stage always opens the next one.
 - Medals from every series count toward the Gold and Author car skins.
 - Campaign opens a series screen that lists every series in `series.json`.
-  A series with fewer than 10 stages shows there as **Coming soon**.
+  A series with no stages shows there as **Coming soon**.
 
 In the Mapmaker, choose **Use For** → **Campaign · <series>**. The panel under
 it shows the stage number, **Laps** and **Medal Target**. For a series that is

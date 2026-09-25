@@ -21,7 +21,7 @@ the design below instead.
 ## Mapmaker rules (your answers)
 
 - A track is used for Daily or for one series, never both.
-- A series is hidden until it has 10 stages. After that, new tracks go after the last stage,
+- A series is hidden until it has 1 stage. After that, new tracks go after the last stage,
   and the stages that exist are fixed.
 - Author time: the Mapmaker shows the 10 best Drive Draft laps and their average. You pick one,
   or you type a time.
@@ -35,9 +35,9 @@ the design below instead.
 - `game/campaign/series.json` holds the series and their stages. Numbers is copied from the old
   stage list. Dirt (`dirt-v1`) has no stages.
 - `game/campaign/manifest.js` builds the stages from it. A stage has a `seriesId`. Only series
-  with 10 or more stages are live (`CAMPAIGN_SERIES`). `CAMPAIGN_ID` and `CAMPAIGN_STAGES` still
+  with 1 or more stages are live (`CAMPAIGN_SERIES`). `CAMPAIGN_ID` and `CAMPAIGN_STAGES` still
   name Numbers.
-- `game/campaign/series-rules.js` holds the 10-stage rule and the medal-target rule. It has no
+- `game/campaign/series-rules.js` holds the 1-stage rule and the medal-target rule. It has no
   imports, so the Mapmaker server can use it.
 
 ### Phase B: Mapmaker
@@ -83,7 +83,7 @@ the design below instead.
   opens a series screen. It lists every series in `series.json`: Numbers (tarmac), Mini Rally
   (dirt), Sliders (snow) and Formula Mini (grip).
   Each row has a picture of the first track of the series, the name in the Home menu type, and
-  "TARMAC · 16 STAGES · 23/64 MEDALS". A series with fewer than 10 stages is dimmed and says
+  "TARMAC · 16 STAGES · 23/64 MEDALS". A series with no stages is dimmed and says
   its ground and Coming soon, for example "DIRT · COMING SOON". An empty series shows a track of its ground (Country Road, Snow Circuit, Grip
   Circuit).
 - Choosing a series opens its stages (the carousel and Start Race). **Campaign** in the switch,
@@ -99,6 +99,6 @@ the design below instead.
 
 1. **Launcher post copy.** `pages/campaign.html` says "The Numbers". Change it when Dirt goes
    live.
-2. **Dirt content.** Build at least 10 dirt tracks. Set their medal times in the Mapmaker.
-   Dirt goes live on the first build with 10 stages.
+2. **Dirt content.** Build the dirt tracks. Set their medal times in the Mapmaker.
+   Dirt goes live on the first build with 1 stage.
 3. **Optional:** a split of Campaign analytics by series.
