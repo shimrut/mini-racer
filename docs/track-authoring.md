@@ -110,7 +110,7 @@ your slowest speed, your longest time without steering, your steering beat and
 your left-right changes. The numbers describe your own lap, so a wall hit
 shows as a slow point.
 
-**Drive Draft** looks like a lap in the game. It uses the race camera
+**Drive Draft** looks like a lap in the game. The drive view fills the space left on the screen and stays inside it. It uses the race camera
 (`game/race/race-camera.js`): the same zoom and look-ahead as the race, with
 the phone camera on a touch screen or a narrow window. It draws the default car
 of the track's ground and the race HUD (time, best lap and speed bar).
