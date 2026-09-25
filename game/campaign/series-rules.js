@@ -3,7 +3,14 @@
 
 // A series stays hidden from players until it has this many stages. After that,
 // its stages are fixed, and new stages go after the last one.
-export const CAMPAIGN_SERIES_MIN_STAGES = 2;
+// Formula Mini stays hidden until it has 2 stages.
+export const CAMPAIGN_SERIES_MIN_STAGES = 1;
+const FORMULA_MINI_SERIES_ID = 'grip-v1';
+const FORMULA_MINI_MIN_STAGES = 2;
+
+export function getCampaignSeriesMinStages(series) {
+    return series?.id === FORMULA_MINI_SERIES_ID ? FORMULA_MINI_MIN_STAGES : CAMPAIGN_SERIES_MIN_STAGES;
+}
 
 export const CAMPAIGN_STAGE_MAX_LAPS = 3;
 
@@ -14,7 +21,7 @@ export function getMaxRequiredMedals(stageIndex) {
 }
 
 export function isCampaignSeriesLive(series) {
-    return Array.isArray(series?.stages) && series.stages.length >= CAMPAIGN_SERIES_MIN_STAGES;
+    return Array.isArray(series?.stages) && series.stages.length >= getCampaignSeriesMinStages(series);
 }
 
 // Returns an error text, or null when the medal target fits its position.

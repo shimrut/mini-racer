@@ -57,7 +57,7 @@ function buildSeries(definition) {
             ? definition.name.trim()
             : id,
         ground: typeof definition.ground === 'string' ? definition.ground : 'tarmac',
-        live: isCampaignSeriesLive({ stages }),
+        live: isCampaignSeriesLive({ id, stages }),
         stages,
     });
 }

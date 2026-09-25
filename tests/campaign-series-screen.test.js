@@ -12,16 +12,16 @@ import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby
 import { LobbyUi } from '../game/lobby/ui.js';
 
 describe('Campaign series screen', () => {
-    it('lists every series, and marks a series with fewer than 2 stages Coming soon', () => {
+    it('opens Mini Rally and Sliders with 1 stage, and Formula Mini with 2', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
         });
         expect(rows.map((row) => [row.name, row.comingSoon, row.infoParts])).toEqual([
             ['Numbers', false, ['Street · 16 stages', '23/64 medals']],
-            ['Mini Rally', true, ['Dirt', 'Coming soon']],
-            ['Sliders', true, ['Snow', 'Coming soon']],
-            ['Formula Mini', true, ['Circuit', 'Coming soon']],
+            ['Mini Rally', false, ['Dirt · 1 stages', '0/4 medals']],
+            ['Sliders', false, ['Snow · 1 stages', '0/4 medals']],
+            ['Formula Mini', false, ['Circuit · 2 stages', '0/8 medals']],
         ]);
         expect(rows[0].current).toBe(true);
     });
@@ -45,13 +45,14 @@ describe('Campaign series screen', () => {
         const rows = buildCampaignSeriesRows({ seriesId: 'numbered-v1', series: [] });
         renderCampaignSeriesList(container, rows, { onChoose });
         const buttons = [...container.querySelectorAll('button')];
-        expect(buttons.map((button) => button.disabled)).toEqual([false, true, true, true]);
+        expect(buttons.map((button) => button.disabled)).toEqual([false, false, false, false]);
         expect(buttons[0].querySelector('.lobby-mode-action__label').textContent).toBe('Numbers');
 
         buttons[0].click();
         buttons[1].click();
-        expect(onChoose).toHaveBeenCalledTimes(1);
-        expect(onChoose).toHaveBeenCalledWith('numbered-v1');
+        expect(onChoose).toHaveBeenCalledTimes(2);
+        expect(onChoose).toHaveBeenNthCalledWith(1, 'numbered-v1');
+        expect(onChoose).toHaveBeenNthCalledWith(2, 'dirt-v1');
 
         renderCampaignSeriesList(container, rows, { onChoose });
         expect(container.querySelector('button')).toBe(buttons[0]);

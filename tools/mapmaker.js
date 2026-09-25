@@ -35,7 +35,7 @@ import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geomet
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
 import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
 import {
-    CAMPAIGN_SERIES_MIN_STAGES,
+    getCampaignSeriesMinStages,
     isCampaignSeriesLive,
 } from '../game/campaign/series-rules.js';
 import {
@@ -1141,7 +1141,7 @@ class MapmakerApp {
         for (const series of this.seriesData.series) {
             const state = isCampaignSeriesLive(series)
                 ? 'live'
-                : `hidden, ${series.stages.length}/${CAMPAIGN_SERIES_MIN_STAGES} stages`;
+                : `hidden, ${series.stages.length}/${getCampaignSeriesMinStages(series)} stages`;
             addOption(seriesDestination(series.id), `Campaign · ${series.name} (${state})`);
         }
         if (this.getSavedDestination(trackKey) === UNUSED_DESTINATION) {
@@ -1212,7 +1212,7 @@ class MapmakerApp {
         } else if (live) {
             notes.push(`${series.name} is live. New tracks go after the last stage.`);
         } else {
-            notes.push(`${series.name} stays hidden until it has ${CAMPAIGN_SERIES_MIN_STAGES} stages.`);
+            notes.push(`${series.name} stays hidden until it has ${getCampaignSeriesMinStages(series)} stages.`);
         }
         notes.push('Medal Target: the medals from this series that a player needs to open this stage.');
         const ground = getTrackGround(this.track).key;
