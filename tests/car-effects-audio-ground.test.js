@@ -194,4 +194,48 @@ describe('car sound per ground', () => {
             expect(nodes.sources.length > sourcesBefore, ground).toBe(expectCrack);
         }
     });
+
+    it('plays a lower, less whiny engine on dirt than on tarmac', () => {
+        const tarmac = createMockContext();
+        const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});
+        tarmacAudio.prepareOnUserGesture();
+        driveFrame(tarmacAudio, tarmac.ctx, 'tarmac');
+
+        const dirt = createMockContext();
+        const dirtAudio = createCarEffectsAudio(dirt.ctx, {});
+        dirtAudio.prepareOnUserGesture();
+        driveFrame(dirtAudio, dirt.ctx, 'dirt');
+
+        const enginePitch = (nodes) => nodes.oscillators[0].frequency.last;
+        expect(enginePitch(dirt.nodes)).toBeLessThan(enginePitch(tarmac.nodes) * 0.9);
+        const whine = (nodes) => nodes.gains.find((gain) => gain.gain.value === 0.15);
+        expect(whine(dirt.nodes).gain.last).toBeLessThan(whine(tarmac.nodes).gain.last * 0.5);
+        const bark = (nodes) => nodes.filters.find((filter) => filter.frequency.value === 900);
+        expect(bark(dirt.nodes).gain.last).toBeGreaterThan(bark(tarmac.nodes).gain.last);
+        expect(bark(dirt.nodes).frequency.last).toBeLessThan(bark(tarmac.nodes).frequency.last);
+    });
+
+    it('keeps gravel quieter on a dirt straight than in a slide', () => {
+        const { ctx, nodes } = createMockContext();
+        const audio = createCarEffectsAudio(ctx, {});
+        audio.prepareOnUserGesture();
+        driveFrame(audio, ctx, 'dirt', { slipRatio: 0 });
+        const straight = groundGains(nodes).gravel.gain.last;
+        driveFrame(audio, ctx, 'dirt', { slipRatio: 1 });
+        expect(groundGains(nodes).gravel.gain.last).toBeGreaterThan(straight * 2);
+    });
+
+    it('crackles on dirt when the car slows down, and stays quiet on tarmac', () => {
+        for (const [ground, expectPops] of [['dirt', true], ['tarmac', false]]) {
+            const { ctx, nodes } = createMockContext();
+            const audio = createCarEffectsAudio(ctx, {});
+            audio.prepareOnUserGesture();
+            ctx.currentTime += 1;
+            audio.syncFrame({ status: 'playing', speed: 12, maxSpeedKph: 310, slipRatio: 0, throttleBlocked: false, ground });
+            const sourcesBefore = nodes.sources.length;
+            ctx.currentTime += 1;
+            audio.syncFrame({ status: 'playing', speed: 10, maxSpeedKph: 310, slipRatio: 0, throttleBlocked: false, ground });
+            expect(nodes.sources.length > sourcesBefore, ground).toBe(expectPops);
+        }
+    });
 });

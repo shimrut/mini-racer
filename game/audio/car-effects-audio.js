@@ -55,15 +55,23 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipFreqPerSpeed: 1200,
         shiftCrackVol: 0,
     }),
-    // Rally: a rougher engine, gravel under the tyres, a wide gravel spray
-    // instead of a tyre squeal in a slide, and a crack at each gear change.
+    // Rally: a lower, barkier four-cylinder, gravel that stays quiet on a
+    // straight and louder in a slide, a wide gravel spray instead of a tyre
+    // squeal, a hard bang and a big rev drop at each gear change, and exhaust
+    // pops when the car slows down.
     dirt: Object.freeze({
-        shaperAmount: 26,
-        barkBoostDb: 2.5,
-        motorLowpassScale: 1,
-        pitchScale: 1,
-        whineScale: 1,
-        gravelVol: 0.08,
+        shaperAmount: 34,
+        barkBoostDb: 5.5,
+        barkFreqScale: 0.62,
+        motorLowpassScale: 0.82,
+        pitchScale: 0.78,
+        whineScale: 0.32,
+        thrumScale: 2,
+        pulseScale: 1.8,
+        rpmFloor: 0.16,
+        gravelVol: 0.07,
+        gravelCruise: 0.35,
+        gravelSlip: 1.6,
         gravelFreq: 1800,
         rumbleVol: 0.05,
         slipMax: 0.22,
@@ -73,7 +81,8 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipFreqBase: 650,
         slipFreqPerSlip: 900,
         slipFreqPerSpeed: 500,
-        shiftCrackVol: 0.14,
+        shiftCrackVol: 0.32,
+        overrunPopVol: 0.1,
     }),
     // Snow soaks up sound: a softer, muffled engine, a low soft crunch under
     // the tyres, and a breathy hiss instead of a squeal in a slide.
@@ -184,6 +193,8 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
     let rumbleGain = null;
     let activeShaperAmount = 10;
     let lastGearIndex = null;
+    let lastAudibleSpeed = null;
+    let lastOverrunPopAt = -Infinity;
 
     let combustionPulseOsc = null;
     let motorPulseMod = null;
@@ -470,26 +481,50 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         }
     }
 
-    // A short burst through a mid band, like a rally gearbox and exhaust crack.
-    function scheduleShiftCrack(volume) {
+    // A short noise burst. The gear bang uses a longer mid hit. An overrun pop
+    // is shorter and higher.
+    function scheduleNoiseHit({ volume, freq, q, attack, release, delay = 0 }) {
         if (!ctx || !masterGain || !noiseBuffer || !(volume > 0)) return;
-        const t = ctx.currentTime;
+        const t = ctx.currentTime + delay;
         const burst = ctx.createBufferSource();
         burst.buffer = noiseBuffer;
         const band = ctx.createBiquadFilter();
         band.type = 'bandpass';
-        band.frequency.setValueAtTime(700 + Math.random() * 300, t);
-        band.Q.setValueAtTime(1.4, t);
+        band.frequency.setValueAtTime(freq, t);
+        band.Q.setValueAtTime(q, t);
         const gain = ctx.createGain();
         gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(volume, t + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+        gain.gain.linearRampToValueAtTime(volume, t + attack);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + release);
         burst.connect(band);
         band.connect(gain);
         gain.connect(masterGain);
         keepAlive(burst);
         burst.start(t, Math.random() * 1.5);
-        burst.stop(t + 0.1);
+        burst.stop(t + release + 0.02);
+    }
+
+    function scheduleShiftCrack(volume) {
+        scheduleNoiseHit({
+            volume,
+            freq: 420 + Math.random() * 180,
+            q: 1.1,
+            attack: 0.004,
+            release: 0.11,
+        });
+    }
+
+    function scheduleOverrunPop(volume, delay = 0) {
+        const when = (ctx?.currentTime ?? 0) + delay;
+        lastOverrunPopAt = Math.max(lastOverrunPopAt, when);
+        scheduleNoiseHit({
+            volume: volume * (0.55 + Math.random() * 0.45),
+            freq: 980 + Math.random() * 820,
+            q: 2.4,
+            attack: 0.002,
+            release: 0.03 + Math.random() * 0.025,
+            delay,
+        });
     }
 
     const api = {
@@ -646,6 +681,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
                 gravelGain?.gain.setTargetAtTime(0, t, smooth);
                 rumbleGain?.gain.setTargetAtTime(0, t, smooth);
                 lastGearIndex = null;
+                lastAudibleSpeed = null;
                 motorPulseMod.gain.setTargetAtTime(0, t, smooth);
                 exhaustPulseMod.gain.setTargetAtTime(0, t, smooth);
                 lastParameterSyncTime = t;
@@ -683,9 +719,24 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             }
             if (lastGearIndex !== null && gearIndex > lastGearIndex) {
                 scheduleShiftCrack(profile.shiftCrackVol);
+                const pop = profile.overrunPopVol ?? 0;
+                if (pop > 0) {
+                    scheduleOverrunPop(pop, 0.045);
+                    scheduleOverrunPop(pop, 0.12);
+                    scheduleOverrunPop(pop, 0.2);
+                }
             }
             lastGearIndex = gearIndex;
-            const rpmNorm = 0.34 + gearProgress * 0.66;
+            const slowing = lastAudibleSpeed !== null
+                && speed < lastAudibleSpeed - 0.02
+                && speed > 0.5;
+            const popVol = profile.overrunPopVol ?? 0;
+            if (slowing && popVol > 0 && t >= lastOverrunPopAt + 0.08) {
+                scheduleOverrunPop(popVol);
+            }
+            lastAudibleSpeed = speed;
+            const rpmFloor = profile.rpmFloor ?? 0.34;
+            const rpmNorm = rpmFloor + gearProgress * (1 - rpmFloor);
             const powerCurve = clamp(0.16 + rpmNorm * 0.60 + speedNorm * 0.24, 0, 1);
             const shimmer = 1 + Math.sin(t * 94) * 0.004 + Math.sin(t * 151) * 0.003;
             const f0 = (32 + (rpmNorm ** 1.3) * 105 + speedNorm * 18) * shimmer * profile.pitchScale;
@@ -698,11 +749,11 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             subOsc.frequency.setTargetAtTime(f0 * 0.5, t, smooth);
             combustionPulseOsc.frequency.setTargetAtTime(35 + rpmNorm * 90, t, smooth);
 
-            motorPulseMod.gain.setTargetAtTime(0.015 + rpmNorm * 0.025, t, smooth);
+            motorPulseMod.gain.setTargetAtTime((0.015 + rpmNorm * 0.025) * (profile.pulseScale ?? 1), t, smooth);
             exhaustPulseMod.gain.setTargetAtTime((0.012 + rpmNorm * 0.028) * load, t, smooth);
 
             thrumLFO.frequency.setTargetAtTime(4 + rpmNorm * 8, t, smooth);
-            thrumLFOMod.gain.setTargetAtTime(0.5 + rpmNorm * 3.0, t, smooth);
+            thrumLFOMod.gain.setTargetAtTime((0.5 + rpmNorm * 3.0) * (profile.thrumScale ?? 1), t, smooth);
 
             const filterBase = (450 + (powerCurve ** 1.3) * 1850) * profile.motorLowpassScale;
             motorLowpass.frequency.setTargetAtTime(filterBase, t, smooth);
@@ -710,7 +761,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
 
             const barkDb = clamp(1.5 + rpmNorm * 5.5 + speedNorm * 2.0, 1.5, 9.0) + profile.barkBoostDb;
             motorPeaking.gain.setTargetAtTime(barkDb, t, smooth);
-            motorPeaking.frequency.setTargetAtTime(400 + rpmNorm * 1600, t, smooth);
+            motorPeaking.frequency.setTargetAtTime((400 + rpmNorm * 1600) * (profile.barkFreqScale ?? 1), t, smooth);
 
             const driveAmount = 0.55 + load * 0.25 + rpmNorm * 0.35;
             motorDrive.gain.setTargetAtTime(driveAmount, t, smooth);
@@ -729,7 +780,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             );
 
             if (gravelSource) {
-                const gravelVol = profile.gravelVol * speedNorm * (0.7 + slip * 0.6);
+                const gravelVol = profile.gravelVol * speedNorm * ((profile.gravelCruise ?? 0.7) + slip * (profile.gravelSlip ?? 0.6));
                 gravelGain.gain.setTargetAtTime(gravelVol, t, smooth);
                 gravelBandpass.frequency.setTargetAtTime(profile.gravelFreq, t, smooth);
                 gravelSource.playbackRate?.setTargetAtTime?.(0.6 + speedNorm * 0.8, t, smooth);

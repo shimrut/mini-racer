@@ -222,7 +222,10 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
   turning more slowly, and it turns a little less sharply. A dirt lap is about
   25% slower than tarmac. The road is clay with soft patches, loose soil at the
   edges and small stones, with cream and clay kerbs. The lobby shows "Dirt"
-  after the lap count.
+  after the lap count. The dirt engine is lower and rougher than the circuit
+  car, with a hard bang and a bigger rev drop on each gear change. It crackles
+  when the car slows down. Gravel stays quiet on a straight and gets louder in
+  a slide.
 - **Snow** writes `ground: 'snow'`. On snow, the car has much less grip, a
   lower top speed, less acceleration, and it turns more slowly. A snow lap is
   about 38% slower than tarmac. The road is pale blue-white, with white and
