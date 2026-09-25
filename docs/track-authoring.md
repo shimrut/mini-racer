@@ -220,7 +220,8 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
 - **Dirt** writes `ground: 'dirt'` in the definition file. On dirt, the car has
   less grip, a lower top speed and less acceleration. It still starts and stops
   turning a little more slowly than on tarmac. A slide takes speed, so the car
-  drags instead of gliding. A dirt lap is slower than tarmac. The road is clay with soft patches, loose soil at the
+  drags instead of gliding. A dirt lap is slower than tarmac. The road is clay
+  with soft patches, loose soil at the
   edges and small stones, with cream and clay kerbs. The lobby shows "Dirt"
   after the lap count. The dirt engine is lower and rougher than the circuit
   car, with a hard bang and a bigger rev drop on each gear change. It crackles
