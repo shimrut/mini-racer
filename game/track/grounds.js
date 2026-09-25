@@ -43,11 +43,11 @@ export const TRACK_GROUNDS = Object.freeze({
         maxSpeed: 0.9,
         grip: 0.8,
         steerGripScale: 0.75,
-        turnRate: 1,
-        angularResponse: 0.8,
+        turnRate: 0.9,
+        angularResponse: 0.6,
         highSpeedSteerTrim: 1,
         yawCarry: 0,
-        slideScrub: 1,
+        slideScrub: 0,
         skidMarkMinSlipRatio: 0.4
     }),
     snow: Object.freeze({

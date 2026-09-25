@@ -205,7 +205,7 @@ describe('ground feel settings', () => {
     });
 
     it('takes more speed in a slide, with slide scrub', () => {
-        expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap({ ...dirt, slideScrub: 0 }).lostKph + 5);
+        expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap(dirt).lostKph + 5);
     });
 
     // Reaches top speed, then steers right for the given number of frames.
