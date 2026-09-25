@@ -12,7 +12,7 @@ import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby
 import { LobbyUi } from '../game/lobby/ui.js';
 
 describe('Campaign series screen', () => {
-    it('lists every series, and marks a series with no stages Coming soon', () => {
+    it('lists every series, and marks a series with fewer than 2 stages Coming soon', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],

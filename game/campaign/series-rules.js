@@ -3,7 +3,7 @@
 
 // A series stays hidden from players until it has this many stages. After that,
 // its stages are fixed, and new stages go after the last one.
-export const CAMPAIGN_SERIES_MIN_STAGES = 1;
+export const CAMPAIGN_SERIES_MIN_STAGES = 2;
 
 export const CAMPAIGN_STAGE_MAX_LAPS = 3;
 
