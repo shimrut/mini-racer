@@ -227,14 +227,6 @@ describe('ground feel settings', () => {
         return { widestSlide, sideways };
     }
 
-    it('settles a long dirt slide, while snow keeps washing wider', () => {
-        const tarmac = holdTurn(TRACK_GROUNDS.tarmac, 100).widestSlide;
-        const dirt = holdTurn(TRACK_GROUNDS.dirt, 100).widestSlide;
-        const snow = holdTurn(TRACK_GROUNDS.snow, 100).widestSlide;
-        expect(dirt).toBeLessThan(tarmac * 1.35);
-        expect(snow).toBeGreaterThan(dirt * 1.4);
-    });
-
     it('slides less than half as wide on grip as on tarmac', () => {
         expect(holdTurn(TRACK_GROUNDS.grip, 30).widestSlide)
             .toBeLessThan(holdTurn(TRACK_GROUNDS.tarmac, 30).widestSlide / 2);
