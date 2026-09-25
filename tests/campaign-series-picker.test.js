@@ -76,7 +76,7 @@ describe('Campaign series picker', () => {
         document.getElementById('campaign-series-btn').click();
         const options = [...document.querySelectorAll('[role="option"]')];
         expect(options.map((option) => option.textContent)).toEqual([
-            'NumbersTarmac · 16 stages23/64',
+            'NumbersStreet · 16 stages23/64',
             'DirtDirt · 10 stages40/40',
         ]);
         expect(options[0].getAttribute('aria-selected')).toBe('true');

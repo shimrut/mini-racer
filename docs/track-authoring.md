@@ -215,7 +215,7 @@ Each track has one ground for the full lap. Choose it with **Ground** in the
 Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
 `game/track/grounds.js`.
 
-- **Tarmac** is the default. The Mapmaker does not write a `ground` field for
+- **Street** is the default. The Mapmaker does not write a `ground` field for
   a tarmac track.
 - **Dirt** writes `ground: 'dirt'` in the definition file. On dirt, the car has
   less grip, a lower top speed and less acceleration. It starts and stops
@@ -231,7 +231,7 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
   lower top speed, less acceleration, and it turns more slowly. A snow lap is
   about 38% slower than tarmac. The road is pale blue-white, with white and
   ice-blue kerbs. Snow suits short, tight tracks.
-- **Grip** writes `ground: 'grip'`. It is a race-circuit road with three times
+- **Circuit** writes `ground: 'grip'`. It is a race-circuit road with three times
   the tarmac grip. The car holds its line and almost never slides: in corners,
   it slides about 3.5 degrees (9 degrees on tarmac). On tarmac, the slide makes
   the car's line change smoothly. On grip, the car starts and stops turning

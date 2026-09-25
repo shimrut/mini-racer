@@ -21,7 +21,7 @@ export const DEFAULT_TRACK_GROUND_KEY = 'tarmac';
 
 const TARMAC = Object.freeze({
     key: 'tarmac',
-    label: 'Tarmac',
+    label: 'Street',
     accel: 1,
     maxSpeed: 1,
     grip: 1,
@@ -39,11 +39,11 @@ export const TRACK_GROUNDS = Object.freeze({
     dirt: Object.freeze({
         key: 'dirt',
         label: 'Dirt',
-        accel: 0.6,
+        accel: 0.65,
         maxSpeed: 0.9,
         grip: 0.8,
         steerGripScale: 0.75,
-        turnRate: 0.9,
+        turnRate: 0.8,
         angularResponse: 0.6,
         highSpeedSteerTrim: 1,
         yawCarry: 0,
@@ -53,11 +53,11 @@ export const TRACK_GROUNDS = Object.freeze({
     snow: Object.freeze({
         key: 'snow',
         label: 'Snow',
-        accel: 0.55,
-        maxSpeed: 0.8,
+        accel: 0.65,
+        maxSpeed: 0.85,
         grip: 0.4,
-        steerGripScale: 0.9,
-        turnRate: 0.9,
+        steerGripScale: 0.7,
+        turnRate: 0.7,
         angularResponse: 1,
         highSpeedSteerTrim: 1,
         yawCarry: 0,
@@ -72,7 +72,7 @@ export const TRACK_GROUNDS = Object.freeze({
     // It has its own car sound, and it uses the tarmac cars.
     grip: Object.freeze({
         key: 'grip',
-        label: 'Grip',
+        label: 'Circuit',
         accel: 1,
         maxSpeed: 1,
         grip: 3,

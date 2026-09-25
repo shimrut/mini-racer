@@ -18,10 +18,10 @@ describe('Campaign series screen', () => {
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
         });
         expect(rows.map((row) => [row.name, row.comingSoon, row.infoParts])).toEqual([
-            ['Numbers', false, ['Tarmac · 16 stages', '23/64 medals']],
+            ['Numbers', false, ['Street · 16 stages', '23/64 medals']],
             ['Mini Rally', true, ['Dirt', 'Coming soon']],
             ['Sliders', true, ['Snow', 'Coming soon']],
-            ['Formula Mini', true, ['Grip', 'Coming soon']],
+            ['Formula Mini', true, ['Circuit', 'Coming soon']],
         ]);
         expect(rows[0].current).toBe(true);
     });
