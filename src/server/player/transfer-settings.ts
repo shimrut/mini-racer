@@ -1,7 +1,7 @@
 import type { DailyGpPlayerPreferences } from '../daily/daily-gp-model.js';
 import { readPlayerProfile, upsertPlayerProfile } from '../competition/competition-identity.js';
 
-export type TransferSettingsChoice = 'guest' | 'account' | 'merge';
+export type TransferSettingsChoice = 'account' | 'merge';
 
 const GROUND_SKIN_FIELDS = [
     'carSkinGrip',
@@ -11,15 +11,13 @@ const GROUND_SKIN_FIELDS = [
     'carSkinSpace',
 ] as const;
 
-// The settings the account keeps after a transfer. They follow the player's
-// choice: the guest's settings, the account's, or (merge) the account's with
-// the guest's filling what the account never set.
+// The settings the account keeps after a transfer: the account's, and with
+// Merge the guest's fill what the account never set.
 export function transferredSettings(
     choice: TransferSettingsChoice,
     guest: DailyGpPlayerPreferences | null,
     account: DailyGpPlayerPreferences | null,
 ): DailyGpPlayerPreferences | null {
-    if (choice === 'guest') return guest ?? account;
     if (choice === 'account') return account ?? guest;
     if (!account) return guest;
     if (!guest) return account;

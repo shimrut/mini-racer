@@ -22,10 +22,9 @@ retry is refused with the same answer, including one from a player whose data ha
 That refusal is the design: it is what stops a case looping in the background instead of waiting
 for you. Only a repair takes the mark off, in step 6.
 
-Guest Daily rows are the exception. They expire on the ordinary Daily deadline, and an open
-transfer does not extend it. `expiredDailyChallengeIds` names the frozen days whose guest rows
-have already gone, and that list can grow while the case waits. Capture the evidence in step 1
-promptly. Campaign and Garage evidence does not expire.
+Daily boards are kept for the archive, and the guest Daily clean-up skips a guest whose transfer is
+open, so guest rows do not leave while the case waits. `expiredDailyChallengeIds` names the frozen
+days whose guest rows are already gone. Capture the evidence in step 1 promptly all the same.
 
 ## 1. Capture the evidence before you change anything
 
@@ -64,6 +63,8 @@ Two things are fixed and are not yours to change:
 
 - **The choice.** `record.choice` is what the player picked. It is immutable. If the player now
   wants the other one, that is a new decision made after this case is closed, not a repair.
+  Keep guest is retired: a record that stores `guest` runs as Merge (the faster time wins on every
+  board, and the account keeps what only it has), and every reader reports it as `merge`.
 - **The proven operations.** `completedDomains` and `cleanedDomains` are checkpoints that
   committed. Treat them as done. Repeating a proven copy is not safe once the source is gone.
 
@@ -170,22 +171,10 @@ before you touch anything.
 
 ### The two Garage keys
 
-Two keys exist only while a transfer is open, and the diagnostic reports both:
-
-- `miniracer:car-unlocks:transfer-baseline:v1:<account>` — `garageBaseline`. The account's Garage as
-  preparation froze it. A Guest choice deletes what this names and keeps everything else.
-- `miniracer:car-unlocks:transfer-journal:v1:<account>` — `garageJournalFields`. Rewards accepted
-  while the transfer was open, including ones whose ordinary write was a no-op. A Guest choice keeps
-  every field this names.
-
-Both are collected when the transfer finishes. That cleanup is deliberately best-effort, because a
-failed delete must never turn a committed transfer into a failed one, so either key can outlive its
-transfer. A leftover key is untidy rather than dangerous: the baseline records the transfer it
-belongs to, and a later transfer for the same account replaces it and clears the journal with it.
-
-If you see either key on an account with **no** open transfer, delete it. Check `garageBaseline`'s
-`transferId` against the case in front of you first: if it names this transfer, it is in use, and
-deleting it makes a Guest choice keep the whole account Garage instead of replacing it.
+The retired Keep guest choice kept two keys while a transfer was open:
+`miniracer:car-unlocks:transfer-baseline:v1:<account>` and
+`miniracer:car-unlocks:transfer-journal:v1:<account>`. No code reads or writes them now. If you find
+either key, delete it.
 
 ## 7. Record the outcome
 

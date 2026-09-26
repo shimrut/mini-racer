@@ -100,6 +100,9 @@ Holding the domain locks also drains the outstanding writes for that domain.
   definition, and no PB parsing. An already-expired key counts as cleaned.
 - The Account choice only discards guest data. It never replaces account data, and it never
   needs a historical replay definition.
+- The Merge choice copies the guest's data and keeps the faster time on every board. It never
+  deletes an account row. Keep guest is retired: a stored or requested `guest` choice runs as
+  Merge, and every reader reports it as `merge`.
 - Completion writes the record, the receipt, the index entry, and the marker clears in one
   fenced transaction. A failed lock release never turns a committed success into a failure.
 
@@ -127,8 +130,8 @@ An unsafe case is `409 guest_progress_recovery_required`.
 A new transfer is checked under the transfer locks before anything is written. A retry and a
 repeated completion have a record, so this check does not apply to them.
 
-- A guest with nothing to carry is refused with `409 guest_progress_transfer_not_needed`. A
-  Guest choice would only empty the account. A row the server cannot parse counts as something.
+- A guest with nothing to carry is refused with `409 guest_progress_transfer_not_needed`. A row
+  the server cannot parse counts as something.
 - A guest joined to this account with no record was retired empty. It is refused the same way.
 - A guest joined to another account is `409 guest_progress_recovery_required`. No Campaign or
   Daily copy runs first.

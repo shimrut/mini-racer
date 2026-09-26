@@ -90,16 +90,6 @@ export async function readGuestPromotionTarget(
     return await client.get(promotionKey(guestPlayerId)) || null;
 }
 
-function transferBaselineKey(accountPlayerId: string): string {
-    return `miniracer:car-unlocks:transfer-baseline:v1:${playerFieldHash(accountPlayerId)}`;
-}
-
-function transferJournalKey(accountPlayerId: string): string {
-    return `miniracer:car-unlocks:transfer-journal:v1:${playerFieldHash(accountPlayerId)}`;
-}
-
-const TRANSFER_JOURNAL_FIELD_LIMIT = 64;
-
 export function isValidCarUnlockEventField(field: string, value: unknown): boolean {
     if (value !== '1') return false;
     if (field === COMPLETED_RACE_FIELD) return true;
@@ -109,24 +99,6 @@ export function isValidCarUnlockEventField(field: string, value: unknown): boole
         return Boolean(part) && readFieldPart(part) !== null;
     }
     return false;
-}
-
-async function journalAcceptedTransferEvent(
-    accountPlayerId: string,
-    field: string,
-    client: RedisClient,
-): Promise<void> {
-    if (!accountPlayerId.startsWith('reddit:')) return;
-    const baseline = await client.get(transferBaselineKey(accountPlayerId));
-    if (!baseline) return;
-    const journalKey = transferJournalKey(accountPlayerId);
-    const existing = await client.hGetAll(journalKey);
-    if (existing[field] === '1') return;
-    if (Object.keys(existing).length >= TRANSFER_JOURNAL_FIELD_LIMIT) {
-        console.error('Guest transfer reward journal is full.');
-        return;
-    }
-    await client.hSetNX(journalKey, field, '1');
 }
 
 async function writeRewardField(
@@ -153,7 +125,6 @@ async function writeCarUnlockEvent(
         try {
             const ownerPlayerId = await resolvePromotedPlayerId(playerId, client);
             await writeRewardField(carUnlockHashKey(ownerPlayerId), field, client);
-            await journalAcceptedTransferEvent(ownerPlayerId, field, client);
         } finally {
             await releaseRedisLock(lock, client);
         }
@@ -191,94 +162,6 @@ export async function settleOwedRewards(
         console.error('An owed Garage reward could not be granted:', error);
         return false;
     }
-}
-
-export async function clearOwedRewards(
-    playerId: string,
-    client: RedisClient = redis,
-): Promise<void> {
-    try {
-        await client.del(owedRewardKey(playerId));
-    } catch (error) {
-        console.error('An owed reward list could not be cleared:', error);
-    }
-}
-
-export async function captureGuestTransferGarageBaseline(
-    accountPlayerId: string,
-    transferId: string,
-    client: RedisClient = redis,
-): Promise<boolean> {
-    if (!accountPlayerId.startsWith('reddit:')) return false;
-    const key = transferBaselineKey(accountPlayerId);
-    const lock = await acquireTransferPromotionLock(accountPlayerId, client);
-    try {
-        const stored = await client.get(key);
-        if (stored) {
-            let storedTransferId: unknown = null;
-            try {
-                storedTransferId = (JSON.parse(stored) as { transferId?: unknown })?.transferId;
-            } catch (_error) {
-            }
-            if (storedTransferId === transferId) return false;
-            await client.del(transferJournalKey(accountPlayerId));
-        }
-        await client.set(key, JSON.stringify({
-            version: 2,
-            accountPlayerId,
-            transferId,
-            fields: await client.hGetAll(carUnlockHashKey(accountPlayerId)),
-            capturedAt: new Date().toISOString(),
-        }));
-        return true;
-    } finally {
-        await releaseRedisLock(lock, client);
-    }
-}
-
-function parseTransferBaseline(raw: string | null | undefined): Record<string, string> | null {
-    if (!raw) return null;
-    try {
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-        const fields = (parsed as { fields?: unknown }).fields;
-        if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
-        return fields as Record<string, string>;
-    } catch (_error) {
-        return null;
-    }
-}
-
-export async function clearGuestTransferGarageEvidence(
-    accountPlayerId: string,
-    client: RedisClient = redis,
-): Promise<boolean> {
-    if (!accountPlayerId.startsWith('reddit:')) return true;
-    const outcomes = await Promise.allSettled([
-        client.del(transferBaselineKey(accountPlayerId)),
-        client.del(transferJournalKey(accountPlayerId)),
-    ]);
-    const failed = outcomes.filter((outcome) => outcome.status === 'rejected');
-    for (const outcome of failed) {
-        console.error('Guest transfer Garage evidence cleanup failed:', (outcome as PromiseRejectedResult).reason);
-    }
-    return failed.length === 0;
-}
-
-export async function readGuestTransferGarageBaseline(
-    accountPlayerId: string,
-    client: RedisClient = redis,
-): Promise<Record<string, string> | null> {
-    if (!accountPlayerId.startsWith('reddit:')) return null;
-    return parseTransferBaseline(await client.get(transferBaselineKey(accountPlayerId)));
-}
-
-export async function readGuestTransferGarageJournalFields(
-    accountPlayerId: string,
-    client: RedisClient = redis,
-): Promise<string[]> {
-    if (!accountPlayerId.startsWith('reddit:')) return [];
-    return Object.keys(await client.hGetAll(transferJournalKey(accountPlayerId)) ?? {});
 }
 
 function wonChallengeField(challengeId: string): string {
@@ -384,7 +267,6 @@ export async function mergeGuestCarUnlockProgress({
     guestPlayerId,
     redditPlayerId,
     client = redis,
-    replace = false,
     preserveSource = false,
     verifyGuestSource,
     transactionRunner,
@@ -392,7 +274,6 @@ export async function mergeGuestCarUnlockProgress({
     guestPlayerId: string;
     redditPlayerId: string;
     client?: RedisClient;
-    replace?: boolean;
     preserveSource?: boolean;
     verifyGuestSource?: (observed: { unlocks: Record<string, string> }) => void | Promise<void>;
     transactionRunner?: RedisLockTransactionRunner;
@@ -418,7 +299,6 @@ export async function mergeGuestCarUnlockProgress({
                     'This guest garage was already promoted to another account.',
                 );
             }
-            if (replace) await clearGuestTransferGarageEvidence(redditPlayerId, client);
             return false;
         }
         const guestKey = carUnlockHashKey(guestPlayerId);
@@ -426,34 +306,10 @@ export async function mergeGuestCarUnlockProgress({
         await verifyGuestSource?.({ unlocks: fields });
         const hadGuestProgress = Object.keys(fields).length > 0;
 
-        const preserved: Record<string, string> = Object.create(null);
-        if (replace) {
-            const baseline = parseTransferBaseline(
-                await client.get(transferBaselineKey(redditPlayerId)),
-            );
-            const accountFields = await client.hGetAll(carUnlockHashKey(redditPlayerId));
-            if (!baseline) {
-                console.error('Guest transfer Garage baseline missing; keeping the account Garage.');
-                Object.assign(preserved, accountFields);
-            } else {
-                const journal = await client.hGetAll(transferJournalKey(redditPlayerId));
-                for (const [field, value] of Object.entries(accountFields)) {
-                    if (!(field in baseline)) preserved[field] = value;
-                }
-                for (const field of Object.keys(journal)) {
-                    preserved[field] = accountFields[field] ?? '1';
-                }
-            }
-        }
-
+        // Every Garage field is a one-time event flag, so adding the guest's
+        // fields to the account's is a union of both Garages.
         const enqueue: RedisLockMutation = async (transaction) => {
-            if (replace) {
-                await transaction.del(carUnlockHashKey(redditPlayerId));
-                const next = { ...fields, ...preserved };
-                if (Object.keys(next).length > 0) {
-                    await transaction.hSet(carUnlockHashKey(redditPlayerId), next);
-                }
-            } else if (hadGuestProgress) {
+            if (hadGuestProgress) {
                 await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);
             }
             await transaction.set(promotionKey(guestPlayerId), redditPlayerId);
@@ -475,7 +331,6 @@ export async function mergeGuestCarUnlockProgress({
                 );
             }
         }
-        if (replace) await clearGuestTransferGarageEvidence(redditPlayerId, client);
         return hadGuestProgress;
     } finally {
         await Promise.all(locks.map(async (lock) => {

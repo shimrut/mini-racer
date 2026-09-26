@@ -16,9 +16,6 @@ const {
 } = await import("../src/server/player/car-unlock-store.ts");
 const { campaignProgressKey } = await import("../src/server/campaign/campaign-progress-key.js");
 
-const accountHash = (playerId) => createHash("sha256").update(playerId, "utf8").digest("base64url");
-const baselineKey = (playerId) => `miniracer:car-unlocks:transfer-baseline:v1:${accountHash(playerId)}`;
-const journalKey = (playerId) => `miniracer:car-unlocks:transfer-journal:v1:${accountHash(playerId)}`;
 
 function selectionKey(guestPlayerId, redditPlayerId) {
   return `dailygp:guest-progress-selection:v1:${createHash("sha256")
@@ -58,7 +55,7 @@ async function interruptAfterPreparation(guestPlayerId, redditPlayerId) {
   expect(record.phase).toBe("copying");
 }
 
-describe("Garage rewards earned during a transfer survive replacement", () => {
+describe("Garage rewards earned during a transfer survive it", () => {
   beforeEach(() => {
     redis.reset();
     vi.restoreAllMocks();
@@ -92,7 +89,7 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
       .toBe("1");
   });
 
-  it("does not recapture the baseline when preparation runs again", async () => {
+  it("keeps a reward the account earns while a transfer waits to be retried", async () => {
     const guestPlayerId = "guest:frozen-baseline";
     const redditPlayerId = "reddit:frozen-baseline";
     await seedGuest(guestPlayerId, redditPlayerId);
@@ -155,10 +152,10 @@ describe("a legitimate late guest event does not strand the transfer", () => {
   });
 });
 
-describe("an older interrupted transfer gets no invented baseline", () => {
+describe("an interrupted transfer keeps the account's rewards", () => {
   beforeEach(() => { redis.reset(); vi.restoreAllMocks(); vi.spyOn(console,"error").mockImplementation(()=>{}); });
 
-  it("keeps an interruption reward on an older record with no baseline", async () => {
+  it("keeps a reward the account earns after the transfer stopped partway", async () => {
     const g = "guest:old-record", r = "reddit:old-record";
     await recordCompletedRace(g);
     await redis.set(campaignProgressKey(g), JSON.stringify({
@@ -168,7 +165,6 @@ describe("an older interrupted transfer gets no invented baseline", () => {
     redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" })).rejects.toThrow();
     redis.failTransferRecordWriteAt = null;
-    await redis.del(`miniracer:car-unlocks:transfer-baseline:v1:${createHash("sha256").update(r,"utf8").digest("base64url")}`);
     await recordHeadToHeadPost(r, "numberZero");
 
     await selectGuestProgress({ guestPlayerId: g, redditPlayerId: r, choice: "guest" });

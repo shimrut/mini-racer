@@ -46,7 +46,6 @@ import {
     readPlayerRank,
     readSnapshot,
     writeEntry,
-    withOpponentRaceReady,
     type SnapshotPayload,
 } from '../competition/competition-leaderboard.js';
 import {
@@ -81,9 +80,6 @@ import {
 import {
     getCarUnlockSnapshot,
     discardGuestCarUnlockProgress,
-    captureGuestTransferGarageBaseline,
-    readGuestTransferGarageBaseline,
-    readGuestTransferGarageJournalFields,
     isValidCarUnlockEventField,
     cleanupGuestCarUnlockProgress,
     hasCarUnlockProgress,
@@ -91,7 +87,6 @@ import {
     readGuestPromotionTarget,
     carUnlockHashKey,
     recordCompletedRace,
-    clearOwedRewards,
     type CarUnlockSnapshot,
 } from '../player/car-unlock-store.js';
 import {
@@ -1281,20 +1276,20 @@ async function captureClassifiedGuestDailySource(
     };
 }
 
+// Moves the guest's Daily rows onto the account, keeping the faster time on
+// every day.
 export async function mergeGuestDailyProgress({
     guestPlayerId,
     redditPlayerId,
-    replace = false,
     challengeIds,
     challengeSpecs,
     verifyGuestSource,
     recordedDailyChallengeIds,
     transactionRunner,
-    classifySource = replace,
+    classifySource = false,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
-    replace?: boolean;
     challengeIds?: string[];
     challengeSpecs?: GuestTransferDailyChallengeSpec[];
     verifyGuestSource?: (observed?: {
@@ -1302,8 +1297,8 @@ export async function mergeGuestDailyProgress({
     }) => void | Promise<void>;
     recordedDailyChallengeIds?: ReadonlySet<string>;
     transactionRunner: RedisLockTransactionRunner;
-    // Checks the guest's rows for damage before any write. On by default when
-    // the guest replaces the account.
+    // Checks the guest's rows for damage before any write, so a damaged row
+    // stops the transfer for review instead of being dropped.
     classifySource?: boolean;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -1367,36 +1362,22 @@ export async function mergeGuestDailyProgress({
             redditPb,
             redditRankedScore,
         } = day.state;
-        if (!guestEntry && !guestPb && !replace) continue;
+        if (!guestEntry && !guestPb) continue;
 
-        const guestWinsLeaderboard = replace
-            ? Boolean(guestEntry)
-            : Boolean(
-                guestEntry
-                && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
-            );
-        const guestCanSupplyWinningPb = replace
-            ? Boolean(guestPb)
-            : Boolean(guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs));
-        const entryToWrite = replace && !guestEntry && guestPb
-            ? withOpponentRaceReady(
-                {
-                    playerId: redditPlayerId,
-                    trackKey: challenge.trackKey,
-                    bestTimeMs: guestPb.bestTimeMs,
-                    updatedAt: guestPb.updatedAt,
-                    completedLaps: challenge.objectiveParams.lapCount,
-                    checkpointTimesSec: guestPb.checkpointTimesSec,
-                    validationMethod: 'strict-replay' as const,
-                },
-                guestPb,
-                competition,
-            )
-            : guestWinsLeaderboard
-                ? { ...guestEntry!, playerId: redditPlayerId }
-                : (!replace && redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
-                    ? redditEntry
-                    : null);
+        const guestWinsLeaderboard = Boolean(
+            guestEntry
+            && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
+        );
+        const guestCanSupplyWinningPb = Boolean(
+            guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
+        );
+        // The guest's faster entry moves; otherwise the account's entry is
+        // written again only when its ranking lost step with it.
+        const entryToWrite = guestWinsLeaderboard
+            ? { ...guestEntry!, playerId: redditPlayerId }
+            : (redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
+                ? redditEntry
+                : null);
 
         let rawGuestPb: string | undefined;
         if (guestCanSupplyWinningPb) {
@@ -1414,24 +1395,18 @@ export async function mergeGuestDailyProgress({
                 throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
             }
         }
-        if (entryToWrite || replace || rawGuestPb) {
+        if (entryToWrite || rawGuestPb) {
             // At most 5 queued commands: an account entry is never a guest's,
             // so writeEntry queues 4 (with the raced list), and the PB queues 1.
             dayWrites.push(async (transaction) => {
                 if (entryToWrite) {
                     await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
-                } else if (replace) {
-                    await transaction.hDel(competition.entryHashKey, [redditPlayerId]);
-                    await transaction.zRem(competition.leaderboardKey, [redditPlayerId]);
-                    await transaction.incrBy(competition.standingsRevisionKey, 1);
                 }
                 if (rawGuestPb) {
                     await transaction.hSet(competition.pbHashKey, {
                         [playerFieldHash(redditPlayerId)]: rawGuestPb,
                     });
                     if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
-                } else if (replace) {
-                    await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                 }
             });
         }
@@ -1817,8 +1792,6 @@ export type GuestTransferDiagnostic = {
     changedDomains: string[] | null;
     destinationEvidence: Record<string, unknown> | null;
     expiredDailyChallengeIds: string[];
-    garageBaseline: Record<string, string> | null;
-    garageJournalFields: string[];
     evidenceFingerprint: string | null;
 };
 
@@ -1848,8 +1821,6 @@ export async function getGuestProgressTransferDiagnostic({
         changedDomains: null,
         destinationEvidence: null,
         expiredDailyChallengeIds: [],
-        garageBaseline: null,
-        garageJournalFields: [],
         evidenceFingerprint: null,
     };
     const accountId = typeof redditPlayerId === 'string' && redditPlayerId.startsWith('reddit:')
@@ -1911,10 +1882,6 @@ export async function getGuestProgressTransferDiagnostic({
     let survivingSource: GuestTransferSourceInventory | null = null;
     let destinationEvidence: Record<string, unknown> | null = null;
     const expiredDailyChallengeIds: string[] = [];
-    const [garageBaseline, garageJournalFields] = await Promise.all([
-        readGuestTransferGarageBaseline(accountId),
-        readGuestTransferGarageJournalFields(accountId),
-    ]);
     try {
         survivingSource = await captureGuestTransferSourceInventory(guestId, specs);
         destinationEvidence = {
@@ -1967,8 +1934,6 @@ export async function getGuestProgressTransferDiagnostic({
         changedDomains,
         destinationEvidence,
         expiredDailyChallengeIds,
-        garageBaseline,
-        garageJournalFields,
         evidenceFingerprint: stableFingerprint({
             record,
             survivingSource,

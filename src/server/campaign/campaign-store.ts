@@ -27,7 +27,6 @@ import {
     readPlayerRank,
     readSnapshot,
     writeEntry,
-    withOpponentRaceReady,
 } from '../competition/competition-leaderboard.js';
 import {
     classifyStoredCampaignProgress,
@@ -51,7 +50,6 @@ import {
 import {
     classifyStoredPbRecordFor,
     getPlayerTrackPbRecord,
-    readPlayerTrackPbRecordAndPresence,
     type PlayerTrackPbRecord,
 } from '../competition/pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
@@ -1116,20 +1114,20 @@ async function captureClassifiedGuestCampaignSource(
     };
 }
 
+// Moves the guest's Campaign progress onto the account, keeping the faster
+// time on every stage.
 export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
-    replace = false,
     verifyGuestSource,
     transactionRunner,
     raceIds,
-    classifySource = replace,
+    classifySource = false,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
-    replace?: boolean;
-    // Checks the guest's rows for damage before any write. On by default when
-    // the guest replaces the account.
+    // Checks the guest's rows for damage before any write, so a damaged row
+    // stops the transfer for review instead of being dropped.
     classifySource?: boolean;
     // The stages either player holds a row on; every live stage when absent.
     raceIds?: readonly string[] | null;
@@ -1237,9 +1235,7 @@ export async function mergeGuestCampaignProgress({
         for (const { series, guestProgress, redditProgress } of seriesProgress) {
             guestProgressBySeries.set(series.id, guestProgress);
             redditProgressBySeries.set(series.id, redditProgress);
-            mergedResultsBySeries.set(series.id, replace
-                ? Object.create(null)
-                : { ...redditProgress.resultsByRaceId });
+            mergedResultsBySeries.set(series.id, { ...redditProgress.resultsByRaceId });
             hasGuestEvidence ||= Boolean(
                 guestProgress.startedAt
                 || Object.keys(guestProgress.resultsByRaceId).length > 0
@@ -1250,7 +1246,7 @@ export async function mergeGuestCampaignProgress({
         const stageReads = await Promise.all(stages.map(async (stage) => {
             const competition = competitionFor(stage);
             const track = TRACKS[stage.trackKey];
-            const [snapshotlessGuestEntry, rawRedditEntry, snapshotlessGuestPb, redditPbRead, redditRankedScore] = await Promise.all([
+            const [snapshotlessGuestEntry, rawRedditEntry, snapshotlessGuestPb, redditPb, redditRankedScore] = await Promise.all([
                 guestSource
                     ? Promise.resolve(null)
                     : readEntryByPlayerId(competition, guestPlayerId),
@@ -1258,21 +1254,17 @@ export async function mergeGuestCampaignProgress({
                 guestSource
                     ? Promise.resolve(null)
                     : getPlayerTrackPbRecord({ playerId: guestPlayerId, competition, track }),
-                readPlayerTrackPbRecordAndPresence({ playerId: redditPlayerId, competition, track }),
+                getPlayerTrackPbRecord({ playerId: redditPlayerId, competition, track }),
                 redis.zScore(competition.leaderboardKey, redditPlayerId),
             ]);
-            const isStored = (value: unknown) => value !== undefined && value !== null;
             return {
                 stage,
                 competition,
                 snapshotlessGuestEntry,
                 redditEntry: parseStoredEntry(rawRedditEntry, competition.trackKey),
                 snapshotlessGuestPb,
-                redditPb: redditPbRead.record,
+                redditPb,
                 redditRankedScore,
-                accountHoldsRows: isStored(rawRedditEntry)
-                    || redditPbRead.stored
-                    || (isStored(redditRankedScore) && Number.isFinite(Number(redditRankedScore))),
             };
         }));
 
@@ -1306,46 +1298,30 @@ export async function mergeGuestCampaignProgress({
                 redditProgress.resultsByRaceId[stage.raceId],
                 redditEntryResult,
             );
-            const guestWins = replace
-                ? Boolean(guestResult)
-                : Boolean(
-                    guestResult
-                    && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
-                );
-            const guestCanSupplyWinningPb = replace
-                ? Boolean(guestPb)
-                : Boolean(guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs));
-            const selectedResult = replace ? guestResult : fasterCampaignResult(redditResult, guestResult);
+            const guestWins = Boolean(
+                guestResult
+                && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
+            );
+            const guestCanSupplyWinningPb = Boolean(
+                guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
+            );
+            const selectedResult = fasterCampaignResult(redditResult, guestResult);
             if (selectedResult) {
                 mergedResults[stage.raceId] = selectedResult;
             }
             if (guestWins && guestResult) {
                 mergedRaceIds.push(stage.raceId);
             }
-            const guestEntryWins = replace
-                ? Boolean(guestEntry && guestEntryResult)
-                : Boolean(
-                    guestEntry
-                    && guestEntryResult
-                    && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs)
-                );
-            const entryToWrite = replace && guestResult && !guestEntry
-                ? withOpponentRaceReady(
-                    {
-                        playerId: redditPlayerId,
-                        trackKey: stage.trackKey,
-                        bestTimeMs: guestResult.bestTimeMs,
-                        updatedAt: guestResult.updatedAt,
-                        completedLaps: stage.lapCount,
-                        checkpointTimesSec: guestResult.checkpointTimesSec,
-                        validationMethod: 'strict-replay' as const,
-                    },
-                    guestPb,
-                    competition,
-                )
-                : guestEntryWins
-                    ? { ...guestEntry!, playerId: redditPlayerId }
-                : (!replace && redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
+            const guestEntryWins = Boolean(
+                guestEntry
+                && guestEntryResult
+                && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs),
+            );
+            // The guest's faster entry moves; otherwise the account's entry is
+            // written again only when its ranking lost step with it.
+            const entryToWrite = guestEntryWins
+                ? { ...guestEntry!, playerId: redditPlayerId }
+                : (redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
                     ? redditEntry
                     : null);
             let rawGuestPb: string | undefined;
@@ -1358,8 +1334,7 @@ export async function mergeGuestCampaignProgress({
                     throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                 }
             }
-            const clearsAccount = replace && read.accountHoldsRows;
-            if (!entryToWrite && !rawGuestPb && !clearsAccount) continue;
+            if (!entryToWrite && !rawGuestPb) continue;
             stageWrites.push({
                 raceId: stage.raceId,
                 // At most 5 queued commands: an account entry is never a guest's,
@@ -1367,18 +1342,12 @@ export async function mergeGuestCampaignProgress({
                 mutate: async (transaction) => {
                     if (entryToWrite) {
                         await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
-                    } else if (replace) {
-                        await transaction.hDel(competition.entryHashKey, [redditPlayerId]);
-                        await transaction.zRem(competition.leaderboardKey, [redditPlayerId]);
-                        await transaction.incrBy(competition.standingsRevisionKey, 1);
                     }
                     if (rawGuestPb) {
                         await transaction.hSet(competition.pbHashKey, {
                             [playerFieldHash(redditPlayerId)]: rawGuestPb,
                         });
                         if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
-                    } else if (replace) {
-                        await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                     }
                 },
             });
@@ -1393,7 +1362,7 @@ export async function mergeGuestCampaignProgress({
             });
         }
 
-        if (!hasGuestEvidence && !replace) return { merged: false, mergedRaceIds: [] };
+        if (!hasGuestEvidence) return { merged: false, mergedRaceIds: [] };
 
         await confirmMergeOwnership();
         const nowIso = new Date().toISOString();
@@ -1408,7 +1377,6 @@ export async function mergeGuestCampaignProgress({
             // only when one of the two players has a record in it.
             const touched = series.id === CAMPAIGN_NUMBERS_SERIES_ID
                 || hasRecord(guestProgress)
-                || (replace && hasRecord(redditProgress))
                 || Object.keys(mergedResults).length !== Object.keys(redditProgress.resultsByRaceId).length
                 || mergedRaceIds.some((raceId) => getCampaignStage(raceId)?.seriesId === series.id);
             if (!touched) continue;
@@ -1417,9 +1385,7 @@ export async function mergeGuestCampaignProgress({
             ))!;
             await writeProgressWithOwnedLock(redditPlayerId, {
                 campaignId: series.id,
-                startedAt: replace
-                    ? (guestProgress.startedAt || null)
-                    : (redditProgress.startedAt || guestProgress.startedAt || nowIso),
+                startedAt: redditProgress.startedAt || guestProgress.startedAt || nowIso,
                 resultsByRaceId: mergedResults,
                 updatedAt: nowIso,
             }, redditProgressLock, runMutation);

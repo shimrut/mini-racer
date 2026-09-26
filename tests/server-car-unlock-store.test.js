@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
-    captureGuestTransferGarageBaseline,
     hasRecordedCompletedRace,
     cleanupGuestCarUnlockProgress,
     discardGuestCarUnlockProgress,
@@ -300,7 +299,7 @@ describe('server car unlock store', () => {
         expect((await getCarUnlockSnapshot('reddit:driver', {}, client)).progress.completedRace).toBe(0);
     });
 
-    it('does not replace account unlocks while the account writer owns its lock', async () => {
+    it('does not merge into account unlocks while the account writer owns its lock', async () => {
         await recordCompletedRace('guest:driver', client);
         await recordHeadToHeadWin('reddit:driver', 'account-win', client);
         await client.set(promotionLockKey('reddit:driver'), 'account-writer');
@@ -309,7 +308,6 @@ describe('server car unlock store', () => {
             guestPlayerId: 'guest:driver',
             redditPlayerId: 'reddit:driver',
             client,
-            replace: true,
         })).rejects.toMatchObject({
             statusCode: 503,
             reason: 'progress_selection_retryable',
@@ -328,13 +326,6 @@ describe('every Garage transfer path reports contention as retryable', () => {
     });
 
     const RETRYABLE = { statusCode: 503, reason: 'progress_selection_retryable' };
-
-    it('translates it when preparation freezes the account baseline', async () => {
-        await client.set(promotionLockKey('reddit:driver'), 'account-writer');
-        await expect(captureGuestTransferGarageBaseline(
-            'reddit:driver', 'guest-transfer:x', client,
-        )).rejects.toMatchObject(RETRYABLE);
-    });
 
     it('translates it when cleanup removes the guest Garage', async () => {
         await client.set(promotionLockKey('guest:driver'), 'guest-writer');

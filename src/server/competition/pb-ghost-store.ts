@@ -230,28 +230,6 @@ async function readCompatibleRecord({
     return record;
 }
 
-// One PB read that also reports whether any row is stored, even an unusable one.
-export async function readPlayerTrackPbRecordAndPresence({
-    playerId,
-    competition,
-    track,
-}: {
-    playerId: string;
-    competition: Competition;
-    track: Record<string, any>;
-}): Promise<{ record: PlayerTrackPbRecord | null; stored: boolean }> {
-    const raw = await redis.hGet(competition.pbHashKey, playerFieldHash(playerId));
-    return {
-        record: readCompatibleRecordValue(
-            raw,
-            competition,
-            createTrackFingerprint(track),
-            getCompetitionRaceIdentity(competition),
-        ),
-        stored: raw !== undefined && raw !== null,
-    };
-}
-
 export async function getPlayerTrackPbRecord(input: {
     playerId: string;
     competition: Competition;

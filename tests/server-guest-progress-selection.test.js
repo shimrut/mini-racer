@@ -947,12 +947,10 @@ describe("guest transfer cost and recovery", () => {
     hideHudEnabled: false,
   };
 
-  it("gives the account the settings that follow the player's choice", () => {
+  it("keeps the account's settings, and with Merge fills what the account never set", () => {
     const guest = { ...baseSettings, musicEnabled: true, carSkinDirt: "guest-dirt", carSkinSnow: "guest-snow" };
     const account = { ...baseSettings, trailId: "none", carSkinDirt: "account-dirt" };
 
-    expect(transferredSettings("guest", guest, account)).toBe(guest);
-    expect(transferredSettings("guest", null, account)).toBe(account);
     expect(transferredSettings("account", guest, account)).toBe(account);
     expect(transferredSettings("account", guest, null)).toBe(guest);
     expect(transferredSettings("merge", guest, null)).toBe(guest);
