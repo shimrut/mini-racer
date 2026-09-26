@@ -1399,9 +1399,9 @@ describe('Campaign server store', () => {
                 .map(([key]) => key)
                 .filter((key) => String(key).includes(':submit-lock:')
                     || String(key).includes(':progress-lock:')));
-            // A submit lock for the guest and the account on each stage, and a
-            // progress lock for both in each series.
-            expect(renewedLockKeys.size).toBe(CAMPAIGN_LIVE_STAGES.length * 2 + CAMPAIGN_SERIES.length * 2);
+            // A progress lock for the guest and the account in each series. The
+            // merge takes no stage locks.
+            expect(renewedLockKeys.size).toBe(CAMPAIGN_SERIES.length * 2);
         } finally {
             vi.useRealTimers();
         }
@@ -1420,8 +1420,9 @@ describe('Campaign server store', () => {
             updatedAt: '2026-07-01T00:00:00.000Z',
         }));
         const defaultGet = mockRedis.get.getMockImplementation();
+        const guestLockField = createHash('sha256').update(guestPlayerId, 'utf8').digest('base64url');
         mockRedis.get.mockImplementation(async (key) => {
-            if (String(key).includes(':submit-lock:') && String(key).includes(guestPlayerId)) {
+            if (String(key).includes(':progress-lock:') && String(key).includes(guestLockField)) {
                 return 'successor-owner';
             }
             return defaultGet(key);

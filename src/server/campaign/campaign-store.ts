@@ -51,6 +51,7 @@ import {
 import {
     classifyStoredPbRecordFor,
     getPlayerTrackPbRecord,
+    readPlayerTrackPbRecordAndPresence,
     type PlayerTrackPbRecord,
 } from '../competition/pb-ghost-store.js';
 import { redisCompressed } from '@devvit/redis';
@@ -64,6 +65,7 @@ import {
     beginOwnedRedisLockGroupTransaction,
     beginOwnedRedisLockTransaction,
     commitOwnedRedisLockTransaction,
+    createOwnedLockGroupRunner,
     releaseRedisLock,
     releaseRedisLockGroup,
     renewRedisLockGroup,
@@ -112,6 +114,9 @@ const CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS = Math.max(
     1,
     Math.floor(CAMPAIGN_PROGRESS_LOCK_TTL_MS / 3),
 );
+// Each stage queues at most 4 commands, so 5 stages stay under the budget of
+// 24 commands for one transaction.
+const CAMPAIGN_STAGES_PER_TRANSFER_WRITE = 5;
 const CAMPAIGN_GUEST_CLEANUP_THROTTLE_SECONDS = 60;
 const CAMPAIGN_GUEST_CLEANUP_LIMIT = 10;
 export { CAMPAIGN_GUEST_EXPIRY_KEY };
@@ -1029,8 +1034,11 @@ async function captureClassifiedGuestCampaignSource(
 
     const rawProgressBySeries: Record<string, string | null> = {};
     const progressBySeries = new Map<string, CampaignProgress>();
-    for (const series of CAMPAIGN_SERIES) {
-        const rawProgress = (await redis.get(progressKey(guestPlayerId, series.id))) ?? null;
+    const rawProgressList = await Promise.all(
+        CAMPAIGN_SERIES.map((series) => redis.get(progressKey(guestPlayerId, series.id))),
+    );
+    for (const [seriesIndex, series] of CAMPAIGN_SERIES.entries()) {
+        const rawProgress = rawProgressList[seriesIndex] ?? null;
         rawProgressBySeries[series.id] = rawProgress;
         progressBySeries.set(series.id, parseCampaignProgress(rawProgress, series.id));
         observeTimestamp(readStoredUpdatedAt(rawProgress));
@@ -1047,15 +1055,19 @@ async function captureClassifiedGuestCampaignSource(
     }
 
     const stages = new Map<string, GuestCampaignStageSource>();
-    for (const stage of CAMPAIGN_LIVE_STAGES) {
+    const stageRows = await Promise.all(CAMPAIGN_LIVE_STAGES.map((stage) => {
         const competition = competitionFor(stage);
-        const [rawEntry, rawPb, rank] = await Promise.all([
+        return Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
             redisCompressed.hGet(competition.pbHashKey, playerFieldHash(guestPlayerId)),
             typeof redis.zScore === 'function'
                 ? redis.zScore(competition.leaderboardKey, guestPlayerId)
                 : Promise.resolve(null),
         ]);
+    }));
+    for (const [stageIndex, stage] of CAMPAIGN_LIVE_STAGES.entries()) {
+        const competition = competitionFor(stage);
+        const [rawEntry, rawPb, rank] = stageRows[stageIndex];
         const pbClass = classifyStoredPbRecordFor(rawPb, competition, TRACKS[stage.trackKey]);
         const entryClass = classifyStoredLeaderboardEntry(rawEntry, guestPlayerId, stage);
         observeTimestamp(readStoredUpdatedAt(rawEntry));
@@ -1116,64 +1128,50 @@ export async function mergeGuestCampaignProgress({
 
     const locks: RedisLock[] = [];
     let lease: RedisLockLease | null = null;
-    const acquireAll = async (keys: string[], ttlMs: number) => {
-        for (const key of [...new Set(keys)].sort()) {
-            const lock = await acquireRedisLock(key, ttlMs, redis);
-            if (!lock) throw new CampaignProgressBusyError('Campaign merge is already in progress.');
-            locks.push(lock);
-        }
-    };
+    const startLease = () => startRedisLockGroupLeaseRenewal(
+        locks,
+        CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS,
+        redis,
+    );
     const confirmMergeOwnership = async () => {
         if (!lease || !await lease.confirmOwnership()) {
             throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
         }
     };
+    // Without the transfer's runner (tests), the progress locks fence each write.
+    const runner = transactionRunner ?? createOwnedLockGroupRunner(
+        locks,
+        (reason) => new CampaignProgressBusyError(reason === 'lost'
+            ? 'Campaign merge ownership was lost.'
+            : 'Campaign leaderboard copy was interrupted.'),
+        redis,
+    );
     const runMutation = async (
         domainLocks: readonly RedisLock[],
         mutate: RedisLockMutation,
     ): Promise<void> => {
-        if (transactionRunner) {
-            const activeLease = lease;
-            lease = null;
-            if (activeLease) {
-                await activeLease.stop().catch((error) => {
-                    console.error('Campaign merge lease pause failed:', error);
-                });
-            }
-            await transactionRunner(domainLocks, mutate);
-            lease = startRedisLockGroupLeaseRenewal(
-                locks,
-                Math.max(1, Math.floor(SUBMISSION_LOCK_TTL_MS / 3)),
-                redis,
-            );
-            return;
+        const activeLease = lease;
+        lease = null;
+        if (activeLease) {
+            await activeLease.stop().catch((error) => {
+                console.error('Campaign merge lease pause failed:', error);
+            });
         }
-        const lock = domainLocks[0];
-        if (!lock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
-        if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-        await mutate(transaction);
-        if (!await commitOwnedRedisLockTransaction(transaction)) {
-            throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
-        }
+        await runner(domainLocks, mutate);
+        lease = startLease();
     };
     try {
-        await acquireAll(CAMPAIGN_LIVE_STAGES.flatMap((stage) => {
-            const competition = competitionFor(stage);
-            return [
-                competitionSubmissionLockKey(competition, guestPlayerId),
-                competitionSubmissionLockKey(competition, redditPlayerId),
-            ];
-        }), SUBMISSION_LOCK_TTL_MS);
-        await acquireAll([
+        // A race save cannot start once the transfer marks are set, and the
+        // transfer checks for one in flight, so the merge takes no stage locks.
+        for (const key of [
             ...allProgressLockKeys(guestPlayerId),
             ...allProgressLockKeys(redditPlayerId),
-        ], CAMPAIGN_PROGRESS_LOCK_TTL_MS);
-        lease = startRedisLockGroupLeaseRenewal(
-            locks,
-            Math.max(1, Math.floor(SUBMISSION_LOCK_TTL_MS / 3)),
-            redis,
-        );
+        ].sort()) {
+            const lock = await acquireRedisLock(key, CAMPAIGN_PROGRESS_LOCK_TTL_MS, redis);
+            if (!lock) throw new CampaignProgressBusyError('Campaign merge is already in progress.');
+            locks.push(lock);
+        }
+        lease = startLease();
         await confirmMergeOwnership();
 
         const guestSource = replace
@@ -1208,13 +1206,16 @@ export async function mergeGuestCampaignProgress({
         const redditProgressBySeries = new Map<string, CampaignProgress>();
         const mergedResultsBySeries = new Map<string, Record<string, CampaignBestResult>>();
         let hasGuestEvidence = false;
-        for (const series of CAMPAIGN_SERIES) {
+        const seriesProgress = await Promise.all(CAMPAIGN_SERIES.map(async (series) => {
             const [guestProgress, redditProgress] = await Promise.all([
                 guestSource
                     ? Promise.resolve(guestSource.progressBySeries.get(series.id) ?? emptyProgress(series.id))
                     : readProgress(guestPlayerId, series.id),
                 readProgress(redditPlayerId, series.id),
             ]);
+            return { series, guestProgress, redditProgress };
+        }));
+        for (const { series, guestProgress, redditProgress } of seriesProgress) {
             guestProgressBySeries.set(series.id, guestProgress);
             redditProgressBySeries.set(series.id, redditProgress);
             mergedResultsBySeries.set(series.id, replace
@@ -1225,36 +1226,48 @@ export async function mergeGuestCampaignProgress({
                 || Object.keys(guestProgress.resultsByRaceId).length > 0
             );
         }
+
+        // Read every stage at the same time.
+        const stageReads = await Promise.all(CAMPAIGN_LIVE_STAGES.map(async (stage) => {
+            const competition = competitionFor(stage);
+            const track = TRACKS[stage.trackKey];
+            const [snapshotlessGuestEntry, rawRedditEntry, snapshotlessGuestPb, redditPbRead, redditRankedScore] = await Promise.all([
+                guestSource
+                    ? Promise.resolve(null)
+                    : readEntryByPlayerId(competition, guestPlayerId),
+                redis.hGet(competition.entryHashKey, redditPlayerId),
+                guestSource
+                    ? Promise.resolve(null)
+                    : getPlayerTrackPbRecord({ playerId: guestPlayerId, competition, track }),
+                readPlayerTrackPbRecordAndPresence({ playerId: redditPlayerId, competition, track }),
+                redis.zScore(competition.leaderboardKey, redditPlayerId),
+            ]);
+            const isStored = (value: unknown) => value !== undefined && value !== null;
+            return {
+                stage,
+                competition,
+                snapshotlessGuestEntry,
+                redditEntry: parseStoredEntry(rawRedditEntry, competition.trackKey),
+                snapshotlessGuestPb,
+                redditPb: redditPbRead.record,
+                redditRankedScore,
+                accountHoldsRows: isStored(rawRedditEntry)
+                    || redditPbRead.stored
+                    || (isStored(redditRankedScore) && Number.isFinite(Number(redditRankedScore))),
+            };
+        }));
+
+        // Decide what each stage needs. A stage with nothing to write is skipped.
+        const stageWrites: { raceId: string; mutate: RedisLockMutation }[] = [];
         const mergedRaceIds: string[] = [];
-        for (const stage of CAMPAIGN_LIVE_STAGES) {
+        for (const read of stageReads) {
+            const { stage, competition, redditEntry, redditPb, redditRankedScore } = read;
             const guestProgress = guestProgressBySeries.get(stage.seriesId)!;
             const redditProgress = redditProgressBySeries.get(stage.seriesId)!;
             const mergedResults = mergedResultsBySeries.get(stage.seriesId)!;
-            await confirmMergeOwnership();
-            const guestCompetition = competitionFor(stage);
-            const redditCompetition = competitionFor(stage);
             const stageSource = guestSource?.stages.get(stage.raceId);
-            const [snapshotlessGuestEntry, redditEntry, snapshotlessGuestPb, redditPb, redditRankedScore] = await Promise.all([
-                guestSource
-                    ? Promise.resolve(null)
-                    : readEntryByPlayerId(guestCompetition, guestPlayerId),
-                readEntryByPlayerId(redditCompetition, redditPlayerId),
-                guestSource
-                    ? Promise.resolve(null)
-                    : getPlayerTrackPbRecord({
-                        playerId: guestPlayerId,
-                        competition: guestCompetition,
-                        track: TRACKS[stage.trackKey],
-                    }),
-                getPlayerTrackPbRecord({
-                    playerId: redditPlayerId,
-                    competition: redditCompetition,
-                    track: TRACKS[stage.trackKey],
-                }),
-                redis.zScore(redditCompetition.leaderboardKey, redditPlayerId),
-            ]);
-            const guestEntry = guestSource ? (stageSource?.entry ?? null) : snapshotlessGuestEntry;
-            const guestPb = guestSource ? (stageSource?.pb ?? null) : snapshotlessGuestPb;
+            const guestEntry = guestSource ? (stageSource?.entry ?? null) : read.snapshotlessGuestEntry;
+            const guestPb = guestSource ? (stageSource?.pb ?? null) : read.snapshotlessGuestPb;
             const guestEntryResult = campaignResultFromEntry(
                 stage,
                 guestEntry,
@@ -1309,79 +1322,55 @@ export async function mergeGuestCampaignProgress({
                         validationMethod: 'strict-replay' as const,
                     },
                     guestPb,
-                    redditCompetition,
+                    competition,
                 )
                 : guestEntryWins
                     ? { ...guestEntry!, playerId: redditPlayerId }
                 : (!replace && redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
                     ? redditEntry
                     : null);
-            const accountEntryLock = locks.find((lock) => (
-                lock.key === competitionSubmissionLockKey(redditCompetition, redditPlayerId)
-            ));
-            if (transactionRunner) {
-                if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                let rawGuestPb: string | undefined;
-                if (guestCanSupplyWinningPb) {
-                    const validated = guestSource ? stageSource?.rawPb ?? null : null;
-                    rawGuestPb = validated !== null
-                        ? encodeRedisCompressedValue(validated)
-                        : await redis.hGet(guestCompetition.pbHashKey, playerFieldHash(guestPlayerId));
-                    if (!rawGuestPb) {
-                        throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
-                    }
-                }
-                if (entryToWrite || replace || rawGuestPb) {
-                    await runMutation([accountEntryLock], async (transaction) => {
-                        if (entryToWrite) {
-                            await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
-                        } else if (replace) {
-                            await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
-                            await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
-                            await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
-                        }
-                        if (rawGuestPb) {
-                            await transaction.hSet(redditCompetition.pbHashKey, {
-                                [playerFieldHash(redditPlayerId)]: rawGuestPb,
-                            });
-                        } else if (replace) {
-                            await transaction.hDel(redditCompetition.pbHashKey, [playerFieldHash(redditPlayerId)]);
-                        }
-                    });
-                }
-            } else {
-                if (entryToWrite || replace) {
-                    if (!accountEntryLock) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                    const transaction = await beginOwnedRedisLockTransaction(accountEntryLock, redis);
-                    if (!transaction) throw new CampaignProgressBusyError('Campaign merge ownership was lost.');
-                    if (entryToWrite) {
-                        await writeEntry(redditCompetition, redditPlayerId, entryToWrite, transaction);
-                    } else {
-                        await transaction.hDel(redditCompetition.entryHashKey, [redditPlayerId]);
-                        await transaction.zRem(redditCompetition.leaderboardKey, [redditPlayerId]);
-                        await transaction.incrBy(redditCompetition.standingsRevisionKey, 1);
-                    }
-                    if (!await commitOwnedRedisLockTransaction(transaction)) {
-                        throw new CampaignProgressBusyError('Campaign leaderboard copy was interrupted.');
-                    }
-                }
-                if (guestCanSupplyWinningPb) {
-                    const rawGuestPb = guestSource
-                        ? stageSource?.rawPb ?? null
-                        : await redisCompressed.hGet(
-                            guestCompetition.pbHashKey,
-                            playerFieldHash(guestPlayerId),
-                        );
-                    if (!rawGuestPb) {
-                        throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
-                    }
-                    await redisCompressed.hSet(redditCompetition.pbHashKey, {
-                        [playerFieldHash(redditPlayerId)]: rawGuestPb,
-                    });
-                } else if (replace) {
-                    await redisCompressed.hDel(redditCompetition.pbHashKey, [playerFieldHash(redditPlayerId)]);
+            let rawGuestPb: string | undefined;
+            if (guestCanSupplyWinningPb) {
+                const validated = guestSource ? stageSource?.rawPb ?? null : null;
+                rawGuestPb = validated !== null
+                    ? encodeRedisCompressedValue(validated)
+                    : await redis.hGet(competition.pbHashKey, playerFieldHash(guestPlayerId));
+                if (!rawGuestPb) {
+                    throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                 }
             }
+            const clearsAccount = replace && read.accountHoldsRows;
+            if (!entryToWrite && !rawGuestPb && !clearsAccount) continue;
+            stageWrites.push({
+                raceId: stage.raceId,
+                // At most 4 queued commands: an account entry is never a guest's,
+                // so writeEntry queues 3, and the PB queues 1.
+                mutate: async (transaction) => {
+                    if (entryToWrite) {
+                        await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
+                    } else if (replace) {
+                        await transaction.hDel(competition.entryHashKey, [redditPlayerId]);
+                        await transaction.zRem(competition.leaderboardKey, [redditPlayerId]);
+                        await transaction.incrBy(competition.standingsRevisionKey, 1);
+                    }
+                    if (rawGuestPb) {
+                        await transaction.hSet(competition.pbHashKey, {
+                            [playerFieldHash(redditPlayerId)]: rawGuestPb,
+                        });
+                    } else if (replace) {
+                        await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
+                    }
+                },
+            });
+        }
+
+        // Write the stages in groups, one fenced transaction for each group.
+        await confirmMergeOwnership();
+        for (let index = 0; index < stageWrites.length; index += CAMPAIGN_STAGES_PER_TRANSFER_WRITE) {
+            const group = stageWrites.slice(index, index + CAMPAIGN_STAGES_PER_TRANSFER_WRITE);
+            await runMutation([], async (transaction) => {
+                for (const write of group) await write.mutate(transaction);
+            });
         }
 
         if (!hasGuestEvidence && !replace) return { merged: false, mergedRaceIds: [] };
@@ -1413,7 +1402,7 @@ export async function mergeGuestCampaignProgress({
                     : (redditProgress.startedAt || guestProgress.startedAt || nowIso),
                 resultsByRaceId: mergedResults,
                 updatedAt: nowIso,
-            }, redditProgressLock, transactionRunner ? runMutation : undefined);
+            }, redditProgressLock, runMutation);
         }
 
         return { merged: mergedRaceIds.length > 0, mergedRaceIds };

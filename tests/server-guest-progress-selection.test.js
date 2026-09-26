@@ -535,8 +535,9 @@ describe("guest progress selection", () => {
     await redis.set(accountProgressKey, JSON.stringify(accountProgress));
     const accountSelectionLock = `${guestProgressSelectionAccountPendingKey(redditPlayerId)}:lock`;
     vi.spyOn(console, "error").mockImplementation(() => {});
+    // The first Campaign write fenced by the account's progress lock.
     redis.setBeforeExec((keys) => {
-      if (keys.some((key) => key.includes(":submit-lock:"))) {
+      if (keys.some((key) => key.includes(":progress-lock:"))) {
         void redis.set(accountSelectionLock, "successor-owner");
         redis.setBeforeExec(null);
       }
@@ -623,6 +624,39 @@ describe("guest transfer cost and recovery", () => {
 
     expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
     expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
+  });
+
+  it("clears every account row on stages the guest never raced when the guest progress is kept", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:replaces-account";
+    const redditPlayerId = "reddit:replaced-account";
+    const [guestStage, goodStage, damagedStage, pbOnlyStage, rankOnlyStage] = NUMBERS_STAGES;
+    await seedCampaignStage(guestStage, guestPlayerId);
+    const boardOf = (stage) => campaignCompetitionFor(stage, redditPlayerId);
+    await redis.hSet(boardOf(goodStage).entryHashKey, {
+      [redditPlayerId]: JSON.stringify({
+        playerId: redditPlayerId,
+        displayName: "Account racer",
+        bestTimeMs: 29000,
+        trackKey: goodStage.trackKey,
+        completedLaps: goodStage.lapCount,
+        validationMethod: "strict-replay",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    await redis.zAdd(boardOf(goodStage).leaderboardKey, { member: redditPlayerId, score: 29000 });
+    await redis.hSet(boardOf(damagedStage).entryHashKey, { [redditPlayerId]: "{not json" });
+    await redis.hSet(boardOf(pbOnlyStage).pbHashKey, { [dailyPbField(redditPlayerId)]: "{not json" });
+    await redis.zAdd(boardOf(rankOnlyStage).leaderboardKey, { member: redditPlayerId, score: 30000 });
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    for (const stage of [goodStage, damagedStage, pbOnlyStage, rankOnlyStage]) {
+      const board = boardOf(stage);
+      expect(await redis.hGet(board.entryHashKey, redditPlayerId)).toBeFalsy();
+      expect(await redis.hGet(board.pbHashKey, dailyPbField(redditPlayerId))).toBeFalsy();
+      expect(await redis.zScore(board.leaderboardKey, redditPlayerId)).toBeFalsy();
+    }
+    expect(JSON.parse(await redis.hGet(boardOf(guestStage).entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
   });
 
   it("does not repair Campaign standings while a transfer owns the player", async () => {
