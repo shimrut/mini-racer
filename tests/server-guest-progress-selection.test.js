@@ -49,6 +49,7 @@ const OTHER_SERIES_FIRST_STAGES = CAMPAIGN_SERIES.length - 1;
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 const { competitionSubmissionLockKey } = await import("../src/server/competition/competition-submit.ts");
 const { racedListKey } = await import("../src/server/player/raced-list.ts");
+const { RACED_LIST_FILL_READY_KEY } = await import("../src/server/player/raced-list-fill.ts");
 const { transferredSettings } = await import("../src/server/player/transfer-settings.ts");
 const { readPlayerProfile, upsertPlayerProfile } = await import("../src/server/competition/competition-identity.ts");
 const { repairCampaignStandingsFromEntries } = await import("../src/server/campaign/campaign-store.ts");
@@ -666,6 +667,117 @@ describe("guest transfer cost and recovery", () => {
     expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(30000);
   });
 
+  // A Daily day 30 days back: no longer playable, still stored for the archive.
+  async function seedArchivedDay() {
+    const realNow = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(realNow - 30 * 86400000));
+    const archived = await getServerDailyGpChallenge();
+    vi.setSystemTime(new Date(realNow));
+    vi.useRealTimers();
+    await seedSevenDayPlaylist();
+    return archived;
+  }
+
+  // Writes a Daily row the way a race save does, and lists the day.
+  async function seedDailyRow(challenge, playerId, bestTimeMs) {
+    const competition = toDailyCompetition(challenge);
+    await redis.hSet(competition.entryHashKey, {
+      [playerId]: JSON.stringify({
+        playerId,
+        displayName: "Racer",
+        bestTimeMs,
+        trackKey: challenge.trackKey,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    await redis.zAdd(competition.leaderboardKey, { member: playerId, score: bestTimeMs });
+    await redis.hSet(racedListKey(playerId), { [`daily:${challenge.id}`]: "1" });
+    return competition;
+  }
+
+  function markFillReady() {
+    return redis.set(RACED_LIST_FILL_READY_KEY, JSON.stringify({ completedAt: new Date().toISOString() }));
+  }
+
+  it("moves an archived Daily day once the raced lists are complete", async () => {
+    const archived = await seedArchivedDay();
+    const guestPlayerId = "guest:archive-mover";
+    const redditPlayerId = "reddit:archive-mover";
+    const board = await seedDailyRow(archived, guestPlayerId, 41000);
+    await markFillReady();
+
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    expect(JSON.parse(await redis.hGet(board.entryHashKey, redditPlayerId)).bestTimeMs).toBe(41000);
+    expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBeFalsy();
+    expect(await redis.hGet(racedListKey(redditPlayerId), `daily:${archived.id}`)).toBeTruthy();
+  });
+
+  it("clears the account's archived day under Keep guest, and keeps it under Keep account", async () => {
+    for (const choice of ["guest", "account"]) {
+      redis.reset();
+      const archived = await seedArchivedDay();
+      const [recent] = await getServerDailyGpPlaylist();
+      const guestPlayerId = `guest:archive-${choice}`;
+      const redditPlayerId = `reddit:archive-${choice}`;
+      await seedDailyRow(recent, guestPlayerId, 41000);
+      const board = await seedDailyRow(archived, redditPlayerId, 39000);
+      await markFillReady();
+
+      await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+
+      const kept = await redis.hGet(board.entryHashKey, redditPlayerId);
+      if (choice === "guest") expect(kept).toBeFalsy();
+      else expect(JSON.parse(kept).bestTimeMs).toBe(39000);
+    }
+  });
+
+  it("leaves archived days alone until the raced lists are complete", async () => {
+    const archived = await seedArchivedDay();
+    const [recent] = await getServerDailyGpPlaylist();
+    const guestPlayerId = "guest:archive-not-ready";
+    const redditPlayerId = "reddit:archive-not-ready";
+    await seedDailyRow(recent, guestPlayerId, 41000);
+    const board = await seedDailyRow(archived, guestPlayerId, 42000);
+
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    expect(await redis.hGet(board.entryHashKey, redditPlayerId)).toBeFalsy();
+    expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBeTruthy();
+  });
+
+  it("counts a guest with only an archived Daily row as having progress to move", async () => {
+    const archived = await seedArchivedDay();
+    const guestPlayerId = "guest:archive-only";
+    const redditPlayerId = "reddit:archive-only";
+    await seedDailyRow(archived, guestPlayerId, 41000);
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toMatchObject({ reason: "guest_progress_transfer_not_needed" });
+
+    await markFillReady();
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("waits for a race save still running on an archived day", async () => {
+    const archived = await seedArchivedDay();
+    const guestPlayerId = "guest:archive-saving";
+    const redditPlayerId = "reddit:archive-saving";
+    await seedDailyRow(archived, guestPlayerId, 41000);
+    await markFillReady();
+    const saveLockKey = competitionSubmissionLockKey({ mode: "daily", id: archived.id }, guestPlayerId);
+    await redis.set(saveLockKey, "save-in-flight");
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toMatchObject({ statusCode: 503, reason: "progress_selection_retryable" });
+
+    await redis.del(saveLockKey);
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+  });
+
   it("clears every account row on stages the guest never raced when the guest progress is kept", async () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:replaces-account";
@@ -1057,6 +1169,28 @@ describe("guest transfer cost and recovery", () => {
   // (3 calls) and of the account (3 calls). The one lock check (mGet) names
   // every stage. A planned list of raced stages removes these reads.
   const UNRACED_STAGE_READS = { account: 6, guest: 15 };
+
+  for (const choice of ["account", "guest"]) {
+    it(`does not touch a stage nobody raced once the raced lists are complete (${choice} kept)`, async () => {
+      await seedSevenDayPlaylist();
+      const guestPlayerId = `guest:listed-${choice}`;
+      const redditPlayerId = `reddit:listed-${choice}`;
+      await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
+      await redis.hSet(racedListKey(guestPlayerId), { [`campaign:${NUMBERS_STAGES[0].raceId}`]: "1" });
+      await redis.set(RACED_LIST_FILL_READY_KEY, "{}");
+      const unraced = CAMPAIGN_LIVE_STAGES[CAMPAIGN_LIVE_STAGES.length - 1];
+
+      const calls = recordStageCalls(unraced.raceId);
+      await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+      stopCountingRedisCalls();
+
+      expect(calls).toEqual([]);
+      expect(JSON.parse(await redis.hGet(
+        campaignCompetitionFor(NUMBERS_STAGES[0], redditPlayerId).entryHashKey,
+        choice === "guest" ? redditPlayerId : guestPlayerId,
+      ) ?? "null")).toEqual(choice === "guest" ? expect.objectContaining({ bestTimeMs: 31234 }) : null);
+    });
+  }
 
   for (const choice of ["account", "guest"]) {
     it(`only reads a stage nobody raced, when the ${choice} progress is kept`, async () => {

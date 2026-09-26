@@ -145,10 +145,21 @@ function competitionFor(stage: CampaignStage): Competition {
     return toCampaignCompetition(stage.seriesId, stage);
 }
 
+// The live stages named by `raceIds`, in stage order; every live stage when
+// `raceIds` is not given.
+function transferStages(raceIds?: readonly string[] | null): readonly CampaignStage[] {
+    if (!raceIds) return CAMPAIGN_LIVE_STAGES;
+    const named = new Set(raceIds);
+    return CAMPAIGN_LIVE_STAGES.filter((stage) => named.has(stage.raceId));
+}
+
 // The race-save lock of every live stage, for each player. A transfer reads
 // them once to find a save that started before it set its marks.
-export function campaignSubmissionLockKeys(playerIds: readonly string[]): string[] {
-    return CAMPAIGN_LIVE_STAGES.flatMap((stage) => {
+export function campaignSubmissionLockKeys(
+    playerIds: readonly string[],
+    raceIds?: readonly string[] | null,
+): string[] {
+    return transferStages(raceIds).flatMap((stage) => {
         const competition = competitionFor(stage);
         return playerIds.map((playerId) => competitionSubmissionLockKey(competition, playerId));
     });
@@ -1020,6 +1031,7 @@ type GuestCampaignSourceSnapshot = {
 
 async function captureClassifiedGuestCampaignSource(
     guestPlayerId: string,
+    stagesToRead: readonly CampaignStage[] = CAMPAIGN_LIVE_STAGES,
 ): Promise<GuestCampaignSourceSnapshot> {
     const malformed: string[] = [];
     const obsolete: string[] = [];
@@ -1054,7 +1066,7 @@ async function captureClassifiedGuestCampaignSource(
     }
 
     const stages = new Map<string, GuestCampaignStageSource>();
-    const stageRows = await Promise.all(CAMPAIGN_LIVE_STAGES.map((stage) => {
+    const stageRows = await Promise.all(stagesToRead.map((stage) => {
         const competition = competitionFor(stage);
         return Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
@@ -1064,7 +1076,7 @@ async function captureClassifiedGuestCampaignSource(
                 : Promise.resolve(null),
         ]);
     }));
-    for (const [stageIndex, stage] of CAMPAIGN_LIVE_STAGES.entries()) {
+    for (const [stageIndex, stage] of stagesToRead.entries()) {
         const competition = competitionFor(stage);
         const [rawEntry, rawPb, rank] = stageRows[stageIndex];
         const pbClass = classifyStoredPbRecordFor(rawPb, competition, TRACKS[stage.trackKey]);
@@ -1110,10 +1122,13 @@ export async function mergeGuestCampaignProgress({
     replace = false,
     verifyGuestSource,
     transactionRunner,
+    raceIds,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
+    // The stages either player holds a row on; every live stage when absent.
+    raceIds?: readonly string[] | null;
     verifyGuestSource?: (observed?: {
         campaignProgress: string | null;
         campaignSeriesProgress: Record<string, string | null>;
@@ -1173,8 +1188,9 @@ export async function mergeGuestCampaignProgress({
         lease = startLease();
         await confirmMergeOwnership();
 
+        const stages = transferStages(raceIds);
         const guestSource = replace
-            ? await captureClassifiedGuestCampaignSource(guestPlayerId)
+            ? await captureClassifiedGuestCampaignSource(guestPlayerId, stages)
             : null;
         if (guestSource?.malformed.length) {
             await ensureGuestCampaignRetention(guestPlayerId, guestSource.newestUpdatedAt);
@@ -1227,7 +1243,7 @@ export async function mergeGuestCampaignProgress({
         }
 
         // Read every stage at the same time.
-        const stageReads = await Promise.all(CAMPAIGN_LIVE_STAGES.map(async (stage) => {
+        const stageReads = await Promise.all(stages.map(async (stage) => {
             const competition = competitionFor(stage);
             const track = TRACKS[stage.trackKey];
             const [snapshotlessGuestEntry, rawRedditEntry, snapshotlessGuestPb, redditPbRead, redditRankedScore] = await Promise.all([
@@ -1431,6 +1447,7 @@ async function clearGuestCampaignProgress(
     guestPlayerId: string,
     label: 'cleanup' | 'discard',
     transactionRunner?: RedisLockTransactionRunner,
+    raceIds?: readonly string[] | null,
 ): Promise<boolean> {
     if (!guestPlayerId.startsWith('guest:')) return false;
     const locks: RedisLock[] = [];
@@ -1450,7 +1467,7 @@ async function clearGuestCampaignProgress(
             redis,
         );
         const hadProgress = await guestHasAnyProgress(guestPlayerId);
-        const stagesToClear = (await Promise.all(CAMPAIGN_LIVE_STAGES.map(async (stage) => (
+        const stagesToClear = (await Promise.all(transferStages(raceIds).map(async (stage) => (
             await competitionHoldsPlayerRows(competitionFor(stage), guestPlayerId) ? stage : null
         )))).filter((stage): stage is CampaignStage => stage !== null);
 
@@ -1479,19 +1496,23 @@ async function clearGuestCampaignProgress(
 export async function cleanupGuestCampaignProgress({
     guestPlayerId,
     transactionRunner,
+    raceIds,
 }: {
     guestPlayerId: string;
     transactionRunner?: RedisLockTransactionRunner;
+    raceIds?: readonly string[] | null;
 }): Promise<boolean> {
-    return clearGuestCampaignProgress(guestPlayerId, 'cleanup', transactionRunner);
+    return clearGuestCampaignProgress(guestPlayerId, 'cleanup', transactionRunner, raceIds);
 }
 
 export async function discardGuestCampaignProgress({
     guestPlayerId,
     transactionRunner,
+    raceIds,
 }: {
     guestPlayerId: string;
     transactionRunner?: RedisLockTransactionRunner;
+    raceIds?: readonly string[] | null;
 }): Promise<boolean> {
-    return clearGuestCampaignProgress(guestPlayerId, 'discard', transactionRunner);
+    return clearGuestCampaignProgress(guestPlayerId, 'discard', transactionRunner, raceIds);
 }

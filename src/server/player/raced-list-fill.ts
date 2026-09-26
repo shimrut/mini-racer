@@ -44,15 +44,17 @@ type FillState = {
 
 type BoardKeys = { entryHashKey: string; leaderboardKey: string; pbHashKey: string };
 
+export function dailyBoardKeys(challengeId: string): BoardKeys {
+    return {
+        entryHashKey: createRedisChallengeEntryHashKey(challengeId),
+        leaderboardKey: createRedisChallengeLeaderboardKey(challengeId),
+        pbHashKey: challengeCollectionKey(challengeId),
+    };
+}
+
 function boardKeys(board: string): BoardKeys | null {
     const [mode, id] = [board.slice(0, board.indexOf(':')), board.slice(board.indexOf(':') + 1)];
-    if (mode === 'daily') {
-        return {
-            entryHashKey: createRedisChallengeEntryHashKey(id),
-            leaderboardKey: createRedisChallengeLeaderboardKey(id),
-            pbHashKey: challengeCollectionKey(id),
-        };
-    }
+    if (mode === 'daily') return dailyBoardKeys(id);
     const stage = mode === 'campaign' ? getCampaignStage(id) : null;
     if (!stage) return null;
     const competition = toCampaignCompetition(stage.seriesId, stage);
@@ -167,4 +169,28 @@ export async function runRacedListFill(
 
 export async function isRacedListFillReady(): Promise<boolean> {
     return Boolean(await redis.get(RACED_LIST_FILL_READY_KEY));
+}
+
+export type TransferBoards = {
+    // Live Campaign stages, in stage order.
+    campaignRaceIds: string[];
+    // Daily days, oldest first.
+    dailyChallengeIds: string[];
+};
+
+// The boards any of the players holds a row on, from their raced lists. It
+// returns null until the fill is ready: then the lists may miss old rows.
+export async function readTransferBoards(playerIds: readonly string[]): Promise<TransferBoards | null> {
+    if (!await isRacedListFillReady()) return null;
+    const lists = await Promise.all(playerIds.map((playerId) => redis.hKeys(racedListKey(playerId))));
+    const fields = new Set(lists.flat());
+    return {
+        campaignRaceIds: CAMPAIGN_LIVE_STAGES
+            .filter((stage) => fields.has(`campaign:${stage.raceId}`))
+            .map((stage) => stage.raceId),
+        dailyChallengeIds: [...fields]
+            .filter((field) => field.startsWith('daily:'))
+            .map((field) => field.slice('daily:'.length))
+            .sort(),
+    };
 }

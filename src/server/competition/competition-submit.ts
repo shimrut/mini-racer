@@ -31,7 +31,10 @@ function rateLimitKey(competition: Competition, identity: string): string {
     return `${competition.mode === 'daily' ? 'dailygp' : 'campaign'}:submit-rate-limit:${competition.id}:${identity}`;
 }
 
-export function competitionSubmissionLockKey(competition: Competition, playerId: string): string {
+export function competitionSubmissionLockKey(
+    competition: Pick<Competition, 'mode' | 'id'>,
+    playerId: string,
+): string {
     return `${competition.mode === 'daily' ? 'dailygp' : 'campaign'}:submit-lock:${competition.id}:${playerId}`;
 }
 

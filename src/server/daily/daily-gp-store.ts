@@ -127,6 +127,7 @@ import { playerFieldHash } from '../redis/redis-names.js';
 import { queueRacedBoard } from '../player/raced-list.js';
 import { carryGuestSettings } from '../player/transfer-settings.js';
 import { cleanupExpiredDailyGuestsBestEffort } from './daily-guest-cleanup.js';
+import { dailyBoardKeys, readTransferBoards } from '../player/raced-list-fill.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
@@ -268,9 +269,14 @@ function transferChallengeFromSpec(spec: GuestTransferDailyChallengeSpec): Daily
 
 async function captureCampaignStageEvidence(
     guestPlayerId: string,
+    raceIds?: readonly string[] | null,
 ): Promise<Record<string, string>> {
     const playerField = playerFieldHash(guestPlayerId);
-    const rows = await Promise.all(CAMPAIGN_LIVE_STAGES.map(async (stage) => {
+    const named = raceIds ? new Set(raceIds) : null;
+    const stages = named
+        ? CAMPAIGN_LIVE_STAGES.filter((stage) => named.has(stage.raceId))
+        : CAMPAIGN_LIVE_STAGES;
+    const rows = await Promise.all(stages.map(async (stage) => {
         const competition = toCampaignCompetition(stage.seriesId, stage);
         const [entry, pb, rank] = await Promise.all([
             redis.hGet(competition.entryHashKey, guestPlayerId),
@@ -325,11 +331,12 @@ async function captureDailyEvidence(
 async function captureGuestTransferSourceInventory(
     guestPlayerId: string,
     challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+    campaignRaceIds?: readonly string[] | null,
 ): Promise<GuestTransferSourceInventory> {
     const [campaignProgress, campaignSeriesProgress, campaignStages, daily, unlocks] = await Promise.all([
         redis.get(campaignProgressKey(guestPlayerId)),
         captureCampaignSeriesProgressEvidence(guestPlayerId),
-        captureCampaignStageEvidence(guestPlayerId),
+        captureCampaignStageEvidence(guestPlayerId, campaignRaceIds),
         captureDailyEvidence(guestPlayerId, challengeSpecs),
         redis.hGetAll(carUnlockHashKey(guestPlayerId)),
     ]);
@@ -906,13 +913,28 @@ async function readFinalPodiumPositions(
 const DAILY_DAYS_PER_TRANSFER_WRITE = 4;
 
 function dailySubmissionLockKeys(
-    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+    challengeIds: readonly string[],
     playerIds: readonly string[],
 ): string[] {
-    return challengeSpecs.flatMap((spec) => {
-        const competition = toDailyCompetition(transferChallengeFromSpec(spec));
-        return playerIds.map((playerId) => competitionSubmissionLockKey(competition, playerId));
-    });
+    return challengeIds.flatMap((id) => (
+        playerIds.map((playerId) => competitionSubmissionLockKey({ mode: 'daily', id }, playerId))
+    ));
+}
+
+// Freezes the Daily days a transfer works on: the playable days it already
+// holds, and every day either player raced. Days stay in order, oldest first.
+async function freezeTransferDays(
+    record: GuestProgressSelectionRecord,
+    racedChallengeIds: readonly string[],
+): Promise<void> {
+    const challengeIds = [...new Set([...(record.dailyChallengeIds ?? []), ...racedChallengeIds])].sort();
+    const specsById = new Map((record.dailyChallengeSpecs ?? []).map((spec) => [spec.id, spec]));
+    const loaded = await resolveGuestTransferDailyChallenges(
+        challengeIds.filter((challengeId) => !specsById.has(challengeId)),
+    );
+    for (const challenge of loaded) specsById.set(challenge.id, transferChallengeSpec(challenge));
+    record.dailyChallengeIds = challengeIds;
+    record.dailyChallengeSpecs = challengeIds.map((challengeId) => specsById.get(challengeId)!);
 }
 
 // A race save takes its stage lock and then checks the transfer marks. After
@@ -920,11 +942,12 @@ function dailySubmissionLockKeys(
 // to find a save that took its lock before the marks: one read of every lock.
 async function ensureNoRaceSaveInFlight(
     playerIds: readonly string[],
-    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+    campaignRaceIds: readonly string[] | null,
+    challengeIds: readonly string[],
 ): Promise<void> {
     const keys = [
-        ...campaignSubmissionLockKeys(playerIds),
-        ...dailySubmissionLockKeys(challengeSpecs, playerIds),
+        ...campaignSubmissionLockKeys(playerIds, campaignRaceIds),
+        ...dailySubmissionLockKeys(challengeIds, playerIds),
     ];
     if (keys.length === 0) return;
     const owners = await redis.mGet(keys);
@@ -958,8 +981,11 @@ async function resolveGuestTransferDailyChallenges(challengeIds?: string[]): Pro
         return getServerDailyGpPlaylist();
     }
     if (challengeIds.length === 0) return [];
-    const challenges = await Promise.all(challengeIds.map((challengeId) => (
-        getServerDailyGpChallengeById(challengeId, { persistFallback: false })
+    // One read for every stored day; a day not stored yet takes the usual path.
+    const storedRaw = await redis.hMGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challengeIds);
+    const challenges = await Promise.all(challengeIds.map((challengeId, index) => (
+        parseStoredChallenge(storedRaw[index])
+            ?? getServerDailyGpChallengeById(challengeId, { persistFallback: false })
     )));
     if (challenges.some((challenge) => !challenge || !TRACKS[challenge.trackKey])) {
         throw guestProgressRecoveryRequiredError();
@@ -1520,12 +1546,20 @@ async function guestHoldsTransferableProgress(
     }
     if (await hasCarUnlockProgress(guestPlayerId)) return true;
     if ((await readPlayerProfile(guestPlayerId))?.hasAnyData) return true;
-    const competitions = [
-        ...CAMPAIGN_LIVE_STAGES.map((stage) => toCampaignCompetition(stage.seriesId, stage)),
-        ...dailyPlaylist.map((challenge) => toDailyCompetition(challenge)),
+    // Once the raced lists are complete, they name every board the guest can
+    // hold a row on, archived Daily days too.
+    const listed = await readTransferBoards([guestPlayerId]);
+    const listedStages = listed ? new Set(listed.campaignRaceIds) : null;
+    const boards = [
+        ...CAMPAIGN_LIVE_STAGES
+            .filter((stage) => !listedStages || listedStages.has(stage.raceId))
+            .map((stage) => toCampaignCompetition(stage.seriesId, stage)),
+        ...(listed
+            ? listed.dailyChallengeIds.map(dailyBoardKeys)
+            : dailyPlaylist.map((challenge) => toDailyCompetition(challenge))),
     ];
-    const holds = await Promise.all(competitions.map((competition) => (
-        competitionHoldsPlayerRows(competition, guestPlayerId)
+    const holds = await Promise.all(boards.map((board) => (
+        competitionHoldsPlayerRows(board, guestPlayerId)
     )));
     return holds.some(Boolean);
 }
@@ -2287,14 +2321,27 @@ export async function selectGuestProgress({
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
         }
+        // After the marks no new race can start, so the raced lists hold every
+        // board either player can have a row on. Without complete lists, the
+        // transfer works on every Campaign stage and the playable Daily days.
+        const transferBoards = await readTransferBoards([guestPlayerId, redditPlayerId]);
+        const campaignRaceIds = transferBoards?.campaignRaceIds ?? null;
         await ensureNoRaceSaveInFlight(
             [guestPlayerId, redditPlayerId],
-            record.dailyChallengeSpecs ?? [],
+            campaignRaceIds,
+            [...new Set([
+                ...(record.dailyChallengeIds ?? []),
+                ...(transferBoards?.dailyChallengeIds ?? []),
+            ])],
         );
+        if (preparing && transferBoards) {
+            await freezeTransferDays(record, transferBoards.dailyChallengeIds);
+        }
         if (recaptureInventory) {
             record.sourceInventory = await captureGuestTransferSourceInventory(
                 guestPlayerId,
                 record.dailyChallengeSpecs ?? [],
+                campaignRaceIds,
             );
         }
         if (replacementRemaining && !isValidSourceInventory(record.sourceInventory)) {
@@ -2364,7 +2411,7 @@ export async function selectGuestProgress({
                             await redis.get(campaignProgressKey(guestPlayerId)) ?? null,
                         ),
                         campaignSeriesProgress: await captureCampaignSeriesProgressEvidence(guestPlayerId),
-                        campaignStages: await captureCampaignStageEvidence(guestPlayerId),
+                        campaignStages: await captureCampaignStageEvidence(guestPlayerId, campaignRaceIds),
                     };
                 } else if (domain === 'daily') {
                     evidence = {
@@ -2392,6 +2439,7 @@ export async function selectGuestProgress({
                 await timed('campaignMs', () => mergeGuestCampaignProgress({
                     guestPlayerId,
                     redditPlayerId,
+                    raceIds: campaignRaceIds,
                     replace: true,
                     verifyGuestSource: verifySourceDomain('campaign'),
                     transactionRunner: runTransferMutation,
@@ -2437,6 +2485,7 @@ export async function selectGuestProgress({
             if (!record.cleanedDomains?.includes('campaign')) {
                 await timed('campaignCleanupMs', () => cleanupGuestCampaignProgress({
                     guestPlayerId,
+                    raceIds: campaignRaceIds,
                     transactionRunner: runTransferMutation,
                 }));
                 record.cleanedDomains = [...(record.cleanedDomains || []), 'campaign'];
@@ -2458,6 +2507,7 @@ export async function selectGuestProgress({
             if (!record.completedDomains?.includes('campaign')) {
                 await timed('campaignMs', () => discardGuestCampaignProgress({
                     guestPlayerId,
+                    raceIds: campaignRaceIds,
                     transactionRunner: runTransferMutation,
                 }));
                 record.completedDomains = [...record.completedDomains, 'campaign'];
