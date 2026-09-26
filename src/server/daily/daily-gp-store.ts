@@ -126,6 +126,7 @@ import {
 import { playerFieldHash } from '../redis/redis-names.js';
 import { queueRacedBoard } from '../player/raced-list.js';
 import { carryGuestSettings } from '../player/transfer-settings.js';
+import { cleanupExpiredDailyGuestsBestEffort } from './daily-guest-cleanup.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
@@ -2553,6 +2554,7 @@ export async function getServerDailyGpSnapshot({
     limit?: unknown;
     offset?: unknown;
 } = {}): Promise<SnapshotPayload> {
+    await cleanupExpiredDailyGuestsBestEffort();
     const requestedId = typeof challengeId === 'string' && challengeId ? challengeId : null;
     const loaded = playableLoadedChallenge(loadedChallenge, requestedId);
     let challenge: DailyGpChallenge | null = loaded;

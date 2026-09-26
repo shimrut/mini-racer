@@ -153,7 +153,7 @@ export function withOpponentRaceReady(
 }
 
 export async function competitionHoldsPlayerRows(
-    competition: Competition,
+    competition: Pick<Competition, 'entryHashKey' | 'pbHashKey' | 'leaderboardKey'>,
     playerId: string,
 ): Promise<boolean> {
     const [rawEntry, rawPb, score] = await Promise.all([

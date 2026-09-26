@@ -859,7 +859,12 @@ describe("Daily finish after the run is saved", () => {
   }
 
   it("adds the day to the guest's raced list with the time and the personal best", async () => {
-    const { racedListKey, GUEST_RACED_LIST_TTL_SECONDS } = await import("../src/server/player/raced-list.ts");
+    const {
+      racedListKey,
+      GUEST_RACED_LIST_TTL_SECONDS,
+      DAILY_GUEST_EXPIRY_KEY,
+      DAILY_GUEST_ROW_KEEP_SECONDS,
+    } = await import("../src/server/player/raced-list.ts");
     const challenge = await getServerDailyGpChallenge();
     const { result } = await finishDaily("guest-raced-list");
     expect(result.status).toBe(200);
@@ -868,6 +873,8 @@ describe("Daily finish after the run is saved", () => {
     expect(await redis.hGet(key, `daily:${challenge.id}`)).toBeTruthy();
     const expiresAt = await redis.expireTime(key);
     expect(expiresAt - Math.floor(Date.now() / 1000)).toBeGreaterThan(GUEST_RACED_LIST_TTL_SECONDS - 60);
+    const cleanupAtMs = await redis.zScore(DAILY_GUEST_EXPIRY_KEY, "guest:guest-raced-list");
+    expect(cleanupAtMs - Date.now()).toBeGreaterThan((DAILY_GUEST_ROW_KEEP_SECONDS - 60) * 1000);
   });
 
   it("answers saved without a rank when the rank read fails", async () => {

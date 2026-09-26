@@ -48,6 +48,7 @@ const { redis } = vi.hoisted(() => {
                     unwatch: vi.fn(async () => undefined),
                     hSet: vi.fn(async (...args) => commands.push(() => redis.hSet(...args))),
                     expire: vi.fn(async (...args) => commands.push(() => redis.expire(...args))),
+                    zAdd: vi.fn(async () => commands.push(() => 1)),
                     del: vi.fn(async (...args) => commands.push(() => redis.del(...args))),
                     exec: vi.fn(async () => {
                         const results = [];
