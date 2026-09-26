@@ -218,6 +218,13 @@ function isGuestTransferChoice(value: unknown): value is GuestTransferChoice {
     return value === 'guest' || value === 'account' || value === 'merge';
 }
 
+// Keep guest is retired: it deleted the account's results wherever the guest
+// had none. A request for it from an old game page, and a Keep guest transfer
+// that started before, both run as Merge, which loses nothing.
+function runnableTransferChoice(choice: GuestTransferChoice): 'account' | 'merge' {
+    return choice === 'account' ? 'account' : 'merge';
+}
+
 // Keep guest and Merge copy the guest's progress, then clean it up.
 function copiesGuestProgress(choice: GuestTransferChoice): boolean {
     return choice === 'guest' || choice === 'merge';
@@ -1641,7 +1648,7 @@ export function pendingSelectionPayload({
         accountHasProgress: false,
         guestSummary: unavailableProgressSummary({ hasDailyResults: true, unlocks: true }),
         accountSummary: unavailableProgressSummary(),
-        ...(choice ? { choice } : {}),
+        ...(choice ? { choice: runnableTransferChoice(choice) } : {}),
         ...(completedAt ? { completedAt } : {}),
     } as GuestProgressSelection;
 }
@@ -2063,7 +2070,7 @@ export async function getGuestProgressSelection({
 export async function selectGuestProgress({
     guestPlayerId,
     redditPlayerId,
-    choice,
+    choice: requestedChoice,
     resume = false,
     transferId,
 }: {
@@ -2082,9 +2089,10 @@ export async function selectGuestProgress({
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         throw new Error('Guest progress selection requires a guest and Reddit identity.');
     }
-    if (!isGuestTransferChoice(choice)) {
+    if (!isGuestTransferChoice(requestedChoice)) {
         throw new Error('Guest progress selection is invalid.');
     }
+    const choice = runnableTransferChoice(requestedChoice);
     const key = guestProgressSelectionKey(guestPlayerId, redditPlayerId);
     const derivedTransferId = guestProgressSelectionTransferId(guestPlayerId, redditPlayerId);
     const pendingGuestKey = guestProgressSelectionPendingKey(guestPlayerId);
@@ -2256,7 +2264,7 @@ export async function selectGuestProgress({
             if (!isGuestTransferChoice(parsedRecord.choice)) {
                 throw guestProgressRecoveryRequiredError();
             }
-            if (parsedRecord.choice !== choice) {
+            if (runnableTransferChoice(parsedRecord.choice) !== choice) {
                 const conflict = new Error('A different guest progress choice was already made.');
                 (conflict as Error & { statusCode?: number }).statusCode = 409;
                 throw conflict;
@@ -2347,11 +2355,6 @@ export async function selectGuestProgress({
             await resolveGuestTransferDailyChallenges(record.dailyChallengeIds);
         }
         if (record.phase === 'preparing') {
-            if (choice === 'guest') {
-                await captureGuestTransferGarageBaseline(redditPlayerId, derivedTransferId);
-                await clearOwedRewards(redditPlayerId);
-                await clearOwedRewards(guestPlayerId);
-            }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
         }
@@ -2506,16 +2509,14 @@ export async function selectGuestProgress({
             delete record.dailyStepDone;
         };
         if (copiesGuestProgress(choice)) {
-            // Keep guest replaces the account's rows; Merge keeps the faster
-            // time on each board. Both check the guest's rows for damage first.
-            const replace = choice === 'guest';
+            // Merge keeps the faster time on each board. It checks the guest's
+            // rows for damage first, so a damaged row stops for review.
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
                 await timed('campaignMs', () => mergeGuestCampaignProgress({
                     guestPlayerId,
                     redditPlayerId,
                     raceIds: campaignRaceIds,
-                    replace,
                     classifySource: true,
                     verifyGuestSource: verifySourceDomain('campaign'),
                     transactionRunner: runTransferMutation,
@@ -2529,7 +2530,6 @@ export async function selectGuestProgress({
                     mergeGuestDailyProgress({
                         guestPlayerId,
                         redditPlayerId,
-                        replace,
                         classifySource: true,
                         challengeIds,
                         challengeSpecs,
@@ -2546,7 +2546,6 @@ export async function selectGuestProgress({
                 await timed('unlocksMs', () => mergeGuestCarUnlockProgress({
                     guestPlayerId,
                     redditPlayerId,
-                    replace,
                     preserveSource: true,
                     verifyGuestSource: verifySourceDomain('unlocks'),
                     transactionRunner: runTransferMutation,

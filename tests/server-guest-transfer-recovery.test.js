@@ -97,7 +97,8 @@ describe("guest transfer record contract", () => {
       transferId: transferId(guestPlayerId, redditPlayerId),
       guestPlayerId,
       redditPlayerId,
-      choice: "guest",
+      // Keep guest is retired and runs as Merge.
+      choice: "merge",
       status: "completed",
       phase: "completed",
     });
@@ -376,14 +377,14 @@ describe("guest transfer legacy records", () => {
     await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), guestPlayerId);
   }
 
-  it("keeps an older Guest-choice record without source evidence for review", async () => {
+  it("keeps an older Guest-choice record without source evidence for review, reported as Merge", async () => {
     await writeLegacyRecord("guest:legacy-guest", "reddit:legacy-guest", {
       version: 2,
       choice: "guest",
     });
 
     await expect(resolveAccountTransferState("reddit:legacy-guest"))
-      .resolves.toMatchObject({ state: "recovery_required", choice: "guest" });
+      .resolves.toMatchObject({ state: "recovery_required", choice: "merge" });
   });
 
   it("lets a recognized older Account-choice record resume its discard", async () => {
@@ -458,7 +459,7 @@ describe("bootstrap reports the account's transfer before anything else", () => 
 
     expect(payload.progressSelection).toMatchObject({
       state: "resume_required",
-      choice: "guest",
+      choice: "merge",
       sourceGuestPlayerId: guestPlayerId,
       transferId: transferId(guestPlayerId, redditPlayerId),
     });
@@ -538,7 +539,7 @@ describe("guest transfer resumes from any interrupted checkpoint", () => {
   });
 
   for (const failAt of [1, 2, 3, 4, 5, 6, 7]) {
-    for (const choice of ["guest", "account"]) {
+    for (const choice of ["merge", "account"]) {
       it(`finishes a ${choice} choice after checkpoint ${failAt} was interrupted`, async () => {
         const guestPlayerId = `guest:interrupt-${choice}-${failAt}`;
         const redditPlayerId = `reddit:interrupt-${choice}-${failAt}`;
@@ -725,7 +726,7 @@ describe("guest transfer does not strand the account or the next guest", () => {
     await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), guestPlayerId);
 
     await expect(resolveAccountTransferState(redditPlayerId))
-      .resolves.toMatchObject({ state: "resume_required", choice: "guest" });
+      .resolves.toMatchObject({ state: "resume_required", choice: "merge" });
   });
 
   it("does not strand a transfer when the Campaign stage list gains a stage", async () => {

@@ -472,7 +472,7 @@ describe("guest progress selection", () => {
     expect(await redis.get(accountProgressKey)).toBe(JSON.stringify(accountProgress));
   });
 
-  it("completes a normal guest replacement with the frozen Daily window", async () => {
+  it("runs a Keep guest request as Merge, so the account keeps its Campaign results", async () => {
     await seedSevenDayPlaylist();
     const guestId = "normal-guest-transfer";
     const guestPlayerId = `guest:${guestId}`;
@@ -506,10 +506,10 @@ describe("guest progress selection", () => {
       guestPlayerId,
       redditPlayerId,
       choice: "guest",
-    })).resolves.toMatchObject({ status: "completed", choice: "guest" });
+    })).resolves.toMatchObject({ status: "completed", choice: "merge" });
 
     const accountProgress = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId)));
-    expect(accountProgress.resultsByRaceId).toEqual({});
+    expect(accountProgress.resultsByRaceId["numbered-v1-00"]).toMatchObject({ bestTimeMs: 12_000, medal: "gold" });
     expect(accountProgress.startedAt).toBeTruthy();
     expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeUndefined();
   });
@@ -718,8 +718,8 @@ describe("guest transfer cost and recovery", () => {
     expect(await redis.hGet(racedListKey(redditPlayerId), `daily:${archived.id}`)).toBeTruthy();
   });
 
-  it("clears the account's archived day under Keep guest, and keeps it under Keep account", async () => {
-    for (const choice of ["guest", "account"]) {
+  it("keeps the account's archived day under every choice", async () => {
+    for (const choice of ["guest", "merge", "account"]) {
       redis.reset();
       const archived = await seedArchivedDay();
       const [recent] = await getServerDailyGpPlaylist();
@@ -732,8 +732,7 @@ describe("guest transfer cost and recovery", () => {
       await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
 
       const kept = await redis.hGet(board.entryHashKey, redditPlayerId);
-      if (choice === "guest") expect(kept).toBeFalsy();
-      else expect(JSON.parse(kept).bestTimeMs).toBe(39000);
+      expect(JSON.parse(kept).bestTimeMs).toBe(39000);
     }
   });
 
@@ -893,7 +892,7 @@ describe("guest transfer cost and recovery", () => {
       .resolves.toMatchObject({ status: "completed" });
   });
 
-  it("clears every account row on stages the guest never raced when the guest progress is kept", async () => {
+  it("runs a Keep guest request as Merge, so every account row on stages the guest never raced stays", async () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:replaces-account";
     const redditPlayerId = "reddit:replaced-account";
@@ -925,12 +924,11 @@ describe("guest transfer cost and recovery", () => {
     await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
     delete redis.incrBy;
 
-    for (const stage of [goodStage, damagedStage, pbOnlyStage, rankOnlyStage]) {
-      const board = boardOf(stage);
-      expect(await redis.hGet(board.entryHashKey, redditPlayerId)).toBeFalsy();
-      expect(await redis.hGet(board.pbHashKey, dailyPbField(redditPlayerId))).toBeFalsy();
-      expect(await redis.zScore(board.leaderboardKey, redditPlayerId)).toBeFalsy();
-    }
+    expect(JSON.parse(await redis.hGet(boardOf(goodStage).entryHashKey, redditPlayerId)).bestTimeMs).toBe(29000);
+    expect(await redis.zScore(boardOf(goodStage).leaderboardKey, redditPlayerId)).toBe(29000);
+    expect(await redis.hGet(boardOf(damagedStage).entryHashKey, redditPlayerId)).toBe("{not json");
+    expect(await redis.hGet(boardOf(pbOnlyStage).pbHashKey, dailyPbField(redditPlayerId))).toBe("{not json");
+    expect(await redis.zScore(boardOf(rankOnlyStage).leaderboardKey, redditPlayerId)).toBe(30000);
     expect(JSON.parse(await redis.hGet(boardOf(guestStage).entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
     expect(await redis.hGet(boardOf(guestStage).entryHashKey, guestPlayerId)).toBeFalsy();
     expect(bumped.some((key) => key.includes(`:${emptyStage.raceId}:`))).toBe(false);
@@ -965,7 +963,7 @@ describe("guest transfer cost and recovery", () => {
   });
 
   for (const choice of ["guest", "account", "merge"]) {
-    it(`moves the settings with the ${choice} progress`, async () => {
+    it(`keeps the account's settings when the choice is ${choice}`, async () => {
       await seedSevenDayPlaylist();
       const guestPlayerId = `guest:settings-${choice}`;
       const redditPlayerId = `reddit:settings-${choice}`;
@@ -975,15 +973,23 @@ describe("guest transfer cost and recovery", () => {
 
       await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
 
+      // Keep guest runs as Merge; Merge and Keep account keep the account's settings.
       const settings = (await readPlayerProfile(redditPlayerId)).preferences;
-      if (choice === "guest") {
-        expect(settings).toMatchObject({ musicEnabled: true, trailId: "gold" });
-      } else {
-        // Keep account and Merge keep the account's settings.
-        expect(settings).toMatchObject({ musicEnabled: false, trailId: "none" });
-      }
+      expect(settings).toMatchObject({ musicEnabled: false, trailId: "none" });
     });
   }
+
+  it("gives an account without settings the guest's settings when the player merges", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:settings-to-empty-account";
+    const redditPlayerId = "reddit:settings-to-empty-account";
+    await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
+    await upsertPlayerProfile({ playerId: guestPlayerId, preferences: { ...baseSettings, musicEnabled: true } });
+
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "merge" });
+
+    expect((await readPlayerProfile(redditPlayerId)).preferences).toMatchObject({ musicEnabled: true });
+  });
 
   it("does not repair Campaign standings while a transfer owns the player", async () => {
     const redditPlayerId = "reddit:repair-during-transfer";

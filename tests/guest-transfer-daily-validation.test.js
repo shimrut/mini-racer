@@ -264,7 +264,8 @@ describe("a transfer stopped for review survives a reload", () => {
     expect(record).toMatchObject({
       status: "recovery_required",
       phase: "recovery_required",
-      choice: "guest",
+      // Keep guest is retired and runs as Merge.
+      choice: "merge",
     });
     expect(record.completedDomains).toContain("campaign");
     expect(record.sourceInventory).toBeTruthy();
@@ -280,10 +281,10 @@ describe("a transfer stopped for review survives a reload", () => {
 
     await expect(resolveAccountTransferState(redditPlayerId)).resolves.toMatchObject({
       state: "recovery_required",
-      choice: "guest",
+      choice: "merge",
     });
     await expect(getGuestProgressSelection({ guestPlayerId, redditPlayerId }))
-      .resolves.toMatchObject({ required: true, state: "recovery_required", choice: "guest" });
+      .resolves.toMatchObject({ required: true, state: "recovery_required", choice: "merge" });
   });
 
   it("repeats no replacement and no cleanup when the case is read again", async () => {

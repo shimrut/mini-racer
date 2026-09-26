@@ -78,21 +78,6 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
       .toBe("1");
   });
 
-  it("drops a reward the account is owed when the player chooses Guest", async () => {
-    const guestPlayerId = "guest:owed-drop";
-    const redditPlayerId = "reddit:owed-drop";
-    await seedGuest(guestPlayerId, redditPlayerId);
-    vi.spyOn(redis, "hSetNX").mockRejectedValueOnce(new Error("reward busy"));
-    await expect(recordHeadToHeadWin(redditPlayerId, "challenge-owed"))
-      .rejects.toThrow("reward busy");
-
-    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
-    await settleOwedRewards(redditPlayerId);
-
-    expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["win:challenge:challenge-owed"])
-      .toBeUndefined();
-  });
-
   it("keeps a reward earned again whose ordinary write was a no-op", async () => {
     const guestPlayerId = "guest:repeat-reward";
     const redditPlayerId = "reddit:repeat-reward";
@@ -105,35 +90,6 @@ describe("Garage rewards earned during a transfer survive replacement", () => {
 
     expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["post:track:numberZero"])
       .toBe("1");
-  });
-
-  it("keeps a reward accepted past its event cap", async () => {
-    const guestPlayerId = "guest:capped-reward";
-    const redditPlayerId = "reddit:capped-reward";
-    for (const trackKey of ["numberZero", "numberOne", "numberTwo", "numberThree", "numberFour"]) {
-      await recordHeadToHeadPost(redditPlayerId, trackKey);
-    }
-    await seedGuest(guestPlayerId, redditPlayerId);
-    await interruptAfterPreparation(guestPlayerId, redditPlayerId);
-
-    await recordHeadToHeadPost(redditPlayerId, "numberFive");
-    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
-
-    expect((await redis.hGetAll(carUnlockHashKey(redditPlayerId)))["post:track:numberFive"])
-      .toBe("1");
-  });
-
-  it("still discards a pre-choice reward that was not earned again", async () => {
-    const guestPlayerId = "guest:discarded";
-    const redditPlayerId = "reddit:discarded";
-    await recordHeadToHeadPost(redditPlayerId, "numberZero");
-    await seedGuest(guestPlayerId, redditPlayerId);
-
-    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
-
-    const after = await redis.hGetAll(carUnlockHashKey(redditPlayerId));
-    expect(after["post:track:numberZero"]).toBeUndefined();
-    expect(after["race:completed"]).toBe("1");
   });
 
   it("does not recapture the baseline when preparation runs again", async () => {
@@ -220,65 +176,6 @@ describe("an older interrupted transfer gets no invented baseline", () => {
   });
 });
 
-describe("a Garage evidence cleanup that fails cannot spoil the next transfer", () => {
-  const GUEST = "guest:evidence";
-  const ACCOUNT = "reddit:evidence";
-  const NEXT_GUEST = "guest:evidence-second";
-
-  beforeEach(() => {
-    redis.reset();
-    vi.restoreAllMocks();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-  });
-
-  it("completes the transfer and reports the refused delete rather than failing", async () => {
-    await seedGuest(GUEST, ACCOUNT);
-    await recordCompletedRace(ACCOUNT);
-
-    redis.failDelKeys = new Set(["transfer-baseline"]);
-    const result = await selectGuestProgress({
-      guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest",
-    });
-
-    expect(result.status).toBe("completed");
-    expect(await redis.get(baselineKey(ACCOUNT))).not.toBeNull();
-    expect(console.error).toHaveBeenCalled();
-  });
-
-  it("attempts the journal delete even when the baseline delete is refused", async () => {
-    await seedGuest(GUEST, ACCOUNT);
-    await recordCompletedRace(ACCOUNT);
-    await interruptAfterPreparation(GUEST, ACCOUNT);
-    await recordHeadToHeadWin(ACCOUNT, "duringTransfer");
-    expect(Object.keys(await redis.hGetAll(journalKey(ACCOUNT)))).toContain("win:challenge:duringTransfer");
-
-    redis.failDelKeys = new Set(["transfer-baseline"]);
-    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
-
-    expect(await redis.hGetAll(journalKey(ACCOUNT))).toEqual({});
-  });
-
-  it("does not replace the next transfer against a baseline frozen for the last one", async () => {
-    await seedGuest(GUEST, ACCOUNT);
-    await recordHeadToHeadPost(ACCOUNT, "givenUpTrack");
-
-    redis.failDelKeys = new Set(["transfer-baseline"]);
-    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
-    const leaked = JSON.parse(await redis.get(baselineKey(ACCOUNT)));
-
-    await seedGuest(NEXT_GUEST, ACCOUNT);
-    await recordHeadToHeadWin(ACCOUNT, "earnedBeforeSecondChoice");
-    const beforeSecondChoice = await redis.hGetAll(carUnlockHashKey(ACCOUNT));
-
-    await selectGuestProgress({ guestPlayerId: NEXT_GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
-
-    const captured = JSON.parse(await redis.get(baselineKey(ACCOUNT)));
-    expect(captured.transferId).not.toBe(leaked.transferId);
-    expect(captured.fields).toEqual(beforeSecondChoice);
-    expect(Object.keys(captured.fields)).toContain("win:challenge:earnedBeforeSecondChoice");
-  });
-});
-
 describe("the transfer's logging names no player", () => {
   const GUEST = "guest:quiet";
   const ACCOUNT = "reddit:quiet";
@@ -295,23 +192,6 @@ describe("the transfer's logging names no player", () => {
       .flat()
       .map((argument) => (typeof argument === "string" ? argument : JSON.stringify(argument) ?? ""));
   }
-
-  it("keeps the account out of the missing-baseline log", async () => {
-    await seedGuest(GUEST, ACCOUNT);
-    await recordCompletedRace(ACCOUNT);
-    await interruptAfterPreparation(GUEST, ACCOUNT);
-    await redis.del(baselineKey(ACCOUNT));
-
-    await selectGuestProgress({ guestPlayerId: GUEST, redditPlayerId: ACCOUNT, choice: "guest" });
-
-    expect(console.error).toHaveBeenCalledWith(
-      "Guest transfer Garage baseline missing; keeping the account Garage.",
-    );
-    for (const argument of loggedArguments()) {
-      expect(argument).not.toMatch(/reddit:/);
-      expect(argument).not.toMatch(/guest:/);
-    }
-  });
 
   it("keeps both identities out of a completed transfer's logging", async () => {
     await seedGuest(GUEST, ACCOUNT);

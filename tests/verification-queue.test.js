@@ -88,7 +88,7 @@ describe('verification queue', () => {
         expect(getNextVerificationAttemptAt()).toBe(null);
     });
 
-    it('moves only the selected guest queue into the signed-in owner', () => {
+    it('runs a stored Keep guest choice as Merge: moves the guest queue and keeps the account queue', () => {
         setActivePlayerOwnerId('guest:guest-choice');
         enqueueDailyChallengeVerification({
             challengeId: 'guest-race',
@@ -116,12 +116,12 @@ describe('verification queue', () => {
         });
 
         expect(result.moved).toBe(1);
-        expect(result.removed).toBe(1);
+        expect(result.removed).toBe(0);
         expect(getDailyChallengeVerificationEntry('guest-race')).toMatchObject({
             ownerPlayerId: OWNER,
             bestTime: 12,
         });
-        expect(getDailyChallengeVerificationEntry('account-race')).toBeNull();
+        expect(getDailyChallengeVerificationEntry('account-race')).toMatchObject({ ownerPlayerId: OWNER });
     });
 
     it('keeps the account queue and moves the guest queue when the player merges', () => {

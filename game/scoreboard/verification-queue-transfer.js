@@ -14,11 +14,12 @@ import {
   writeQueueState,
 } from "./verification-queue.js";
 
-// Keep guest drops the account's queued runs and moves the guest's; Keep
-// account drops the guest's; Merge keeps the account's and moves the guest's,
-// keeping the faster run where both queued one.
-function isTransferChoice(choice) {
-  return choice === "guest" || choice === "account" || choice === "merge";
+// Keep account drops the guest's queued runs; Merge keeps the account's and
+// moves the guest's, keeping the faster run where both queued one. Keep guest
+// is retired and runs as Merge, on the phone as on the server.
+function runnableTransferChoice(choice) {
+  if (choice === "account") return "account";
+  return choice === "guest" || choice === "merge" ? "merge" : null;
 }
 
 function transferReceiptKey({ transferId, guestPlayerId, accountPlayerId }) {
@@ -74,11 +75,12 @@ export function prepareVerificationQueueGuestProgressReconciliation({
   transferId = null,
   guestPlayerId,
   accountPlayerId,
-  choice,
+  choice: requestedChoice,
 } = {}) {
+  const choice = runnableTransferChoice(requestedChoice);
   if (!normalizedTransferValue(guestPlayerId)
     || !normalizedTransferValue(accountPlayerId)
-    || !isTransferChoice(choice)) {
+    || !choice) {
     return { prepared: false };
   }
   const queueState = readQueueState();
@@ -86,7 +88,7 @@ export function prepareVerificationQueueGuestProgressReconciliation({
   const receiptKey = transferReceiptKey({ transferId, guestPlayerId, accountPlayerId });
   const existing = queueState[TRANSFER_RECONCILIATIONS_KEY][receiptKey];
   if (existing) {
-    return existing.choice === choice
+    return runnableTransferChoice(existing.choice) === choice
       ? { prepared: true, receiptKey }
       : { prepared: false, receiptKey, choiceLocked: true };
   }
@@ -115,8 +117,9 @@ export function isVerificationQueueGuestProgressReconciled({
   transferId = null,
   guestPlayerId,
   accountPlayerId,
-  choice,
+  choice: requestedChoice,
 } = {}) {
+  const choice = requestedChoice ? runnableTransferChoice(requestedChoice) : null;
   if (!normalizedTransferValue(guestPlayerId) || !normalizedTransferValue(accountPlayerId)) {
     return false;
   }
@@ -130,7 +133,7 @@ export function isVerificationQueueGuestProgressReconciled({
     return Boolean(receipt?.completedAt)
       && receipt.guestPlayerId === guestPlayerId
       && receipt.accountPlayerId === accountPlayerId
-      && (!choice || receipt.choice === choice);
+      && (!choice || runnableTransferChoice(receipt.choice) === choice);
   });
 }
 
@@ -194,12 +197,13 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   completedAt = null,
   guestPlayerId,
   accountPlayerId,
-  choice,
+  choice: requestedChoice,
 } = {}) {
+  const choice = runnableTransferChoice(requestedChoice);
   if (
     typeof guestPlayerId !== "string" || !guestPlayerId.trim()
     || typeof accountPlayerId !== "string" || !accountPlayerId.trim()
-    || !isTransferChoice(choice)
+    || !choice
   ) {
     return { changed: false, removed: 0, moved: 0 };
   }
@@ -208,7 +212,7 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   const matchesThisTransfer = (candidate) => Boolean(candidate)
     && candidate.guestPlayerId === guestPlayerId
     && candidate.accountPlayerId === accountPlayerId
-    && candidate.choice === choice;
+    && runnableTransferChoice(candidate.choice) === choice;
   const fallbackKey = transferReceiptKey({ guestPlayerId, accountPlayerId });
   const receiptKey = normalizedTransferValue(transferId)
     ? transferReceiptKey({ transferId, guestPlayerId, accountPlayerId })
@@ -219,8 +223,7 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
     const ambiguous = [];
     for (const bucket of QUEUE_BUCKETS) {
       for (const [entryKey, entry] of Object.entries(queueState[bucket])) {
-        const inDoubt = entry?.ownerPlayerId === guestPlayerId
-          || (choice === "guest" && entry?.ownerPlayerId === accountPlayerId);
+        const inDoubt = entry?.ownerPlayerId === guestPlayerId;
         if (!inDoubt) continue;
         const updatedMs = parseTimestamp(entry.updatedAt);
         if (completedMs === null || updatedMs === null || updatedMs <= completedMs) {
@@ -258,17 +261,6 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   let moved = 0;
   let preserved = 0;
   {
-    if (choice === "guest") {
-      for (const snapshot of receipt.entries.account) {
-        const entry = queueState[snapshot.bucket]?.[snapshot.entryKey];
-        if (!matchesTransferEntrySnapshot(entry, snapshot)) {
-          if (entry) preserved += 1;
-          continue;
-        }
-        delete queueState[snapshot.bucket][snapshot.entryKey];
-        removed += 1;
-      }
-    }
     for (const snapshot of receipt.entries.guest) {
       const entry = queueState[snapshot.bucket]?.[snapshot.entryKey];
       if (!matchesTransferEntrySnapshot(entry, snapshot)) {
