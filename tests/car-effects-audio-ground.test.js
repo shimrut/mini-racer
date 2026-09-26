@@ -203,6 +203,67 @@ describe('car sound per ground', () => {
         }
     });
 
+    it('climbs the jet ski and the jet engine to top speed in one gear, with no gear crack', () => {
+        for (const ground of ['water', 'space']) {
+            const { ctx, nodes } = createMockContext();
+            const audio = createCarEffectsAudio(ctx, {});
+            audio.prepareOnUserGesture();
+            const pitches = [];
+            let cracks = 0;
+            for (const speed of [2, 5, 8, 11, 14]) {
+                const sourcesBefore = nodes.sources.length;
+                ctx.currentTime += 1;
+                audio.syncFrame({ status: 'playing', speed, maxSpeedKph: 310, slipRatio: 0, throttleBlocked: false, ground });
+                // The first frame starts the two ground sounds.
+                if (speed > 2) cracks += nodes.sources.length - sourcesBefore;
+                pitches.push(nodes.oscillators[0].frequency.last);
+            }
+            expect(cracks, ground).toBe(0);
+            for (let i = 1; i < pitches.length; i += 1) {
+                expect(pitches[i], ground).toBeGreaterThan(pitches[i - 1]);
+            }
+        }
+    });
+
+    it('plays water rushing past the jet ski, and a splash in a slide', () => {
+        const tarmac = createMockContext();
+        const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});
+        tarmacAudio.prepareOnUserGesture();
+        driveFrame(tarmacAudio, tarmac.ctx, 'tarmac');
+
+        const water = createMockContext();
+        const waterAudio = createCarEffectsAudio(water.ctx, {});
+        waterAudio.prepareOnUserGesture();
+        driveFrame(waterAudio, water.ctx, 'water');
+
+        const { gravel, rumble } = groundGains(water.nodes);
+        expect(gravel.gain.last).toBeGreaterThan(0);
+        expect(rumble.gain.last).toBeGreaterThan(0);
+        const slipBand = (nodes) => nodes.filters.find((filter) => filter.type === 'bandpass' && filter.frequency.value === 2200);
+        expect(slipBand(water.nodes).Q.last).toBeLessThan(2);
+        expect(slipBand(water.nodes).frequency.last).toBeLessThan(slipBand(tarmac.nodes).frequency.last);
+    });
+
+    it('plays a clean jet with more high whine than tarmac in space, and no tyre sounds', () => {
+        const tarmac = createMockContext();
+        const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});
+        tarmacAudio.prepareOnUserGesture();
+        driveFrame(tarmacAudio, tarmac.ctx, 'tarmac');
+
+        const space = createMockContext();
+        const spaceAudio = createCarEffectsAudio(space.ctx, {});
+        spaceAudio.prepareOnUserGesture();
+        driveFrame(spaceAudio, space.ctx, 'space');
+
+        const whine = (nodes) => nodes.gains.find((gain) => gain.gain.value === 0.15);
+        expect(whine(space.nodes).gain.last).toBeGreaterThan(whine(tarmac.nodes).gain.last * 2);
+        const { gravel, rumble } = groundGains(space.nodes);
+        expect(gravel.gain.last).toBe(0);
+        expect(rumble.gain.last).toBeGreaterThan(0);
+        const slipBand = (nodes) => nodes.filters.find((filter) => filter.type === 'bandpass' && filter.frequency.value === 2200);
+        expect(slipBand(space.nodes).frequency.last).toBeLessThan(1000);
+    });
+
     it('plays a lower, less whiny engine on dirt than on tarmac', () => {
         const tarmac = createMockContext();
         const tarmacAudio = createCarEffectsAudio(tarmac.ctx, {});

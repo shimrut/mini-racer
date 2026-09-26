@@ -4,9 +4,11 @@ import { getCarRearAxleWorldPoint } from "./simulation.js";
 import { KPH_PER_WORLD_UNIT } from "../car/handling.js";
 
 // Look-only effects that keep the car on the ground on a loose surface:
-// tyre tracks behind the rear wheels, small dust puffs, and the look of the
-// skid marks. They never change the drive, so they live outside the shared
-// simulation.
+// tyre tracks behind the rear wheels, lumps of earth or snow thrown from the
+// wheels, and the look of the skid marks. On water, the tracks are the wake of
+// the jet ski and the spray is splashes. In space, the tracks are the engine
+// trails.
+// They never change the drive, so they live outside the shared simulation.
 
 const TYRE_TRACK_DEFAULT_SECONDS = 3;
 const TYRE_TRACK_MAX_SECONDS = 5;
@@ -17,14 +19,85 @@ const MARK_GAP_BREAK_DIST_SQ = 0.45 * 0.45;
 const TYRE_TRACK_FADE_STEPS = 6;
 // On a slow device, fewer fade steps halve the strokes.
 const TYRE_TRACK_LOW_QUALITY_FADE_STEPS = 3;
+// The shade side of a groove, as parts of its width.
+const TYRE_TRACK_SHADE_OFFSET = 0.35;
+const TYRE_TRACK_SHADE_WIDTH = 0.45;
 
-const DUST_MIN_SPEED = 3;
-const DUST_BASE_CHANCE = 0.18;
-const DUST_SLIP_CHANCE = 0.55;
-// Dust starts just behind the rear edge of the car, in line with the rear
-// tires, so it comes out from behind the car and not from under its middle.
-const DUST_BEHIND_CENTER = 0.6;
-const DUST_HALF_WIDTH = 0.28;
+const SPRAY_MIN_SPEED = 3;
+// The spray starts just behind the rear edge of the car, in line with the
+// rear tires, so it comes out from behind the car and not from under its
+// middle.
+const SPRAY_BEHIND_CENTER = 0.6;
+const SPRAY_HALF_WIDTH = 0.28;
+// Dust from the front wheels starts just behind the front tires, in line
+// with them. A front puff is about as wide as the tire (4-6 px), is at its
+// full size at once, and stays in the line of its tire.
+const SPRAY_FRONT_AHEAD_OF_CENTER = 0.2;
+const SPRAY_FRONT_HALF_WIDTH = 0.26;
+const SPRAY_FRONT_POP = 0.12;
+const SPRAY_FRONT_SPREAD_SCALE = 0.3;
+const SPRAY_FRONT_MIN_SIZE = 2.3;
+const SPRAY_FRONT_MAX_SIZE = 3;
+
+// Spray: flat shapes, with a shade to the lower right and a light top to the
+// upper left when the ground gives those colours. Each lump keeps some of the
+// car's speed, is thrown back and out from the wheel, and slows down. It
+// grows to its full size, then shrinks away. A ground picks a spray style:
+// - lumps: splashes of water from the hull, that pop up.
+// - snow: lumps of snow from all four wheels, that pop up.
+// - dust: puffs of dust from all four wheels that stay close behind them,
+//   overlap into one flat cloud, and grow more slowly.
+// frontShare: the part of the rear wheel spray that each front wheel throws.
+const SPRAY_LUMPS = Object.freeze({
+  baseChance: 0.45,
+  slipChance: 0.9,
+  carry: 0.35,
+  throw: 1.5,
+  spread: 2.2,
+  minSize: 4,
+  maxSize: 9,
+  minLife: 0.45,
+  lifeRange: 0.35,
+  // The part of its life a lump takes to reach its full size.
+  pop: 0.2,
+  frontShare: 0,
+});
+const SPRAY_STYLES = Object.freeze({
+  lumps: SPRAY_LUMPS,
+  snow: Object.freeze({ ...SPRAY_LUMPS, frontShare: 0.5 }),
+  dust: Object.freeze({
+    baseChance: 0.6,
+    slipChance: 0.8,
+    carry: 0.5,
+    throw: 0.5,
+    spread: 0.6,
+    minSize: 6,
+    maxSize: 10,
+    minLife: 0.3,
+    lifeRange: 0.15,
+    pop: 0.35,
+    frontShare: 0.5,
+  }),
+});
+const SPRAY_DRAG = 3;
+// Wall hit lumps pop up like snow lumps.
+const SPRAY_POP = SPRAY_STYLES.lumps.pop;
+const SPRAY_SHADE_OFFSET_X = 1.5;
+const SPRAY_SHADE_OFFSET_Y = 2;
+const SPRAY_LIGHT_OFFSET_X = -1;
+const SPRAY_LIGHT_OFFSET_Y = -1.2;
+const SPRAY_LIGHT_SCALE = 0.55;
+
+// A wall hit on a bank of earth or snow throws lumps of the bank in place of
+// sparks. They fly out from the wall into the road, keep a little of the
+// car's speed, and are drawn like the spray. A harder hit throws more.
+const SCRAPE_MIN_LUMPS = 10;
+const SCRAPE_MAX_LUMPS = 18;
+const SCRAPE_THROW = 5;
+const SCRAPE_SPREAD = 2.5;
+const SCRAPE_CARRY = 0.3;
+const SCRAPE_MIN_SIZE = 4;
+const SCRAPE_MAX_SIZE = 9;
 
 export function createTyreTrackBuffer() {
   return new RingBuffer(TYRE_TRACK_CAPACITY, () => ({
@@ -43,46 +116,149 @@ function getSlipRatio(engine) {
   return Math.abs(-vy * engine.velocity.x + vx * engine.velocity.y) / speed;
 }
 
-function spawnDust(engine, heading, slipRatio, maxSpeedWorld, presentation) {
-  const color = presentation.dustColor;
-  const edgeColor = presentation.dustEdgeColor;
-  const sizeScale = Number(presentation.dustSizeScale) || 1;
+function spawnSpray(engine, heading, slipRatio, maxSpeedWorld, presentation) {
+  const style = SPRAY_STYLES[presentation.sprayStyle] || SPRAY_STYLES.lumps;
   const speedRatio = Math.min(1, engine.cachedSpeed / maxSpeedWorld);
   const lowQuality = engine.frameSkip > 0 || engine.qualityLevel > 0;
-  const chance = (DUST_BASE_CHANCE * speedRatio + DUST_SLIP_CHANCE * slipRatio)
+  const chance = (style.baseChance * speedRatio + style.slipChance * slipRatio)
     * (lowQuality ? 0.5 : 1);
 
-  const backX = engine.pos.x - heading.cos * DUST_BEHIND_CENTER;
-  const backY = engine.pos.y - heading.sin * DUST_BEHIND_CENTER;
-  for (const side of [-1, 1]) {
-    if (Math.random() >= chance) continue;
-    const wheelX = backX + side * heading.sin * DUST_HALF_WIDTH;
-    const wheelY = backY - side * heading.cos * DUST_HALF_WIDTH;
-    const drift = 0.4 + Math.random() * 0.8;
-    const spread = (Math.random() - 0.5) * 1.2;
-    const life = 0.35 + Math.random() * 0.3;
-    const size = (4 + Math.random() * 4) * sizeScale;
-    const vx = -heading.cos * drift - heading.sin * spread;
-    const vy = -heading.sin * drift + heading.cos * spread;
-    // On a pale ground, a slightly larger darker puff underneath gives the
-    // spray an edge, so it stands out from the road.
-    if (edgeColor) {
-      engine.particles.push({
-        x: wheelX, y: wheelY, vx, vy, life, maxLife: life, color: edgeColor, size: size + 1.5,
-      });
+  const axles = [{
+    ahead: -SPRAY_BEHIND_CENTER,
+    halfWidth: SPRAY_HALF_WIDTH,
+    chance,
+    spreadScale: 1,
+    pop: style.pop,
+    minSize: style.minSize,
+    maxSize: style.maxSize,
+  }];
+  if (style.frontShare > 0) {
+    axles.push({
+      ahead: SPRAY_FRONT_AHEAD_OF_CENTER,
+      halfWidth: SPRAY_FRONT_HALF_WIDTH,
+      chance: chance * style.frontShare,
+      spreadScale: SPRAY_FRONT_SPREAD_SCALE,
+      pop: SPRAY_FRONT_POP,
+      minSize: SPRAY_FRONT_MIN_SIZE,
+      maxSize: SPRAY_FRONT_MAX_SIZE,
+    });
+  }
+  for (const axle of axles) {
+    const axleX = engine.pos.x + heading.cos * axle.ahead;
+    const axleY = engine.pos.y + heading.sin * axle.ahead;
+    for (const side of [-1, 1]) {
+      if (Math.random() >= axle.chance) continue;
+      spawnSprayLump(engine, heading, presentation, style, axle, side,
+        axleX + side * heading.sin * axle.halfWidth,
+        axleY - side * heading.cos * axle.halfWidth);
     }
-    engine.particles.push({
-      x: wheelX, y: wheelY, vx, vy, life, maxLife: life, color, size,
+  }
+}
+
+function spawnSprayLump(engine, heading, presentation, style, axle, side, x, y) {
+  const throwSpeed = style.throw * (0.6 + Math.random() * 0.8);
+  // Each wheel throws its spray out to its own side, so the cloud fans out.
+  const spread = side * style.spread * axle.spreadScale * (0.2 + Math.random());
+  const life = style.minLife + Math.random() * style.lifeRange;
+  engine.particles.push({
+    x,
+    y,
+    vx: engine.velocity.x * style.carry - heading.cos * throwSpeed + heading.sin * spread,
+    vy: engine.velocity.y * style.carry - heading.sin * throwSpeed - heading.cos * spread,
+    life,
+    maxLife: life,
+    color: presentation.sprayColor,
+    size: axle.minSize + Math.random() * (axle.maxSize - axle.minSize),
+    pop: axle.pop,
+    spray: true,
+  });
+}
+
+// The point on the nearest wall line, and the direction from it into the road.
+function findNearestWall(collisionHash, pos) {
+  const segments = collisionHash?.segments;
+  if (!Array.isArray(segments) || segments.length === 0) return null;
+  let best = null;
+  let bestDistSq = Infinity;
+  for (const segment of segments) {
+    const t = segment.lenSq > 0
+      ? Math.max(0, Math.min(1, ((pos.x - segment.start.x) * segment.dx + (pos.y - segment.start.y) * segment.dy) / segment.lenSq))
+      : 0;
+    const x = segment.start.x + segment.dx * t;
+    const y = segment.start.y + segment.dy * t;
+    const distSq = (pos.x - x) * (pos.x - x) + (pos.y - y) * (pos.y - y);
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      best = { x, y };
+    }
+  }
+  const dist = Math.sqrt(bestDistSq);
+  if (!(dist > 1e-6)) return null;
+  return { point: best, normal: { x: (pos.x - best.x) / dist, y: (pos.y - best.y) / dist } };
+}
+
+function spawnScrapeDebris(engine, presentation, config, severity) {
+  // Take away the sparks that the simulation made for this hit.
+  const particles = engine.particles;
+  while (particles.length > 0) {
+    const last = particles[particles.length - 1];
+    if (last.spray || last.color !== config?.sparkColor) break;
+    particles.pop();
+  }
+
+  const wall = findNearestWall(engine.collisionHash, engine.pos);
+  const normal = wall ? wall.normal : { x: -Math.cos(engine.angle), y: -Math.sin(engine.angle) };
+  const origin = wall ? wall.point : engine.pos;
+  const tangentX = -normal.y;
+  const tangentY = normal.x;
+  const hardness = Math.max(0, Math.min(1, Number(severity) || 0));
+  const lowQuality = engine.frameSkip > 0 || engine.qualityLevel > 0;
+  const count = Math.round((SCRAPE_MIN_LUMPS + (SCRAPE_MAX_LUMPS - SCRAPE_MIN_LUMPS) * hardness)
+    * (lowQuality ? 0.5 : 1));
+  for (let i = 0; i < count; i += 1) {
+    const throwSpeed = SCRAPE_THROW * (0.4 + Math.random() * 0.8) * (0.7 + hardness * 0.5);
+    const spread = (Math.random() - 0.5) * 2 * SCRAPE_SPREAD;
+    const start = (Math.random() - 0.5) * 0.5;
+    const life = 0.35 + Math.random() * 0.3;
+    particles.push({
+      x: origin.x + tangentX * start,
+      y: origin.y + tangentY * start,
+      vx: normal.x * throwSpeed + tangentX * spread + engine.velocity.x * SCRAPE_CARRY,
+      vy: normal.y * throwSpeed + tangentY * spread + engine.velocity.y * SCRAPE_CARRY,
+      life,
+      maxLife: life,
+      color: presentation.scrapeDebris.color,
+      size: SCRAPE_MIN_SIZE + Math.random() * (SCRAPE_MAX_SIZE - SCRAPE_MIN_SIZE),
+      spray: true,
+      debris: true,
     });
   }
 }
 
-// Call once per physics step, after the simulation moved the car.
-export function recordGroundEffects(engine, presentation, config) {
+// Spray puffs slow down in the air. The shared particle step moves them.
+function slowSpray(particles, dt) {
+  const keep = Math.max(0, 1 - SPRAY_DRAG * dt);
+  for (const particle of particles) {
+    if (!particle.spray) continue;
+    particle.vx *= keep;
+    particle.vy *= keep;
+  }
+}
+
+// Call once per physics step, after the simulation moved the car, with the
+// events of that step.
+export function recordGroundEffects(engine, presentation, config, events = null) {
   const tracks = engine.tyreTracks;
   const trackColor = presentation?.tyreTrackColor;
-  const dustColor = presentation?.dustColor;
-  if (!tracks || (!trackColor && !dustColor)) return;
+  const sprayColor = presentation?.sprayColor;
+  const scrapeDebris = presentation?.scrapeDebris;
+  if (scrapeDebris && events?.wallImpact?.kind === "scrape" && Array.isArray(engine.particles)) {
+    spawnScrapeDebris(engine, presentation, config, events.wallImpact.severity);
+  }
+  if ((sprayColor || scrapeDebris) && Array.isArray(engine.particles)) {
+    slowSpray(engine.particles, Number(config?.fixedDt) || 1 / 60);
+  }
+  if (!tracks || (!trackColor && !sprayColor)) return;
   if (engine.status !== "playing" || engine.relaunchDelayRemaining > 0) return;
   if (!(engine.cachedSpeed > TYRE_TRACK_MIN_SPEED)) return;
 
@@ -97,27 +273,90 @@ export function recordGroundEffects(engine, presentation, config) {
     slot.sin = heading.sin;
   }
 
-  if (dustColor && engine.cachedSpeed > DUST_MIN_SPEED && Array.isArray(engine.particles)) {
+  if (sprayColor && engine.cachedSpeed > SPRAY_MIN_SPEED && Array.isArray(engine.particles)) {
     const maxSpeedWorld = Math.max(0.001, (Number(config?.maxSpeed) || 220) / KPH_PER_WORLD_UNIT);
-    spawnDust(engine, heading, getSlipRatio(engine), maxSpeedWorld, presentation);
+    spawnSpray(engine, heading, getSlipRatio(engine), maxSpeedWorld, presentation);
   }
+}
+
+// A lump grows to its full size, then shrinks away.
+function getSprayRadius(particle) {
+  const age = particle.maxLife > 0 ? 1 - Math.max(0, particle.life / particle.maxLife) : 1;
+  const pop = particle.pop || SPRAY_POP;
+  return particle.size * Math.min(1, age / pop) * Math.sqrt(1 - age);
+}
+
+// One flat layer of the spray lumps, or of the wall hit lumps, as one fill,
+// so lumps that touch merge.
+function fillSprayLayer(ctx, particles, gs, debris, color, scale, offsetX, offsetY) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  let lumps = 0;
+  for (const particle of particles) {
+    if (!particle.spray || Boolean(particle.debris) !== debris) continue;
+    const radius = getSprayRadius(particle) * scale;
+    if (!(radius > 0.3)) continue;
+    const x = particle.x * gs + offsetX;
+    const y = particle.y * gs + offsetY;
+    ctx.moveTo(x + radius, y);
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    lumps += 1;
+  }
+  if (lumps > 0) ctx.fill();
+}
+
+// Spray and wall hit lumps, under the car and the sparks. The race and
+// the Mapmaker test drive draw the other particles as flat dots.
+export function drawSpray(ctx, particles, presentation, gs) {
+  if (!presentation || !Array.isArray(particles) || particles.length === 0) return;
+  const debris = presentation.scrapeDebris;
+  const layers = [
+    [false, presentation.sprayColor, presentation.sprayShadeColor, presentation.sprayLightColor],
+    [true, debris?.color, debris?.shade, debris?.light],
+  ];
+  ctx.save();
+  for (const [isDebris, color, shade, light] of layers) {
+    if (!color) continue;
+    if (shade) {
+      fillSprayLayer(ctx, particles, gs, isDebris, shade, 1, SPRAY_SHADE_OFFSET_X, SPRAY_SHADE_OFFSET_Y);
+    }
+    fillSprayLayer(ctx, particles, gs, isDebris, color, 1, 0, 0);
+    if (light) {
+      fillSprayLayer(ctx, particles, gs, isDebris, light, SPRAY_LIGHT_SCALE,
+        SPRAY_LIGHT_OFFSET_X, SPRAY_LIGHT_OFFSET_Y);
+    }
+  }
+  ctx.restore();
+}
+
+// The distance of each line of tyre tracks and skid marks from the middle of
+// the car, in world units. A ground can put them under the rear tires.
+export function getMarkHalfWidth(presentation) {
+  return Number(presentation?.markHalfWidth) || MARK_HALF_WIDTH;
 }
 
 // One side of a line of marks behind the rear wheels, for tyre tracks and
 // skid marks. A gap in the marks starts a new line.
-export function addMarkSide(path, marks, start, end, gs, side) {
+// offset moves the line that many pixels to the lower right, or to the upper
+// left when it is less than 0.
+// halfWidthAt: optional, gives the distance of the line from the middle at
+// each mark: for a ground that puts the marks under the rear tires, or for a
+// wake that opens out. Without it, the distance is MARK_HALF_WIDTH.
+export function addMarkSide(path, marks, start, end, gs, side, offset = 0, halfWidthAt = null) {
   const first = marks.get(start);
+  const firstHalf = halfWidthAt ? halfWidthAt(start) : MARK_HALF_WIDTH;
   path.moveTo(
-    (first.x + side * first.sin * MARK_HALF_WIDTH) * gs,
-    (first.y - side * first.cos * MARK_HALF_WIDTH) * gs,
+    (first.x + side * first.sin * firstHalf) * gs + offset,
+    (first.y - side * first.cos * firstHalf) * gs + offset,
   );
   for (let i = start + 1; i <= end; i++) {
     const prev = marks.get(i - 1);
     const mark = marks.get(i);
     const dx = mark.x - prev.x;
     const dy = mark.y - prev.y;
-    const x = (mark.x + side * mark.sin * MARK_HALF_WIDTH) * gs;
-    const y = (mark.y - side * mark.cos * MARK_HALF_WIDTH) * gs;
+    const half = halfWidthAt ? halfWidthAt(i) : MARK_HALF_WIDTH;
+    const x = (mark.x + side * mark.sin * half) * gs + offset;
+    const y = (mark.y - side * mark.cos * half) * gs + offset;
     if (dx * dx + dy * dy > MARK_GAP_BREAK_DIST_SQ) path.moveTo(x, y);
     else path.lineTo(x, y);
   }
@@ -143,46 +382,52 @@ export function drawTyreTracks(ctx, tracks, presentation, gs, zoom, lowQuality =
   ctx.strokeStyle = color;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const lineWidth = Math.max(width * 0.8, width / zoom);
-  // A rut: a light ridge of pushed-aside snow or soil under a darker groove.
-  const edgeColor = presentation.tyreTrackEdgeColor;
-  const edgeWidth = lineWidth + 2 * (Number(presentation.tyreTrackEdgeWidth) || 1.5);
+  // Tracks as wide as the tire keep their width in the world, as the tire
+  // does. Other tracks keep most of their width on the screen when the
+  // camera zooms out.
+  const lineWidth = presentation.tyreTrackIsTireWidth === true
+    ? width
+    : Math.max(width * 0.8, width / zoom);
+  // A groove pressed into earth or snow: the light from the top left puts
+  // its upper left side in shade.
+  const shadeColor = presentation.tyreTrackShadeColor;
+  const shadeOffset = lineWidth * TYRE_TRACK_SHADE_OFFSET;
+  const shadeWidth = lineWidth * TYRE_TRACK_SHADE_WIDTH;
   const fadeSteps = lowQuality ? TYRE_TRACK_LOW_QUALITY_FADE_STEPS : TYRE_TRACK_FADE_STEPS;
   const chunk = Math.ceil(visible / fadeSteps);
+  // A wake opens out: each second, its two lines move this far apart.
+  const spread = Number(presentation.tyreTrackSpread) || 0;
+  const newest = tracks.length - 1;
+  const halfWidth = getMarkHalfWidth(presentation);
+  const halfWidthAt = spread > 0
+    ? (index) => halfWidth + ((newest - index) / 60) * spread
+    : () => halfWidth;
+  const strokeChunk = (start, end, offset, strokeStyle, strokeWidth) => {
+    ctx.beginPath();
+    addMarkSide(ctx, tracks, start, end, gs, -1, offset, halfWidthAt);
+    addMarkSide(ctx, tracks, start, end, gs, 1, offset, halfWidthAt);
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = strokeWidth;
+    ctx.stroke();
+  };
   for (let step = 0; step < fadeSteps; step++) {
     const start = first + step * chunk;
     if (start >= tracks.length - 1) break;
     const end = Math.min(tracks.length - 1, start + chunk);
     ctx.globalAlpha = (step + 1) / fadeSteps;
-    ctx.beginPath();
-    addMarkSide(ctx, tracks, start, end, gs, -1);
-    addMarkSide(ctx, tracks, start, end, gs, 1);
-    if (edgeColor) {
-      ctx.strokeStyle = edgeColor;
-      ctx.lineWidth = edgeWidth;
-      ctx.stroke();
-    }
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
+    if (shadeColor) strokeChunk(start, end, -shadeOffset, shadeColor, shadeWidth);
+    strokeChunk(start, end, 0, color, lineWidth);
   }
   ctx.restore();
 }
 
-// Skid marks show where the car slid. A ground can put a light ridge of
-// pushed-aside soil along each dark mark, so a slide stands out from the
-// tyre tracks. strokePaths strokes the mark paths with the current style.
+// Skid marks show where the car slid. strokePaths strokes the mark paths
+// with the current style.
 export function strokeSkidMarks(ctx, presentation, zoom, strokePaths) {
-  const lineWidth = Math.max(3.4, 4.2 / zoom);
+  const lineWidth = Math.max(3.4, 4.2 / zoom) * (Number(presentation?.skidWidthScale) || 1);
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  const edgeColor = presentation?.skidEdgeColor;
-  if (edgeColor) {
-    ctx.strokeStyle = edgeColor;
-    ctx.lineWidth = lineWidth + 2 * (Number(presentation.skidEdgeWidth) || 1.5);
-    strokePaths();
-  }
   ctx.strokeStyle = presentation?.skidColor || CONFIG.skidColor;
   ctx.lineWidth = lineWidth;
   strokePaths();
@@ -193,10 +438,11 @@ export function strokeSkidMarks(ctx, presentation, zoom, strokePaths) {
 export function drawSkidMarks(ctx, skidMarks, presentation, gs, zoom) {
   if (!skidMarks || skidMarks.length < 2) return;
   const end = skidMarks.length - 1;
+  const halfWidth = getMarkHalfWidth(presentation);
   strokeSkidMarks(ctx, presentation, zoom, () => {
     ctx.beginPath();
-    addMarkSide(ctx, skidMarks, 0, end, gs, -1);
-    addMarkSide(ctx, skidMarks, 0, end, gs, 1);
+    addMarkSide(ctx, skidMarks, 0, end, gs, -1, 0, () => halfWidth);
+    addMarkSide(ctx, skidMarks, 0, end, gs, 1, 0, () => halfWidth);
     ctx.stroke();
   });
 }

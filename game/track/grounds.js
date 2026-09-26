@@ -69,13 +69,13 @@ export const TRACK_GROUNDS = Object.freeze({
     // slide, the car starts and stops turning more slowly, so its line and
     // the camera stay as calm as on tarmac. A turn takes some speed, as the
     // slide does on tarmac, so a long turn does not go much wider.
-    // It has its own car sound, and it uses the tarmac cars.
+    // It has its own car sound and its own cars.
     grip: Object.freeze({
         key: 'grip',
         label: 'Circuit',
         accel: 1,
         maxSpeed: 1,
-        grip: 3,
+        grip: 2,
         steerGripScale: 1,
         turnRate: 1,
         angularResponse: 0.5,
@@ -83,6 +83,42 @@ export const TRACK_GROUNDS = Object.freeze({
         yawCarry: 0,
         slideScrub: 3,
         skidMarkMinSlipRatio: 0.28
+    }),
+    // Open water: the jet ski is driven, not a car. The hull slides wide in
+    // a turn, like on snow. The nose starts to turn slowly, and the jet ski
+    // keeps turning a little after the player lets go. The water takes some speed
+    // in a slide. A water lap is about 23% slower than tarmac, as on dirt.
+    water: Object.freeze({
+        key: 'water',
+        label: 'Water',
+        accel: 0.75,
+        maxSpeed: 0.9,
+        grip: 0.6,
+        steerGripScale: 0.8,
+        turnRate: 0.85,
+        angularResponse: 0.55,
+        highSpeedSteerTrim: 1,
+        yawCarry: 0.25,
+        slideScrub: 0.4,
+        skidMarkMinSlipRatio: 0.45
+    }),
+    // A space lane: the spaceship is driven, not a car. It speeds up
+    // fastest and has the highest top speed. The nose turns quickly, but
+    // the ship keeps its line and slides very wide, with no loss of speed.
+    // A space lap takes about the same time as tarmac.
+    space: Object.freeze({
+        key: 'space',
+        label: 'Space',
+        accel: 1.15,
+        maxSpeed: 1.08,
+        grip: 0.55,
+        steerGripScale: 1,
+        turnRate: 1.05,
+        angularResponse: 1.15,
+        highSpeedSteerTrim: 1,
+        yawCarry: 0,
+        slideScrub: 0,
+        skidMarkMinSlipRatio: 0.45
     })
 });
 

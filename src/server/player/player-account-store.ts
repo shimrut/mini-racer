@@ -75,7 +75,7 @@ const RETURNING_PLAYER_DELAY_MS = 24 * 60 * 60 * 1000;
 
 function isAllowedGroundCarSkin(
     assetName: string | undefined,
-    ground: 'tarmac' | 'dirt' | 'snow',
+    ground: 'tarmac' | 'grip' | 'dirt' | 'snow' | 'water' | 'space',
     carUnlocks: CarUnlockSnapshot,
 ): assetName is string {
     return typeof assetName === 'string'
@@ -84,27 +84,33 @@ function isAllowedGroundCarSkin(
 }
 
 // Each skin must be unlocked and belong to its own ground. A bad tarmac skin
-// falls back to the stock car; a bad dirt or snow skin is dropped.
+// falls back to the stock car; a bad skin for any other ground is dropped.
 function preferencesAllowedByCarUnlocks(
     preferences: DailyGpPlayerPreferences | null,
     carUnlocks: CarUnlockSnapshot,
 ): DailyGpPlayerPreferences | null {
     if (!preferences) return null;
-    const { carSkinDirt, carSkinSnow, ...rest } = preferences;
+    const { carSkinGrip, carSkinDirt, carSkinSnow, carSkinWater, carSkinSpace, ...rest } = preferences;
     return {
         ...rest,
         carSkin: isAllowedGroundCarSkin(preferences.carSkin, 'tarmac', carUnlocks)
             ? preferences.carSkin
             : STOCK_CAR_ASSET_NAME,
+        ...(isAllowedGroundCarSkin(carSkinGrip, 'grip', carUnlocks) ? { carSkinGrip } : {}),
         ...(isAllowedGroundCarSkin(carSkinDirt, 'dirt', carUnlocks) ? { carSkinDirt } : {}),
         ...(isAllowedGroundCarSkin(carSkinSnow, 'snow', carUnlocks) ? { carSkinSnow } : {}),
+        ...(isAllowedGroundCarSkin(carSkinWater, 'water', carUnlocks) ? { carSkinWater } : {}),
+        ...(isAllowedGroundCarSkin(carSkinSpace, 'space', carUnlocks) ? { carSkinSpace } : {}),
     };
 }
 
 function carSkinsDiffer(a: DailyGpPlayerPreferences, b: DailyGpPlayerPreferences): boolean {
     return a.carSkin !== b.carSkin
+        || a.carSkinGrip !== b.carSkinGrip
         || a.carSkinDirt !== b.carSkinDirt
-        || a.carSkinSnow !== b.carSkinSnow;
+        || a.carSkinSnow !== b.carSkinSnow
+        || a.carSkinWater !== b.carSkinWater
+        || a.carSkinSpace !== b.carSkinSpace;
 }
 
 export async function selectServerGuestProgress({

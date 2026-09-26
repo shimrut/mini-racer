@@ -1,14 +1,18 @@
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from './car-unlock-policy.js';
 
 // Each car skin belongs to one ground. The file name says which:
-// mr_dirt_*.webp is a dirt skin, mr_snow_*.webp a snow skin, and every other
+// mr_grip_* is a circuit skin, mr_dirt_*.webp a dirt skin, mr_snow_*.webp a
+// snow skin, mr_water_* a jet ski and mr_space_* a spaceship. Every other
 // skin is a tarmac skin. A player picks one skin for each ground.
 
-export const CAR_SKIN_GROUND_KEYS = Object.freeze(['tarmac', 'dirt', 'snow']);
+export const CAR_SKIN_GROUND_KEYS = Object.freeze(['tarmac', 'grip', 'dirt', 'snow', 'water', 'space']);
 
 const GROUND_FILE_PREFIXES = Object.freeze({
+    grip: 'mr_grip_',
     dirt: 'mr_dirt_',
     snow: 'mr_snow_',
+    water: 'mr_water_',
+    space: 'mr_space_',
 });
 
 export function getCarAssetGround(assetName) {

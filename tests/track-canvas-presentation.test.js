@@ -177,4 +177,32 @@ describe('track canvas presentation', () => {
         expect(ctx.stroke).not.toHaveBeenCalled();
         expect(ctx.fill).toHaveBeenCalled();
     });
+
+    it('paints an uneven finish line with one fill for each colour', () => {
+        const fills = [];
+        const points = [];
+        const ctx = {
+            ...createContext(),
+            moveTo: (x, y) => points.push([x, y]),
+            lineTo: (x, y) => points.push([x, y]),
+            fill() { fills.push(this.fillStyle); },
+        };
+        const look = {
+            key: 'test-painted',
+            finishLineStyle: 'painted',
+            finishLineColor: '#2d5b8c',
+            finishLineAltColor: '#eef4f9'
+        };
+
+        drawTrackFinishLine(ctx, { x: 24, y: 18 }, { x: 24, y: 74 }, 14, look);
+        expect(fills).toEqual(['#eef4f9', '#2d5b8c']);
+        // The squares stay close to the line: 7 px to each side, and a little more.
+        for (const [x] of points) expect(Math.abs(x - 24)).toBeLessThan(9);
+        // The corners move, so the squares are not all straight.
+        expect(new Set(points.map(([x]) => x.toFixed(2))).size).toBeGreaterThan(3);
+
+        fills.length = 0;
+        drawTrackFinishLine(ctx, { x: 24, y: 18 }, { x: 24, y: 74 }, 14, { ...look, finishLineAltColor: null });
+        expect(fills).toEqual(['#2d5b8c']);
+    });
 });

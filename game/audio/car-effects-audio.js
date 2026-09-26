@@ -148,6 +148,68 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipFreqPerSpeed: 1200,
         shiftCrackVol: 0,
     }),
+    // A racing jet ski: a buzzy two-stroke with one long gear, so the note
+    // climbs all the way to top speed with no gear change. Water rushes
+    // past the hull, the hull slaps the waves with a low thump, and a slide
+    // is a wide splash, not a squeal.
+    water: Object.freeze({
+        gearCount: 1,
+        shaperAmount: 24,
+        barkBoostDb: 3,
+        barkFreqScale: 1.2,
+        motorLowpassScale: 1.1,
+        pitchScale: 1.25,
+        whineScale: 0.8,
+        thrumScale: 2.4,
+        pulseScale: 2.2,
+        rpmFloor: 0.18,
+        level: 1.15,
+        gravelVol: 0.06,
+        gravelCruise: 0.9,
+        gravelSlip: 1.2,
+        gravelFreq: 900,
+        gravelQ: 0.7,
+        gravelRate: 0.9,
+        rumbleVol: 0.05,
+        rumbleSlip: 1.2,
+        slipMax: 0.24,
+        slipScale: 0.8,
+        slipQBase: 0.7,
+        slipQPerSlip: 0.2,
+        slipFreqBase: 1300,
+        slipFreqPerSlip: 600,
+        slipFreqPerSpeed: 500,
+        slipHighpass: 400,
+        shiftCrackVol: 0,
+    }),
+    // A jet engine: a clean, smooth note with one long gear and a strong high
+    // whine, over a low rocket rumble. Nothing touches the ground, so there
+    // are no tyre sounds. A slide is a low whoosh.
+    space: Object.freeze({
+        gearCount: 1,
+        shaperAmount: 3,
+        barkBoostDb: 0,
+        motorLowpassScale: 1.3,
+        pitchScale: 1.35,
+        whineScale: 2.6,
+        thrumScale: 0.3,
+        pulseScale: 0.2,
+        rpmFloor: 0.3,
+        level: 1.1,
+        gravelVol: 0,
+        gravelFreq: 1800,
+        rumbleVol: 0.07,
+        rumbleSlip: 0.8,
+        slipMax: 0.16,
+        slipScale: 0.6,
+        slipQBase: 0.6,
+        slipQPerSlip: 0.2,
+        slipFreqBase: 420,
+        slipFreqPerSlip: 300,
+        slipFreqPerSpeed: 300,
+        slipHighpass: 160,
+        shiftCrackVol: 0,
+    }),
 });
 
 function getGroundSoundProfile(ground) {
@@ -727,13 +789,14 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
             const slip = clamp(slipRatio, 0, 1);
             const load = throttleBlocked ? 0.35 : 1.0;
 
-            const gearCount = 6;
+            const profile = getGroundSoundProfile(ground);
+            // A jet ski or a jet has one long gear: the note climbs to top speed.
+            const gearCount = profile.gearCount ?? 6;
             const shiftedSpeed = clamp(speedNorm, 0, 0.995);
             const gearIndex = Math.min(gearCount - 1, Math.floor(shiftedSpeed * gearCount));
             const gearStart = gearIndex / gearCount;
             const gearEnd = (gearIndex + 1) / gearCount;
             const gearProgress = clamp((shiftedSpeed - gearStart) / (gearEnd - gearStart), 0, 1);
-            const profile = getGroundSoundProfile(ground);
             if (profile.gravelVol > 0 || profile.rumbleVol > 0) startGroundNoise();
             else stopGroundNoise();
             if (profile.shaperAmount !== activeShaperAmount && motorShaper) {

@@ -1,6 +1,9 @@
 import { FORMULA_CAR } from "./drawn-car/formula.js";
+import { CIRCUIT_CAR } from "./drawn-car/circuit.js";
 import { RALLY_CAR } from "./drawn-car/rally.js";
 import { SNOW_CAR } from "./drawn-car/snow.js";
+import { JET_SKI } from "./drawn-car/jet-ski.js";
+import { SPACESHIP } from "./drawn-car/spaceship.js";
 import { isHexColor, paintTones } from "./drawn-car/paint.js";
 
 // Draws a car in code from its parts. Each part is its own file in
@@ -37,10 +40,27 @@ import { isHexColor, paintTones } from "./drawn-car/paint.js";
 // Three things move: the front wheels turn with the steering, the tires roll
 // with the speed, and the brake light comes on when the car loses speed
 // quickly. The parts that do not move are drawn one time and kept.
+//
+// The jet ski and the spaceship are drawn in the same way. They have no
+// wheels: the handlebars and the jet nozzle turn with the steering, and the
+// wake and the engine flames grow with the speed.
 
-export const DRAWN_CAR_MODELS = Object.freeze({ formula: FORMULA_CAR, rally: RALLY_CAR, snow: SNOW_CAR });
+export const DRAWN_CAR_MODELS = Object.freeze({
+  formula: FORMULA_CAR,
+  circuit: CIRCUIT_CAR,
+  rally: RALLY_CAR,
+  snow: SNOW_CAR,
+  jetski: JET_SKI,
+  spaceship: SPACESHIP,
+});
 
-const STILL = Object.freeze({ steerAngle: 0, roll: 0, rollBlur: 0, brake: 0 });
+// The motion that a part reads:
+//   steerAngle  the turn angle of the steering, in radians
+//   roll        how far the tires rolled, in car units
+//   rollBlur    0 to 1: how blurred the tire grooves are
+//   brake       0 to 1: how bright the brake light is
+//   pace        the speed of the car, in car units each second
+const STILL = Object.freeze({ steerAngle: 0, roll: 0, rollBlur: 0, brake: 0, pace: 0 });
 
 // The race picture of the car is this many times larger than the car on the
 // screen. A high quality shrink of it keeps the thin lines from breaking up.
@@ -73,6 +93,7 @@ export class DrawnCar {
     this.rollBlur = 0;
     this.brake = 0;
     this.brakeHoldSec = 0;
+    this.pace = 0;
     this.lastSpeedKph = null;
     this.moving = false;
     this.paintedRoll = 0;
@@ -106,6 +127,7 @@ export class DrawnCar {
     this.roll += Math.min(rolled, wheelSpin.maxStepPerFrame);
     const blurTarget = clamp(rolled / wheelSpin.blurStep, 0, 1);
     this.rollBlur += (blurTarget - this.rollBlur) * Math.min(1, dt * 10);
+    this.pace += (rolled / dt - this.pace) * Math.min(1, dt * 10);
 
     const decel = this.lastSpeedKph === null ? 0 : (this.lastSpeedKph - speedKph) / dt;
     this.lastSpeedKph = speedKph;
@@ -267,6 +289,8 @@ function placeParts(car, skin = {}) {
       settings: { ...part.defaults, ...(item.settings || {}), ...(change.settings || {}) },
       colors: { ...carColors, ...(item.colors || {}), ...(change.colors || {}) },
       steers: item.steers === true,
+      // -1 turns the part against the steering, as a jet ski's nozzle turns.
+      steerScale: Number.isFinite(item.steerScale) ? item.steerScale : 1,
       pivot: item.pivot || [0, 0],
       flip: false,
       paint,
@@ -316,7 +340,8 @@ function drawPlacement(ctx, placement, motion, outline, method = "draw") {
   if (placement.steers && motion.steerAngle) {
     const [px, py] = placement.pivot;
     ctx.translate(px, py);
-    ctx.rotate(placement.flip ? -motion.steerAngle : motion.steerAngle);
+    const angle = motion.steerAngle * placement.steerScale;
+    ctx.rotate(placement.flip ? -angle : angle);
     ctx.translate(-px, -py);
   }
   ctx.lineJoin = "round";

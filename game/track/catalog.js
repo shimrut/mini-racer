@@ -143,6 +143,17 @@ export const TRACK_CATALOG = {
     snowCircuit: { name: "Snow Circuit" },
     gripCircuit: { name: "Grip Circuit" },
     middleWay: { name: "Middle Way" },
+    waterCircuit: { name: "Water Circuit" },
+    spaceCircuit: { name: "Space Circuit" },
+    forestTrail: { name: "Forest Trail" },
+    hillsideScramble: { name: "Hillside Scramble" },
+    dirtLoop: { name: "Dirt Loop" },
+    ridgeRunner: { name: "Ridge Runner" },
+    brokenRoad: { name: "Broken Road" },
+    roughCut: { name: "Rough Cut" },
+    dirtSnake: { name: "Dirt Snake" },
+    wildCrest: { name: "Wild Crest" },
+    dirtValley: { name: "Dirt Valley" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -270,10 +281,8 @@ export const TRACK_SCHEDULE_KEYS = [
     'puppetMaster',
     'sunsetTerrace',
     'anvilCircuit',
-    'countryRoad',
-    'snowCircuit',
-    'gripCircuit',
-    'middleWay',
+    'waterCircuit',
+    'spaceCircuit',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

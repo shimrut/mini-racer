@@ -101,7 +101,7 @@ describe('drawn car parts and skins', () => {
             .toEqual(['frontTire', 'frontTire', 'frontHub', 'frontHub']);
     });
 
-    it.each(['formula', 'rally'])('puts every hub of the %s car on the inner edge of its tire, facing the body', (model) => {
+    it.each(['formula', 'circuit', 'rally'])('puts every hub of the %s car on the inner edge of its tire, facing the body', (model) => {
         const car = new DrawnCar(DRAWN_CAR_MODELS[model]);
         const hubs = car.placements.filter((placement) => placement.part === car.placements.find((p) => p.id === 'rearHub').part);
         expect(hubs).toHaveLength(4);
@@ -263,6 +263,39 @@ describe('drawn car pictures', () => {
         const frame = car.renderFrame();
         expect(pixel(frame, ...arm)).toEqual(straightArm);
         expect(pixel(frame, ...hubEnd)).not.toEqual(straightHub);
+    });
+});
+
+describe('circuit car', () => {
+    const PPU = 4;
+    let savedDocument;
+
+    beforeAll(() => {
+        savedDocument = globalThis.document;
+        globalThis.document = { createElement: () => createCanvas(1, 1) };
+    });
+
+    afterAll(() => {
+        globalThis.document = savedDocument;
+    });
+
+    function alphaAt(car, x, y) {
+        const canvas = car.sprite;
+        const center = canvas.width / 2;
+        return canvas.getContext('2d').getImageData(Math.round(center + x * PPU), Math.round(center + y * PPU), 1, 1).data[3];
+    }
+
+    it('is the Formula car with a larger rear wing, tall end plates and wider rear tires', () => {
+        const formula = new DrawnCar(DRAWN_CAR_MODELS.formula, {}, { pixelsPerUnit: PPU });
+        const circuit = new DrawnCar(DRAWN_CAR_MODELS.circuit, {}, { pixelsPerUnit: PPU });
+        const ids = (car) => car.placements.map((placement) => placement.id);
+        expect(ids(circuit)).toEqual(ids(formula));
+        // Behind the outer end of the wing: only the tall end plate is there.
+        expect(alphaAt(formula, -52.5, -22)).toBe(0);
+        expect(alphaAt(circuit, -52.5, -22)).toBe(255);
+        // Outside the Formula rear tire.
+        expect(alphaAt(formula, -29.8, -31)).toBe(0);
+        expect(alphaAt(circuit, -29.8, -31)).toBe(255);
     });
 });
 

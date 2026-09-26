@@ -101,6 +101,15 @@ describe('race song per ground', () => {
         expect(snow.squareCount).toBe(0);
     });
 
+    it('plays the bright D major water song, with a bouncing bass and plucks', () => {
+        const water = playTwoSeconds('water');
+        const tarmac = playTwoSeconds('tarmac');
+        expect(water.bassHz).toBeCloseTo(440 * 2 ** ((38 - 69) / 12));
+        expect(water.triangleCount).toBeGreaterThan(0);
+        expect(water.squareCount).toBe(0);
+        expect(water.noteStarts.length).not.toBe(tarmac.noteStarts.length);
+    });
+
     it('keeps the low F sharp minor space song, with no note above A4', () => {
         const space = playTwoSeconds('space');
         const tarmac = playTwoSeconds('tarmac');

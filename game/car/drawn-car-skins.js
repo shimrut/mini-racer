@@ -1,13 +1,14 @@
 // Garage skins that game/car/drawn-car.js draws in code. They have no image
 // file. The key is the skin name that the garage, the unlock rules and the
-// server keep for the player. A name whose last part starts with mr_dirt_ or
-// mr_snow_ is a dirt or snow skin, as for the image skins.
+// server keep for the player. A name whose last part starts with mr_grip_,
+// mr_dirt_, mr_snow_, mr_water_ or mr_space_ is a skin for that ground, as
+// for the image skins.
 //
 // To make a skin, add an entry:
 //   label   the name in the garage
 //   series  the garage section, such as "formula"
-//   car     the car file in game/car/drawn-car/: "formula", "rally" or
-//           "snow"
+//   car     the car file in game/car/drawn-car/: "formula", "circuit",
+//           "rally", "snow", "jetski" or "spaceship"
 //   livery  the main, accent and tertiary colors
 //   decals  the paint of each area: "main", "accent", "tertiary", a color
 //           such as "#ffffff", or null for no paint
@@ -19,8 +20,15 @@
 //   body, centerStripe, sidePodStripes, noseTip, noseStripe, cockpitRim,
 //   intakes, rearWing, rearWingFlap, rearWingEnds, frontWing,
 //   frontWingTips, frontWingEdge
+// The Circuit car has the same areas.
 // The Rally and Snow cars have the same areas, and also:
 //   scoop
+// The Jet Ski has other areas:
+//   hull, hullStripes, hoodStripe, noseTip, seat, mirrors, barPad, helmet,
+//   vest
+// The Spaceship has the areas of the Formula car body, cockpit and front
+// wing, and also:
+//   wings, wingTips, wingStripes, pods, podRing
 //
 // For example, a blue car with orange wing ends and green side stripes:
 //   'drawn/formula-blue': {
@@ -73,6 +81,41 @@ export const DRAWN_CAR_SKINS = Object.freeze({
             rearWingEnds: 'tertiary',
             frontWingTips: 'tertiary',
         }),
+    }),
+    // Circuit skins: players drive them on circuit tracks. The end plates of
+    // the rear wing take paint, so each skin shows its wing from far away.
+    'drawn/mr_grip_circuit': Object.freeze({
+        label: 'Red',
+        series: 'grip',
+        car: 'circuit',
+    }),
+    'drawn/mr_grip_circuit-silver': Object.freeze({
+        label: 'Silver',
+        series: 'grip',
+        car: 'circuit',
+        livery: Object.freeze({ main: '#c3ccd4', accent: '#00a19b', tertiary: '#1b1f24' }),
+        decals: Object.freeze({ noseStripe: 'accent', rearWingEnds: 'tertiary', frontWingTips: 'accent' }),
+    }),
+    'drawn/mr_grip_circuit-blue': Object.freeze({
+        label: 'Blue',
+        series: 'grip',
+        car: 'circuit',
+        livery: Object.freeze({ main: '#1f3f9e', accent: '#ffcc00', tertiary: '#e0161e' }),
+        decals: Object.freeze({ noseTip: 'accent', noseStripe: 'tertiary', rearWingEnds: 'accent' }),
+    }),
+    'drawn/mr_grip_circuit-orange': Object.freeze({
+        label: 'Orange',
+        series: 'grip',
+        car: 'circuit',
+        livery: Object.freeze({ main: '#ff7a00', accent: '#1b1f24', tertiary: '#3fa9ff' }),
+        decals: Object.freeze({ noseStripe: 'tertiary', rearWingEnds: 'accent', frontWingTips: 'accent' }),
+    }),
+    'drawn/mr_grip_circuit-black': Object.freeze({
+        label: 'Black',
+        series: 'grip',
+        car: 'circuit',
+        livery: Object.freeze({ main: '#1c1e22', accent: '#d9a520', tertiary: '#ffffff' }),
+        decals: Object.freeze({ sidePodStripes: 'accent', noseStripe: 'accent', rearWingEnds: 'accent' }),
     }),
     // Dirt skins: players drive them on dirt tracks. Each rally skin has its
     // own mud pattern, so no two look the same.
@@ -210,6 +253,74 @@ export const DRAWN_CAR_SKINS = Object.freeze({
             frontWingTips: 'accent',
         }),
         parts: Object.freeze({ snow: Object.freeze({ settings: Object.freeze({ seed: 37 }) }) }),
+    }),
+    // Jet skis: players drive them on water tracks.
+    'drawn/mr_water_jetski': Object.freeze({
+        label: 'White',
+        series: 'water',
+        car: 'jetski',
+    }),
+    'drawn/mr_water_jetski-red': Object.freeze({
+        label: 'Red',
+        series: 'water',
+        car: 'jetski',
+        livery: Object.freeze({ main: '#d62828', accent: '#ffffff', tertiary: '#ffd23f' }),
+        decals: Object.freeze({ noseTip: 'tertiary', helmet: 'tertiary', vest: '#1b1b1f' }),
+    }),
+    'drawn/mr_water_jetski-yellow': Object.freeze({
+        label: 'Yellow',
+        series: 'water',
+        car: 'jetski',
+        livery: Object.freeze({ main: '#ffc72c', accent: '#1b1b1f', tertiary: '#e0161e' }),
+        decals: Object.freeze({ helmet: 'tertiary', vest: 'accent', barPad: 'accent' }),
+    }),
+    'drawn/mr_water_jetski-blue': Object.freeze({
+        label: 'Blue',
+        series: 'water',
+        car: 'jetski',
+        livery: Object.freeze({ main: '#1d4fb8', accent: '#ffffff', tertiary: '#ff7a1a' }),
+        decals: Object.freeze({ noseTip: 'tertiary', helmet: 'accent', vest: 'tertiary' }),
+    }),
+    'drawn/mr_water_jetski-black': Object.freeze({
+        label: 'Black',
+        series: 'water',
+        car: 'jetski',
+        livery: Object.freeze({ main: '#1c1e22', accent: '#35c7ff', tertiary: '#ffffff' }),
+        decals: Object.freeze({ hoodStripe: 'accent', noseTip: 'tertiary', helmet: 'tertiary', vest: 'accent' }),
+    }),
+    // Spaceships: players drive them on space tracks.
+    'drawn/mr_space_ship': Object.freeze({
+        label: 'White',
+        series: 'space',
+        car: 'spaceship',
+    }),
+    'drawn/mr_space_ship-red': Object.freeze({
+        label: 'Red',
+        series: 'space',
+        car: 'spaceship',
+        livery: Object.freeze({ main: '#d7263d', accent: '#ffd23f', tertiary: '#1b1b1f' }),
+        decals: Object.freeze({ wingStripes: 'accent', podRing: 'accent', frontWingTips: 'tertiary', noseTip: 'tertiary' }),
+    }),
+    'drawn/mr_space_ship-black': Object.freeze({
+        label: 'Black',
+        series: 'space',
+        car: 'spaceship',
+        livery: Object.freeze({ main: '#1d1f27', accent: '#3de8ff', tertiary: '#ff4fd8' }),
+        decals: Object.freeze({ cockpitRim: 'accent', pods: 'main' }),
+    }),
+    'drawn/mr_space_ship-gold': Object.freeze({
+        label: 'Gold',
+        series: 'space',
+        car: 'spaceship',
+        livery: Object.freeze({ main: '#f2b705', accent: '#1b1b1f', tertiary: '#ffffff' }),
+        decals: Object.freeze({ wingTips: 'tertiary', wingStripes: 'accent', sidePodStripes: 'accent' }),
+    }),
+    'drawn/mr_space_ship-purple': Object.freeze({
+        label: 'Purple',
+        series: 'space',
+        car: 'spaceship',
+        livery: Object.freeze({ main: '#6a3fd1', accent: '#3de8ff', tertiary: '#ffffff' }),
+        decals: Object.freeze({ noseTip: 'tertiary', wingStripes: 'tertiary', podRing: 'accent', pods: 'main' }),
     }),
 });
 

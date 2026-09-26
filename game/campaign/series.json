@@ -91,19 +91,87 @@
       "id": "dirt-v1",
       "name": "Mini Rally",
       "ground": "dirt",
-      "stages": []
+      "stages": [
+        {
+          "trackKey": "countryRoad",
+          "laps": 1,
+          "requiredMedals": 0
+        },
+        {
+          "trackKey": "forestTrail",
+          "laps": 2,
+          "requiredMedals": 2
+        },
+        {
+          "trackKey": "hillsideScramble",
+          "laps": 1,
+          "requiredMedals": 4
+        },
+        {
+          "trackKey": "dirtLoop",
+          "laps": 1,
+          "requiredMedals": 6
+        },
+        {
+          "trackKey": "ridgeRunner",
+          "laps": 1,
+          "requiredMedals": 8
+        },
+        {
+          "trackKey": "roughCut",
+          "laps": 1,
+          "requiredMedals": 10
+        },
+        {
+          "trackKey": "wildCrest",
+          "laps": 1,
+          "requiredMedals": 12
+        },
+        {
+          "trackKey": "brokenRoad",
+          "laps": 1,
+          "requiredMedals": 14
+        },
+        {
+          "trackKey": "dirtSnake",
+          "laps": 1,
+          "requiredMedals": 16
+        },
+        {
+          "trackKey": "dirtValley",
+          "laps": 1,
+          "requiredMedals": 18
+        }
+      ]
     },
     {
       "id": "snow-v1",
       "name": "Sliders",
       "ground": "snow",
-      "stages": []
+      "stages": [
+        {
+          "trackKey": "snowCircuit",
+          "laps": 1,
+          "requiredMedals": 0
+        }
+      ]
     },
     {
       "id": "grip-v1",
       "name": "Formula Mini",
       "ground": "grip",
-      "stages": []
+      "stages": [
+        {
+          "trackKey": "gripCircuit",
+          "laps": 1,
+          "requiredMedals": 0
+        },
+        {
+          "trackKey": "middleWay",
+          "laps": 1,
+          "requiredMedals": 2
+        }
+      ]
     }
   ]
 }

@@ -12,7 +12,8 @@ import {
 const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
-// Tarmac and Grip show the race-circuit speed bar: many thin red lights.
+// Tarmac, Grip, Water and Space show the race-circuit speed bar: many thin
+// red lights.
 // Dirt and Snow show the rally speed bar: fewer wide slanted lights, in the
 // yellow of the Rally car's lamps.
 const RALLY_SPEEDOMETER_GROUNDS = new Set(['dirt', 'snow']);

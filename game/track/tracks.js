@@ -142,6 +142,17 @@ import countryRoad from './definitions/country-road.js';
 import snowCircuit from './definitions/snow-circuit.js';
 import gripCircuit from './definitions/grip-circuit.js';
 import middleWay from './definitions/middle-way.js';
+import waterCircuit from './definitions/water-circuit.js';
+import spaceCircuit from './definitions/space-circuit.js';
+import forestTrail from './definitions/forest-trail.js';
+import hillsideScramble from './definitions/hillside-scramble.js';
+import dirtLoop from './definitions/dirt-loop.js';
+import ridgeRunner from './definitions/ridge-runner.js';
+import brokenRoad from './definitions/broken-road.js';
+import roughCut from './definitions/rough-cut.js';
+import dirtSnake from './definitions/dirt-snake.js';
+import wildCrest from './definitions/wild-crest.js';
+import dirtValley from './definitions/dirt-valley.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -289,6 +300,17 @@ const TRACK_GEOMETRY = {
     snowCircuit,
     gripCircuit,
     middleWay,
+    waterCircuit,
+    spaceCircuit,
+    forestTrail,
+    hillsideScramble,
+    dirtLoop,
+    ridgeRunner,
+    brokenRoad,
+    roughCut,
+    dirtSnake,
+    wildCrest,
+    dirtValley,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

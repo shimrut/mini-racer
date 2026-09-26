@@ -14,7 +14,7 @@ import {
     buildCarUnlockSnapshot,
 } from '../game/car/car-unlock-policy.js';
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from '../game/car/sprite.js';
-import { DRAWN_CAR_ASSET_NAMES, isDrawnCarAsset } from '../game/car/drawn-car-skins.js';
+import { DRAWN_CAR_ASSET_NAMES, DRAWN_CAR_SKINS, isDrawnCarAsset } from '../game/car/drawn-car-skins.js';
 
 describe('player car skin', () => {
     const store = new Map();
@@ -148,6 +148,27 @@ describe('player car skin', () => {
         expect(readPlayerCarSkinAssetName('tarmac')).toBe(STOCK_CAR_ASSET_NAME);
     });
 
+    it.each([
+        ['grip', 'Circuit cars', 'circuit'],
+        ['water', 'Jet skis', 'jetski'],
+        ['space', 'Spaceships', 'spaceship'],
+    ])('offers the %s vehicles drawn in code as %s, and drives the first one by default', (ground, title, model) => {
+        const section = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === ground);
+        expect(section.title).toBe(title);
+        expect(section.skins).toHaveLength(5);
+        for (const skin of section.skins) {
+            expect(DRAWN_CAR_SKINS[skin.assetName].car).toBe(model);
+            expect(skin.ground).toBe(ground);
+        }
+        expect(readPlayerCarSkinAssetName(ground)).toBe(section.skins[0].assetName);
+
+        const last = section.skins[4].assetName;
+        expect(writePlayerCarSkinAssetName(last)).toBe(last);
+        expect(readPlayerCarSkinAssetName(ground)).toBe(last);
+        expect(readPlayerCarSkinAssetName('snow')).not.toBe(last);
+        expect(readPlayerCarSkinAssetName('tarmac')).toBe(STOCK_CAR_ASSET_NAME);
+    });
+
     it('shows car labels without family prefixes', () => {
         const labels = PLAYER_CAR_SKINS.map((s) => s.label);
         expect(labels).toContain('Red');
@@ -157,8 +178,8 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    it('groups skins into Formula, Extra, MR, Cyberpunk, Steampunk, Dirt and Snow garage sections without gaps', () => {
-        const expectedIds = ['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'dirt', 'snow'].filter((id) =>
+    it('groups skins into Formula, Extra, MR, Cyberpunk, Steampunk, Circuit, Dirt, Snow, Jet ski and Spaceship garage sections without gaps', () => {
+        const expectedIds = ['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'grip', 'dirt', 'snow', 'water', 'space'].filter((id) =>
             PLAYER_CAR_SKINS.some((s) => s.series === id)
         );
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id)).toEqual(expectedIds);

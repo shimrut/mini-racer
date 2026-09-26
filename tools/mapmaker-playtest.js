@@ -4,6 +4,7 @@ import { RingBuffer } from '../game/race/ring-buffer.js';
 import {
     createTyreTrackBuffer,
     drawSkidMarks,
+    drawSpray,
     drawTyreTracks,
     recordGroundEffects,
 } from '../game/race/ground-effects.js';
@@ -17,7 +18,7 @@ import {
 } from '../game/race/race-camera.js';
 import { RaceHud } from '../game/race/ui-hud.js';
 import { CarSpriteLoader, getDrawnCar } from '../game/car/sprite.js';
-import { buildTrackCanvas } from '../game/track/canvas.js';
+import { buildTrackCanvas, drawViewportPresentationBackground } from '../game/track/canvas.js';
 import { getTrackGround, getTrackGroundMaxSpeedKph } from '../game/track/grounds.js';
 import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
@@ -220,7 +221,7 @@ function tick() {
     const wasTouching = state.wallContactActive;
     const previousGate = state.nextCheckpointIndex;
     const events = updateSimulation(state, STEP, CONFIG, draft.track, collision.collisionSegments);
-    recordGroundEffects(state, trackPresentation, CONFIG);
+    recordGroundEffects(state, trackPresentation, CONFIG, events);
     flowSamples.push({
         time: state.currentTime,
         speed: state.cachedSpeed,
@@ -293,7 +294,7 @@ function drawGate(gate, color, label, map) {
     context.restore();
 }
 
-// Tyre tracks, skid marks and dust, drawn with the race code in track-canvas pixels.
+// Tyre tracks, skid marks, dust and snow spray, drawn with the race code in track-canvas pixels.
 function drawGroundEffects(center, zoom, width, height) {
     const gs = CONFIG.gridSize;
     const scale = zoom / gs;
@@ -302,7 +303,9 @@ function drawGroundEffects(center, zoom, width, height) {
     context.scale(scale, scale);
     drawTyreTracks(context, state.tyreTracks, trackPresentation, gs, scale);
     drawSkidMarks(context, state.skidMarks, trackPresentation, gs, scale);
+    drawSpray(context, state.particles, trackPresentation, gs);
     for (const particle of state.particles) {
+        if (particle.spray) continue;
         context.globalAlpha = particle.maxLife > 0 ? Math.max(0, particle.life / particle.maxLife) : 0;
         context.fillStyle = particle.color;
         context.beginPath();
@@ -420,6 +423,15 @@ function render(dt = 0) {
         x: width / 2 + (point.x - center.x) * zoom,
         y: height / 2 + (point.y - center.y) * zoom,
     });
+
+    // The ground's own background, as in the race: stars on a space track.
+    if (trackPresentation) {
+        const pixelsPerTrackPixel = zoom / CONFIG.gridSize;
+        drawViewportPresentationBackground(context, width, height, {
+            x: center.x * CONFIG.gridSize - width / 2 / pixelsPerTrackPixel,
+            y: center.y * CONFIG.gridSize - height / 2 / pixelsPerTrackPixel,
+        }, pixelsPerTrackPixel, trackPresentation);
+    }
 
     if (trackCanvas) {
         const topLeft = map({

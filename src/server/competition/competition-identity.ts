@@ -51,10 +51,19 @@ function readCarSkinPreference(value: unknown): string | null {
     return carSkin && carSkin.length <= MAX_CAR_SKIN_LENGTH ? carSkin : null;
 }
 
-function withGroundCarSkins(fields: { carSkinDirt: string | null; carSkinSnow: string | null }) {
+function withGroundCarSkins(fields: {
+    carSkinGrip: string | null;
+    carSkinDirt: string | null;
+    carSkinSnow: string | null;
+    carSkinWater: string | null;
+    carSkinSpace: string | null;
+}) {
     return {
+        ...(fields.carSkinGrip ? { carSkinGrip: fields.carSkinGrip } : {}),
         ...(fields.carSkinDirt ? { carSkinDirt: fields.carSkinDirt } : {}),
         ...(fields.carSkinSnow ? { carSkinSnow: fields.carSkinSnow } : {}),
+        ...(fields.carSkinWater ? { carSkinWater: fields.carSkinWater } : {}),
+        ...(fields.carSkinSpace ? { carSkinSpace: fields.carSkinSpace } : {}),
     };
 }
 
@@ -98,8 +107,11 @@ function readPausePlacement(preferences: Record<string, unknown>): 'separate' | 
 
 function readPlayerPreferenceFields(value: unknown): {
     carSkin: string | null;
+    carSkinGrip: string | null;
     carSkinDirt: string | null;
     carSkinSnow: string | null;
+    carSkinWater: string | null;
+    carSkinSpace: string | null;
     trailId: string | null;
     musicEnabled: boolean | null;
     carAudioEnabled: boolean | null;
@@ -116,8 +128,11 @@ function readPlayerPreferenceFields(value: unknown): {
     const preferences = value as Record<string, unknown>;
     return {
         carSkin: readCarSkinPreference(preferences.carSkin),
+        carSkinGrip: readCarSkinPreference(preferences.carSkinGrip),
         carSkinDirt: readCarSkinPreference(preferences.carSkinDirt),
         carSkinSnow: readCarSkinPreference(preferences.carSkinSnow),
+        carSkinWater: readCarSkinPreference(preferences.carSkinWater),
+        carSkinSpace: readCarSkinPreference(preferences.carSkinSpace),
         trailId: readTrailIdPreference(preferences.trailId),
         musicEnabled: readBooleanPreference(preferences.musicEnabled),
         carAudioEnabled: readBooleanPreference(preferences.carAudioEnabled),

@@ -71,14 +71,23 @@ const SNOW_CHORDS = [
     { name: 'F sharp sus 4', root: 30, notes: [54, 59, 61, 66, 71, 73] }
 ];
 
-// The space song: a low synth drive over F sharp minor, D, A and E. No
-// ground plays it yet. It is kept for a future space track. Each chord
-// lists its bass root and the notes for the arp.
+// The space song: a low synth drive over F sharp minor, D, A and E. The
+// space ground plays it. Each chord lists its bass root and the notes for
+// the arp.
 const SPACE_CHORDS = [
     { name: 'F sharp minor', root: 30, notes: [54, 57, 61, 66, 69] },
     { name: 'D Major', root: 26, notes: [54, 57, 62, 66, 69] },
     { name: 'A Major', root: 33, notes: [52, 57, 61, 64, 69] },
     { name: 'E Major', root: 28, notes: [52, 56, 59, 64, 68] }
+];
+
+// The water song: a bright D major synth track over D, B minor, G and A.
+// Each chord lists its bass root and the notes for the plucks.
+const WATER_CHORDS = [
+    { name: 'D Major', root: 38, notes: [62, 66, 69, 71, 74, 78] },
+    { name: 'B minor', root: 35, notes: [59, 62, 66, 69, 71, 74] },
+    { name: 'G Major', root: 31, notes: [59, 62, 66, 67, 71, 74] },
+    { name: 'A Major', root: 33, notes: [57, 61, 64, 66, 69, 73] }
 ];
 
 // Grip keeps the tarmac song's driving synth sound and sixteenth-note
@@ -95,6 +104,7 @@ const RACE_SONGS = Object.freeze({
     dirt: Object.freeze({ key: 'dirt', bpm: 134 }),
     snow: Object.freeze({ key: 'snow', bpm: 120 }),
     space: Object.freeze({ key: 'space', bpm: 126 }),
+    water: Object.freeze({ key: 'water', bpm: 124 }),
     grip: Object.freeze({ key: 'grip', bpm: 128 })
 });
 
@@ -113,6 +123,10 @@ const SNOW_PLUCK_PATTERN = [0, null, null, 3, null, null, 5, null, 4, null, null
 // Their contour differs from the tarmac arp even though they share its drive.
 const GRIP_ARP_A = [0, 2, 4, 6, 4, 2, 5, 3, 1, 3, 5, 7, 5, 3, 2, 4];
 const GRIP_ARP_B = [2, 4, 6, 4, 3, 5, 7, 5, 2, 4, 6, 5, 4, 3, 1, 0];
+
+// Pluck notes of the water song, one per sixteenth; null is a rest. They
+// skip up and down like drops of water.
+const WATER_PLUCK_PATTERN = [0, null, 2, null, 4, null, 3, 2, null, 1, null, 3, 5, null, 4, null];
 
 // Arp notes of the space song, one per sixteenth, as for the tarmac arp.
 const SPACE_ARP_PATTERN = [0, 1, 2, 1, 3, 2, 1, 2, 0, 2, 3, 2, 4, 3, 2, 1];
@@ -688,6 +702,42 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         }
     }
 
+    function scheduleWaterStep(step, time, status) {
+        const isPlaying = status === 'playing';
+        const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
+        const chord = WATER_CHORDS[chordIndex];
+
+        // The bass bounces: the root on the beat, and the octave on the half
+        // beat after it, as a jet ski rides the waves.
+        if (step % 4 === 0) {
+            playBass(time, midiToFreq(chord.root), isPlaying ? 0.3 : 0.2, isPlaying ? 0.14 : 0.25);
+        } else if (step % 4 === 2) {
+            playBass(time, midiToFreq(chord.root + 12), isPlaying ? 0.24 : 0.16, 0.1);
+        }
+
+        if (isPlaying) {
+            if (step % 4 === 0 && speedNorm > 0.02) {
+                playKick(time, 0.4 + speedNorm * 0.08);
+            }
+            if ((step === 4 || step === 12) && speedNorm > 0.25) {
+                playSnare(time, 0.2 + speedNorm * 0.05);
+            }
+            if (step % 4 === 2 && speedNorm > 0.1) {
+                playHihat(time, 0.08 + speedNorm * 0.04);
+            } else if (step % 2 === 1 && speedNorm > 0.7) {
+                playHihat(time, 0.035);
+            }
+        }
+
+        if (status !== 'starting') {
+            const noteIndex = WATER_PLUCK_PATTERN[step];
+            // At low speed only the notes on the beat play.
+            if (noteIndex !== null && (speedNorm > 0.35 || step % 4 === 0)) {
+                playGlassPluck(time, midiToFreq(chord.notes[noteIndex]), 0.08 + speedNorm * 0.04, 0.3 + speedNorm * 0.5);
+            }
+        }
+    }
+
     function scheduleGripStep(step, time, status) {
         const isPlaying = status === 'playing';
         const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
@@ -724,6 +774,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         dirt: scheduleDirtStep,
         snow: scheduleSnowStep,
         space: scheduleSpaceStep,
+        water: scheduleWaterStep,
         grip: scheduleGripStep,
     };
 

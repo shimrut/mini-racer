@@ -23,6 +23,8 @@ import { tire } from "./parts/tire.js";
 //   settings  changes to the part's own settings (sizes and shapes)
 //   mirror    true: the part is also drawn as a mirror copy on the right side
 //   steers    true: the part turns with the steering, around "pivot"
+//   steerScale  optional: a multiplier on the steering angle; -1 turns the
+//             part the other way
 //   pivot     the turn point, from the center of the part (default: the
 //             center)
 //

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { drawOuterDebris, getTrackCanvasPadding } from '../game/track/canvas.js';
 import { CONFIG } from '../game/config.js';
+import { TRACKSIDE_ITEMS } from '../game/track/trackside-items.js';
 
 const DESERT_DEBRIS_PRESENTATION = {
     key: 'event:daily-challenge:kettleRun:desert',
@@ -99,6 +100,29 @@ describe('track canvas padding', () => {
         });
 
         expect(bigger).toBeGreaterThan(base);
+    });
+
+    it('leaves room for the snow banks outside the road', () => {
+        const bare = { showCurbs: false, showTireWalls: false };
+        const banks = getTrackCanvasPadding({ ...bare, bankColor: '#e2ebf3', bankWidth: 20 });
+        const noColor = getTrackCanvasPadding({ ...bare, bankWidth: 20 });
+
+        expect(banks).toBeGreaterThan(20);
+        expect(noColor).toBe(getTrackCanvasPadding(bare));
+    });
+
+    it('leaves room for the trees and igloos beside the road', () => {
+        const bare = { showCurbs: false, showTireWalls: false };
+        const trees = getTrackCanvasPadding({ ...bare, tracksideItems: [['tree', 1]] });
+        const igloos = getTrackCanvasPadding({ ...bare, tracksideItems: [['bush', 1], ['igloo', 1]] });
+        const withBank = getTrackCanvasPadding({ ...bare, tracksideItems: [['tree', 1]], bankColor: '#9c7b56', bankWidth: 20 });
+
+        expect(trees).toBeGreaterThan(2 * TRACKSIDE_ITEMS.tree.maxSize);
+        expect(igloos).toBeGreaterThan(2 * TRACKSIDE_ITEMS.igloo.maxSize * TRACKSIDE_ITEMS.igloo.reach);
+        expect(igloos).toBeGreaterThan(trees);
+        expect(withBank).toBeGreaterThan(trees);
+        expect(getTrackCanvasPadding({ ...bare, tracksideItems: [] })).toBe(getTrackCanvasPadding(bare));
+        expect(getTrackCanvasPadding({ ...bare, finishMarker: 'hayBale' })).toBeGreaterThan(getTrackCanvasPadding(bare));
     });
 
     it('ignores debris sizing when the presentation paints no debris', () => {

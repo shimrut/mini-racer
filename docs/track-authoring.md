@@ -245,12 +245,38 @@ Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
   top speed are the same as tarmac. The road is a little darker than tarmac.
 - Dirt and snow each have their own look, tyre tracks, spray, car sound, race
   song and cars. The snow song is a cold B minor synth track. Grip has its own
-  look, car sound and race song, and uses the tarmac cars. The grip engine is
+  look, car sound, race song and cars. The Circuit car is the Formula car with
+  a larger rear wing, tall end plates and wider rear tyres. The grip engine is
   a little higher, brighter and cleaner than on tarmac, with more high whine.
   The tyres squeal as on tarmac. The grip song has the tarmac song's driving
   synth sound: eighth-note bass, four-on-the-floor drums, and a continuous
   sixteenth-note arp with echo. Its own E minor, G, D and A progression and
   alternating melodies run at 128 BPM, a little faster than tarmac.
+- **Water** writes `ground: 'water'`. The player drives a jet ski, not a
+  car. The jet ski slides as wide as on snow, and its nose starts to turn
+  slowly. After the player lets go, the jet ski keeps turning a little. A
+  slide takes some speed. A water lap is about 23% slower than tarmac, as on
+  dirt. The road is blue water with light shallows at each edge and small
+  wave marks. Sand banks with a line of foam take the place of kerbs. Palm
+  trees, rocks and beach umbrellas stand at the checkpoints. The jet ski
+  leaves a wake that opens out, and throws splashes. The engine is a buzzy
+  two-stroke with no gear change, so its note climbs to top speed. Water
+  rushes past the hull, and a slide is a wide splash. The water song is a
+  bright D major synth track with a bouncing bass and plucks, at 124 BPM.
+- **Space** writes `ground: 'space'`. The player drives a spaceship, not a
+  car. The ship speeds up fastest and has the highest top speed (335 km/h).
+  Its nose turns quickly, but the ship keeps its line and slides very wide,
+  with no loss of speed. A space lap takes about the same time as tarmac. The
+  road is a dark violet lane with a grid, with magenta and cyan light strips
+  for kerbs, and stars behind it. Asteroids, planets and satellites float at
+  the checkpoints. The ship floats above the lane, so its shadow falls far
+  from it. Its engines leave two short trails, and their flames grow with the
+  speed. The engine is a clean jet with a high whine and no gear change, over
+  a low rumble. The space song is the low F sharp minor synth track.
+- Each jet ski and spaceship is drawn in code, as the Formula, Rally and
+  Snow cars are. A jet ski has a rider who holds the handlebars, and the
+  handlebars turn with the steering. The garage shows them as **Jet skis**
+  and **Spaceships**. A player picks one for each ground.
 - **Drive Draft** drives with the chosen ground.
 
 The game and the server replay check read the same definition file, so the

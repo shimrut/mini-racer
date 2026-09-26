@@ -31,23 +31,53 @@ const DEFAULT_TRACK_PRESENTATION = Object.freeze({
 
 // The look of each non-tarmac ground. An event look still wins over it.
 const GROUND_TRACK_PRESENTATIONS = Object.freeze({
+    // A dirt road with banks of piled earth in place of kerbs, and bushes
+    // and trees in place of tyre stacks. The kerb colours stay for the
+    // series mark.
     dirt: Object.freeze({
         trackColor: '#634833',
         patchColors: Object.freeze(['rgba(146, 112, 78, 0.1)', 'rgba(60, 42, 28, 0.14)']),
         patchAreaPerDot: 1400,
-        edgeBandColor: 'rgba(150, 118, 84, 0.2)',
-        edgeBandWidth: 16,
         speckleColors: Object.freeze(['#735a43', '#4f3a29', '#86694e']),
         speckleAreaPerDot: 200,
+        showCurbs: false,
+        bankColor: '#9c7b56',
+        bankShadeColor: '#4a3422',
+        bankLightColor: '#c2a077',
+        // One sharp line of dark earth at the wall, and a thin, even lip of
+        // earth, so the edge of the road is easy to see.
+        bankFootLineColor: 'rgba(38, 22, 10, 0.62)',
+        bankFootLineWidth: 6,
+        bankLipMaxRadius: 3,
+        bankWidth: 18,
+        showTireWalls: false,
+        tracksideItems: Object.freeze([['bush', 3], ['tree', 2]]),
+        // A finish line of chalk squares, with a hay bale and a flag at each end.
+        finishLineStyle: 'painted',
+        finishLineColor: 'rgba(241, 228, 204, 0.92)',
+        finishLineAltColor: 'rgba(36, 22, 10, 0.45)',
+        finishLineWidth: 14,
+        finishMarker: 'hayBale',
+        // A wall hit throws clods of the earth bank in place of sparks.
+        scrapeDebris: Object.freeze({ color: '#9c7b56', shade: '#4a3422', light: '#c2a077' }),
         outerStrokeColor: '#f1e4cc',
         innerStrokeColor: '#d8c3a0',
         curbRed: '#b07a4c',
         curbWhite: '#f1e4cc',
-        skidColor: 'rgba(30, 16, 6, 0.62)',
-        skidEdgeColor: 'rgba(168, 134, 96, 0.5)',
-        skidEdgeWidth: 1.5,
-        tyreTrackColor: 'rgba(40, 26, 14, 0.32)',
-        dustColor: 'rgba(222, 192, 150, 0.75)',
+        // A slide scrapes a wide smear of dark earth.
+        skidColor: 'rgba(36, 20, 8, 0.4)',
+        skidWidthScale: 1.5,
+        // Ruts pressed into the earth, with a shade side. The ruts and the
+        // skid marks are under the rear tires, and a rut is as wide as a
+        // rear tire of the Rally car.
+        tyreTrackColor: 'rgba(40, 24, 12, 0.34)',
+        tyreTrackShadeColor: 'rgba(24, 12, 4, 0.34)',
+        markHalfWidth: 0.29,
+        tyreTrackWidth: 6,
+        tyreTrackIsTireWidth: true,
+        // A flat cloud of dust behind the wheels, in one colour.
+        sprayStyle: 'dust',
+        sprayColor: '#b39570',
         carShadowColor: 'rgba(24, 14, 6, 0.55)',
         carShadowBlur: 6,
         carShadowOffsetX: 2,
@@ -55,23 +85,50 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         schematicRoadColor: '#7a5c42',
         schematicEdgeColor: '#f1e4cc'
     }),
+    // Packed snow: a smooth road with some ice patches, banks of fresh snow
+    // in place of kerbs, and pine trees, snowmen and igloos in place of tyre
+    // stacks. The kerb colours stay for the series mark.
     snow: Object.freeze({
-        trackColor: '#a9bbcc',
-        speckleColors: Object.freeze(['#c4d3e1', '#94a8bc']),
-        speckleAreaPerDot: 320,
+        trackColor: '#b8c8d7',
+        icePatchColor: 'rgba(190, 222, 246, 0.5)',
+        icePatchGlintColor: '#ffffff',
+        icePatchSpacing: 150,
+        showCurbs: false,
+        bankColor: '#e2ebf3',
+        bankShadeColor: '#9db2c7',
+        bankLightColor: '#fbfdff',
+        bankShadowColor: 'rgba(84, 110, 140, 0.16)',
+        bankWidth: 20,
+        showTireWalls: false,
+        tracksideItems: Object.freeze([['pine', 3], ['snowman', 1], ['igloo', 1]]),
+        // A finish line of squares dyed blue in the snow, with a block of ice
+        // and a flag at each end.
+        finishLineStyle: 'painted',
+        finishLineColor: '#2d5b8c',
+        finishLineAltColor: '#eef4f9',
+        finishLineWidth: 14,
+        finishMarker: 'iceBlock',
+        // A wall hit throws lumps of the snow bank in place of sparks.
+        scrapeDebris: Object.freeze({ color: '#e2ebf3', shade: '#9db2c7', light: '#fbfdff' }),
         outerStrokeColor: '#f8fafc',
         innerStrokeColor: '#cfe0ee',
         curbRed: '#6fa8d6',
         curbWhite: '#f8fafc',
-        skidColor: 'rgba(70, 92, 118, 0.42)',
-        tyreTrackColor: 'rgba(66, 88, 116, 0.55)',
-        tyreTrackEdgeColor: 'rgba(236, 243, 250, 0.7)',
-        tyreTrackEdgeWidth: 1.5,
+        // A slide scrapes a wide, soft smear.
+        skidColor: 'rgba(92, 122, 156, 0.26)',
+        skidWidthScale: 1.8,
+        // Grooves pressed into the snow, with a shade side. The grooves and
+        // the skid marks are under the rear tires, and a groove is as wide
+        // as a rear tire of the Snow car.
+        tyreTrackColor: 'rgba(98, 126, 160, 0.34)',
+        tyreTrackShadeColor: 'rgba(70, 98, 132, 0.3)',
         tyreTrackSeconds: 5,
-        tyreTrackWidth: 5,
-        dustColor: '#f8fbff',
-        dustEdgeColor: 'rgba(96, 120, 148, 0.55)',
-        dustSizeScale: 1.3,
+        markHalfWidth: 0.29,
+        tyreTrackWidth: 6,
+        tyreTrackIsTireWidth: true,
+        // Flat lumps of snow thrown from all four wheels, in one colour.
+        sprayStyle: 'snow',
+        sprayColor: '#eef4f9',
         carShadowColor: 'rgba(28, 42, 62, 0.3)',
         carShadowBlur: 4,
         carShadowOffsetX: 1,
@@ -83,6 +140,79 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
     grip: Object.freeze({
         trackColor: '#2d3644',
         schematicRoadColor: '#3b4554'
+    }),
+    // Open water: a blue channel with light shallows at each edge and small
+    // wave marks. Sand banks with a line of white foam on the water take
+    // the place of kerbs, and palm trees, rocks and beach umbrellas take the
+    // place of tyre stacks. The kerb colours stay for the series mark.
+    water: Object.freeze({
+        trackColor: '#1f6fae',
+        edgeBandColor: 'rgba(88, 196, 214, 0.3)',
+        edgeBandWidth: 14,
+        waveColor: 'rgba(214, 240, 255, 0.55)',
+        waveAreaPerMark: 1100,
+        showCurbs: false,
+        bankColor: '#e6d3a3',
+        bankShadeColor: '#b89d64',
+        bankLightColor: '#f7eed3',
+        bankWidth: 18,
+        // A line of foam where the water meets the sand.
+        bankLipColor: '#eef8ff',
+        bankLipShadeColor: '#9ccbe8',
+        showTireWalls: false,
+        tracksideItems: Object.freeze([['palm', 3], ['rock', 2], ['umbrella', 1]]),
+        outerStrokeColor: '#f7eed3',
+        innerStrokeColor: '#e6d3a3',
+        curbRed: '#2a8fd0',
+        curbWhite: '#f7eed3',
+        // A slide leaves a wide smear of white foam.
+        skidColor: 'rgba(236, 248, 255, 0.4)',
+        skidWidthScale: 1.6,
+        // The wake: two lines of foam that open out behind the jet ski.
+        tyreTrackColor: 'rgba(232, 246, 255, 0.6)',
+        tyreTrackSeconds: 1.6,
+        tyreTrackWidth: 3.5,
+        tyreTrackSpread: 0.6,
+        // Splashes of water thrown from the hull, in foam colours.
+        sprayColor: '#e8f5ff',
+        sprayShadeColor: '#8cc4e6',
+        sprayLightColor: '#ffffff',
+        carShadowColor: 'rgba(6, 36, 66, 0.35)',
+        carShadowBlur: 3,
+        carShadowOffsetX: 1.5,
+        carShadowOffsetY: 2.5,
+        schematicRoadColor: '#2a78b5',
+        schematicEdgeColor: '#f7eed3'
+    }),
+    // A lane in space: a dark violet road with a grid, magenta and cyan
+    // light strips in place of kerbs, and stars behind it. Asteroids,
+    // planets and satellites take the place of tyre stacks.
+    space: Object.freeze({
+        trackColor: '#241d4f',
+        infieldColor: 'transparent',
+        backgroundStyle: 'space',
+        starColors: Object.freeze(['#ffffff', '#c7d2fe', '#fde68a']),
+        gridColor: 'rgba(132, 116, 240, 0.3)',
+        gridSpacing: 48,
+        showTireWalls: false,
+        tracksideItems: Object.freeze([['asteroid', 3], ['planet', 1], ['satellite', 1]]),
+        outerStrokeColor: '#3de8ff',
+        innerStrokeColor: '#ff4fd8',
+        curbRed: '#ff4fd8',
+        curbWhite: '#3de8ff',
+        skidColor: 'rgba(61, 232, 255, 0.3)',
+        skidWidthScale: 1.4,
+        // Two short trails behind the engines.
+        tyreTrackColor: 'rgba(61, 232, 255, 0.5)',
+        tyreTrackSeconds: 1,
+        tyreTrackWidth: 3,
+        // The ship floats above the lane, so its shadow falls far from it.
+        carShadowColor: 'rgba(0, 0, 0, 0.5)',
+        carShadowBlur: 6,
+        carShadowOffsetX: 7,
+        carShadowOffsetY: 10,
+        schematicRoadColor: '#2c2560',
+        schematicEdgeColor: '#3de8ff'
     })
 });
 

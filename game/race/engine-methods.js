@@ -8,7 +8,9 @@ import { getScoreboardReplayMaxFrames } from "./replay.js";
 import { getTrackGround, getTrackGroundMaxSpeedKph } from "../track/grounds.js";
 import {
   addMarkSide,
+  drawSpray,
   drawTyreTracks,
+  getMarkHalfWidth,
   recordGroundEffects,
   strokeSkidMarks,
 } from "./ground-effects.js";
@@ -128,21 +130,21 @@ function getSkidMarkStartIndex(skidMarks, frameSkip) {
   return frameSkip > 0 ? Math.max(0, skidMarks.length - 50) : 0;
 }
 
-function addSkidMarkSidePath(path, skidMarks, startIdx, gs, side) {
-  addMarkSide(path, skidMarks, startIdx, skidMarks.length - 1, gs, side);
+function addSkidMarkSidePath(path, skidMarks, startIdx, gs, side, halfWidth) {
+  addMarkSide(path, skidMarks, startIdx, skidMarks.length - 1, gs, side, 0, () => halfWidth);
 }
 
-function drawSkidMarksImmediate(ctx, skidMarks, startIdx, gs) {
+function drawSkidMarksImmediate(ctx, skidMarks, startIdx, gs, halfWidth) {
   ctx.beginPath();
-  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, -1);
+  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, -1, halfWidth);
   ctx.stroke();
 
   ctx.beginPath();
-  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, 1);
+  addSkidMarkSidePath(ctx, skidMarks, startIdx, gs, 1, halfWidth);
   ctx.stroke();
 }
 
-function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx) {
+function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx, halfWidth) {
   const version = skidMarks.version ?? -1;
   const cache = engine._skidMarkPathCache;
   if (
@@ -151,15 +153,16 @@ function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx) {
     cache.length === skidMarks.length &&
     cache.frameSkip === frameSkip &&
     cache.gridSize === gs &&
-    cache.startIdx === startIdx
+    cache.startIdx === startIdx &&
+    cache.halfWidth === halfWidth
   ) {
     return cache;
   }
 
   const leftPath = new Path2D();
   const rightPath = new Path2D();
-  addSkidMarkSidePath(leftPath, skidMarks, startIdx, gs, -1);
-  addSkidMarkSidePath(rightPath, skidMarks, startIdx, gs, 1);
+  addSkidMarkSidePath(leftPath, skidMarks, startIdx, gs, -1, halfWidth);
+  addSkidMarkSidePath(rightPath, skidMarks, startIdx, gs, 1, halfWidth);
 
   engine._skidMarkPathCache = {
     version,
@@ -167,6 +170,7 @@ function getSkidMarkPathCache(engine, skidMarks, frameSkip, gs, startIdx) {
     frameSkip,
     gridSize: gs,
     startIdx,
+    halfWidth,
     leftPath,
     rightPath,
   };
@@ -749,7 +753,7 @@ export const raceEngineMethods = {
       this.currentTrack,
       this.collisionSegments,
     );
-    recordGroundEffects(this, this.currentTrackPresentation, this.runtimeConfig);
+    recordGroundEffects(this, this.currentTrackPresentation, this.runtimeConfig, events);
 
     this.pbGhostSizeCapture?.sample?.({
       timeSec: this.currentTime,
@@ -986,15 +990,16 @@ export const raceEngineMethods = {
 
     if (this.skidMarks.length > 0) {
       const startIdx = getSkidMarkStartIndex(this.skidMarks, this.frameSkip);
+      const halfWidth = getMarkHalfWidth(this.currentTrackPresentation);
       const skidPathCache = typeof Path2D === "function"
-        ? getSkidMarkPathCache(this, this.skidMarks, this.frameSkip, gs, startIdx)
+        ? getSkidMarkPathCache(this, this.skidMarks, this.frameSkip, gs, startIdx, halfWidth)
         : null;
       strokeSkidMarks(ctx, this.currentTrackPresentation, this.zoom, () => {
         if (skidPathCache) {
           ctx.stroke(skidPathCache.leftPath);
           ctx.stroke(skidPathCache.rightPath);
         } else {
-          drawSkidMarksImmediate(ctx, this.skidMarks, startIdx, gs);
+          drawSkidMarksImmediate(ctx, this.skidMarks, startIdx, gs, halfWidth);
         }
       });
     }
@@ -1022,9 +1027,11 @@ export const raceEngineMethods = {
     }
 
     if (this.particles.length > 0) {
+      drawSpray(ctx, this.particles, this.currentTrackPresentation, gs);
       const buckets = this._particleBuckets;
       for (let i = 0; i < this.particles.length; i++) {
         const particle = this.particles[i];
+        if (particle.spray) continue;
         const rawAlpha =
           particle.maxLife > 0 ? particle.life / particle.maxLife : 0;
         const alphaStep = Math.max(

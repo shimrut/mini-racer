@@ -19,8 +19,11 @@ export const PLAYER_CAR_SKIN_STORAGE_KEY = 'MiniRacerPlayerCarSkin';
 // One stored choice for each ground. Tarmac keeps the original key.
 const PLAYER_CAR_SKIN_STORAGE_KEYS = Object.freeze({
     tarmac: PLAYER_CAR_SKIN_STORAGE_KEY,
+    grip: 'MiniRacerPlayerCarSkinGrip',
     dirt: 'MiniRacerPlayerCarSkinDirt',
     snow: 'MiniRacerPlayerCarSkinSnow',
+    water: 'MiniRacerPlayerCarSkinWater',
+    space: 'MiniRacerPlayerCarSkinSpace',
 });
 
 function titleCaseUnderscored(s) {
@@ -84,8 +87,11 @@ export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
     Object.freeze({ id: 'mini', title: 'Mini cars' }),
     Object.freeze({ id: 'cyberpunk', title: 'Cyberpunk cars' }),
     Object.freeze({ id: 'steampunk', title: 'Steampunk cars' }),
+    Object.freeze({ id: 'grip', title: 'Circuit cars' }),
     Object.freeze({ id: 'dirt', title: 'Dirt cars' }),
-    Object.freeze({ id: 'snow', title: 'Snow cars' })
+    Object.freeze({ id: 'snow', title: 'Snow cars' }),
+    Object.freeze({ id: 'water', title: 'Jet skis' }),
+    Object.freeze({ id: 'space', title: 'Spaceships' })
 ]);
 
 export const PLAYER_CAR_SKINS = Object.freeze(
@@ -200,7 +206,7 @@ export function readPlayerCarSkinAssetName(ground = 'tarmac') {
 }
 
 // Stores a skin for its own ground. An invalid skin resets tarmac to the stock
-// car and clears a dirt or snow pick. Returns the skin the player now drives
+// car and clears the pick of any other ground. Returns the skin the player now drives
 // on that ground.
 export function writePlayerCarSkinAssetName(assetName, ground = getCarAssetGround(assetName)) {
     const key = normalizeCarSkinGround(ground);

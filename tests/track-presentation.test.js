@@ -162,7 +162,7 @@ describe('track presentation resolver', () => {
         expect(presentation.key).toBe('track:kettleRun:default');
     });
 
-    it('gives a dirt track its own look and picture cache key', () => {
+    it('gives a dirt track its own look, earth banks and picture cache key', () => {
         const tarmac = resolveTrackPresentation('circuit');
         const dirt = resolveTrackPresentation('circuit', { ground: 'dirt' });
 
@@ -170,15 +170,33 @@ describe('track presentation resolver', () => {
         expect(dirt.trackColor).not.toBe(tarmac.trackColor);
         expect(dirt.skidColor).not.toBe(tarmac.skidColor);
         expect(dirt.schematicRoadColor).not.toBe(tarmac.schematicRoadColor);
-        expect(dirt.showCurbs).toBe(true);
+        // Banks of earth take the place of the kerbs. The series mark still
+        // uses the dirt kerb colours.
+        expect(dirt.showCurbs).toBe(false);
+        expect(dirt.bankColor).toBeTruthy();
+        expect(dirt.bankWidth).toBeGreaterThan(0);
+        expect(tarmac.bankColor).toBeUndefined();
         expect(dirt.curbRed).not.toBe(tarmac.curbRed);
+        // Bushes and trees take the place of the tyre stacks.
+        expect(tarmac.showTireWalls).toBe(true);
+        expect(dirt.showTireWalls).toBe(false);
+        expect(dirt.tracksideItems.map(([name]) => name).sort()).toEqual(['bush', 'tree']);
+        // A chalk finish line with a hay bale and a flag at each end.
+        expect(dirt.finishLineStyle).toBe('painted');
+        expect(dirt.finishMarker).toBe('hayBale');
+        expect(tarmac.finishLineStyle).toBeUndefined();
+        // A wall hit throws clods of the bank, and tarmac keeps its sparks.
+        expect(dirt.scrapeDebris.color).toBe(dirt.bankColor);
+        expect(tarmac.scrapeDebris).toBeUndefined();
+        // A flat cloud of dust behind the wheels.
+        expect(dirt.sprayStyle).toBe('dust');
         expect(dirt.curbWhite).not.toBe(tarmac.curbWhite);
         expect(dirt.speckleColors.length).toBeGreaterThan(0);
         expect(dirt.speckleAreaPerDot).toBeGreaterThan(0);
         expect(tarmac.speckleColors).toBeUndefined();
     });
 
-    it('gives snow its own light road, blue kerbs and longer tyre tracks', () => {
+    it('gives snow its own light road, snow banks, ice, spray and longer tyre tracks', () => {
         const tarmac = resolveTrackPresentation('circuit');
         const dirt = resolveTrackPresentation('circuit', { ground: 'dirt' });
         const snow = resolveTrackPresentation('circuit', { ground: 'snow' });
@@ -186,9 +204,28 @@ describe('track presentation resolver', () => {
         expect(snow.key).toBe('track:circuit:ground:snow');
         expect(snow.trackColor).not.toBe(tarmac.trackColor);
         expect(snow.trackColor).not.toBe(dirt.trackColor);
+        // Banks of snow take the place of the kerbs, and there are no specks.
+        expect(snow.showCurbs).toBe(false);
+        expect(snow.bankColor).toBeTruthy();
+        expect(snow.bankWidth).toBeGreaterThan(0);
+        expect(snow.speckleColors).toBeUndefined();
+        expect(snow.icePatchColor).toBeTruthy();
+        expect(snow.icePatchSpacing).toBeGreaterThan(0);
+        expect(snow.bankColor).not.toBe(dirt.bankColor);
+        // Pine trees, snowmen and igloos take the place of the tyre stacks.
+        expect(snow.showTireWalls).toBe(false);
+        expect(snow.tracksideItems.map(([name]) => name).sort()).toEqual(['igloo', 'pine', 'snowman']);
+        // A finish line dyed in the snow with a block of ice and a flag at each end.
+        expect(snow.finishLineStyle).toBe('painted');
+        expect(snow.finishMarker).toBe('iceBlock');
+        expect(snow.scrapeDebris.color).toBe(snow.bankColor);
+        expect(dirt.icePatchColor).toBeUndefined();
+        // The series mark still uses the snow kerb colours.
         expect(snow.curbRed).not.toBe(tarmac.curbRed);
         expect(snow.tyreTrackSeconds).toBeGreaterThan(3);
-        expect(snow.dustColor).toBeTruthy();
+        // Lumps of snow, not the dirt dust.
+        expect(snow.sprayColor).toBeTruthy();
+        expect(snow.sprayStyle).not.toBe(dirt.sprayStyle);
     });
 
     it('gives grip a darker road, and keeps the tarmac kerbs', () => {

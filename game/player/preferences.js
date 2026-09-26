@@ -43,13 +43,19 @@ import { isLocalEnvironment } from '../track/environment.js';
 let saveTimer = null;
 
 export function readPlayerPreferences() {
+    const carSkinGrip = readPlayerGroundCarSkinChoice('grip');
     const carSkinDirt = readPlayerGroundCarSkinChoice('dirt');
     const carSkinSnow = readPlayerGroundCarSkinChoice('snow');
+    const carSkinWater = readPlayerGroundCarSkinChoice('water');
+    const carSkinSpace = readPlayerGroundCarSkinChoice('space');
     return {
         carSkin: readPlayerCarSkinAssetName(),
-        // Sent only once the player picks a dirt or snow skin.
+        // Sent only once the player picks a skin for that ground.
+        ...(carSkinGrip ? { carSkinGrip } : {}),
         ...(carSkinDirt ? { carSkinDirt } : {}),
         ...(carSkinSnow ? { carSkinSnow } : {}),
+        ...(carSkinWater ? { carSkinWater } : {}),
+        ...(carSkinSpace ? { carSkinSpace } : {}),
         trailId: readPlayerTrailId(),
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
@@ -68,8 +74,11 @@ export function applyPlayerPreferences(value) {
     }
 
     writePlayerCarSkinAssetName(value.carSkin, 'tarmac');
+    writePlayerCarSkinAssetName(value.carSkinGrip, 'grip');
     writePlayerCarSkinAssetName(value.carSkinDirt, 'dirt');
     writePlayerCarSkinAssetName(value.carSkinSnow, 'snow');
+    writePlayerCarSkinAssetName(value.carSkinWater, 'water');
+    writePlayerCarSkinAssetName(value.carSkinSpace, 'space');
     writePlayerTrailId(value.trailId);
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);

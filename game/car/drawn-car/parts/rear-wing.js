@@ -7,6 +7,10 @@ import { fillWithOutline, insideShape, traceRoundRect } from "../paint.js";
 //   rearWing      the paint of the whole plate
 //   rearWingFlap  the strip from the rear edge to the flap line
 //   rearWingEnds  the two end plates, at the outer ends of the wing
+//
+// With "endFront" or "endBack", the end plates are tall plates of their own:
+// they stand past the edges of the wing, and they have the wing paint when
+// "rearWingEnds" has no paint.
 export const rearWing = {
   defaults: {
     from: -49.6,
@@ -19,10 +23,17 @@ export const rearWing = {
     flapWidth: 20,
     // The length of each end plate, across the car.
     endLength: 4.2,
+    // The end plates stand this far in front of the wing and behind it.
+    // Both 0: the end plates are only paint on the wing.
+    endFront: 0,
+    endBack: 0,
   },
 
   draw(ctx, { settings, colors, paint, outline }) {
-    const { from, to, width, radius, frontBand, flapX, flapWidth, endLength } = settings;
+    const {
+      from, to, width, radius, frontBand, flapX, flapWidth, endLength, endFront, endBack,
+    } = settings;
+    const tallEnds = endFront > 0 || endBack > 0;
     const half = width / 2;
     const plate = paint("rearWing", "main");
     const flap = paint("rearWingFlap");
@@ -37,7 +48,7 @@ export const rearWing = {
       }
       ctx.fillStyle = plate.shade;
       ctx.fillRect(to - frontBand, -half, frontBand, width);
-      if (ends) {
+      if (ends && !tallEnds) {
         for (const y of [-half, half - endLength]) {
           ctx.fillStyle = ends.base;
           ctx.fillRect(from, y, to - from, endLength);
@@ -63,5 +74,19 @@ export const rearWing = {
       ctx.strokeStyle = (flap || plate).deep;
       ctx.stroke();
     });
+
+    if (tallEnds) {
+      const end = ends || plate;
+      const back = from - endBack;
+      const front = to + endFront;
+      for (const y of [-half, half - endLength]) {
+        const traceEnd = (c) => traceRoundRect(c, back, y, front - back, endLength, endLength / 2);
+        fillWithOutline(ctx, traceEnd, end.base, { outline, outlineColor: colors.outline });
+        insideShape(ctx, traceEnd, () => {
+          ctx.fillStyle = end.shade;
+          ctx.fillRect(front - frontBand * 1.5, y, frontBand * 1.5, endLength);
+        });
+      }
+    }
   },
 };
