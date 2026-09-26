@@ -24,7 +24,11 @@ export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
-export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_REDIS_TTL_SECONDS;
+// The Daily archive keeps every day. Devvit Redis cannot remove an expiry, so
+// a day's boards, ghosts and its entry in the day list expire 50 years after
+// the day. The value stays under 2^31 seconds.
+export const DAILY_GP_BOARD_KEEP_SECONDS = 50 * 365 * 24 * 60 * 60;
+export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_BOARD_KEEP_SECONDS;
 export const DAILY_GP_PLAYLIST_DAYS = 7;
 
 export type DailyGpChallenge = {
@@ -238,7 +242,7 @@ export function isDailyGpChallengePlayable(challenge: DailyGpChallenge, now = ne
 }
 
 export function getDailyGpCompetitionDeadlineMs(challenge: DailyGpChallenge): number {
-    return Date.parse(challenge.startsAt) + (DAILY_GP_REDIS_TTL_SECONDS * 1000);
+    return Date.parse(challenge.startsAt) + (DAILY_GP_BOARD_KEEP_SECONDS * 1000);
 }
 
 export function getDailyGpCompetitionTtlSeconds(

@@ -667,13 +667,14 @@ describe('server daily gp store submissions', () => {
     it('prunes challenge history in bounded batches and corrects known leaderboard deadlines', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2030-02-15T12:00:00.000Z'));
+        // Older than the 50 years the archive keeps a day.
         const oldChallenge = {
-            id: 'daily-gp-2029-01-01',
-            challengeDate: '2029-01-01',
+            id: 'daily-gp-1979-01-01',
+            challengeDate: '1979-01-01',
             trackKey: 'circuit',
-            startsAt: '2029-01-01T00:00:00.000Z',
-            endsAt: '2029-01-02T00:00:00.000Z',
-            availableUntil: '2029-01-08T00:00:00.000Z',
+            startsAt: '1979-01-01T00:00:00.000Z',
+            endsAt: '1979-01-02T00:00:00.000Z',
+            availableUntil: '1979-01-08T00:00:00.000Z',
             status: 'active',
             objectiveType: 'single_lap_fastest',
             objectiveParams: {},
@@ -687,10 +688,20 @@ describe('server daily gp store submissions', () => {
             endsAt: '2030-02-16T00:00:00.000Z',
             availableUntil: '2030-02-22T00:00:00.000Z',
         };
+        // A year-old day stays in the archive.
+        const yearOldChallenge = {
+            ...oldChallenge,
+            id: 'daily-gp-2029-01-01',
+            challengeDate: '2029-01-01',
+            startsAt: '2029-01-01T00:00:00.000Z',
+            endsAt: '2029-01-02T00:00:00.000Z',
+            availableUntil: '2029-01-08T00:00:00.000Z',
+        };
         mockRedis.hScan.mockResolvedValue({
             cursor: 17,
             fieldValues: [
                 { field: oldChallenge.id, value: JSON.stringify(oldChallenge) },
+                { field: yearOldChallenge.id, value: JSON.stringify(yearOldChallenge) },
                 { field: currentChallenge.id, value: JSON.stringify(currentChallenge) },
             ],
         });
@@ -718,6 +729,11 @@ describe('server daily gp store submissions', () => {
                 `dailygp:leaderboard:${oldChallenge.id}:standings-revision`,
                 0,
             );
+            expect(mockRedis.expire).toHaveBeenCalledWith(
+                `dailygp:leaderboard:${yearOldChallenge.id}`,
+                getDailyGpCompetitionTtlSeconds(yearOldChallenge),
+            );
+            expect(getDailyGpCompetitionTtlSeconds(yearOldChallenge)).toBeGreaterThan(48 * 365 * 24 * 60 * 60);
             expect(mockRedis.expire).toHaveBeenCalledWith(
                 `dailygp:leaderboard:${currentChallenge.id}`,
                 getDailyGpCompetitionTtlSeconds(currentChallenge),
@@ -3256,12 +3272,12 @@ describe('server daily gp store submissions', () => {
         it('deletes expired challenge history entries during maintenance', async () => {
             const { persistServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
             const expiredChallenge = {
-                id: 'daily-gp-2020-01-01',
-                challengeDate: '2020-01-01',
+                id: 'daily-gp-1975-01-01',
+                challengeDate: '1975-01-01',
                 trackKey: 'circuit',
-                startsAt: '2020-01-01T00:00:00.000Z',
-                endsAt: '2020-01-02T00:00:00.000Z',
-                availableUntil: '2020-01-08T00:00:00.000Z',
+                startsAt: '1975-01-01T00:00:00.000Z',
+                endsAt: '1975-01-02T00:00:00.000Z',
+                availableUntil: '1975-01-08T00:00:00.000Z',
                 status: 'active',
                 objectiveType: 'single_lap_fastest',
                 objectiveParams: {},

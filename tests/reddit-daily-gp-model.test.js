@@ -43,7 +43,8 @@ describe('reddit daily gp model', () => {
         expect(DAILY_GP_REDIS_TTL_SECONDS).toBe(31_536_000);
         expect(DAILY_GP_GUEST_PROFILE_TTL_SECONDS).toBe(31_536_000);
         expect(DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS).toBe(null);
-        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(31_536_000);
+        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBe(1_576_800_000);
+        expect(DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS).toBeLessThan(2 ** 31);
         expect(DAILY_GP_PLAYLIST_DAYS).toBe(7);
     });
 
@@ -222,20 +223,25 @@ describe('reddit daily gp model', () => {
             getUtcDayIndex(new Date('2026-05-06T00:00:00.000Z')),
             'circuit',
         );
+        // The archive keeps a day for 50 years (18,250 days).
         expect(getDailyGpCompetitionDeadlineMs(challenge)).toBe(
-            Date.parse('2027-05-06T00:00:00.000Z'),
+            Date.parse('2076-04-23T00:00:00.000Z'),
         );
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2027-05-05T23:59:01.000Z'),
+            new Date('2027-05-06T00:00:00.000Z'),
+        )).toBe(49 * 365 * 24 * 60 * 60);
+        expect(getDailyGpCompetitionTtlSeconds(
+            challenge,
+            new Date('2076-04-22T23:59:01.000Z'),
         )).toBe(59);
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2027-05-06T00:00:00.000Z'),
+            new Date('2076-04-23T00:00:00.000Z'),
         )).toBe(0);
         expect(getDailyGpCompetitionTtlSeconds(
             challenge,
-            new Date('2027-05-07T00:00:00.000Z'),
+            new Date('2076-04-24T00:00:00.000Z'),
         )).toBe(0);
         expect(getDailyGpCompetitionTtlSeconds({
             ...challenge,

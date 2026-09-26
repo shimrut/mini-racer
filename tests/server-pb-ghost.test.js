@@ -525,7 +525,8 @@ describe('PB ghost trace and storage', () => {
 
     it('rejects PB writes after the challenge retention deadline', async () => {
         vi.useFakeTimers();
-        vi.setSystemTime(new Date('2031-01-01T00:00:00.001Z'));
+        // The archive keeps a day for 50 years.
+        vi.setSystemTime(new Date('2079-12-20T00:00:00.001Z'));
         try {
             await expect(upsertPlayerTrackPersonalBest({
                 playerId: 'reddit:late',

@@ -139,14 +139,14 @@ describe('server daily gp store wave 2', () => {
         mockRedis.hScan.mockResolvedValue({
             cursor: 4,
             fieldValues: [{
-                field: 'daily-gp-2010-01-01',
+                field: 'daily-gp-1970-01-01',
                 value: JSON.stringify({
-                    id: 'daily-gp-2010-01-01',
-                    challengeDate: '2010-01-01',
+                    id: 'daily-gp-1970-01-01',
+                    challengeDate: '1970-01-01',
                     trackKey: 'circuit',
-                    startsAt: '2010-01-01T00:00:00.000Z',
-                    endsAt: '2010-01-02T00:00:00.000Z',
-                    availableUntil: '2010-01-08T00:00:00.000Z',
+                    startsAt: '1970-01-01T00:00:00.000Z',
+                    endsAt: '1970-01-02T00:00:00.000Z',
+                    availableUntil: '1970-01-08T00:00:00.000Z',
                 }),
             }],
         });
@@ -155,7 +155,7 @@ describe('server daily gp store wave 2', () => {
 
         expect(mockRedis.hDel).toHaveBeenCalledWith(
             'dailygp:challenges',
-            ['daily-gp-2010-01-01'],
+            ['daily-gp-1970-01-01'],
         );
         expect(mockRedis.set).toHaveBeenCalledWith(
             'dailygp:maintenance:challenge-history:v1:cursor',
