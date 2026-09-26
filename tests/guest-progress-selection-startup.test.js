@@ -130,6 +130,86 @@ describe('promoted guest startup selection', () => {
         });
     });
 
+    it('resumes the same transfer at once when the server asks it to continue', async () => {
+        const dom = new JSDOM('<body class="loading-active"></body>', {
+            url: 'https://example.devvit.net/game.html',
+        });
+        dom.window.localStorage.setItem(PLAYER_ID_KEY, 'promoted-guest');
+        dom.window.localStorage.setItem(GUEST_TOKEN_KEY, 'guest-token');
+        vi.stubGlobal('window', dom.window);
+        vi.stubGlobal('document', dom.window.document);
+        vi.stubGlobal('localStorage', dom.window.localStorage);
+        vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'new-guest') });
+
+        const selectedState = {
+            hasAnyData: true,
+            isReturningPlayer: true,
+            redditUsername: 'RaceFan',
+            playerId: 'reddit:racefan',
+            guestToken: null,
+            leaderboardIdentity: 'reddit',
+            playerPreferences: null,
+            progressSelection: { required: false },
+        };
+        const continueAnswer = response(503, {
+            error: 'Moving your progress. Continuing…',
+            reason: 'progress_selection_continue',
+            transferId: 'transfer-1',
+        });
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(response(200, {
+                ...selectedState,
+                guestToken: 'guest-token',
+                progressSelection: {
+                    required: true,
+                    guestHasProgress: true,
+                    accountHasProgress: true,
+                    guestSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 1,
+                        campaignUnlockedTracks: 2,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 1,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 15,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
+                    accountSummary: {
+                        hasDailyResults: true,
+                        campaignResults: 2,
+                        campaignUnlockedTracks: 3,
+                        campaignTotalStages: 16,
+                        dailySavedResults: 2,
+                        dailyPlaylistSize: 7,
+                        carsUnlocked: 16,
+                        carsTotal: 23,
+                        unlocks: true,
+                    },
+                },
+            }))
+            .mockResolvedValueOnce(continueAnswer)
+            .mockResolvedValueOnce(continueAnswer)
+            .mockResolvedValueOnce(response(200, selectedState));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { getPlayerProgressState } = await import('../game/player/progress-state.js');
+        const statePromise = getPlayerProgressState({ onProgressSelectionRequired: async () => {} });
+        await vi.waitFor(() => {
+            expect(document.querySelector('.guest-progress-selection__button')).not.toBeNull();
+        });
+        document.querySelector('.guest-progress-selection__button').click();
+        await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
+        const state = await statePromise;
+
+        expect(fetchMock).toHaveBeenCalledTimes(4);
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ choice: 'guest' });
+        for (const call of fetchMock.mock.calls.slice(2)) {
+            expect(JSON.parse(call[1].body)).toEqual({ action: 'resume', transferId: 'transfer-1' });
+        }
+        expect(state).toMatchObject({ redditUsername: 'RaceFan' });
+    });
+
     it('includes an account Campaign result that is still saving locally', async () => {
         const dom = new JSDOM('<body class="loading-active"></body>', {
             url: 'https://example.devvit.net/game.html',

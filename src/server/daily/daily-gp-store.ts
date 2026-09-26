@@ -75,6 +75,7 @@ import {
 } from '../redis/redis-lock.js';
 import {
     GuestProgressRecoveryRequiredError,
+    GuestProgressSelectionContinueError,
     GuestProgressSelectionRetryableError,
 } from '../guest-transfer/guest-progress-selection-error.js';
 import {
@@ -202,6 +203,9 @@ type GuestProgressSelectionRecord = {
     cleanedDomains?: string[];
     dailyChallengeIds?: string[];
     dailyChallengeSpecs?: GuestTransferDailyChallengeSpec[];
+    // How many frozen days the current Daily step finished, while it works in
+    // pieces. Absent between steps.
+    dailyStepDone?: number;
     sourceInventory?: GuestTransferSourceInventory;
     completedAt?: string;
 };
@@ -493,6 +497,13 @@ function isValidPendingSelectionRecord(
         if (!isValidDailyChallengeSpecs(value.dailyChallengeSpecs, value.dailyChallengeIds)) {
             return false;
         }
+    }
+    if (value.dailyStepDone !== undefined && (
+        !Number.isInteger(value.dailyStepDone)
+        || Number(value.dailyStepDone) < 0
+        || Number(value.dailyStepDone) > value.dailyChallengeIds.length
+    )) {
+        return false;
     }
     return true;
 }
@@ -911,6 +922,11 @@ async function readFinalPodiumPositions(
 // A copied day queues at most 5 commands and a cleared day 4, so 4 days stay
 // under the budget of 24 commands for one transaction.
 const DAILY_DAYS_PER_TRANSFER_WRITE = 4;
+// A Daily step works on this many frozen days at a time, and one request does
+// at most DAILY_DAYS_PER_TRANSFER_REQUEST of them, so a request stays well
+// inside the client's 15-second wait.
+const DAILY_DAYS_PER_TRANSFER_PIECE = 20;
+const DAILY_DAYS_PER_TRANSFER_REQUEST = 60;
 
 function dailySubmissionLockKeys(
     challengeIds: readonly string[],
@@ -2090,7 +2106,7 @@ export async function selectGuestProgress({
     let reportedPhase: GuestTransferPhase = 'preparing';
     let persistRecoveryPhase: (() => Promise<void>) | null = null;
     const reportTiming = (
-        outcome: 'completed' | 'retryable' | 'recovery_required' | 'not_needed' | 'failed',
+        outcome: 'completed' | 'continued' | 'retryable' | 'recovery_required' | 'not_needed' | 'failed',
     ): void => {
         console.log('Guest progress transfer timing:', JSON.stringify({
             choice,
@@ -2296,6 +2312,7 @@ export async function selectGuestProgress({
             cleanedDomains: currentRecord?.cleanedDomains ?? [],
             dailyChallengeIds,
             dailyChallengeSpecs,
+            ...(currentRecord?.dailyStepDone !== undefined ? { dailyStepDone: currentRecord.dailyStepDone } : {}),
             ...(sourceInventory ? { sourceInventory } : {}),
         };
         persistRecoveryPhase = async (): Promise<void> => {
@@ -2365,7 +2382,10 @@ export async function selectGuestProgress({
                 rank: number | null;
             };
         };
-        const verifySourceDomain = (domain: 'campaign' | 'daily' | 'unlocks') => (
+        const verifySourceDomain = (
+            domain: 'campaign' | 'daily' | 'unlocks',
+            dailySpecs?: readonly GuestTransferDailyChallengeSpec[],
+        ) => (
             async (raw?: ObservedSource): Promise<void> => {
                 if (!record.sourceInventory) return;
                 let evidence: Partial<GuestTransferSourceInventory>;
@@ -2414,11 +2434,16 @@ export async function selectGuestProgress({
                         campaignStages: await captureCampaignStageEvidence(guestPlayerId, campaignRaceIds),
                     };
                 } else if (domain === 'daily') {
+                    // A piece checks its own days; the other days keep their
+                    // recorded rows, so only the piece can differ.
                     evidence = {
-                        daily: await captureDailyEvidence(
-                            guestPlayerId,
-                            record.dailyChallengeSpecs ?? [],
-                        ),
+                        daily: {
+                            ...record.sourceInventory.daily,
+                            ...await captureDailyEvidence(
+                                guestPlayerId,
+                                dailySpecs ?? record.dailyChallengeSpecs ?? [],
+                            ),
+                        },
                     };
                 } else {
                     const current = await redis.hGetAll(carUnlockHashKey(guestPlayerId));
@@ -2433,6 +2458,36 @@ export async function selectGuestProgress({
             }
         );
         await saveRecord(record, { markPending: true });
+        // A Daily step goes through the frozen days in pieces. When this
+        // request did its share and days remain, it saves its position and
+        // asks the client to continue the same transfer.
+        let dailyDaysThisRequest = 0;
+        const runDailyInPieces = async (
+            step: (
+                challengeIds: string[],
+                challengeSpecs: GuestTransferDailyChallengeSpec[],
+            ) => Promise<unknown>,
+        ): Promise<void> => {
+            const challengeIds = record.dailyChallengeIds ?? [];
+            const challengeSpecs = record.dailyChallengeSpecs ?? [];
+            let done = record.dailyStepDone ?? 0;
+            while (done < challengeIds.length) {
+                if (dailyDaysThisRequest >= DAILY_DAYS_PER_TRANSFER_REQUEST) {
+                    reportedPhase = record.phase ?? reportedPhase;
+                    throw new GuestProgressSelectionContinueError(derivedTransferId);
+                }
+                const end = Math.min(challengeIds.length, done + DAILY_DAYS_PER_TRANSFER_PIECE);
+                await step(challengeIds.slice(done, end), challengeSpecs.slice(done, end));
+                dailyDaysThisRequest += end - done;
+                done = end;
+                if (done < challengeIds.length) {
+                    record.dailyStepDone = done;
+                    await saveRecord(record);
+                    await confirmSelectionOwnership();
+                }
+            }
+            delete record.dailyStepDone;
+        };
         if (choice === 'guest') {
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
@@ -2449,16 +2504,18 @@ export async function selectGuestProgress({
             }
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('daily')) {
-                await timed('dailyMs', () => mergeGuestDailyProgress({
-                    guestPlayerId,
-                    redditPlayerId,
-                    replace: true,
-                    challengeIds: record.dailyChallengeIds,
-                    challengeSpecs: record.dailyChallengeSpecs,
-                    verifyGuestSource: verifySourceDomain('daily'),
-                    recordedDailyChallengeIds: recordedDailyDays(record.sourceInventory),
-                    transactionRunner: runTransferMutation,
-                }));
+                await timed('dailyMs', () => runDailyInPieces((challengeIds, challengeSpecs) => (
+                    mergeGuestDailyProgress({
+                        guestPlayerId,
+                        redditPlayerId,
+                        replace: true,
+                        challengeIds,
+                        challengeSpecs,
+                        verifyGuestSource: verifySourceDomain('daily', challengeSpecs),
+                        recordedDailyChallengeIds: recordedDailyDays(record.sourceInventory),
+                        transactionRunner: runTransferMutation,
+                    })
+                )));
                 record.completedDomains = [...record.completedDomains, 'daily'];
                 await saveRecord(record);
             }
@@ -2493,12 +2550,14 @@ export async function selectGuestProgress({
             }
             await confirmSelectionOwnership();
             if (!record.cleanedDomains?.includes('daily')) {
-                await timed('dailyCleanupMs', () => cleanupGuestDailyProgress({
-                    guestPlayerId,
-                    challengeIds: record.dailyChallengeIds,
-                    challengeSpecs: record.dailyChallengeSpecs,
-                    transactionRunner: runTransferMutation,
-                }));
+                await timed('dailyCleanupMs', () => runDailyInPieces((challengeIds, challengeSpecs) => (
+                    cleanupGuestDailyProgress({
+                        guestPlayerId,
+                        challengeIds,
+                        challengeSpecs,
+                        transactionRunner: runTransferMutation,
+                    })
+                )));
                 record.cleanedDomains = [...(record.cleanedDomains || []), 'daily'];
                 await saveRecord(record);
             }
@@ -2515,12 +2574,14 @@ export async function selectGuestProgress({
             }
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('daily')) {
-                await timed('dailyMs', () => discardGuestDailyProgress({
-                    guestPlayerId,
-                    challengeIds: record.dailyChallengeIds,
-                    challengeSpecs: record.dailyChallengeSpecs,
-                    transactionRunner: runTransferMutation,
-                }));
+                await timed('dailyMs', () => runDailyInPieces((challengeIds, challengeSpecs) => (
+                    discardGuestDailyProgress({
+                        guestPlayerId,
+                        challengeIds,
+                        challengeSpecs,
+                        transactionRunner: runTransferMutation,
+                    })
+                )));
                 record.completedDomains = [...record.completedDomains, 'daily'];
                 await saveRecord(record);
             }
@@ -2559,7 +2620,9 @@ export async function selectGuestProgress({
         };
     } catch (error) {
         const reason = (error as { reason?: string })?.reason;
-        const outcome = reason === 'guest_progress_recovery_required'
+        const outcome = error instanceof GuestProgressSelectionContinueError
+            ? 'continued'
+            : reason === 'guest_progress_recovery_required'
             ? 'recovery_required'
             : reason === GUEST_PROGRESS_TRANSFER_NOT_NEEDED_REASON
                 ? 'not_needed'

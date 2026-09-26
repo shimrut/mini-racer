@@ -69,11 +69,13 @@ export function registerPlayerRoutes(
             const statusCode = Number(error?.statusCode);
             if (statusCode === 401 || statusCode === 409 || statusCode === 503) {
                 const reason = typeof error?.reason === 'string' ? error.reason : undefined;
+                const transferId = typeof error?.transferId === 'string' ? error.transferId : undefined;
                 res.status(statusCode).json({
                     error: reason === 'progress_selection_retryable'
                         ? 'Your save is busy. Wait a moment, then try again.'
                         : error.message,
                     ...(reason ? { reason } : {}),
+                    ...(transferId ? { transferId } : {}),
                 });
                 return;
             }

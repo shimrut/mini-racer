@@ -96,9 +96,37 @@ async function postProgressSelection(body, controller = null) {
         const error = new Error(payload?.error || `Could not save your choice (${response.status}).`);
         error.status = response.status;
         error.reason = payload?.reason || null;
+        error.transferId = typeof payload?.transferId === 'string' ? payload.transferId : null;
         throw error;
     }
     return payload;
+}
+
+const PROGRESS_SELECTION_CONTINUE_REASON = 'progress_selection_continue';
+// A transfer with many Daily days answers "continue" after each share of the
+// work. Each request gets its own wait; this bounds the number of requests.
+const PROGRESS_SELECTION_MAX_REQUESTS = 200;
+
+// Sends the choice (or a resume), then follows every "continue" answer by
+// resuming the same transfer at once, until the transfer answers for good.
+async function postProgressSelectionUntilDone(body, { onContinue = null } = {}) {
+    let next = body;
+    for (let request = 0; request < PROGRESS_SELECTION_MAX_REQUESTS; request += 1) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        const timeoutId = controller
+            ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
+            : null;
+        try {
+            return await postProgressSelection(next, controller);
+        } catch (error) {
+            if (error?.reason !== PROGRESS_SELECTION_CONTINUE_REASON || !error.transferId) throw error;
+            onContinue?.();
+            next = { action: 'resume', transferId: error.transferId };
+        } finally {
+            if (timeoutId !== null) clearTimeout(timeoutId);
+        }
+    }
+    throw new Error('Could not finish your transfer. Try again.');
 }
 
 async function readCompletedTransfer(transferId) {
@@ -178,16 +206,12 @@ function requestInterruptedTransfer(selection, { onBeforeSubmit = null } = {}) {
             attemptInFlight = true;
             overlay.setBusy(true);
             overlay.setStatus('Finishing your transfer…');
-            const controller = typeof AbortController === 'function' ? new AbortController() : null;
-            const timeoutId = controller
-                ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
-                : null;
             try {
                 await onBeforeSubmit?.(selection?.choice);
-                succeed(await postProgressSelection({
+                succeed(await postProgressSelectionUntilDone({
                     action: 'resume',
                     transferId: selection?.transferId,
-                }, controller));
+                }, { onContinue: () => overlay.setStatus('Moving your progress…') }));
             } catch (error) {
                 if (error?.transferRecovery
                     || error?.reason === 'guest_progress_recovery_required'
@@ -216,7 +240,6 @@ function requestInterruptedTransfer(selection, { onBeforeSubmit = null } = {}) {
                 }
             } finally {
                 attemptInFlight = false;
-                if (timeoutId !== null) clearTimeout(timeoutId);
             }
         };
         const retryButton = overlay.buttons.find((button) => button.dataset.choice === 'resume');
@@ -311,10 +334,6 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
             overlay.setBusy(true);
             for (const input of choiceInputs) input.disabled = true;
             overlay.setStatus('Saving your choice…');
-            const controller = typeof AbortController === 'function' ? new AbortController() : null;
-            const timeoutId = controller
-                ? setTimeout(() => controller.abort(), PROGRESS_SELECTION_TIMEOUT_MS)
-                : null;
             try {
                 const prepared = await onBeforeSubmit?.(choice);
                 if (prepared?.choiceLocked) {
@@ -324,11 +343,11 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                     });
                 }
                 choiceLocked = choice;
-                const body = await postProgressSelection({
+                const body = await postProgressSelectionUntilDone({
                     playerId: getOrCreatePlayerId('guest progress selection'),
                     guestToken: getGuestPlayerToken(),
                     choice,
-                }, controller);
+                }, { onContinue: () => overlay.setStatus('Moving your progress…') });
                 overlay.remove();
                 resolve({
                     choice,
@@ -351,8 +370,6 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                 overlay.setStatus(error?.name === 'AbortError'
                     ? 'Saving took too long. Try again.'
                     : error?.message || 'Could not save your choice. Try again.');
-            } finally {
-                if (timeoutId !== null) clearTimeout(timeoutId);
             }
         };
         continueButton?.addEventListener('click', () => void choose(selectedChoice));

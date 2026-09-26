@@ -761,6 +761,61 @@ describe("guest transfer cost and recovery", () => {
       .resolves.toMatchObject({ status: "completed" });
   });
 
+  // Days 8 to 7 + count back: no longer playable, still stored for the archive.
+  async function seedArchivedDays(count) {
+    const realNow = Date.now();
+    const days = [];
+    vi.useFakeTimers({ toFake: ["Date"] });
+    for (let back = 7 + count; back > 7; back -= 1) {
+      vi.setSystemTime(new Date(realNow - back * 86400000));
+      days.push(await getServerDailyGpChallenge());
+    }
+    vi.setSystemTime(new Date(realNow));
+    vi.useRealTimers();
+    await seedSevenDayPlaylist();
+    return days;
+  }
+
+  for (const choice of ["guest", "account"]) {
+    it(`works through a long Daily history in pieces, one request at a time (${choice} kept)`, async () => {
+      const archived = await seedArchivedDays(70);
+      const guestPlayerId = `guest:long-history-${choice}`;
+      const redditPlayerId = `reddit:long-history-${choice}`;
+      const boards = [];
+      for (const day of archived) boards.push(await seedDailyRow(day, guestPlayerId, 41000));
+      await markFillReady();
+
+      const first = await selectGuestProgress({ guestPlayerId, redditPlayerId, choice })
+        .catch((error) => error);
+      expect(first).toMatchObject({ statusCode: 503, reason: "progress_selection_continue" });
+      const saved = JSON.parse(await redis.get(guestProgressSelectionKey(guestPlayerId, redditPlayerId)));
+      expect(saved.dailyStepDone).toBe(60);
+
+      // 77 frozen days (70 archived, 7 playable) at 60 days a request.
+      let requests = 1;
+      let result = first;
+      while (result?.reason === "progress_selection_continue" && requests < 10) {
+        requests += 1;
+        result = await selectGuestProgress({
+          guestPlayerId,
+          redditPlayerId,
+          choice,
+          resume: true,
+          transferId: first.transferId,
+        }).catch((error) => error);
+      }
+      expect(result).toMatchObject({ status: "completed" });
+      expect(requests).toBe(choice === "guest" ? 3 : 2);
+
+      for (const board of boards) {
+        expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBeFalsy();
+        const moved = await redis.hGet(board.entryHashKey, redditPlayerId);
+        if (choice === "guest") expect(JSON.parse(moved).bestTimeMs).toBe(41000);
+        else expect(moved).toBeFalsy();
+      }
+    });
+  }
+
   it("waits for a race save still running on an archived day", async () => {
     const archived = await seedArchivedDay();
     const guestPlayerId = "guest:archive-saving";

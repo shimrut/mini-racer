@@ -219,6 +219,35 @@ describe('server route contracts', () => {
         });
     });
 
+    it('tells the client to continue a transfer that works in pieces, and names it', async () => {
+        const { GuestProgressSelectionContinueError } = await import(
+            '../src/server/guest-transfer/guest-progress-selection-error.ts'
+        );
+        const selectServerGuestProgress = vi.fn(async () => {
+            throw new GuestProgressSelectionContinueError('guest-transfer:abc');
+        });
+        const baseUrl = await startApp((app) => registerPlayerRoutes(app, {
+            getRequestUsername: () => 'RaceFan',
+            getServerPlayerBootstrap: vi.fn(),
+            selectServerGuestProgress,
+            updateServerPlayerIdentity: vi.fn(),
+            updateServerPlayerPreferences: vi.fn(),
+        }));
+
+        const response = await fetch(`${baseUrl}/api/player/progress-selection`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'resume', transferId: 'guest-transfer:abc' }),
+        });
+
+        expect(response.status).toBe(503);
+        expect(await readJson(response)).toEqual({
+            error: 'Moving your progress. Continuing…',
+            reason: 'progress_selection_continue',
+            transferId: 'guest-transfer:abc',
+        });
+    });
+
     it('preserves player mutation forwarding, success, and invalid-preference responses', async () => {
         const updateServerPlayerIdentity = vi.fn(async () => ({
             playerId: 'guest:guest-1',
