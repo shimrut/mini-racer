@@ -87,7 +87,8 @@ describe('promoted guest startup selection', () => {
         });
 
         expect(document.body.classList.contains('loading-active')).toBe(false);
-        expect(document.querySelectorAll('.guest-progress-selection__source-input')).toHaveLength(3);
+        expect(document.querySelectorAll('.guest-progress-selection__source-input')).toHaveLength(2);
+        expect(document.querySelector('[data-choice="guest"]')).toBeNull();
         const sourcesText = document.querySelector('.guest-progress-selection__sources').textContent;
         expect(sourcesText).toContain('Daily2/7');
         expect(sourcesText).toContain('Campaign3/16');
@@ -98,24 +99,22 @@ describe('promoted guest startup selection', () => {
         expect(sourcesText).not.toContain('replaces saved account progress');
         expect(sourcesText).not.toContain('discards guest progress');
         expect(document.querySelector('.guest-progress-selection__message').textContent)
-            .toBe('Keep one save, or merge both.');
+            .toBe('Merge both saves, or keep the account.');
         expect(document.querySelector('[data-choice="account"]')?.parentElement?.textContent)
             .toContain('Account');
         const continueButton = document.querySelector('.guest-progress-selection__button');
         expect(document.querySelectorAll('.guest-progress-selection__button')).toHaveLength(1);
         expect(continueButton.disabled).toBe(false);
         expect(document.querySelector('.guest-progress-selection__source.is-selected'))
-            .toBe(document.querySelector('[data-choice="guest"]')?.parentElement);
-        expect(continueButton.textContent).toBe('CONTINUE WITH GUEST');
+            .toBe(document.querySelector('[data-choice="merge"]')?.parentElement);
+        expect(continueButton.textContent).toBe('MERGE BEST TIMES');
+        expect(document.querySelector('[data-choice="merge"]')?.parentElement?.textContent)
+            .toContain('Best time on each track');
         document.querySelector('[data-choice="account"]').click();
         expect(continueButton.disabled).toBe(false);
         expect(continueButton.textContent).toBe('CONTINUE WITH ACCOUNT');
         document.querySelector('[data-choice="merge"]').click();
         expect(continueButton.textContent).toBe('MERGE BEST TIMES');
-        expect(document.querySelector('[data-choice="merge"]')?.parentElement?.textContent)
-            .toContain('Best time on each track');
-        document.querySelector('[data-choice="guest"]').click();
-        expect(continueButton.textContent).toBe('CONTINUE WITH GUEST');
         continueButton.click();
         const state = await statePromise;
 
@@ -125,7 +124,7 @@ describe('promoted guest startup selection', () => {
         expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
             playerId: 'promoted-guest',
             guestToken: 'guest-token',
-            choice: 'guest',
+            choice: 'merge',
         });
         expect(state).toMatchObject({
             authoritative: true,
@@ -207,7 +206,7 @@ describe('promoted guest startup selection', () => {
         const state = await statePromise;
 
         expect(fetchMock).toHaveBeenCalledTimes(4);
-        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ choice: 'guest' });
+        expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ choice: 'merge' });
         for (const call of fetchMock.mock.calls.slice(2)) {
             expect(JSON.parse(call[1].body)).toEqual({ action: 'resume', transferId: 'transfer-1' });
         }

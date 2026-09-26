@@ -77,7 +77,7 @@ describe('the Keep Progress chooser when the queue receipt cannot be saved', () 
         expect(store.has(BLOCKS_KEY)).toBe(true);
 
         const continueButton = [...dom.window.document.querySelectorAll('.guest-progress-selection__button')]
-            .find((button) => /CONTINUE/.test(button.textContent));
+            .find((button) => /CONTINUE|MERGE/.test(button.textContent));
         continueButton.click();
 
         await vi.waitFor(() => {

@@ -147,7 +147,7 @@ describe('the Keep Progress chooser without numbers', () => {
         vi.unstubAllGlobals();
     });
 
-    it('picks nothing for the player, and sends only the choice the player makes', async () => {
+    it('chooses Merge even without numbers, because Merge loses nothing', async () => {
         startWithQueue({});
         const fetchMock = vi.fn().mockResolvedValue(response(200, { playerId: 'reddit:veteran' }));
         vi.stubGlobal('fetch', fetchMock);
@@ -162,23 +162,22 @@ describe('the Keep Progress chooser without numbers', () => {
         });
 
         const button = document.querySelector('.guest-progress-selection__button');
-        expect(document.querySelector('input:checked')).toBeNull();
-        expect(button.disabled).toBe(true);
-        expect(button.textContent).toBe('CHOOSE A SAVE');
-        button.click();
-        expect(fetchMock).not.toHaveBeenCalled();
+        expect(document.querySelector('input:checked')?.value).toBe('merge');
+        expect(button.disabled).toBe(false);
+        expect(button.textContent).toBe('MERGE BEST TIMES');
+        expect(document.querySelector('[data-choice="guest"]')).toBeNull();
 
         const account = document.querySelector('[data-choice="account"]');
         account.checked = true;
         account.dispatchEvent(new window.Event('change'));
-        expect(button.disabled).toBe(false);
+        expect(button.textContent).toBe('CONTINUE WITH ACCOUNT');
         button.click();
 
         await expect(choice).resolves.toMatchObject({ choice: 'account' });
         expect(JSON.parse(fetchMock.mock.calls[0][1].body).choice).toBe('account');
     });
 
-    it('still offers Guest by default when both sides show what they hold', async () => {
+    it('offers Merge by default when both sides show what they hold', async () => {
         startWithQueue({});
         const { requestGuestProgressSelection } = await import('../game/player/guest-progress-selection.js');
         void requestGuestProgressSelection({
@@ -189,7 +188,7 @@ describe('the Keep Progress chooser without numbers', () => {
             accountSummary: { campaignUnlockedTracks: 5, campaignTotalStages: 16 },
         });
 
-        expect(document.querySelector('input:checked')?.value).toBe('guest');
+        expect(document.querySelector('input:checked')?.value).toBe('merge');
         expect(document.querySelector('.guest-progress-selection__button').disabled).toBe(false);
     });
 });

@@ -65,13 +65,15 @@ function summaryBlock(summary) {
     return block;
 }
 
+// Keep guest is not offered: it deletes the account's results wherever the
+// guest has none. The server still finishes a Keep guest transfer that
+// started before.
 const CHOICE_BUTTON_LABELS = {
-    guest: 'CONTINUE WITH GUEST',
-    account: 'CONTINUE WITH ACCOUNT',
     merge: 'MERGE BEST TIMES',
+    account: 'CONTINUE WITH ACCOUNT',
 };
 
-const CHOICE_NAMES = { guest: 'Guest', account: 'Account', merge: 'Merge' };
+const CHOICE_NAMES = { account: 'Account', merge: 'Merge' };
 
 function noteBlock(text) {
     const block = document.createElement('div');
@@ -292,10 +294,10 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
     return new Promise((resolve, reject) => {
         const sources = document.createElement('div');
         sources.className = 'guest-progress-selection__sources';
-        const guestOption = sourceBlock({
-            choice: 'guest',
-            label: 'Guest',
-            summary: summaryBlock(selection?.guestSummary),
+        const mergeOption = sourceBlock({
+            choice: 'merge',
+            label: 'Merge',
+            summary: noteBlock('Best time on each track'),
         });
         const accountOption = sourceBlock({
             choice: 'account',
@@ -304,44 +306,32 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                 ? summaryBlock(selection?.accountSummary)
                 : summaryBlock(null),
         });
-        const mergeOption = sourceBlock({
-            choice: 'merge',
-            label: 'Merge',
-            summary: noteBlock('Best time on each track'),
-        });
-        sources.append(guestOption.source, accountOption.source, mergeOption.source);
+        sources.append(mergeOption.source, accountOption.source);
 
         const overlay = presentPlayerChoiceOverlay({
             titleId: 'guest-progress-selection-title',
             title: 'Keep Progress',
-            message: 'Keep one save, or merge both.',
+            message: 'Merge both saves, or keep the account.',
             extraNodes: [sources],
-            actions: [{ label: 'CONTINUE WITH GUEST', choice: 'confirm', primary: true }],
+            actions: [{ label: CHOICE_BUTTON_LABELS.merge, choice: 'confirm', primary: true }],
         });
 
-        const choiceInputs = [guestOption.input, accountOption.input, mergeOption.input];
+        const choiceInputs = [mergeOption.input, accountOption.input];
         const continueButton = overlay.buttons[0];
-        const guestShowsProgress = summaryMetrics(selection?.guestSummary).length > 0;
-        const accountShowsProgress = !selection?.accountHasProgress
-            || summaryMetrics(selection?.accountSummary).length > 0;
-        let selectedChoice = guestShowsProgress && accountShowsProgress ? 'guest' : null;
+        // Merge loses nothing, so it is chosen until the player picks the account.
+        let selectedChoice = 'merge';
         let choiceLocked = null;
-        if (selectedChoice) {
-            guestOption.input.checked = true;
-            guestOption.source.classList.add('is-selected');
-        } else if (continueButton) {
-            continueButton.textContent = 'CHOOSE A SAVE';
-            continueButton.disabled = true;
-        }
+        mergeOption.input.checked = true;
+        mergeOption.source.classList.add('is-selected');
 
         for (const input of choiceInputs) {
             input.addEventListener('change', () => {
                 selectedChoice = input.value;
                 if (continueButton) continueButton.disabled = false;
-                for (const option of [guestOption.source, accountOption.source, mergeOption.source]) {
+                for (const option of [mergeOption.source, accountOption.source]) {
                     option.classList.toggle('is-selected', option.contains(input));
                 }
-                continueButton.textContent = CHOICE_BUTTON_LABELS[input.value] ?? CHOICE_BUTTON_LABELS.guest;
+                continueButton.textContent = CHOICE_BUTTON_LABELS[input.value] ?? CHOICE_BUTTON_LABELS.merge;
             });
         }
 
