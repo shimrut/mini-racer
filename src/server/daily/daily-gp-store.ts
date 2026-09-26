@@ -1630,6 +1630,11 @@ function resumableRecordState(
 ): 'resume_required' | 'recovery_required' {
     if (record.phase === 'recovery_required') return 'recovery_required';
     if (!hasReplacementRemaining(record)) return 'resume_required';
+    // A transfer that set its marks but copied nothing yet captures its
+    // inventory on the next try.
+    if (record.version === 4 && record.phase === 'preparing' && record.completedDomains.length === 0) {
+        return 'resume_required';
+    }
     if (record.version !== 4 || !isValidSourceInventory(record.sourceInventory)) {
         return 'recovery_required';
     }
@@ -2239,14 +2244,11 @@ export async function selectGuestProgress({
             && !TRANSFER_COMPLETION_DOMAINS.every(
                 (domain) => currentRecord?.completedDomains?.includes(domain),
             );
-        const sourceInventory = !replacementRemaining
-            ? currentRecord?.sourceInventory
-            : preparing || !isValidSourceInventory(currentRecord?.sourceInventory)
-                ? await captureGuestTransferSourceInventory(guestPlayerId, dailyChallengeSpecs)
-                : currentRecord.sourceInventory;
-        if (replacementRemaining && !isValidSourceInventory(sourceInventory)) {
-            throw guestProgressRecoveryRequiredError();
-        }
+        // A new inventory is captured only after the marks are set, below, so
+        // no race can change the guest's rows between the capture and the copy.
+        const recaptureInventory = replacementRemaining
+            && (preparing || !isValidSourceInventory(currentRecord?.sourceInventory));
+        const sourceInventory = recaptureInventory ? undefined : currentRecord?.sourceInventory;
         const record: GuestProgressSelectionRecord = {
             version: 4,
             transferId: derivedTransferId,
@@ -2284,6 +2286,19 @@ export async function selectGuestProgress({
             }
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
+        }
+        await ensureNoRaceSaveInFlight(
+            [guestPlayerId, redditPlayerId],
+            record.dailyChallengeSpecs ?? [],
+        );
+        if (recaptureInventory) {
+            record.sourceInventory = await captureGuestTransferSourceInventory(
+                guestPlayerId,
+                record.dailyChallengeSpecs ?? [],
+            );
+        }
+        if (replacementRemaining && !isValidSourceInventory(record.sourceInventory)) {
+            throw guestProgressRecoveryRequiredError();
         }
         if (record.phase !== 'cleaning') record.phase = 'copying';
         record.updatedAt = new Date().toISOString();
@@ -2371,10 +2386,6 @@ export async function selectGuestProgress({
             }
         );
         await saveRecord(record, { markPending: true });
-        await ensureNoRaceSaveInFlight(
-            [guestPlayerId, redditPlayerId],
-            record.dailyChallengeSpecs ?? [],
-        );
         if (choice === 'guest') {
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {

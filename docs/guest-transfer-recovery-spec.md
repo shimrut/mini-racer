@@ -46,8 +46,11 @@ checks the authenticated destination account.
 ### Phases
 
 `preparing` permits no destination replacement. Preparation may repeat safely, so a record in
-this phase may capture its inventory again. Once the phase reaches `copying`, the inventory is
-frozen. The server never manufactures new evidence from whatever survived.
+this phase may capture its inventory again. The inventory is captured only after the transfer marks
+are set and no race save is still running, so no race can change the guest's rows after the
+capture. A `preparing` record may therefore carry no inventory yet; the next try captures it. Once
+the phase reaches `copying`, the inventory is frozen. The server never manufactures new evidence
+from whatever survived.
 
 ### Keys
 

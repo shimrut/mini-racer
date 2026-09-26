@@ -638,6 +638,34 @@ describe("guest transfer cost and recovery", () => {
     expect(await redis.expireTime(racedListKey(redditPlayerId))).toBeLessThan(0);
   });
 
+  it("captures the guest's rows after the marks, so a race saved just before them moves", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:saved-before-marks";
+    const redditPlayerId = "reddit:saved-before-marks";
+    const [stage] = NUMBERS_STAGES;
+    await seedCampaignStage(stage, guestPlayerId);
+    const competition = campaignCompetitionFor(stage, guestPlayerId);
+    // A race improves the guest's time just before the transfer sets its marks.
+    const realSet = RedisTestDouble.prototype.set;
+    redis.set = async function saveBeforeMarks(key, value, options) {
+      if (key === guestProgressSelectionPendingKey(guestPlayerId)) {
+        delete redis.set;
+        const entry = JSON.parse(await redis.hGet(competition.entryHashKey, guestPlayerId));
+        await redis.hSet(competition.entryHashKey, {
+          [guestPlayerId]: JSON.stringify({ ...entry, bestTimeMs: 30000 }),
+        });
+        await redis.zAdd(competition.leaderboardKey, { member: guestPlayerId, score: 30000 });
+      }
+      return realSet.call(this, key, value, options);
+    };
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+    delete redis.set;
+
+    expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(30000);
+  });
+
   it("clears every account row on stages the guest never raced when the guest progress is kept", async () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:replaces-account";

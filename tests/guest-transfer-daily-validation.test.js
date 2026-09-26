@@ -215,7 +215,8 @@ describe("a frozen Daily day is judged before it is copied", () => {
     await redis.hSet(competition.entryHashKey, {
       [redditPlayerId]: dailyEntry(redditPlayerId, challenge, 21_000),
     });
-    redis.failTransferRecordWriteAt = 2;
+    // The inventory is saved with the first write after the marks.
+    redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .rejects.toThrow();
     const prepared = await readRecord(guestPlayerId, redditPlayerId);
@@ -302,10 +303,12 @@ describe("a transfer stopped for review survives a reload", () => {
 
   async function markAnInterruptedTransfer(guestPlayerId, redditPlayerId) {
     await seedGuestWithDailyRow(guestPlayerId, redditPlayerId);
-    redis.failTransferRecordWriteAt = 2;
+    // The inventory is saved with the first write after the marks.
+    redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .rejects.toThrow();
     const prepared = await readRecord(guestPlayerId, redditPlayerId);
+    expect(prepared.sourceInventory).toBeTruthy();
     await redis.set(selectionKey(guestPlayerId, redditPlayerId), JSON.stringify({
       ...prepared,
       phase: "recovery_required",

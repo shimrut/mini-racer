@@ -117,6 +117,8 @@ describe("guest transfer record contract", () => {
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
     await redis.set(accountKey, JSON.stringify({ campaignId: "numbered-v1", resultsByRaceId: {} }));
 
+    // The first write sets the marks; the second saves the inventory, which is
+    // captured only after the marks. No account write comes before it.
     redis.failTransferRecordWriteAt = 2;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(selectGuestProgress({
@@ -125,11 +127,25 @@ describe("guest transfer record contract", () => {
       choice: "guest",
     })).rejects.toThrow();
 
-    const record = await readRecord(guestPlayerId, redditPlayerId);
-    expect(record.phase).toBe("preparing");
-    expect(record.completedDomains).toEqual([]);
-    expect(record.sourceInventory).toBeTruthy();
+    const marked = await readRecord(guestPlayerId, redditPlayerId);
+    expect(marked.phase).toBe("preparing");
+    expect(marked.completedDomains).toEqual([]);
+    expect(marked.sourceInventory).toBeUndefined();
     expect(JSON.parse(await redis.get(accountKey)).resultsByRaceId).toEqual({});
+
+    // The retry sets the marks again, then saves the inventory before it
+    // copies anything; the write after the Campaign copy fails.
+    redis.failTransferRecordWriteAt = redis.transferRecordWriteCount + 3;
+    await expect(selectGuestProgress({
+      guestPlayerId,
+      redditPlayerId,
+      choice: "guest",
+    })).rejects.toThrow();
+
+    const prepared = await readRecord(guestPlayerId, redditPlayerId);
+    expect(prepared.phase).toBe("copying");
+    expect(prepared.completedDomains).toEqual([]);
+    expect(prepared.sourceInventory).toBeTruthy();
   });
 
   it("keeps the completion receipt and the account index in step with the record", async () => {
@@ -716,7 +732,8 @@ describe("guest transfer does not strand the account or the next guest", () => {
     const guestPlayerId = "guest:new-stage";
     const redditPlayerId = "reddit:new-stage";
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
-    redis.failTransferRecordWriteAt = 2;
+    // The inventory is saved with the first write after the marks.
+    redis.failTransferRecordWriteAt = 3;
     await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
       .rejects.toThrow();
     const record = await readRecord(guestPlayerId, redditPlayerId);
