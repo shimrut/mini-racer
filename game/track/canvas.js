@@ -990,18 +990,16 @@ function createEdgeWalk(points) {
     return { length, pointAt, locate };
 }
 
-// The directions at a point on the road edge: along the edge, and out to the
-// side away from the road.
+// The direction at a point on the road edge out to the side away from the
+// road, for an edge that runs at `angle`.
 function getEdgeFrame(ctx, surfacePath, point, angle) {
-    const tangentX = Math.cos(angle);
-    const tangentY = Math.sin(angle);
-    let normalX = -tangentY;
-    let normalY = tangentX;
+    let normalX = -Math.sin(angle);
+    let normalY = Math.cos(angle);
     if (ctx.isPointInPath(surfacePath, point.x + normalX * 4, point.y + normalY * 4, 'evenodd')) {
         normalX = -normalX;
         normalY = -normalY;
     }
-    return { tangentX, tangentY, normalX, normalY, facing: Math.atan2(-normalY, -normalX) };
+    return { normalX, normalY, facing: Math.atan2(-normalY, -normalX) };
 }
 
 // Where an item of this size stands beside the road, `distance` along the
