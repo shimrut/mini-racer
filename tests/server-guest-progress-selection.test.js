@@ -48,6 +48,7 @@ const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 const OTHER_SERIES_FIRST_STAGES = CAMPAIGN_SERIES.length - 1;
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 const { competitionSubmissionLockKey } = await import("../src/server/competition/competition-submit.ts");
+const { racedListKey } = await import("../src/server/player/raced-list.ts");
 const { repairCampaignStandingsFromEntries } = await import("../src/server/campaign/campaign-store.ts");
 
 afterEach(() => {
@@ -572,7 +573,7 @@ describe("guest progress selection", () => {
 });
 
 // Campaign transfer writes hold at most this many stages in one transaction.
-const STAGES_PER_TRANSFER_WRITE = 5;
+const STAGES_PER_TRANSFER_WRITE = 4;
 
 const BUDGET_RPCS = 360;
 const BUDGET_SEQUENTIAL_STEPS = 300;
@@ -631,6 +632,8 @@ describe("guest transfer cost and recovery", () => {
 
     expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
     expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
+    expect(await redis.hGet(racedListKey(redditPlayerId), `campaign:${stage.raceId}`)).toBeTruthy();
+    expect(await redis.expireTime(racedListKey(redditPlayerId))).toBeLessThan(0);
   });
 
   it("clears every account row on stages the guest never raced when the guest progress is kept", async () => {

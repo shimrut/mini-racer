@@ -329,6 +329,8 @@ describe("daily-gp-store submission hardening", () => {
       lapCompletionTimesSec: null,
       ghostAvailable: false,
     });
+    const { racedListKey } = await import("../src/server/player/raced-list.ts");
+    expect(await redis.hGet(racedListKey(canonicalPlayerId), `daily:${challenge.id}`)).toBeTruthy();
     expect(full.personalBest).toMatchObject({
       bestTimeMs: 4321,
       checkpointTimesSec: [1.2, 2.4],
@@ -855,6 +857,18 @@ describe("Daily finish after the run is saved", () => {
     const snapshot = await getServerDailyGpSnapshot({ challengeId: challenge.id, playerId: guestPlayerId, guestToken });
     return { result, thrown, boardTimeMs: snapshot.currentPlayerRow?.bestTimeMs ?? null };
   }
+
+  it("adds the day to the guest's raced list with the time and the personal best", async () => {
+    const { racedListKey, GUEST_RACED_LIST_TTL_SECONDS } = await import("../src/server/player/raced-list.ts");
+    const challenge = await getServerDailyGpChallenge();
+    const { result } = await finishDaily("guest-raced-list");
+    expect(result.status).toBe(200);
+
+    const key = racedListKey("guest:guest-raced-list");
+    expect(await redis.hGet(key, `daily:${challenge.id}`)).toBeTruthy();
+    const expiresAt = await redis.expireTime(key);
+    expect(expiresAt - Math.floor(Date.now() / 1000)).toBeGreaterThan(GUEST_RACED_LIST_TTL_SECONDS - 60);
+  });
 
   it("answers saved without a rank when the rank read fails", async () => {
     vi.spyOn(leaderboard, "readPlayerRank").mockRejectedValueOnce(new Error("rank unavailable"));

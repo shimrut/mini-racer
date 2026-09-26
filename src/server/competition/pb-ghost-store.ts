@@ -19,6 +19,7 @@ import type {
     StoredRecordClassification,
 } from '../guest-transfer/guest-transfer-source-classification.js';
 import { playerFieldHash } from '../redis/redis-names.js';
+import { queueRacedBoard } from '../player/raced-list.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 
 export type PlayerTrackPbRecord = {
@@ -406,6 +407,7 @@ export async function upsertPlayerTrackPersonalBest({
         if (ttlSeconds != null) {
             await transaction.expire(collectionKey, ttlSeconds);
         }
+        await queueRacedBoard(transaction, playerId, competition);
         const transactionResults = await transaction.exec();
         if (!Array.isArray(transactionResults) || transactionResults.length === 0) {
             throw new Error('Personal best lock ownership was lost.');

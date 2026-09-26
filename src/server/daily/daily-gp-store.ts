@@ -124,6 +124,7 @@ import {
     type RankedSubmitReuseOptions,
 } from '../competition/competition-submit.js';
 import { playerFieldHash } from '../redis/redis-names.js';
+import { queueRacedBoard } from '../player/raced-list.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
@@ -898,9 +899,9 @@ async function readFinalPodiumPositions(
     return [positionAt(1), positionAt(2), positionAt(3)];
 }
 
-// Each day queues at most 4 commands, so 5 days stay under the budget of 24
-// commands for one transaction.
-const DAILY_DAYS_PER_TRANSFER_WRITE = 5;
+// A copied day queues at most 5 commands and a cleared day 4, so 4 days stay
+// under the budget of 24 commands for one transaction.
+const DAILY_DAYS_PER_TRANSFER_WRITE = 4;
 
 function dailySubmissionLockKeys(
     challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
@@ -1346,8 +1347,8 @@ export async function mergeGuestDailyProgress({
             }
         }
         if (entryToWrite || replace || rawGuestPb) {
-            // At most 4 queued commands: an account entry is never a guest's,
-            // so writeEntry queues 3, and the PB queues 1.
+            // At most 5 queued commands: an account entry is never a guest's,
+            // so writeEntry queues 4 (with the raced list), and the PB queues 1.
             dayWrites.push(async (transaction) => {
                 if (entryToWrite) {
                     await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
@@ -1360,6 +1361,7 @@ export async function mergeGuestDailyProgress({
                     await transaction.hSet(competition.pbHashKey, {
                         [playerFieldHash(redditPlayerId)]: rawGuestPb,
                     });
+                    if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
                 } else if (replace) {
                     await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                 }

@@ -80,6 +80,7 @@ import {
 import { recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
 import { isPlayerProgressSelectionPending, isProgressTransferPending } from '../player/guest-retirement.js';
 import { playerFieldHash } from '../redis/redis-names.js';
+import { queueRacedBoard } from '../player/raced-list.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
@@ -112,9 +113,9 @@ const CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS = Math.max(
     1,
     Math.floor(CAMPAIGN_PROGRESS_LOCK_TTL_MS / 3),
 );
-// Each stage queues at most 4 commands, so 5 stages stay under the budget of
-// 24 commands for one transaction.
-const CAMPAIGN_STAGES_PER_TRANSFER_WRITE = 5;
+// A copied stage queues at most 5 commands and a cleared stage 4, so 4 stages
+// stay under the budget of 24 commands for one transaction.
+const CAMPAIGN_STAGES_PER_TRANSFER_WRITE = 4;
 const CAMPAIGN_GUEST_CLEANUP_THROTTLE_SECONDS = 60;
 const CAMPAIGN_GUEST_CLEANUP_LIMIT = 10;
 export { CAMPAIGN_GUEST_EXPIRY_KEY };
@@ -1341,8 +1342,8 @@ export async function mergeGuestCampaignProgress({
             if (!entryToWrite && !rawGuestPb && !clearsAccount) continue;
             stageWrites.push({
                 raceId: stage.raceId,
-                // At most 4 queued commands: an account entry is never a guest's,
-                // so writeEntry queues 3, and the PB queues 1.
+                // At most 5 queued commands: an account entry is never a guest's,
+                // so writeEntry queues 4 (with the raced list), and the PB queues 1.
                 mutate: async (transaction) => {
                     if (entryToWrite) {
                         await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
@@ -1355,6 +1356,7 @@ export async function mergeGuestCampaignProgress({
                         await transaction.hSet(competition.pbHashKey, {
                             [playerFieldHash(redditPlayerId)]: rawGuestPb,
                         });
+                        if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
                     } else if (replace) {
                         await transaction.hDel(competition.pbHashKey, [playerFieldHash(redditPlayerId)]);
                     }

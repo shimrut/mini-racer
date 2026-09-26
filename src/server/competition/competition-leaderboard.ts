@@ -1,4 +1,5 @@
 import { redis } from '@devvit/redis';
+import { queueRacedBoard } from '../player/raced-list.js';
 import { createHash } from 'node:crypto';
 import {
     DAILY_GP_NEARBY_RADIUS,
@@ -280,6 +281,7 @@ export async function writeEntry(
         score: encodeDailyGpLeaderboardScore(entry.bestTimeMs),
     });
     await transaction.incrBy(competition.standingsRevisionKey, 1);
+    await queueRacedBoard(transaction, playerId, competition);
     if (
         playerId.startsWith('guest:')
         && competition.guestExpiryKey
