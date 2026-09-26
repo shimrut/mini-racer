@@ -577,6 +577,9 @@ const STAGES_PER_TRANSFER_WRITE = 5;
 const BUDGET_RPCS = 360;
 const BUDGET_SEQUENTIAL_STEPS = 300;
 const BUDGET_LARGEST_WINDOW = 24;
+// The same fixture when the guest progress is kept (measured 905 / 387).
+const BUDGET_GUEST_KEPT_RPCS = 950;
+const BUDGET_GUEST_KEPT_SEQUENTIAL_STEPS = 420;
 
 describe("guest transfer cost and recovery", () => {
   beforeEach(() => {
@@ -924,6 +927,75 @@ describe("guest transfer cost and recovery", () => {
     return measurement;
   }
 
+  // Records every call that names one stage, as "method" or "tx.method".
+  function recordStageCalls(raceId) {
+    const calls = [];
+    const namesStage = (args) => args.flat().some((arg) => (
+      typeof arg === "string" && new RegExp(`(^|:)${raceId}(:|$)`).test(arg)
+    ));
+    let delegating = false;
+    let replaying = false;
+    const baseWatch = RedisTestDouble.prototype.watch;
+    for (const method of REDIS_METHODS) {
+      const original = RedisTestDouble.prototype[method];
+      redis[method] = async function recorded(...args) {
+        if (replaying || delegating) return original.apply(this, args);
+        if (namesStage(args)) calls.push(method);
+        if (method === "mGet") {
+          delegating = true;
+          try {
+            return await original.apply(this, args);
+          } finally {
+            delegating = false;
+          }
+        }
+        if (method !== "watch") return await original.apply(this, args);
+        const transaction = await baseWatch.apply(this, args);
+        return new Proxy(transaction, {
+          get(target, prop) {
+            const value = target[prop];
+            if (typeof value !== "function") return value;
+            return async (...queuedArgs) => {
+              if (namesStage(queuedArgs)) calls.push(`tx.${String(prop)}`);
+              if (prop !== "exec") return await value.apply(target, queuedArgs);
+              replaying = true;
+              try {
+                return await value.apply(target, queuedArgs);
+              } finally {
+                replaying = false;
+              }
+            };
+          },
+        });
+      };
+    }
+    return calls;
+  }
+
+  // Reads of a stage nobody raced, in the cost fixture: each read of the guest
+  // (3 calls) and of the account (3 calls). The one lock check (mGet) names
+  // every stage. A planned list of raced stages removes these reads.
+  const UNRACED_STAGE_READS = { account: 6, guest: 15 };
+
+  for (const choice of ["account", "guest"]) {
+    it(`only reads a stage nobody raced, when the ${choice} progress is kept`, async () => {
+      await seedSevenDayPlaylist();
+      const guestPlayerId = `guest:unraced-${choice}`;
+      const redditPlayerId = `reddit:unraced-${choice}`;
+      await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
+      const unraced = CAMPAIGN_LIVE_STAGES[CAMPAIGN_LIVE_STAGES.length - 1];
+
+      const calls = recordStageCalls(unraced.raceId);
+      await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+      stopCountingRedisCalls();
+
+      const reads = calls.filter((call) => call === "hGet" || call === "zScore");
+      expect(calls.filter((call) => call === "mGet")).toHaveLength(1);
+      expect(calls.filter((call) => !["hGet", "zScore", "mGet"].includes(call))).toEqual([]);
+      expect(reads.length).toBeLessThanOrEqual(UNRACED_STAGE_READS[choice]);
+    });
+  }
+
   it("keeps one transfer inside its round-trip budget", async () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:budget";
@@ -960,6 +1032,44 @@ describe("guest transfer cost and recovery", () => {
     expect(largestWindow).toBeLessThanOrEqual(BUDGET_LARGEST_WINDOW);
     expect(measurement.steps).toBeLessThanOrEqual(BUDGET_SEQUENTIAL_STEPS);
     expect(measurement.rpcs).toBeLessThanOrEqual(BUDGET_RPCS);
+  });
+
+  it("keeps a transfer that moves the guest progress inside its round-trip budget", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:budget-moved";
+    const redditPlayerId = "reddit:budget-moved";
+    await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
+    await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T00:00:00.000Z",
+      resultsByRaceId: {},
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    }));
+    for (const challenge of await getServerDailyGpPlaylist()) {
+      const competition = toDailyCompetition(challenge);
+      await redis.hSet(competition.entryHashKey, {
+        [guestPlayerId]: JSON.stringify({
+          playerId: guestPlayerId,
+          displayName: "Guest racer",
+          bestTimeMs: 41234,
+          trackKey: challenge.trackKey,
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+      await redis.zAdd(competition.leaderboardKey, { member: guestPlayerId, score: 41234 });
+    }
+
+    const measurement = measureRedis();
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+    stopCountingRedisCalls();
+
+    const largestWindow = Math.max(...measurement.windows);
+    if (process.env.REPORT_TRANSFER_COST) {
+      console.log("transfer cost (guest kept)", { ...measurement, windows: undefined, largestWindow });
+    }
+    expect(largestWindow).toBeLessThanOrEqual(BUDGET_LARGEST_WINDOW);
+    expect(measurement.steps).toBeLessThanOrEqual(BUDGET_GUEST_KEPT_SEQUENTIAL_STEPS);
+    expect(measurement.rpcs).toBeLessThanOrEqual(BUDGET_GUEST_KEPT_RPCS);
   });
 
   it("reports a thrown transaction conflict as retryable, not as a server error", async () => {
