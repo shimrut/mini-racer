@@ -287,7 +287,6 @@ describe('Campaign with more than one live series', () => {
         expect(numbers.body.progress.unlockedRaceIds).toEqual(['numbered-v1-00']);
         expect(numbers.body.series.find((series) => series.id === 'test-v1')).toMatchObject({
             medalCount: 4,
-            resultCount: 1,
             finished: false,
         });
         // The author medal from the test series counts for the car skins.

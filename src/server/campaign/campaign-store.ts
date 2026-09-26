@@ -506,7 +506,6 @@ function seriesSummaries(progressList: readonly CampaignProgress[]) {
             ground: series.ground,
             stageCount: series.stages.length,
             medalCount: countCampaignMedals(results, series.id),
-            resultCount: series.stages.filter((stage) => results[stage.raceId]).length,
             finished: isCampaignSeriesFinished(series.id, results),
         };
     });

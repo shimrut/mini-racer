@@ -65,10 +65,6 @@ export type HeadToHeadRecord = HeadToHeadPostData & {
     postUrl: string | null;
 };
 
-export function isHeadToHeadRaceId(value: unknown): value is string {
-    return getCampaignStage(value) !== null;
-}
-
 export function isHeadToHeadOrigin(value: unknown): value is HeadToHeadOrigin {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const origin = value as Record<string, unknown>;

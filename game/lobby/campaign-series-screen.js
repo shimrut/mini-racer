@@ -40,7 +40,6 @@ export function buildCampaignSeriesRows(state = {}) {
         return {
             id: series.id,
             name: series.name,
-            ground: series.ground,
             comingSoon,
             finished: !comingSoon && summary?.finished === true,
             current: series.id === state?.seriesId,
@@ -49,7 +48,6 @@ export function buildCampaignSeriesRows(state = {}) {
             infoParts: comingSoon
                 ? [getSeriesGroundLabel(series.ground), 'Coming soon']
                 : [`${getSeriesGroundLabel(series.ground)} · ${series.stages.length} stages`, `${medals} medals`],
-            medals,
         };
     });
 }

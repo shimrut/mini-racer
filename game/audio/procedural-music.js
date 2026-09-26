@@ -91,11 +91,11 @@ const GRIP_CHORDS = [
 ];
 
 const RACE_SONGS = Object.freeze({
-    tarmac: Object.freeze({ key: 'tarmac', bpm: 122, chords: RACE_CHORDS }),
-    dirt: Object.freeze({ key: 'dirt', bpm: 134, chords: DIRT_CHORDS }),
-    snow: Object.freeze({ key: 'snow', bpm: 120, chords: SNOW_CHORDS }),
-    space: Object.freeze({ key: 'space', bpm: 126, chords: SPACE_CHORDS }),
-    grip: Object.freeze({ key: 'grip', bpm: 128, chords: GRIP_CHORDS })
+    tarmac: Object.freeze({ key: 'tarmac', bpm: 122 }),
+    dirt: Object.freeze({ key: 'dirt', bpm: 134 }),
+    snow: Object.freeze({ key: 'snow', bpm: 120 }),
+    space: Object.freeze({ key: 'space', bpm: 126 }),
+    grip: Object.freeze({ key: 'grip', bpm: 128 })
 });
 
 function getRaceSong(ground) {
