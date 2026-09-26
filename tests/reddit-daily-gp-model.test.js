@@ -4,7 +4,7 @@ import {
     TRACK_CATALOG,
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
-import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } from '../game/shared/daily-gp-history-backfill.js';
 import { getBackfilledDailyGpChallenge } from '../src/server/daily/daily-gp-history-backfill.ts';
 import { CAMPAIGN_GUEST_TTL_SECONDS } from '../src/server/competition/competition.ts';
@@ -32,6 +32,8 @@ import {
     normalizeDailyGpRaceContract,
     selectDailyGpLapCount,
 } from '../src/server/daily/daily-gp-model.ts';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 describe('reddit daily gp model', () => {
     it('pins retention and window constants to exact second/ms budgets', () => {
@@ -126,7 +128,7 @@ describe('reddit daily gp model', () => {
         expect(TRACK_SCHEDULE_KEYS.every((trackKey) => (
             Object.hasOwn(TRACK_CATALOG, trackKey)
         ))).toBe(true);
-        const campaignTrackKeys = CAMPAIGN_STAGES.map((stage) => stage.trackKey);
+        const campaignTrackKeys = NUMBERS_STAGES.map((stage) => stage.trackKey);
         expect(TRACK_SCHEDULE_KEYS.filter((trackKey) => (
             campaignTrackKeys.includes(trackKey)
         ))).toEqual([]);

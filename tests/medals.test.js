@@ -15,17 +15,13 @@ import {
     renderChallengeFinishHero,
 } from '../game/medals/medals.js';
 import {
-    TRACK_MEDAL_THRESHOLDS,
     getAuthorMedalSeconds,
     getMedalForLapTime,
     getMedalForRaceTime,
     getNextMedalTarget,
     getRaceMedalThresholds,
-    getTimeToBeatSeconds,
     getTrackMedalThresholds,
-    formatMedalTargetsLine,
     getCombinedMedalStackTiers,
-    allStandardMedalsUnlocked,
 } from '../game/medals/medal-timing.js';
 
 describe('medals', () => {
@@ -34,20 +30,8 @@ describe('medals', () => {
         expect(typeof createMedalIconSvg).toBe('function');
     });
 
-    it('formats a readable medal tier line', () => {
-        const line = formatMedalTargetsLine('circuit');
-        expect(line).toContain('Gold');
-        expect(line).toContain('Silver');
-        expect(line).toContain('Bronze');
-    });
-
     it('defines ordered thresholds for every track', () => {
         const keys = Object.keys(TRACK_CATALOG).sort();
-        const thresholdKeys = Object.keys(TRACK_MEDAL_THRESHOLDS).sort();
-        for (const trackKey of keys) {
-            expect(thresholdKeys).toContain(trackKey);
-        }
-
         for (const trackKey of keys) {
             const t = getTrackMedalThresholds(trackKey);
             expect(t).toBeTruthy();
@@ -121,16 +105,6 @@ describe('medals', () => {
         } else {
             expect(getNextMedalTarget(tk, 'gold')).toBe(null);
         }
-    });
-
-    it('time to beat follows next medal ceiling (gold bar or author when set)', () => {
-        const tk = 'circuit';
-        const th = getTrackMedalThresholds(tk);
-        const authorSec = getAuthorMedalSeconds(tk);
-        expect(getTimeToBeatSeconds(tk, null)).toBe(th.bronze);
-        expect(getTimeToBeatSeconds(tk, 'bronze')).toBe(th.silver);
-        expect(getTimeToBeatSeconds(tk, 'silver')).toBe(th.gold);
-        expect(getTimeToBeatSeconds(tk, 'gold')).toBe(authorSec != null ? authorSec : th.gold);
     });
 
     it('win overlay layout: large medal is best unlocked on track; small row is all other unlocked tiers', () => {
@@ -274,19 +248,6 @@ describe('medals', () => {
         expect(shouldShowPersonalBestMedalHero(tk, lap, { ...opts, previousTrackMedal: 'author' })).toBe(true);
         expect(shouldShowPersonalBestMedalHero(tk, lap, { previousTrackMedal: 'author' })).toBe(false);
     });
-    it('allStandardMedalsUnlocked mirrors combined stack fill state', () => {
-        const tk = 'circuit';
-        const authorSec = getAuthorMedalSeconds(tk);
-        expect(allStandardMedalsUnlocked(tk, null)).toBe(false);
-        if (authorSec != null) {
-            expect(allStandardMedalsUnlocked(tk, 'gold')).toBe(false);
-            expect(allStandardMedalsUnlocked(tk, 'author')).toBe(true);
-        } else {
-            expect(allStandardMedalsUnlocked(tk, 'silver')).toBe(false);
-            expect(allStandardMedalsUnlocked(tk, 'gold')).toBe(true);
-        }
-    });
-
     it('planFirstUnlockMedalRevealDelays: 250ms between celebrates when multiple first-unlocks', () => {
         const celebrate = (tier) => shouldCelebrateMedalTier(tier, null);
         expect(planFirstUnlockMedalRevealDelays(['bronze', 'silver', 'gold'], celebrate)).toEqual([

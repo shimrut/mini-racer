@@ -7,11 +7,13 @@ import {
     TRACK_CATALOG,
     TRACK_SCHEDULE_KEYS,
 } from '../game/track/catalog.js';
-import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { TRACKS } from '../game/track/tracks.js';
 import { CONFIG } from '../game/config.js';
 import { DEFAULT_TRACK_GROUND_KEY, isTrackGroundKey } from '../game/track/grounds.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 function expectFinitePoint(point) {
     expect(Number.isFinite(point?.x)).toBe(true);
@@ -193,7 +195,7 @@ describe('track runtime integrity', () => {
             'sunsetTerrace',
             'anvilCircuit',
         ]);
-        const campaignTrackKeys = new Set(CAMPAIGN_STAGES.map((stage) => stage.trackKey));
+        const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
         expect(TRACK_SCHEDULE_KEYS.filter((trackKey) => (
             existingCatalogKeys.includes(trackKey)

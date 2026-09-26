@@ -31,7 +31,7 @@ import {
     normalizeCampaignLeaderboardSnapshot,
 } from '../game/campaign/engine-methods.js';
 import { RANKED_RUN_STALL_MESSAGE } from '../game/race/engine-methods.js';
-import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import {
     clearCampaignVerification,
     enqueueCampaignVerification,
@@ -41,6 +41,8 @@ import {
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GarageUi } from '../game/settings/garage-ui.js';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 function createClassList() {
     const values = new Set();
@@ -352,7 +354,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('offers nothing after the last stage of the campaign', () => {
         const context = createCampaignFinishContext();
-        const lastStage = CAMPAIGN_STAGES.at(-1);
+        const lastStage = NUMBERS_STAGES.at(-1);
         const finalStage = {
             raceId: lastStage.raceId,
             trackKey: lastStage.trackKey,
@@ -2011,7 +2013,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('shows every Campaign standings entry without rank filtering', () => {
         const state = {
-            stages: CAMPAIGN_STAGES.map((stage, index) => ({
+            stages: NUMBERS_STAGES.map((stage, index) => ({
                 id: stage.raceId,
                 numberLabel: stage.stageNumber,
                 trackName: stage.trackKey,
@@ -2022,9 +2024,9 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         const options = buildCampaignLeaderboardOptions(state);
 
-        expect(options).toHaveLength(CAMPAIGN_STAGES.length);
+        expect(options).toHaveLength(NUMBERS_STAGES.length);
         expect(options.map((option) => option.challengeId)).toEqual(
-            CAMPAIGN_STAGES.map((stage) => stage.raceId),
+            NUMBERS_STAGES.map((stage) => stage.raceId),
         );
     });
 
@@ -2523,14 +2525,14 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('launches Campaign on the manifest stage behind the default lobby stage', async () => {
-        const [firstStage] = CAMPAIGN_STAGES;
+        const [firstStage] = NUMBERS_STAGES;
         campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
             availability: 'available',
             authoritative: true,
             campaignId: 'numbered-v1',
             ranked: true,
             signedIn: true,
-            stages: CAMPAIGN_STAGES,
+            stages: NUMBERS_STAGES,
             progress: { resultsByRaceId: {}, unlockedRaceIds: [firstStage.raceId] },
         });
         campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({
@@ -2561,14 +2563,14 @@ describe('Campaign lobby and shared modal adapters', () => {
     });
 
     it('returns the Campaign stage without waiting for the ghost', async () => {
-        const [firstStage] = CAMPAIGN_STAGES;
+        const [firstStage] = NUMBERS_STAGES;
         campaignServiceMocks.getCampaignBootstrap.mockResolvedValue({
             availability: 'available',
             authoritative: true,
             campaignId: 'numbered-v1',
             ranked: true,
             signedIn: true,
-            stages: CAMPAIGN_STAGES,
+            stages: NUMBERS_STAGES,
             progress: { resultsByRaceId: {}, unlockedRaceIds: [firstStage.raceId] },
         });
         campaignServiceMocks.getCampaignPbGhost.mockReturnValue(new Promise(() => {}));
@@ -2640,7 +2642,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             campaignId: 'numbered-v1',
             ranked: true,
             signedIn: true,
-            stages: CAMPAIGN_STAGES.slice(0, 2),
+            stages: NUMBERS_STAGES.slice(0, 2),
             progress: { resultsByRaceId: {}, unlockedRaceIds: ['numbered-v1-00'], complete: false },
         });
 
@@ -3032,10 +3034,10 @@ describe('Campaign lobby and shared modal adapters', () => {
             ok: true,
             body: { personalBest: null },
         });
-        const nextStage = CAMPAIGN_STAGES[1];
+        const nextStage = NUMBERS_STAGES[1];
         const context = createStartContext({
             status: 'won',
-            activeCampaignStage: CAMPAIGN_STAGES[0],
+            activeCampaignStage: NUMBERS_STAGES[0],
             campaignLobbyState: {
                 complete: false,
                 nextStage: { id: nextStage.raceId },
@@ -3044,8 +3046,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             reset: vi.fn(),
         });
         enqueueCampaignVerification({
-            raceId: CAMPAIGN_STAGES[0].raceId,
-            trackKey: CAMPAIGN_STAGES[0].trackKey,
+            raceId: NUMBERS_STAGES[0].raceId,
+            trackKey: NUMBERS_STAGES[0].trackKey,
             bestTime: 7.3,
             lapCount: 1,
             rulesRevision: 1,
@@ -3057,7 +3059,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.startSequence).not.toHaveBeenCalled();
         expect(campaignServiceMocks.startServerCampaignRace).not.toHaveBeenCalled();
 
-        clearCampaignVerification(CAMPAIGN_STAGES[0].raceId);
+        clearCampaignVerification(NUMBERS_STAGES[0].raceId);
         await startPromise;
 
         expect(context.startSequence).toHaveBeenCalledTimes(1);
@@ -3068,10 +3070,10 @@ describe('Campaign lobby and shared modal adapters', () => {
 
     it('does not start the next stage when the previous run is refused', async () => {
         campaignServiceMocks.startServerCampaignRace.mockResolvedValue({ ok: true, body: {} });
-        const nextStage = CAMPAIGN_STAGES[1];
+        const nextStage = NUMBERS_STAGES[1];
         const context = createStartContext({
             status: 'won',
-            activeCampaignStage: CAMPAIGN_STAGES[0],
+            activeCampaignStage: NUMBERS_STAGES[0],
             campaignLobbyState: {
                 complete: false,
                 nextStage: { id: nextStage.raceId },
@@ -3080,15 +3082,15 @@ describe('Campaign lobby and shared modal adapters', () => {
             reset: vi.fn(),
         });
         enqueueCampaignVerification({
-            raceId: CAMPAIGN_STAGES[0].raceId,
-            trackKey: CAMPAIGN_STAGES[0].trackKey,
+            raceId: NUMBERS_STAGES[0].raceId,
+            trackKey: NUMBERS_STAGES[0].trackKey,
             bestTime: 7.3,
             lapCount: 1,
             rulesRevision: 1,
             replay: { revision: 1, segments: [] },
         });
         markCampaignVerificationError(
-            CAMPAIGN_STAGES[0].raceId,
+            NUMBERS_STAGES[0].raceId,
             'Submission replay validation failed.',
         );
 

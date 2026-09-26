@@ -43,23 +43,4 @@ describe('author medal', () => {
         expect(tm.getNextMedalTarget('circuit', 'gold')).toEqual({ tier: 'author', maxSeconds: 4 });
         expect(tm.getNextMedalTarget('circuit', 'author')).toBe(null);
     });
-
-    it('time to beat after gold targets author; at author stays on author ceiling', async () => {
-        vi.doMock('../game/medals/medal-times.json', () => ({
-            default: circuitFixture
-        }));
-        const tm = await import('../game/medals/medal-timing.js');
-        expect(tm.getTimeToBeatSeconds('circuit', 'gold')).toBe(4);
-        expect(tm.getTimeToBeatSeconds('circuit', 'author')).toBe(4);
-    });
-
-    it('includes author in targets line when active', async () => {
-        vi.doMock('../game/medals/medal-times.json', () => ({
-            default: circuitFixture
-        }));
-        const tm = await import('../game/medals/medal-timing.js');
-        const line = tm.formatMedalTargetsLine('circuit');
-        expect(line).toContain('Author');
-        expect(line).toContain('Gold');
-    });
 });

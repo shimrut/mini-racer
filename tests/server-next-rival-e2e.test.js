@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { TRACKS } from '../game/track/tracks.js';
-import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_ID, CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { PB_GHOST_SAMPLE_INTERVAL_MS } from '../src/server/competition/pb-ghost-trace.ts';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 vi.mock('@devvit/redis', async () => {
     const { RedisTestDouble } = await import('./redis-test-double.js');
@@ -34,7 +36,7 @@ import { prepareServerLeaderboardRace } from '../src/server/competition/leaderbo
 import { opponentRaceEngineMethods } from '../game/scoreboard/opponent-race-engine-methods.js';
 import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
-const stage = CAMPAIGN_STAGES[0];
+const stage = NUMBERS_STAGES[0];
 const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
 const PLAYER_ID = 'reddit:e2eracer';
 const PLAYER_TIME_MS = 5000;

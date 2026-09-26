@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { TRACKS } from '../game/track/tracks.js';
-import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 const hashes = new Map();
 const strings = new Map();
@@ -1389,7 +1391,7 @@ describe('Campaign server store', () => {
                 .map(([key]) => key)
                 .filter((key) => String(key).includes(':submit-lock:')
                     || String(key).includes(':progress-lock:')));
-            expect(renewedLockKeys.size).toBe(CAMPAIGN_STAGES.length * 2 + 2);
+            expect(renewedLockKeys.size).toBe(NUMBERS_STAGES.length * 2 + 2);
         } finally {
             vi.useRealTimers();
         }

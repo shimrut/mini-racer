@@ -576,14 +576,15 @@ describe('head-to-head service', () => {
     });
 
     it('creates and loads a challenge from every Campaign stage, including the last ones', async () => {
-        const { CAMPAIGN_STAGES } = await import('../game/campaign/manifest.js');
+        const { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } = await import('../game/campaign/manifest.js');
+        const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
         const { mintGuestPlayerToken } = await import('../src/server/player/player-token.ts');
         const viewer = {
             subredditName: context.subredditName,
             playerId: 'campaign-h2h-racer',
             guestToken: await mintGuestPlayerToken('campaign-h2h-racer'),
         };
-        for (const stage of CAMPAIGN_STAGES) {
+        for (const stage of NUMBERS_STAGES) {
             const service = createHeadToHeadService({
                 resolveSource: vi.fn(async () => ({
                     ...source(),

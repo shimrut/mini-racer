@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
     CAMPAIGN_ID,
-    CAMPAIGN_STAGES,
+    CAMPAIGN_NUMBERS_SERIES_ID,
     countCampaignMedals,
+    getCampaignSeriesStages,
     getCampaignStage,
     getCampaignStageMedalCount,
     getCampaignUnlockedRaceIds,
 } from '../game/campaign/manifest.js';
 import { normalizeRaceSpec } from '../game/race/race-spec.js';
 
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
+
 describe('Campaign manifest', () => {
     it('defines the immutable numbered-v1 stage order, laps, and medal-total gates', () => {
         expect(CAMPAIGN_ID).toBe('numbered-v1');
-        expect(CAMPAIGN_STAGES.map((stage) => ({
+        expect(NUMBERS_STAGES.map((stage) => ({
             raceId: stage.raceId,
             trackKey: stage.trackKey,
             lapCount: stage.lapCount,
@@ -35,12 +38,12 @@ describe('Campaign manifest', () => {
             { raceId: 'numbered-v1-14', trackKey: 'squareRoot', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 35, previousRaceId: 'numbered-v1-13' } },
             { raceId: 'numbered-v1-15', trackKey: 'halfLife', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 37, previousRaceId: 'numbered-v1-14' } },
         ]);
-        expect(Object.isFrozen(CAMPAIGN_STAGES)).toBe(true);
+        expect(Object.isFrozen(NUMBERS_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
     });
 
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
-        const requirements = CAMPAIGN_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
+        const requirements = NUMBERS_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
         expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32, 35, 37]);
         requirements.forEach((required, index) => {
             expect(required).toBeLessThanOrEqual(index * 3);
@@ -87,14 +90,14 @@ describe('Campaign manifest', () => {
 
     it('opens one stage at a time however strong the early runs are', () => {
         for (const medal of ['gold', 'author']) {
-            for (let played = 1; played < CAMPAIGN_STAGES.length; played += 1) {
+            for (let played = 1; played < NUMBERS_STAGES.length; played += 1) {
                 const results = {};
-                for (const stage of CAMPAIGN_STAGES.slice(0, played)) {
+                for (const stage of NUMBERS_STAGES.slice(0, played)) {
                     results[stage.raceId] = { medal };
                 }
                 const unlocked = getCampaignUnlockedRaceIds(results);
                 expect(unlocked).toHaveLength(played + 1);
-                expect(unlocked.at(-1)).toBe(CAMPAIGN_STAGES[played].raceId);
+                expect(unlocked.at(-1)).toBe(NUMBERS_STAGES[played].raceId);
             }
         }
     });
@@ -116,17 +119,17 @@ describe('Campaign manifest', () => {
 
     it('lets Authors buy back the Golds the last stage would otherwise need', () => {
         const silverEverywhere = Object.fromEntries(
-            CAMPAIGN_STAGES.slice(0, 9).map((stage) => [stage.raceId, { medal: 'silver' }]),
+            NUMBERS_STAGES.slice(0, 9).map((stage) => [stage.raceId, { medal: 'silver' }]),
         );
         expect(countCampaignMedals(silverEverywhere)).toBe(18);
         expect(getCampaignUnlockedRaceIds(silverEverywhere)).not.toContain('numbered-v1-09');
 
         const withFourGolds = { ...silverEverywhere };
-        for (const stage of CAMPAIGN_STAGES.slice(0, 4)) withFourGolds[stage.raceId] = { medal: 'gold' };
+        for (const stage of NUMBERS_STAGES.slice(0, 4)) withFourGolds[stage.raceId] = { medal: 'gold' };
         expect(getCampaignUnlockedRaceIds(withFourGolds)).toContain('numbered-v1-09');
 
         const withTwoAuthors = { ...silverEverywhere };
-        for (const stage of CAMPAIGN_STAGES.slice(0, 2)) withTwoAuthors[stage.raceId] = { medal: 'author' };
+        for (const stage of NUMBERS_STAGES.slice(0, 2)) withTwoAuthors[stage.raceId] = { medal: 'author' };
         expect(getCampaignUnlockedRaceIds(withTwoAuthors)).toContain('numbered-v1-09');
     });
 

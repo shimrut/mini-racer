@@ -31,12 +31,6 @@ function normalizeMedalTimes(raw) {
 
 const MEDAL_TIMES = normalizeMedalTimes(_medalTimesRaw);
 
-export const TRACK_MEDAL_THRESHOLDS = Object.freeze(
-    Object.fromEntries(
-        Object.entries(MEDAL_TIMES).map(([k, v]) => [k, { gold: v.gold, silver: v.silver, bronze: v.bronze }])
-    )
-);
-
 export function getTrackMedalThresholds(trackKey) {
     const row = MEDAL_TIMES[trackKey];
     if (!row || !Number.isFinite(row.gold)) return null;
@@ -127,18 +121,6 @@ export function getNextMedalTarget(trackKey, currentMedal) {
     return { tier: 'bronze', maxSeconds: t.bronze };
 }
 
-export function getTimeToBeatSeconds(trackKey, bestEarnedMedal) {
-    const t = getTrackMedalThresholds(trackKey);
-    if (!t) return null;
-    const next = getNextMedalTarget(trackKey, bestEarnedMedal);
-    if (next) return next.maxSeconds;
-    if (bestEarnedMedal === 'author') {
-        const a = getAuthorMedalSeconds(trackKey);
-        return a != null ? a : t.gold;
-    }
-    return t.gold;
-}
-
 export function formatMedalLabel(medal) {
     if (medal === 'author') return 'Author';
     if (medal === 'gold') return 'Gold';
@@ -187,11 +169,6 @@ export function getWinOverlayAllMedalsUnlocked(trackKey, bestStoredMedal) {
     return slots.length > 0 && slots.every((s) => s.filled);
 }
 
-export function allStandardMedalsUnlocked(trackKey, bestStoredMedal) {
-    const stack = getCombinedMedalStackTiers(trackKey, bestStoredMedal);
-    return stack.length > 0 && stack.every((x) => x.filled);
-}
-
 export function isPersonalBestTimeImprovement(finishTimeSec, previousBest) {
     const ft = Number(finishTimeSec);
     if (!Number.isFinite(ft)) return false;
@@ -199,13 +176,4 @@ export function isPersonalBestTimeImprovement(finishTimeSec, previousBest) {
     const prev = prevRaw != null && Number.isFinite(Number(prevRaw)) ? Number(prevRaw) : null;
     if (prev === null) return true;
     return ft < prev;
-}
-
-export function formatMedalTargetsLine(trackKey) {
-    const t = getTrackMedalThresholds(trackKey);
-    if (!t) return null;
-    const fmt = (s) => `${Number(s).toFixed(3)}s`;
-    const authorSec = getAuthorMedalSeconds(trackKey);
-    const authorPart = authorSec != null ? `Author ≤ ${fmt(authorSec)} · ` : '';
-    return `${authorPart}Gold ≤ ${fmt(t.gold)} · Silver ≤ ${fmt(t.silver)} · Bronze ≤ ${fmt(t.bronze)}`;
 }

@@ -84,9 +84,8 @@ if (!SERIES_BY_ID.has(CAMPAIGN_NUMBERS_SERIES_ID)) {
     throw new Error('The Numbers Campaign series must stay live.');
 }
 
-// The Numbers series, under the names that the code used before there were series.
+// The Numbers series, under the name that the code used before there were series.
 export const CAMPAIGN_ID = CAMPAIGN_NUMBERS_SERIES_ID;
-export const CAMPAIGN_STAGES = SERIES_BY_ID.get(CAMPAIGN_NUMBERS_SERIES_ID).stages;
 
 export function getCampaignSeries(seriesId) {
     return typeof seriesId === 'string' ? SERIES_BY_ID.get(seriesId) ?? null : null;

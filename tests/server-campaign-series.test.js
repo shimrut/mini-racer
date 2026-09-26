@@ -234,7 +234,7 @@ describe('Campaign with more than one live series', () => {
         expect(manifest.getCampaignStage('numbered-v1-03')).toMatchObject({ seriesId: 'numbered-v1' });
         expect(manifest.getCampaignUnlockedRaceIds({})).toEqual(['numbered-v1-00', 'test-v1-00']);
         // Medals of one series do not open stages of another series.
-        const numbersMedals = Object.fromEntries(manifest.CAMPAIGN_STAGES.slice(0, 8).map((stage) => [
+        const numbersMedals = Object.fromEntries(manifest.getCampaignSeriesStages(manifest.CAMPAIGN_NUMBERS_SERIES_ID).slice(0, 8).map((stage) => [
             stage.raceId,
             { medal: 'author' },
         ]));

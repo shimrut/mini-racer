@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRACKS } from '../game/track/tracks.js';
-import { CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../game/medals/medal-timing.js';
 import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 const mockDailyChallenge = vi.hoisted(() => vi.fn());
 const mockValidateReplay = vi.hoisted(() => vi.fn());
@@ -105,7 +107,7 @@ describe('head-to-head runtime', () => {
     });
 
     it('builds a Campaign challenge source from the exact submitted finish, not the saved best', async () => {
-        const stage = CAMPAIGN_STAGES[0];
+        const stage = NUMBERS_STAGES[0];
         const replay = {
             rulesRevision: stage.rulesRevision,
             targetLapNumber: stage.lapCount,
@@ -134,7 +136,7 @@ describe('head-to-head runtime', () => {
     });
 
     it.each([
-        ['a Campaign finish without its run', { source: 'campaign', raceId: CAMPAIGN_STAGES[0].raceId }],
+        ['a Campaign finish without its run', { source: 'campaign', raceId: NUMBERS_STAGES[0].raceId }],
         ['a Campaign race the manifest does not define', { source: 'campaign', raceId: 'numbered-v1-99', replay: {} }],
         ['a Daily finish without its run', { source: 'daily', challengeId: dailyChallenge.id }],
     ])('refuses %s', async (_case, input) => {
@@ -147,7 +149,7 @@ describe('head-to-head runtime', () => {
 
         expect(await resolveHeadToHeadSource({
             source: 'campaign',
-            raceId: CAMPAIGN_STAGES[0].raceId,
+            raceId: NUMBERS_STAGES[0].raceId,
             replay: {},
         })).toBeNull();
     });
@@ -373,7 +375,7 @@ describe('the best a challenge viewer already holds', () => {
         mockRepairStandings.mockResolvedValue(undefined);
         mockGetCampaignProgress.mockResolvedValue({
             resultsByRaceId: Object.fromEntries(
-                CAMPAIGN_STAGES.map((stage) => [stage.raceId, { medal: 'gold' }]),
+                NUMBERS_STAGES.map((stage) => [stage.raceId, { medal: 'gold' }]),
             ),
         });
     });
@@ -423,7 +425,7 @@ describe('the best a challenge viewer already holds', () => {
         mockReadEntry.mockResolvedValue(null);
         mockGetCampaignProgress.mockResolvedValue({
             resultsByRaceId: Object.fromEntries(
-                CAMPAIGN_STAGES.map((stage) => [stage.raceId, {
+                NUMBERS_STAGES.map((stage) => [stage.raceId, {
                     medal: 'gold',
                     ...(stage.raceId === 'numbered-v1-03' ? { bestTimeMs: 24_100 } : {}),
                 }]),

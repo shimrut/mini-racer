@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { TRACKS } from '../game/track/tracks.js';
-import { CAMPAIGN_ID, CAMPAIGN_STAGES } from '../game/campaign/manifest.js';
+import { CAMPAIGN_ID, CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
+
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
 const { mockRedis, hashes, strings, sortedSets } = vi.hoisted(() => {
     const hashes = new Map();
@@ -54,7 +56,7 @@ import { toCampaignCompetition } from '../src/server/competition/competition.ts'
 import { createRedisPlayerProfileKey } from '../src/server/competition/competition-identity.ts';
 import { prepareCompetitionOpponentRace } from '../src/server/competition/competition-opponent-race.ts';
 
-const stage = CAMPAIGN_STAGES[0];
+const stage = NUMBERS_STAGES[0];
 const competition = toCampaignCompetition(CAMPAIGN_ID, stage);
 const playerId = 'reddit:player';
 const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});

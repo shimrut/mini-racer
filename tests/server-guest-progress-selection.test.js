@@ -36,7 +36,8 @@ const { discardGuestDailyProgress } = await import("../src/server/daily/daily-gp
 const { toDailyCompetition } = await import("../src/server/competition/competition.ts");
 const { upsertPlayerTrackPersonalBest } = await import("../src/server/competition/pb-ghost-store.ts");
 const { TRACKS } = await import("../game/track/tracks.js");
-const { CAMPAIGN_STAGES } = await import("../game/campaign/manifest.js");
+const { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } = await import("../game/campaign/manifest.js");
+const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 
 afterEach(() => {
@@ -619,7 +620,7 @@ describe("guest transfer cost and recovery", () => {
 
   it("resumes a Campaign discard that died partway, without re-bumping cleared stages", async () => {
     const guestPlayerId = "guest:half-discarded";
-    const [firstStage, secondStage] = CAMPAIGN_STAGES;
+    const [firstStage, secondStage] = NUMBERS_STAGES;
     await seedCampaignStage(firstStage, guestPlayerId);
     await seedCampaignStage(secondStage, guestPlayerId);
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
@@ -666,7 +667,7 @@ describe("guest transfer cost and recovery", () => {
 
   it("stops a Campaign discard whose lock was taken over, and leaves that lock alone", async () => {
     const guestPlayerId = "guest:stolen-lock";
-    const [firstStage, secondStage] = CAMPAIGN_STAGES;
+    const [firstStage, secondStage] = NUMBERS_STAGES;
     await seedCampaignStage(firstStage, guestPlayerId);
     await seedCampaignStage(secondStage, guestPlayerId);
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
@@ -701,7 +702,7 @@ describe("guest transfer cost and recovery", () => {
 
   it("clears rows a parsed read would have called empty", async () => {
     const guestPlayerId = "guest:unparseable";
-    const [rankOnlyStage, unparseableStage, pbOnlyStage, emptyStage] = CAMPAIGN_STAGES;
+    const [rankOnlyStage, unparseableStage, pbOnlyStage, emptyStage] = NUMBERS_STAGES;
     const rankOnly = campaignCompetitionFor(rankOnlyStage, guestPlayerId);
     const unparseable = campaignCompetitionFor(unparseableStage, guestPlayerId);
     const pbOnly = campaignCompetitionFor(pbOnlyStage, guestPlayerId);
@@ -736,7 +737,7 @@ describe("guest transfer cost and recovery", () => {
 
   it("skips stages the guest never raced", async () => {
     const guestPlayerId = "guest:one-stage";
-    await seedCampaignStage(CAMPAIGN_STAGES[0], guestPlayerId);
+    await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
       campaignId: "numbered-v1",
       startedAt: "2026-09-01T00:00:00.000Z",
@@ -820,7 +821,7 @@ describe("guest transfer cost and recovery", () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:budget";
     const redditPlayerId = "reddit:budget";
-    await seedCampaignStage(CAMPAIGN_STAGES[0], guestPlayerId);
+    await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
       campaignId: "numbered-v1",
       startedAt: "2026-09-01T00:00:00.000Z",
