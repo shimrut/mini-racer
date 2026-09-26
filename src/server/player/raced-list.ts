@@ -49,3 +49,20 @@ export async function queueRacedBoard(
         });
     }
 }
+
+// A race save lists its board right after it takes its stage lock, before it
+// checks the transfer marks. A save that passed that check therefore listed
+// its board before any transfer set its marks, so the transfer's one check of
+// the listed boards finds every save still running.
+export async function listRacedBoard(
+    client: {
+        hSet(key: string, values: Record<string, string>): Promise<unknown>;
+        expire(key: string, seconds: number): Promise<unknown>;
+    },
+    playerId: string,
+    board: { mode: string; id: string },
+): Promise<void> {
+    const key = racedListKey(playerId);
+    await client.hSet(key, { [racedListField(board)]: '1' });
+    if (playerId.startsWith('guest:')) await client.expire(key, GUEST_RACED_LIST_TTL_SECONDS);
+}

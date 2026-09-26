@@ -341,7 +341,8 @@ describe('submitCompetitionRun', () => {
             bestTimeMs,
             opponentRaceReady: true,
         });
-        expect(mockRedisHSet).not.toHaveBeenCalled();
+        // Only the raced list is written outside the save transaction.
+        expect(mockRedisHSet.mock.calls.filter(([key]) => !String(key).startsWith('miniracer:raced:'))).toEqual([]);
     });
 
     it('stamps opponentRaceReady when a later ghost matches an unmarked stored time', async () => {

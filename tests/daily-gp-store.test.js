@@ -877,6 +877,27 @@ describe("Daily finish after the run is saved", () => {
     expect(cleanupAtMs - Date.now()).toBeGreaterThan((DAILY_GUEST_ROW_KEEP_SECONDS - 60) * 1000);
   });
 
+  it("lists the day before it checks for a transfer, so a refused save is still listed", async () => {
+    const { racedListKey } = await import("../src/server/player/raced-list.ts");
+    const challenge = await getServerDailyGpChallenge();
+    // The transfer sets its marks just after the save takes its stage lock.
+    const realSet = RedisTestDouble.prototype.set;
+    redis.set = async function markOnLock(key, value, options) {
+      const stored = await realSet.call(this, key, value, options);
+      if (String(key).includes(":submit-lock:")) {
+        await realSet.call(this, guestProgressSelectionPendingKey("guest:guest-refused-save"), "1");
+      }
+      return stored;
+    };
+
+    const { result } = await finishDaily("guest-refused-save");
+    delete redis.set;
+
+    expect(result.body.accepted).toBe(false);
+    expect(await redis.hGet(racedListKey("guest:guest-refused-save"), `daily:${challenge.id}`)).toBeTruthy();
+    expect(await redis.hGet(`dailygp:leaderboard:${challenge.id}:entries`, "guest:guest-refused-save")).toBeFalsy();
+  });
+
   it("answers saved without a rank when the rank read fails", async () => {
     vi.spyOn(leaderboard, "readPlayerRank").mockRejectedValueOnce(new Error("rank unavailable"));
     const { result, thrown, boardTimeMs } = await finishDaily("guest-after-save-rank");

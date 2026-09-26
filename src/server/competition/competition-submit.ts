@@ -19,6 +19,7 @@ import { sanitizeRedditUsername } from '../../../game/shared/leaderboard-identit
 import { TRACKS } from '../../../game/track/tracks.js';
 import type { DailyGpLeaderboardEntry } from '../daily/daily-gp-model.js';
 import { isProgressTransferPending } from '../player/guest-retirement.js';
+import { listRacedBoard } from '../player/raced-list.js';
 import { checkFixedWindowRateLimit, type RateLimitResult } from '../request/rate-limit.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
@@ -247,7 +248,17 @@ export async function submitCompetitionRun(
         };
     }
 
-    if (await isProgressTransferPending(playerId)) {
+    let transferPending: boolean;
+    try {
+        await listRacedBoard(redis, playerId, competition);
+        transferPending = await isProgressTransferPending(playerId);
+    } catch (error) {
+        await releaseRedisLock(submissionLock, redis).catch((releaseError) => {
+            console.error('Competition submission lock cleanup failed:', releaseError);
+        });
+        throw error;
+    }
+    if (transferPending) {
         const pendingRelease = releaseRedisLock(submissionLock, redis).catch((error) => {
             console.error('Pending transfer submission lock cleanup failed:', error);
         });
