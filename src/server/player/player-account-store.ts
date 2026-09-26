@@ -41,6 +41,7 @@ import { getCarAssetGround } from '../../../game/car/car-skin-grounds.js';
 import { verifyGuestPlayerToken } from './player-token.js';
 import {
     isGuestProgressSelectionPending,
+    isProgressTransferPending,
     resolveGuestIdentityStatus,
 } from './guest-retirement.js';
 import {
@@ -214,6 +215,8 @@ async function readOrSeedTrackPersonalBest({
     if (!retainedEntry || retainedEntry.validationMethod !== 'strict-replay') {
         return null;
     }
+    // A transfer owns the player's rows until it ends.
+    if (await isProgressTransferPending(playerId)) return null;
 
     try {
         const seeded = await seedPlayerTrackPersonalBest({

@@ -78,7 +78,7 @@ import {
     GuestProgressSelectionRetryableError,
 } from '../guest-transfer/guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
-import { isPlayerProgressSelectionPending } from '../player/guest-retirement.js';
+import { isPlayerProgressSelectionPending, isProgressTransferPending } from '../player/guest-retirement.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
@@ -139,6 +139,15 @@ function guestExpiresAt(): Date {
 
 function competitionFor(stage: CampaignStage): Competition {
     return toCampaignCompetition(stage.seriesId, stage);
+}
+
+// The race-save lock of every live stage, for each player. A transfer reads
+// them once to find a save that started before it set its marks.
+export function campaignSubmissionLockKeys(playerIds: readonly string[]): string[] {
+    return CAMPAIGN_LIVE_STAGES.flatMap((stage) => {
+        const competition = competitionFor(stage);
+        return playerIds.map((playerId) => competitionSubmissionLockKey(competition, playerId));
+    });
 }
 
 function emptyProgress(seriesId: string): CampaignProgress {
@@ -583,6 +592,9 @@ export async function repairCampaignStandingsFromEntries(
     playerId: string,
     seriesId: string | null = null,
 ): Promise<void> {
+    // A transfer owns the player's rows until it ends. Like a race save, the
+    // repair checks for one again after it takes each stage lock.
+    if (await isProgressTransferPending(playerId)) return;
     const stages = seriesId ? getCampaignSeriesStages(seriesId) : CAMPAIGN_LIVE_STAGES;
     for (const stage of stages) {
         const competition = competitionFor(stage);
@@ -599,6 +611,7 @@ export async function repairCampaignStandingsFromEntries(
         );
         if (!lock) continue;
         try {
+            if (await isProgressTransferPending(playerId)) return;
             const transaction = await beginOwnedRedisLockTransaction(lock, redis);
             if (!transaction) continue;
             const [currentEntry, currentRankedScore] = await Promise.all([

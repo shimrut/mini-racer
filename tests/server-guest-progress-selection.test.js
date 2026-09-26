@@ -46,6 +46,8 @@ const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 // The first stage of every other series is open to every player.
 const OTHER_SERIES_FIRST_STAGES = CAMPAIGN_SERIES.length - 1;
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
+const { competitionSubmissionLockKey } = await import("../src/server/competition/competition-submit.ts");
+const { repairCampaignStandingsFromEntries } = await import("../src/server/campaign/campaign-store.ts");
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -600,6 +602,55 @@ describe("guest transfer cost and recovery", () => {
     });
     await redis.zAdd(competition.leaderboardKey, { member: guestPlayerId, score: 31234 });
   }
+
+  it("waits for a race save that took its stage lock before the transfer marks", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:saving";
+    const redditPlayerId = "reddit:saving";
+    const [stage] = NUMBERS_STAGES;
+    await seedCampaignStage(stage, guestPlayerId);
+    const competition = campaignCompetitionFor(stage, guestPlayerId);
+    const saveLockKey = competitionSubmissionLockKey(competition, guestPlayerId);
+    await redis.set(saveLockKey, "save-in-flight");
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .rejects.toMatchObject({ statusCode: 503, reason: "progress_selection_retryable" });
+    expect(await redis.hGet(competition.entryHashKey, redditPlayerId)).toBeFalsy();
+    expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeTruthy();
+
+    await redis.del(saveLockKey);
+    await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+
+    expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
+    expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
+  });
+
+  it("does not repair Campaign standings while a transfer owns the player", async () => {
+    const redditPlayerId = "reddit:repair-during-transfer";
+    const [stage] = NUMBERS_STAGES;
+    const competition = campaignCompetitionFor(stage, redditPlayerId);
+    await redis.hSet(competition.entryHashKey, {
+      [redditPlayerId]: JSON.stringify({
+        playerId: redditPlayerId,
+        displayName: "Account racer",
+        bestTimeMs: 31234,
+        trackKey: stage.trackKey,
+        completedLaps: stage.lapCount,
+        validationMethod: "strict-replay",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    await redis.set(guestProgressSelectionAccountPendingKey(redditPlayerId), "guest:repair-during-transfer");
+
+    await repairCampaignStandingsFromEntries(redditPlayerId, stage.seriesId);
+
+    expect(await redis.zScore(competition.leaderboardKey, redditPlayerId)).toBeFalsy();
+
+    await redis.del(guestProgressSelectionAccountPendingKey(redditPlayerId));
+    await repairCampaignStandingsFromEntries(redditPlayerId, stage.seriesId);
+
+    expect(await redis.zScore(competition.leaderboardKey, redditPlayerId)).toBeTruthy();
+  });
 
   it("clears a Daily day the guest holds only a personal best on", async () => {
     await seedSevenDayPlaylist();

@@ -37,6 +37,7 @@ const {
   updateServerPlayerPreferences,
 } = await import("../src/server/player/player-account-store.ts");
 const { mintGuestPlayerToken } = await import("../src/server/player/player-token.ts");
+const { guestProgressSelectionPendingKey } = await import("../src/server/player/guest-retirement.ts");
 const { validateDailyGpReplayDetailed } = await import("../src/server/competition/replay-validator.ts");
 
 const validateDailyGpReplayDetailedMock = vi.mocked(validateDailyGpReplayDetailed);
@@ -334,6 +335,35 @@ describe("daily-gp-store submission hardening", () => {
       lapCompletionTimesSec: null,
       ghost: null,
     });
+  });
+
+  it("does not seed a track PB while a progress transfer owns the player", async () => {
+    const challenge = await getServerDailyGpChallenge();
+    const guestPlayerId = "guest-pb-during-transfer";
+    const canonicalPlayerId = `guest:${guestPlayerId}`;
+    const bootstrap = await getServerPlayerBootstrap({ playerId: guestPlayerId });
+    await redis.hSet(createRedisChallengeEntryHashKey(challenge.id), {
+      [canonicalPlayerId]: JSON.stringify({
+        playerId: canonicalPlayerId,
+        trackKey: challenge.trackKey,
+        bestTimeMs: 4321,
+        updatedAt: "2026-07-16T12:00:00.000Z",
+        completedLaps: null,
+        checkpointTimesSec: [1.2, 2.4],
+        validationMethod: "strict-replay",
+        strictReplayFailureReason: null,
+      }),
+    });
+    await redis.set(guestProgressSelectionPendingKey(canonicalPlayerId), "1");
+
+    const summaries = await getServerPlayerTrackPbSummaries({
+      challengeIds: [challenge.id],
+      playerId: guestPlayerId,
+      guestToken: bootstrap.guestToken,
+    });
+
+    expect(summaries.trackPbs[challenge.id]).toBeNull();
+    expect(redis.hashes.get(`dailygp:challenge-pbs:${challenge.id}`)?.size ?? 0).toBe(0);
   });
 
   it("keeps the guest rate limit when the client rotates its signed player identity", async () => {

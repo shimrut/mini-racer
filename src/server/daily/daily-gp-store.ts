@@ -97,6 +97,7 @@ import {
     type CarUnlockSnapshot,
 } from '../player/car-unlock-store.js';
 import {
+    campaignSubmissionLockKeys,
     cleanupGuestCampaignProgress,
     discardGuestCampaignProgress,
     getCampaignResultsForCarUnlocks,
@@ -899,6 +900,34 @@ async function readFinalPodiumPositions(
         formattedTime: null,
     };
     return [positionAt(1), positionAt(2), positionAt(3)];
+}
+
+function dailySubmissionLockKeys(
+    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+    playerIds: readonly string[],
+): string[] {
+    return challengeSpecs.flatMap((spec) => {
+        const competition = toDailyCompetition(transferChallengeFromSpec(spec));
+        return playerIds.map((playerId) => competitionSubmissionLockKey(competition, playerId));
+    });
+}
+
+// A race save takes its stage lock and then checks the transfer marks. After
+// the marks are set, a new save stops at that check, so the transfer only has
+// to find a save that took its lock before the marks: one read of every lock.
+async function ensureNoRaceSaveInFlight(
+    playerIds: readonly string[],
+    challengeSpecs: readonly GuestTransferDailyChallengeSpec[],
+): Promise<void> {
+    const keys = [
+        ...campaignSubmissionLockKeys(playerIds),
+        ...dailySubmissionLockKeys(challengeSpecs, playerIds),
+    ];
+    if (keys.length === 0) return;
+    const owners = await redis.mGet(keys);
+    if (owners.some((owner) => owner !== null && owner !== undefined)) {
+        throw new GuestProgressSelectionRetryableError('A race is still saving. Try again.');
+    }
 }
 
 async function releaseSubmissionLocksSafely(
@@ -2495,6 +2524,10 @@ export async function selectGuestProgress({
             }
         );
         await saveRecord(record, { markPending: true });
+        await ensureNoRaceSaveInFlight(
+            [guestPlayerId, redditPlayerId],
+            record.dailyChallengeSpecs ?? [],
+        );
         if (choice === 'guest') {
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
