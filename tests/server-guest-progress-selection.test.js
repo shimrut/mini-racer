@@ -583,6 +583,10 @@ const BUDGET_SEQUENTIAL_STEPS = 300;
 const BUDGET_LARGEST_WINDOW = 24;
 // The same fixture when the guest progress is kept (measured 905 / 387).
 const BUDGET_GUEST_KEPT_RPCS = 950;
+// One request of a 77-day history, 60 days of work at most (measured
+// 1,953 calls / 650 steps at most).
+const BUDGET_LONG_HISTORY_REQUEST_RPCS = 2100;
+const BUDGET_LONG_HISTORY_REQUEST_STEPS = 700;
 const BUDGET_GUEST_KEPT_SEQUENTIAL_STEPS = 420;
 
 describe("guest transfer cost and recovery", () => {
@@ -1340,6 +1344,47 @@ describe("guest transfer cost and recovery", () => {
     expect(largestWindow).toBeLessThanOrEqual(BUDGET_LARGEST_WINDOW);
     expect(measurement.steps).toBeLessThanOrEqual(BUDGET_GUEST_KEPT_SEQUENTIAL_STEPS);
     expect(measurement.rpcs).toBeLessThanOrEqual(BUDGET_GUEST_KEPT_RPCS);
+  });
+
+  it("keeps each request of a long Daily history inside its round-trip budget", async () => {
+    const archived = await seedArchivedDays(70);
+    const guestPlayerId = "guest:budget-long";
+    const redditPlayerId = "reddit:budget-long";
+    for (const day of archived) {
+      const competition = toDailyCompetition(day);
+      await redis.hSet(competition.entryHashKey, {
+        [guestPlayerId]: JSON.stringify({
+          playerId: guestPlayerId,
+          displayName: "Guest racer",
+          bestTimeMs: 41234,
+          trackKey: day.trackKey,
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+      await redis.zAdd(competition.leaderboardKey, { member: guestPlayerId, score: 41234 });
+      await redis.hSet(racedListKey(guestPlayerId), { [`daily:${day.id}`]: "1" });
+    }
+    await redis.set(RACED_LIST_FILL_READY_KEY, "{}");
+
+    const requests = [];
+    let body = { guestPlayerId, redditPlayerId, choice: "guest" };
+    for (let request = 0; request < 10; request += 1) {
+      const measurement = measureRedis();
+      const result = await selectGuestProgress(body).catch((error) => error);
+      stopCountingRedisCalls();
+      requests.push({ ...measurement, largestWindow: Math.max(...measurement.windows) });
+      if (result?.reason !== "progress_selection_continue") break;
+      body = { ...body, resume: true, transferId: result.transferId };
+    }
+    if (process.env.REPORT_TRANSFER_COST) {
+      console.log("long history cost", requests.map(({ rpcs, steps, largestWindow }) => ({ rpcs, steps, largestWindow })));
+    }
+    expect(requests.length).toBe(3);
+    for (const request of requests) {
+      expect(request.largestWindow).toBeLessThanOrEqual(BUDGET_LARGEST_WINDOW);
+      expect(request.steps).toBeLessThanOrEqual(BUDGET_LONG_HISTORY_REQUEST_STEPS);
+      expect(request.rpcs).toBeLessThanOrEqual(BUDGET_LONG_HISTORY_REQUEST_RPCS);
+    }
   });
 
   it("reports a thrown transaction conflict as retryable, not as a server error", async () => {
