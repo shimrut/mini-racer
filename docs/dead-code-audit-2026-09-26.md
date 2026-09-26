@@ -6,6 +6,29 @@ tracks, and new series data. §4 covers that work separately.
 
 This report records findings. It does not change code.
 
+## Removal progress
+
+The removals run on branch `chore/dead-code-safe-removals`, which starts from
+`feat/campaign-series`. The uncommitted ground work stays out of these commits.
+
+- **Group 1 — done (`bb9d768`), except the items in the uncommitted work.**
+  `isHeadToHeadRaceId`, `resultCount`, the song `chords` fields, the series row `ground`
+  and `medals`, and `newCircuit.jpg`. The `chords` change is committed only on the committed
+  songs. The working tree also drops it from the uncommitted water song.
+- **Group 2 — done (`2209eb9`, `9e8e944`).** The four medal helpers, `CAMPAIGN_STAGES`, the
+  server `PB_GHOST_SAMPLE_RATE_HZ`, the autopost alias names, and the two Daily store
+  re-exports. The tests import each name from its owner, or read the Numbers stages from
+  the series. The suite has 5 tests fewer. Each removed test called only a removed helper.
+  The medal-times check for every track stays.
+- **Waiting for the ground work commit.** `tangentX` and `tangentY` in `getEdgeFrame`, the
+  share pictures of `countryRoad`, `snowCircuit`, `gripCircuit` and `middleWay`, and the
+  untracked `brokenRoad.jpg` and `dirtSnake.jpg`. These belong to uncommitted files, or they
+  become unused only when that work lands.
+
+Validation: `npx tsc --noEmit` passes. Every client entry bundles with esbuild. The full
+suite has the same 22 failures before and after each commit. All 22 come from the
+uncommitted ground and series work, not from these removals.
+
 ## Why this audit
 
 The last audit ran on 2026-09-23 (`docs/dead-code-audit-2026-09-23.md`). Its removals landed
