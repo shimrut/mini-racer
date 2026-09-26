@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestTransferRunner } from "./transfer-runner-helper.js";
 import { createHash } from "node:crypto";
 import { RedisTestDouble } from "./redis-test-double.js";
 
@@ -576,6 +577,7 @@ describe("a frozen Daily day cannot be skipped on a presence read", () => {
 
     const verifyGuestSource = vi.fn();
     await mergeGuestDailyProgress({
+      transactionRunner: await createTestTransferRunner(),
       guestPlayerId,
       redditPlayerId,
       replace: true,
@@ -597,6 +599,7 @@ describe("a frozen Daily day cannot be skipped on a presence read", () => {
 
     const verifyGuestSource = vi.fn();
     await mergeGuestDailyProgress({
+      transactionRunner: await createTestTransferRunner(),
       guestPlayerId,
       redditPlayerId,
       replace: true,

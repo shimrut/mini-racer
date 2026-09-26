@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestTransferRunner } from "./transfer-runner-helper.js";
 import { createHash } from "node:crypto";
 import { RedisTestDouble } from "./redis-test-double.js";
 
@@ -716,6 +717,7 @@ describe("guest transfer cost and recovery", () => {
     expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
 
     await expect(discardGuestDailyProgress({
+      transactionRunner: await createTestTransferRunner(),
       guestPlayerId,
       challengeIds: [challenge.id],
     })).resolves.toBe(true);

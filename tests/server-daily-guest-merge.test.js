@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTestTransferRunner } from './transfer-runner-helper.js';
 import { createHash } from 'node:crypto';
 import {
     createDailyChallengeId,
@@ -171,6 +172,7 @@ describe('mergeGuestDailyProgress', () => {
             mergeGuestDailyProgress,
         } = await import('../src/server/daily/daily-gp-store.ts');
         const result = await mergeGuestDailyProgress({
+            transactionRunner: await createTestTransferRunner(),
             guestPlayerId,
             redditPlayerId,
         });
@@ -188,7 +190,7 @@ describe('mergeGuestDailyProgress', () => {
         expect(mockRedis.zRem).not.toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
         expect(mockRedis.hDel).not.toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
 
-        await cleanupGuestDailyProgress({ guestPlayerId });
+        await cleanupGuestDailyProgress({ guestPlayerId, transactionRunner: await createTestTransferRunner() });
         expect(mockRedis.zRem).toHaveBeenCalledWith(leaderboardKey, [guestPlayerId]);
         expect(mockRedis.hDel).toHaveBeenCalledWith(entryHashKey, [guestPlayerId]);
     });
@@ -233,6 +235,7 @@ describe('mergeGuestDailyProgress', () => {
 
         const { mergeGuestDailyProgress } = await import('../src/server/daily/daily-gp-store.ts');
         const result = await mergeGuestDailyProgress({
+            transactionRunner: await createTestTransferRunner(),
             guestPlayerId,
             redditPlayerId,
         });
