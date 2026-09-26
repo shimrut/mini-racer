@@ -570,6 +570,9 @@ describe("guest progress selection", () => {
   });
 });
 
+// Campaign transfer writes hold at most this many stages in one transaction.
+const STAGES_PER_TRANSFER_WRITE = 5;
+
 const BUDGET_RPCS = 360;
 const BUDGET_SEQUENTIAL_STEPS = 300;
 const BUDGET_LARGEST_WINDOW = 24;
@@ -630,7 +633,7 @@ describe("guest transfer cost and recovery", () => {
     await seedSevenDayPlaylist();
     const guestPlayerId = "guest:replaces-account";
     const redditPlayerId = "reddit:replaced-account";
-    const [guestStage, goodStage, damagedStage, pbOnlyStage, rankOnlyStage] = NUMBERS_STAGES;
+    const [guestStage, goodStage, damagedStage, pbOnlyStage, rankOnlyStage, emptyStage] = NUMBERS_STAGES;
     await seedCampaignStage(guestStage, guestPlayerId);
     const boardOf = (stage) => campaignCompetitionFor(stage, redditPlayerId);
     await redis.hSet(boardOf(goodStage).entryHashKey, {
@@ -648,7 +651,15 @@ describe("guest transfer cost and recovery", () => {
     await redis.hSet(boardOf(damagedStage).entryHashKey, { [redditPlayerId]: "{not json" });
     await redis.hSet(boardOf(pbOnlyStage).pbHashKey, { [dailyPbField(redditPlayerId)]: "{not json" });
     await redis.zAdd(boardOf(rankOnlyStage).leaderboardKey, { member: redditPlayerId, score: 30000 });
+    const bumped = [];
+    const realIncrBy = RedisTestDouble.prototype.incrBy;
+    redis.incrBy = async function counted(key, value) {
+      if (String(key).includes("standings-revision")) bumped.push(key);
+      return realIncrBy.call(this, key, value);
+    };
+
     await selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+    delete redis.incrBy;
 
     for (const stage of [goodStage, damagedStage, pbOnlyStage, rankOnlyStage]) {
       const board = boardOf(stage);
@@ -657,6 +668,8 @@ describe("guest transfer cost and recovery", () => {
       expect(await redis.zScore(board.leaderboardKey, redditPlayerId)).toBeFalsy();
     }
     expect(JSON.parse(await redis.hGet(boardOf(guestStage).entryHashKey, redditPlayerId)).bestTimeMs).toBe(31234);
+    expect(await redis.hGet(boardOf(guestStage).entryHashKey, guestPlayerId)).toBeFalsy();
+    expect(bumped.some((key) => key.includes(`:${emptyStage.raceId}:`))).toBe(false);
   });
 
   it("does not repair Campaign standings while a transfer owns the player", async () => {
@@ -712,9 +725,9 @@ describe("guest transfer cost and recovery", () => {
 
   it("resumes a Campaign discard that died partway, without re-bumping cleared stages", async () => {
     const guestPlayerId = "guest:half-discarded";
-    const [firstStage, secondStage] = NUMBERS_STAGES;
-    await seedCampaignStage(firstStage, guestPlayerId);
-    await seedCampaignStage(secondStage, guestPlayerId);
+    // One more stage than a single grouped write holds.
+    const racedStages = NUMBERS_STAGES.slice(0, STAGES_PER_TRANSFER_WRITE + 1);
+    for (const stage of racedStages) await seedCampaignStage(stage, guestPlayerId);
     await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
       campaignId: "numbered-v1",
       startedAt: "2026-09-01T00:00:00.000Z",
@@ -741,15 +754,15 @@ describe("guest transfer cost and recovery", () => {
     redis.beforeExec = null;
 
     const firstAttemptBumps = [...bumped];
-    expect(firstAttemptBumps).toHaveLength(1);
+    expect(firstAttemptBumps).toHaveLength(STAGES_PER_TRANSFER_WRITE);
     expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeTruthy();
 
     bumped.length = 0;
     await expect(discardGuestCampaignProgress({ guestPlayerId })).resolves.toBe(true);
 
     expect(bumped).toHaveLength(1);
-    expect(bumped[0]).not.toBe(firstAttemptBumps[0]);
-    for (const stage of [firstStage, secondStage]) {
+    expect(firstAttemptBumps).not.toContain(bumped[0]);
+    for (const stage of racedStages) {
       const competition = campaignCompetitionFor(stage, guestPlayerId);
       expect(await redis.hGet(competition.entryHashKey, guestPlayerId)).toBeFalsy();
     }
@@ -779,7 +792,7 @@ describe("guest transfer cost and recovery", () => {
     let stolenKey = null;
     redis.beforeExec = (keys) => {
       if (cleared === 0 || stolenKey) return;
-      stolenKey = keys.find((key) => key.includes("submit-lock"));
+      stolenKey = keys.find((key) => key.includes("progress-lock"));
       if (stolenKey) redis.strings.set(stolenKey, "successor-owner");
     };
 

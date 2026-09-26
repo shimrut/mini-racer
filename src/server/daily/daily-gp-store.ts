@@ -2555,7 +2555,10 @@ export async function selectGuestProgress({
                 await saveRecord(record);
             }
             if (!record.cleanedDomains?.includes('campaign')) {
-                await timed('campaignCleanupMs', () => cleanupGuestCampaignProgress({ guestPlayerId }));
+                await timed('campaignCleanupMs', () => cleanupGuestCampaignProgress({
+                    guestPlayerId,
+                    transactionRunner: runTransferMutation,
+                }));
                 record.cleanedDomains = [...(record.cleanedDomains || []), 'campaign'];
                 await saveRecord(record);
             }
@@ -2572,7 +2575,10 @@ export async function selectGuestProgress({
         } else {
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
-                await timed('campaignMs', () => discardGuestCampaignProgress({ guestPlayerId }));
+                await timed('campaignMs', () => discardGuestCampaignProgress({
+                    guestPlayerId,
+                    transactionRunner: runTransferMutation,
+                }));
                 record.completedDomains = [...record.completedDomains, 'campaign'];
                 await saveRecord(record);
             }
