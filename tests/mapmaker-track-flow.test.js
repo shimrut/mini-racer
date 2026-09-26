@@ -12,12 +12,11 @@ const TOP_SPEED = 15.5;
 
 const FLOWY = ['doubleCrest', 'anvilCircuit', 'sharkBite', 'ovenMitt', 'whistleRidge', 'safariCircuit'];
 
-// Tracks judged not flowy in play, and the rule each one misses.
+// Tracks judged not flowy in play, and the rule each one misses. Winding Road and
+// Hook Loop were judged too, but they were reshaped after that on 2026-09-25.
 const NOT_FLOWY = {
-    windingRoad: 'flow-left-right',
     slateCircuit: 'flow-left-right',
     puppetMaster: 'flow-beat',
-    hookLoop: 'flow-beat',
     twinRise: 'flow-steer-gap',
     alloyRing: 'flow-steer-gap',
     groundControl: 'flow-width',
@@ -71,10 +70,10 @@ describe('Mapmaker flow check', () => {
     });
 
     it('names a failing value that differs from its target', () => {
-        const report = analyzeTrackFlow(TRACKS.hookLoop);
+        const report = analyzeTrackFlow(TRACKS.puppetMaster);
         const beat = report.rules.find((rule) => rule.code === 'flow-beat');
         expect(report.metrics.inputsPerSec).toBeLessThan(FLOW_LIMITS.minInputsPerSec);
-        expect(beat.detail).toBe('A new steering input only every 1.5 s. Aim for 1.4 s or less. Add bends.');
+        expect(beat.detail).toBe('A new steering input only every 2.1 s. Aim for 1.4 s or less. Add bends.');
     });
 
     it('skips a track without closed walls', () => {
