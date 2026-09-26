@@ -49,6 +49,8 @@ const OTHER_SERIES_FIRST_STAGES = CAMPAIGN_SERIES.length - 1;
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 const { competitionSubmissionLockKey } = await import("../src/server/competition/competition-submit.ts");
 const { racedListKey } = await import("../src/server/player/raced-list.ts");
+const { transferredSettings } = await import("../src/server/player/transfer-settings.ts");
+const { readPlayerProfile, upsertPlayerProfile } = await import("../src/server/competition/competition-identity.ts");
 const { repairCampaignStandingsFromEntries } = await import("../src/server/campaign/campaign-store.ts");
 
 afterEach(() => {
@@ -678,6 +680,54 @@ describe("guest transfer cost and recovery", () => {
     expect(await redis.hGet(boardOf(guestStage).entryHashKey, guestPlayerId)).toBeFalsy();
     expect(bumped.some((key) => key.includes(`:${emptyStage.raceId}:`))).toBe(false);
   });
+
+  const baseSettings = {
+    carSkin: "assets/cars/mr_mr_red.webp",
+    trailId: "gold",
+    musicEnabled: false,
+    carAudioEnabled: true,
+    crashAutoRestartEnabled: false,
+    crashRestartDelaySec: 0.8,
+    pbGhostEnabled: true,
+    pausePlacement: "timer",
+    pauseOnTimerEnabled: true,
+    hideHudEnabled: false,
+  };
+
+  it("gives the account the settings that follow the player's choice", () => {
+    const guest = { ...baseSettings, musicEnabled: true, carSkinDirt: "guest-dirt", carSkinSnow: "guest-snow" };
+    const account = { ...baseSettings, trailId: "none", carSkinDirt: "account-dirt" };
+
+    expect(transferredSettings("guest", guest, account)).toBe(guest);
+    expect(transferredSettings("guest", null, account)).toBe(account);
+    expect(transferredSettings("account", guest, account)).toBe(account);
+    expect(transferredSettings("account", guest, null)).toBe(guest);
+    expect(transferredSettings("merge", guest, null)).toBe(guest);
+    expect(transferredSettings("merge", guest, account)).toEqual({
+      ...account,
+      carSkinSnow: "guest-snow",
+    });
+  });
+
+  for (const choice of ["guest", "account"]) {
+    it(`moves the settings with the ${choice} progress`, async () => {
+      await seedSevenDayPlaylist();
+      const guestPlayerId = `guest:settings-${choice}`;
+      const redditPlayerId = `reddit:settings-${choice}`;
+      await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
+      await upsertPlayerProfile({ playerId: guestPlayerId, preferences: { ...baseSettings, musicEnabled: true } });
+      await upsertPlayerProfile({ playerId: redditPlayerId, preferences: { ...baseSettings, trailId: "none" } });
+
+      await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
+
+      const settings = (await readPlayerProfile(redditPlayerId)).preferences;
+      if (choice === "guest") {
+        expect(settings).toMatchObject({ musicEnabled: true, trailId: "gold" });
+      } else {
+        expect(settings).toMatchObject({ musicEnabled: false, trailId: "none" });
+      }
+    });
+  }
 
   it("does not repair Campaign standings while a transfer owns the player", async () => {
     const redditPlayerId = "reddit:repair-during-transfer";

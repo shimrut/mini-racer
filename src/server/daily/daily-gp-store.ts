@@ -125,6 +125,7 @@ import {
 } from '../competition/competition-submit.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 import { queueRacedBoard } from '../player/raced-list.js';
+import { carryGuestSettings } from '../player/transfer-settings.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
@@ -2411,6 +2412,7 @@ export async function selectGuestProgress({
                     verifyGuestSource: verifySourceDomain('unlocks'),
                     transactionRunner: runTransferMutation,
                 }));
+                await carryGuestSettings({ guestPlayerId, redditPlayerId, choice: 'guest' });
                 record.completedDomains = [...record.completedDomains, 'unlocks'];
                 await saveRecord(record);
             }
