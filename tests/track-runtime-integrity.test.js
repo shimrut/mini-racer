@@ -194,6 +194,21 @@ describe('track runtime integrity', () => {
             'puppetMaster',
             'sunsetTerrace',
             'anvilCircuit',
+            'countryRoad',
+            'snowCircuit',
+            'gripCircuit',
+            'middleWay',
+            'waterCircuit',
+            'spaceCircuit',
+            'forestTrail',
+            'hillsideScramble',
+            'dirtLoop',
+            'ridgeRunner',
+            'brokenRoad',
+            'roughCut',
+            'dirtSnake',
+            'wildCrest',
+            'dirtValley',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);

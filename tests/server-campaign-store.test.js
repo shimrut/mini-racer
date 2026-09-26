@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { TRACKS } from '../game/track/tracks.js';
-import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
+import {
+    CAMPAIGN_LIVE_STAGES,
+    CAMPAIGN_NUMBERS_SERIES_ID,
+    CAMPAIGN_SERIES,
+    getCampaignSeriesStages,
+} from '../game/campaign/manifest.js';
 import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
@@ -797,10 +802,13 @@ describe('Campaign server store', () => {
             guestToken,
         });
 
-        const boardExpiries = mockRedis.expire.mock.calls
-            .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'))
-            .map(([, seconds]) => seconds);
+        const expiries = mockRedis.expire.mock.calls
+            .filter(([key]) => String(key).startsWith('campaign:') && !String(key).includes('rate-limit'));
+        const boardExpiries = expiries.filter(([key]) => !String(key).includes(':progress:'));
         expect(boardExpiries).toEqual([]);
+        // The guest's progress in the other series gets the same one year.
+        expect(expiries.map(([, seconds]) => seconds))
+            .toEqual(Array(CAMPAIGN_SERIES.length - 1).fill(365 * 24 * 60 * 60));
         const progressSet = mockRedis.set.mock.calls.find(([key]) => String(key).includes(':progress:'));
         expect(progressSet?.[2]?.expiration).toBeInstanceOf(Date);
         expect(progressSet[2].expiration.getTime() - Date.now())
@@ -830,11 +838,11 @@ describe('Campaign server store', () => {
 
         expect(mockRedis.watch).toHaveBeenCalledWith(
             CAMPAIGN_GUEST_EXPIRY_KEY,
-            expect.stringContaining(':progress-lock:'),
+            ...CAMPAIGN_SERIES.map((series) => `campaign:${series.id}:progress-lock:${guestField}`),
         );
-        expect(mockRedis.del).toHaveBeenCalledWith(
-            `campaign:numbered-v1:progress:${guestField}`,
-        );
+        for (const series of CAMPAIGN_SERIES) {
+            expect(mockRedis.del).toHaveBeenCalledWith(`campaign:${series.id}:progress:${guestField}`);
+        }
         expect(mockRedis.zRem).toHaveBeenCalledWith(
             CAMPAIGN_GUEST_EXPIRY_KEY,
             [guestPlayerId],
@@ -1391,7 +1399,9 @@ describe('Campaign server store', () => {
                 .map(([key]) => key)
                 .filter((key) => String(key).includes(':submit-lock:')
                     || String(key).includes(':progress-lock:')));
-            expect(renewedLockKeys.size).toBe(NUMBERS_STAGES.length * 2 + 2);
+            // A submit lock for the guest and the account on each stage, and a
+            // progress lock for both in each series.
+            expect(renewedLockKeys.size).toBe(CAMPAIGN_LIVE_STAGES.length * 2 + CAMPAIGN_SERIES.length * 2);
         } finally {
             vi.useRealTimers();
         }

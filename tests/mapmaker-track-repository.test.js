@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     existsSync,
     mkdtempSync,
@@ -10,7 +10,6 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-    applySeriesStageMove,
     applyTrackRepositoryUpdate,
     applyTrackRepositoryRemoval,
     buildTrackRepositoryRemoval,
@@ -42,14 +41,23 @@ const REMOVABLE_SOURCE = CATALOG_SOURCE
     .replace("    'sunlitTemple',", "    'sunlitTemple',\n    'newHarborRun',");
 const MEDAL_ROW = { author: 9.5, gold: 9.74, silver: 10.02, bronze: 10.34 };
 
-function seriesSource(numbersStages = [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }], dirtStages = []) {
+// Formula Mini stays not live until it has 2 stages. The other series are live
+// from their first stage.
+function seriesSource(
+    numbersStages = [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }],
+    dirtStages = [],
+    formulaMiniStages = [],
+) {
     return `${JSON.stringify({
         series: [
             { id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', stages: numbersStages },
             { id: 'dirt-v1', name: 'Dirt', ground: 'dirt', stages: dirtStages },
+            { id: 'grip-v1', name: 'Formula Mini', ground: 'grip', stages: formulaMiniStages },
         ],
     }, null, 2)}\n`;
 }
+
+const FORMULA_MINI_DRAFT_SOURCE = seriesSource([], [], [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }]);
 
 const SERIES_SOURCE = seriesSource();
 const MEDALS_SOURCE = `${JSON.stringify({ numberZero: MEDAL_ROW, circuit: MEDAL_ROW }, null, 2)}\n`;
@@ -210,6 +218,7 @@ describe('Mapmaker track repository integration', () => {
 
     it('can move a track out of a series that is not live and onto the Daily schedule', () => {
         const update = buildUpdate({
+            seriesSource: FORMULA_MINI_DRAFT_SOURCE,
             trackKey: 'numberZero',
             originalTrackKey: 'numberZero',
             trackName: 'Number Zero',
@@ -220,7 +229,7 @@ describe('Mapmaker track repository integration', () => {
         expect(update.action).toBe('updated');
         expect(update.scheduleIndex).toBe(2);
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
-        expect(JSON.parse(update.seriesSource).series[0].stages).toEqual([]);
+        expect(JSON.parse(update.seriesSource).series[2].stages).toEqual([]);
     });
 
     it('renames a track in place and identifies the old module for removal', () => {
@@ -244,10 +253,11 @@ describe('Mapmaker track repository integration', () => {
 
     it('renames a series track without putting it on the Daily schedule', () => {
         const update = buildUpdate({
+            seriesSource: FORMULA_MINI_DRAFT_SOURCE,
             trackKey: 'numberNil',
             originalTrackKey: 'numberZero',
             trackName: 'Number Nil',
-            destination: 'series:numbered-v1',
+            destination: 'series:grip-v1',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -256,7 +266,7 @@ describe('Mapmaker track repository integration', () => {
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
         expect(parsed.catalogKeys).toContain('numberNil');
         expect(parsed.namesByKey).not.toHaveProperty('numberZero');
-        expect(JSON.parse(update.seriesSource).series[0].stages[0].trackKey).toBe('numberNil');
+        expect(JSON.parse(update.seriesSource).series[2].stages[0].trackKey).toBe('numberNil');
         expect(JSON.parse(update.medalsSource)).toHaveProperty('numberNil');
         expect(JSON.parse(update.medalsSource)).not.toHaveProperty('numberZero');
     });
@@ -457,36 +467,49 @@ describe('Mapmaker Campaign series rules', () => {
         expect(() => buildUpdate({ ...base, laps: 4 })).toThrow('Laps must be');
     });
 
-    it('moves a stage in a series that is not live, and keeps each medal target in place', () => {
-        const root = mkdtempSync(join(tmpdir(), 'dailygp-mapmaker-series-'));
-        temporaryRoots.push(root);
-        mkdirSync(join(root, 'game/campaign'), { recursive: true });
-        writeFileSync(join(root, 'game/campaign/series.json'), seriesSource([
-            { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
-            { trackKey: 'numberOne', laps: 1, requiredMedals: 2 },
-            { trackKey: 'numberTwo', laps: 3, requiredMedals: 5 },
-        ]));
-
-        const result = applySeriesStageMove({
-            rootDir: root,
-            seriesId: 'numbered-v1',
-            trackKey: 'numberTwo',
-            direction: -1,
-        });
-        expect(result.trackKeys).toEqual(['numberZero', 'numberTwo', 'numberOne']);
-        expect(JSON.parse(readFileSync(join(root, 'game/campaign/series.json'), 'utf8')).series[0].stages)
-            .toEqual([
+    it('moves a stage in a series that is not live, and keeps each medal target in place', async () => {
+        // With the current rules a series with 2 stages is live, so its order is fixed.
+        // This checks the move under a rule that keeps a series hidden until 10 stages.
+        vi.resetModules();
+        vi.doMock('../game/campaign/series-rules.js', async (importOriginal) => ({
+            ...(await importOriginal()),
+            isCampaignSeriesLive: (series) => (series?.stages?.length ?? 0) >= 10,
+        }));
+        try {
+            const { applySeriesStageMove: moveStage } = await import('../tools/mapmaker/track-repository.js');
+            const root = mkdtempSync(join(tmpdir(), 'dailygp-mapmaker-series-'));
+            temporaryRoots.push(root);
+            mkdirSync(join(root, 'game/campaign'), { recursive: true });
+            writeFileSync(join(root, 'game/campaign/series.json'), seriesSource([
                 { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
-                { trackKey: 'numberTwo', laps: 3, requiredMedals: 2 },
-                { trackKey: 'numberOne', laps: 1, requiredMedals: 5 },
-            ]);
+                { trackKey: 'numberOne', laps: 1, requiredMedals: 2 },
+                { trackKey: 'numberTwo', laps: 3, requiredMedals: 5 },
+            ]));
 
-        writeFileSync(join(root, 'game/campaign/series.json'), liveSeries);
-        expect(() => applySeriesStageMove({
-            rootDir: root,
-            seriesId: 'dirt-v1',
-            trackKey: 'dirtTrack3',
-            direction: 1,
-        })).toThrow('Dirt is live');
+            const result = moveStage({
+                rootDir: root,
+                seriesId: 'numbered-v1',
+                trackKey: 'numberTwo',
+                direction: -1,
+            });
+            expect(result.trackKeys).toEqual(['numberZero', 'numberTwo', 'numberOne']);
+            expect(JSON.parse(readFileSync(join(root, 'game/campaign/series.json'), 'utf8')).series[0].stages)
+                .toEqual([
+                    { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
+                    { trackKey: 'numberTwo', laps: 3, requiredMedals: 2 },
+                    { trackKey: 'numberOne', laps: 1, requiredMedals: 5 },
+                ]);
+
+            writeFileSync(join(root, 'game/campaign/series.json'), liveSeries);
+            expect(() => moveStage({
+                rootDir: root,
+                seriesId: 'dirt-v1',
+                trackKey: 'dirtTrack3',
+                direction: 1,
+            })).toThrow('Dirt is live');
+        } finally {
+            vi.doUnmock('../game/campaign/series-rules.js');
+            vi.resetModules();
+        }
     });
 });

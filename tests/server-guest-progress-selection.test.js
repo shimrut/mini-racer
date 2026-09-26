@@ -36,8 +36,15 @@ const { discardGuestDailyProgress } = await import("../src/server/daily/daily-gp
 const { toDailyCompetition } = await import("../src/server/competition/competition.ts");
 const { upsertPlayerTrackPersonalBest } = await import("../src/server/competition/pb-ghost-store.ts");
 const { TRACKS } = await import("../game/track/tracks.js");
-const { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } = await import("../game/campaign/manifest.js");
+const {
+  CAMPAIGN_LIVE_STAGES,
+  CAMPAIGN_NUMBERS_SERIES_ID,
+  CAMPAIGN_SERIES,
+  getCampaignSeriesStages,
+} = await import("../game/campaign/manifest.js");
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
+// The first stage of every other series is open to every player.
+const OTHER_SERIES_FIRST_STAGES = CAMPAIGN_SERIES.length - 1;
 const { toCampaignCompetition } = await import("../src/server/competition/competition.ts");
 
 afterEach(() => {
@@ -136,12 +143,12 @@ describe("guest progress selection", () => {
     expect(selection.guestSummary).toEqual({
       hasDailyResults: false,
       campaignResults: 0,
-      campaignUnlockedTracks: 1,
-      campaignTotalStages: 16,
+      campaignUnlockedTracks: 1 + OTHER_SERIES_FIRST_STAGES,
+      campaignTotalStages: CAMPAIGN_LIVE_STAGES.length,
       dailySavedResults: 0,
       dailyPlaylistSize: 7,
-      carsUnlocked: 28,
-      carsTotal: 37,
+      carsUnlocked: 43,
+      carsTotal: 52,
       unlocks: false,
     });
   });
@@ -213,12 +220,12 @@ describe("guest progress selection", () => {
     });
 
     expect(selection.accountSummary.campaignResults).toBe(2);
-    expect(selection.accountSummary.campaignUnlockedTracks).toBe(3);
-    expect(selection.accountSummary.campaignTotalStages).toBe(16);
+    expect(selection.accountSummary.campaignUnlockedTracks).toBe(3 + OTHER_SERIES_FIRST_STAGES);
+    expect(selection.accountSummary.campaignTotalStages).toBe(CAMPAIGN_LIVE_STAGES.length);
     expect(selection.accountSummary.dailySavedResults).toBe(0);
     expect(selection.accountSummary.dailyPlaylistSize).toBe(7);
-    expect(selection.accountSummary.carsUnlocked).toBe(29);
-    expect(selection.accountSummary.carsTotal).toBe(37);
+    expect(selection.accountSummary.carsUnlocked).toBe(44);
+    expect(selection.accountSummary.carsTotal).toBe(52);
   });
 
   it("repairs an account Campaign result before counting the selection summary", async () => {
@@ -297,7 +304,7 @@ describe("guest progress selection", () => {
     });
 
     expect(selection.accountSummary.campaignResults).toBe(1);
-    expect(selection.accountSummary.campaignUnlockedTracks).toBe(1);
+    expect(selection.accountSummary.campaignUnlockedTracks).toBe(1 + OTHER_SERIES_FIRST_STAGES);
   });
 
   it("persists a completed choice without an expiring transfer record", async () => {

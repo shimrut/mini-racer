@@ -12,14 +12,14 @@ import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby
 import { LobbyUi } from '../game/lobby/ui.js';
 
 describe('Campaign series screen', () => {
-    it('opens Mini Rally and Sliders with 1 stage, and Formula Mini with 2', () => {
+    it('lists every series with its ground, stage count and medals', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
         });
         expect(rows.map((row) => [row.name, row.comingSoon, row.infoParts])).toEqual([
             ['Numbers', false, ['Street · 16 stages', '23/64 medals']],
-            ['Mini Rally', false, ['Dirt · 1 stages', '0/4 medals']],
+            ['Mini Rally', false, ['Dirt · 10 stages', '0/40 medals']],
             ['Sliders', false, ['Snow · 1 stages', '0/4 medals']],
             ['Formula Mini', false, ['Circuit · 2 stages', '0/8 medals']],
         ]);

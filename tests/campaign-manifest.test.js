@@ -12,6 +12,12 @@ import { normalizeRaceSpec } from '../game/race/race-spec.js';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
+// The open Numbers stages. The first stage of every other series is open too.
+function getNumbersUnlockedRaceIds(results) {
+    return getCampaignUnlockedRaceIds(results)
+        .filter((raceId) => getCampaignStage(raceId)?.seriesId === CAMPAIGN_NUMBERS_SERIES_ID);
+}
+
 describe('Campaign manifest', () => {
     it('defines the immutable numbered-v1 stage order, laps, and medal-total gates', () => {
         expect(CAMPAIGN_ID).toBe('numbered-v1');
@@ -69,14 +75,14 @@ describe('Campaign manifest', () => {
     });
 
     it('derives unlocks from the campaign-wide medal total', () => {
-        expect(getCampaignUnlockedRaceIds({})).toEqual(['numbered-v1-00']);
-        expect(getCampaignUnlockedRaceIds({
+        expect(getNumbersUnlockedRaceIds({})).toEqual(['numbered-v1-00']);
+        expect(getNumbersUnlockedRaceIds({
             'numbered-v1-00': { medal: 'bronze' },
         })).toEqual(['numbered-v1-00', 'numbered-v1-01']);
     });
 
     it('opens a stage the old Gold chain would have kept shut', () => {
-        expect(getCampaignUnlockedRaceIds({
+        expect(getNumbersUnlockedRaceIds({
             'numbered-v1-00': { medal: 'gold' },
             'numbered-v1-01': { medal: 'silver' },
             'numbered-v1-02': { medal: 'silver' },
@@ -95,7 +101,7 @@ describe('Campaign manifest', () => {
                 for (const stage of NUMBERS_STAGES.slice(0, played)) {
                     results[stage.raceId] = { medal };
                 }
-                const unlocked = getCampaignUnlockedRaceIds(results);
+                const unlocked = getNumbersUnlockedRaceIds(results);
                 expect(unlocked).toHaveLength(played + 1);
                 expect(unlocked.at(-1)).toBe(NUMBERS_STAGES[played].raceId);
             }
