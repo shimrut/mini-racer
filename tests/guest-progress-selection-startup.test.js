@@ -87,7 +87,7 @@ describe('promoted guest startup selection', () => {
         });
 
         expect(document.body.classList.contains('loading-active')).toBe(false);
-        expect(document.querySelectorAll('.guest-progress-selection__source-input')).toHaveLength(2);
+        expect(document.querySelectorAll('.guest-progress-selection__source-input')).toHaveLength(3);
         const sourcesText = document.querySelector('.guest-progress-selection__sources').textContent;
         expect(sourcesText).toContain('Daily2/7');
         expect(sourcesText).toContain('Campaign3/16');
@@ -98,7 +98,7 @@ describe('promoted guest startup selection', () => {
         expect(sourcesText).not.toContain('replaces saved account progress');
         expect(sourcesText).not.toContain('discards guest progress');
         expect(document.querySelector('.guest-progress-selection__message').textContent)
-            .toBe('Choose one save to keep.');
+            .toBe('Keep one save, or merge both.');
         expect(document.querySelector('[data-choice="account"]')?.parentElement?.textContent)
             .toContain('Account');
         const continueButton = document.querySelector('.guest-progress-selection__button');
@@ -110,6 +110,10 @@ describe('promoted guest startup selection', () => {
         document.querySelector('[data-choice="account"]').click();
         expect(continueButton.disabled).toBe(false);
         expect(continueButton.textContent).toBe('CONTINUE WITH ACCOUNT');
+        document.querySelector('[data-choice="merge"]').click();
+        expect(continueButton.textContent).toBe('MERGE BEST TIMES');
+        expect(document.querySelector('[data-choice="merge"]')?.parentElement?.textContent)
+            .toContain('Best time on each track');
         document.querySelector('[data-choice="guest"]').click();
         expect(continueButton.textContent).toBe('CONTINUE WITH GUEST');
         continueButton.click();

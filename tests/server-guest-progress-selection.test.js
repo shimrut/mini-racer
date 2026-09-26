@@ -820,6 +820,62 @@ describe("guest transfer cost and recovery", () => {
     });
   }
 
+  it("keeps the faster time on every board when the player merges", async () => {
+    const archived = await seedArchivedDay();
+    const [recent] = await getServerDailyGpPlaylist();
+    const guestPlayerId = "guest:merger";
+    const redditPlayerId = "reddit:merger";
+    const [guestFaster, accountFaster] = NUMBERS_STAGES;
+    await seedCampaignStage(guestFaster, guestPlayerId);
+    await seedCampaignStage(accountFaster, guestPlayerId);
+    for (const stage of [guestFaster, accountFaster]) {
+      await redis.hSet(racedListKey(guestPlayerId), { [`campaign:${stage.raceId}`]: "1" });
+    }
+    const accountBoard = campaignCompetitionFor(accountFaster, redditPlayerId);
+    await redis.hSet(accountBoard.entryHashKey, {
+      [redditPlayerId]: JSON.stringify({
+        playerId: redditPlayerId,
+        displayName: "Account racer",
+        bestTimeMs: 20000,
+        trackKey: accountFaster.trackKey,
+        completedLaps: accountFaster.lapCount,
+        validationMethod: "strict-replay",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    await redis.zAdd(accountBoard.leaderboardKey, { member: redditPlayerId, score: 20000 });
+    await redis.hSet(racedListKey(redditPlayerId), { [`campaign:${accountFaster.raceId}`]: "1" });
+    const guestDay = await seedDailyRow(archived, guestPlayerId, 41000);
+    const accountDay = await seedDailyRow(recent, redditPlayerId, 39000);
+    await markFillReady();
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "merge" }))
+      .resolves.toMatchObject({ status: "completed", choice: "merge" });
+
+    const entryOf = async (board) => JSON.parse(await redis.hGet(board.entryHashKey, redditPlayerId) ?? "null");
+    expect((await entryOf(campaignCompetitionFor(guestFaster, redditPlayerId))).bestTimeMs).toBe(31234);
+    expect((await entryOf(accountBoard)).bestTimeMs).toBe(20000);
+    expect((await entryOf(guestDay)).bestTimeMs).toBe(41000);
+    expect((await entryOf(accountDay)).bestTimeMs).toBe(39000);
+    for (const board of [campaignCompetitionFor(guestFaster, guestPlayerId), accountBoard, guestDay]) {
+      expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBeFalsy();
+    }
+  });
+
+  it("stops a merge on a damaged guest row instead of dropping it", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:damaged-merge";
+    const redditPlayerId = "reddit:damaged-merge";
+    const [stage] = NUMBERS_STAGES;
+    const board = campaignCompetitionFor(stage, guestPlayerId);
+    await seedCampaignStage(stage, guestPlayerId);
+    await redis.hSet(board.entryHashKey, { [guestPlayerId]: "{ not json" });
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "merge" }))
+      .rejects.toMatchObject({ reason: "guest_progress_recovery_required" });
+    expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBe("{ not json");
+  });
+
   it("waits for a race save still running on an archived day", async () => {
     const archived = await seedArchivedDay();
     const guestPlayerId = "guest:archive-saving";
@@ -908,7 +964,7 @@ describe("guest transfer cost and recovery", () => {
     });
   });
 
-  for (const choice of ["guest", "account"]) {
+  for (const choice of ["guest", "account", "merge"]) {
     it(`moves the settings with the ${choice} progress`, async () => {
       await seedSevenDayPlaylist();
       const guestPlayerId = `guest:settings-${choice}`;
@@ -923,6 +979,7 @@ describe("guest transfer cost and recovery", () => {
       if (choice === "guest") {
         expect(settings).toMatchObject({ musicEnabled: true, trailId: "gold" });
       } else {
+        // Keep account and Merge keep the account's settings.
         expect(settings).toMatchObject({ musicEnabled: false, trailId: "none" });
       }
     });

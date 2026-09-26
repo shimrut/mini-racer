@@ -159,7 +159,7 @@ export type GuestProgressSelection = {
         carsTotal: number;
         unlocks: boolean;
     };
-    choice?: 'guest' | 'account';
+    choice?: GuestTransferChoice;
     state?: 'choice_required' | 'resume_required' | 'recovery_required' | 'completed';
     transferId?: string;
     sourceGuestPlayerId?: string;
@@ -195,7 +195,7 @@ type GuestProgressSelectionRecord = {
     transferId?: string;
     guestPlayerId: string;
     redditPlayerId: string;
-    choice: 'guest' | 'account';
+    choice: GuestTransferChoice;
     status: 'pending' | 'completed' | 'recovery_required';
     phase?: GuestTransferPhase;
     updatedAt: string;
@@ -210,12 +210,25 @@ type GuestProgressSelectionRecord = {
     completedAt?: string;
 };
 
+// Keep guest replaces the account's progress, Keep account drops the guest's,
+// and Merge keeps the faster time on every board.
+export type GuestTransferChoice = 'guest' | 'account' | 'merge';
+
+function isGuestTransferChoice(value: unknown): value is GuestTransferChoice {
+    return value === 'guest' || value === 'account' || value === 'merge';
+}
+
+// Keep guest and Merge copy the guest's progress, then clean it up.
+function copiesGuestProgress(choice: GuestTransferChoice): boolean {
+    return choice === 'guest' || choice === 'merge';
+}
+
 type GuestTransferReceipt = {
     version: 4;
     transferId: string;
     guestPlayerId: string;
     redditPlayerId: string;
-    choice: 'guest' | 'account';
+    choice: GuestTransferChoice;
     completedAt: string;
 };
 
@@ -441,7 +454,7 @@ function isValidRecoverySelectionRecord(
 ): value is GuestProgressSelectionRecord {
     if (!isRecordObject(value)) return false;
     return value.status === 'recovery_required'
-        && (value.choice === 'guest' || value.choice === 'account')
+        && isGuestTransferChoice(value.choice)
         && (value.guestPlayerId === undefined || value.guestPlayerId === guestPlayerId)
         && (value.redditPlayerId === undefined || value.redditPlayerId === redditPlayerId);
 }
@@ -458,7 +471,7 @@ function isValidPendingSelectionRecord(
         || value.status !== 'pending'
         || value.guestPlayerId !== guestPlayerId
         || value.redditPlayerId !== redditPlayerId
-        || (value.choice !== 'guest' && value.choice !== 'account')
+        || !isGuestTransferChoice(value.choice)
         || typeof value.updatedAt !== 'string'
         || !value.updatedAt
         || !Array.isArray(value.dailyChallengeIds)
@@ -472,7 +485,7 @@ function isValidPendingSelectionRecord(
     if (!isOrderedDomainPrefix(cleanedDomains, TRANSFER_CLEANUP_DOMAINS)) return false;
     if (value.choice === 'account' && cleanedDomains.length > 0) return false;
     if (
-        value.choice === 'guest'
+        copiesGuestProgress(value.choice)
         && cleanedDomains.length > 0
         && completedDomains.length !== TRANSFER_COMPLETION_DOMAINS.length
     ) {
@@ -545,7 +558,7 @@ function isValidCompletedSelectionRecord(
         && value.version !== 4) {
         return false;
     }
-    if (value.choice !== 'guest' && value.choice !== 'account') return false;
+    if (!isGuestTransferChoice(value.choice)) return false;
     if (value.guestPlayerId !== guestPlayerId || value.redditPlayerId !== redditPlayerId) return false;
     if (value.version === 4
         && value.transferId !== guestProgressSelectionTransferId(guestPlayerId, redditPlayerId)) {
@@ -1270,6 +1283,7 @@ export async function mergeGuestDailyProgress({
     verifyGuestSource,
     recordedDailyChallengeIds,
     transactionRunner,
+    classifySource = replace,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
@@ -1281,6 +1295,9 @@ export async function mergeGuestDailyProgress({
     }) => void | Promise<void>;
     recordedDailyChallengeIds?: ReadonlySet<string>;
     transactionRunner: RedisLockTransactionRunner;
+    // Checks the guest's rows for damage before any write. On by default when
+    // the guest replaces the account.
+    classifySource?: boolean;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         return { merged: false, mergedChallengeIds: [] };
@@ -1309,7 +1326,7 @@ export async function mergeGuestDailyProgress({
         ]);
         const wasRecorded = recordedDailyChallengeIds?.has(challenge.id) ?? false;
         if (!guestHoldsRows && !accountHoldsRows && !wasRecorded) return null;
-        const guestSource = replace
+        const guestSource = classifySource
             ? await captureClassifiedGuestDailySource(competition, track, challenge, guestPlayerId)
             : null;
         const state = await readDailyMergeState(
@@ -1610,7 +1627,7 @@ export function pendingSelectionPayload({
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
-    choice?: 'guest' | 'account';
+    choice?: GuestTransferChoice;
     state: 'choice_required' | 'resume_required' | 'recovery_required' | 'completed';
     required?: boolean;
     completedAt?: string;
@@ -1643,7 +1660,7 @@ async function readGuestTransferReceipt(
         if (typeof receipt.guestPlayerId !== 'string' || !receipt.guestPlayerId.startsWith('guest:')) {
             return null;
         }
-        if (receipt.choice !== 'guest' && receipt.choice !== 'account') return null;
+        if (!isGuestTransferChoice(receipt.choice)) return null;
         if (typeof receipt.completedAt !== 'string' || !receipt.completedAt) return null;
         return receipt as GuestTransferReceipt;
     } catch {
@@ -1669,7 +1686,7 @@ async function readAccountTransferIndex(redditPlayerId: string): Promise<string[
 }
 
 function hasReplacementRemaining(record: GuestProgressSelectionRecord): boolean {
-    return record.choice === 'guest'
+    return copiesGuestProgress(record.choice)
         && !TRANSFER_COMPLETION_DOMAINS.every(
             (domain) => record.completedDomains?.includes(domain),
         );
@@ -1966,7 +1983,7 @@ export async function getGuestProgressSelection({
     const existing = await redis.get(key);
     if (existing) {
         const leaveSelectionPending = async (
-            choice?: 'guest' | 'account',
+            choice?: GuestTransferChoice,
             state: 'resume_required' | 'recovery_required' = 'resume_required',
         ): Promise<GuestProgressSelection> => {
             await redis.set(guestProgressSelectionPendingKey(guestPlayerId), '1');
@@ -2057,7 +2074,7 @@ export async function selectGuestProgress({
     transferId?: unknown;
 }): Promise<{
     status: 'completed';
-    choice: 'guest' | 'account';
+    choice: GuestTransferChoice;
     transferId: string;
     sourceGuestPlayerId: string;
     completedAt: string;
@@ -2065,7 +2082,7 @@ export async function selectGuestProgress({
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
         throw new Error('Guest progress selection requires a guest and Reddit identity.');
     }
-    if (choice !== 'guest' && choice !== 'account') {
+    if (!isGuestTransferChoice(choice)) {
         throw new Error('Guest progress selection is invalid.');
     }
     const key = guestProgressSelectionKey(guestPlayerId, redditPlayerId);
@@ -2236,7 +2253,7 @@ export async function selectGuestProgress({
             if (!isRecordObject(parsedRecord)) {
                 throw guestProgressRecoveryRequiredError();
             }
-            if (parsedRecord.choice !== 'guest' && parsedRecord.choice !== 'account') {
+            if (!isGuestTransferChoice(parsedRecord.choice)) {
                 throw guestProgressRecoveryRequiredError();
             }
             if (parsedRecord.choice !== choice) {
@@ -2290,7 +2307,7 @@ export async function selectGuestProgress({
                 ? 'copying'
                 : 'preparing';
         const preparing = inheritedPhase === 'preparing';
-        const replacementRemaining = choice === 'guest'
+        const replacementRemaining = copiesGuestProgress(choice)
             && !TRANSFER_COMPLETION_DOMAINS.every(
                 (domain) => currentRecord?.completedDomains?.includes(domain),
             );
@@ -2488,14 +2505,18 @@ export async function selectGuestProgress({
             }
             delete record.dailyStepDone;
         };
-        if (choice === 'guest') {
+        if (copiesGuestProgress(choice)) {
+            // Keep guest replaces the account's rows; Merge keeps the faster
+            // time on each board. Both check the guest's rows for damage first.
+            const replace = choice === 'guest';
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
                 await timed('campaignMs', () => mergeGuestCampaignProgress({
                     guestPlayerId,
                     redditPlayerId,
                     raceIds: campaignRaceIds,
-                    replace: true,
+                    replace,
+                    classifySource: true,
                     verifyGuestSource: verifySourceDomain('campaign'),
                     transactionRunner: runTransferMutation,
                 }));
@@ -2508,7 +2529,8 @@ export async function selectGuestProgress({
                     mergeGuestDailyProgress({
                         guestPlayerId,
                         redditPlayerId,
-                        replace: true,
+                        replace,
+                        classifySource: true,
                         challengeIds,
                         challengeSpecs,
                         verifyGuestSource: verifySourceDomain('daily', challengeSpecs),
@@ -2524,12 +2546,12 @@ export async function selectGuestProgress({
                 await timed('unlocksMs', () => mergeGuestCarUnlockProgress({
                     guestPlayerId,
                     redditPlayerId,
-                    replace: true,
+                    replace,
                     preserveSource: true,
                     verifyGuestSource: verifySourceDomain('unlocks'),
                     transactionRunner: runTransferMutation,
                 }));
-                await carryGuestSettings({ guestPlayerId, redditPlayerId, choice: 'guest' });
+                await carryGuestSettings({ guestPlayerId, redditPlayerId, choice });
                 record.completedDomains = [...record.completedDomains, 'unlocks'];
                 await saveRecord(record);
             }
@@ -2593,7 +2615,7 @@ export async function selectGuestProgress({
             }
         }
         const completedAt = new Date().toISOString();
-        if (choice === 'guest') {
+        if (copiesGuestProgress(choice)) {
             await timed('unlockCleanupMs', () => cleanupGuestCarUnlockProgress({
                 guestPlayerId,
                 redditPlayerId,

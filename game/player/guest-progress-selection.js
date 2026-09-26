@@ -65,6 +65,21 @@ function summaryBlock(summary) {
     return block;
 }
 
+const CHOICE_BUTTON_LABELS = {
+    guest: 'CONTINUE WITH GUEST',
+    account: 'CONTINUE WITH ACCOUNT',
+    merge: 'MERGE BEST TIMES',
+};
+
+const CHOICE_NAMES = { guest: 'Guest', account: 'Account', merge: 'Merge' };
+
+function noteBlock(text) {
+    const block = document.createElement('div');
+    block.className = 'guest-progress-selection__source-summary guest-progress-selection__source-summary--note';
+    block.textContent = text;
+    return block;
+}
+
 function sourceBlock({ choice, label, summary }) {
     const source = document.createElement('label');
     source.className = 'guest-progress-selection__source';
@@ -289,17 +304,22 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
                 ? summaryBlock(selection?.accountSummary)
                 : summaryBlock(null),
         });
-        sources.append(guestOption.source, accountOption.source);
+        const mergeOption = sourceBlock({
+            choice: 'merge',
+            label: 'Merge',
+            summary: noteBlock('Best time on each track'),
+        });
+        sources.append(guestOption.source, accountOption.source, mergeOption.source);
 
         const overlay = presentPlayerChoiceOverlay({
             titleId: 'guest-progress-selection-title',
             title: 'Keep Progress',
-            message: 'Choose one save to keep.',
+            message: 'Keep one save, or merge both.',
             extraNodes: [sources],
             actions: [{ label: 'CONTINUE WITH GUEST', choice: 'confirm', primary: true }],
         });
 
-        const choiceInputs = [guestOption.input, accountOption.input];
+        const choiceInputs = [guestOption.input, accountOption.input, mergeOption.input];
         const continueButton = overlay.buttons[0];
         const guestShowsProgress = summaryMetrics(selection?.guestSummary).length > 0;
         const accountShowsProgress = !selection?.accountHasProgress
@@ -318,17 +338,17 @@ export function requestGuestProgressSelection(selection, { onBeforeSubmit = null
             input.addEventListener('change', () => {
                 selectedChoice = input.value;
                 if (continueButton) continueButton.disabled = false;
-                for (const option of [guestOption.source, accountOption.source]) {
+                for (const option of [guestOption.source, accountOption.source, mergeOption.source]) {
                     option.classList.toggle('is-selected', option.contains(input));
                 }
-                continueButton.textContent = `CONTINUE WITH ${input.value === 'guest' ? 'GUEST' : 'ACCOUNT'}`;
+                continueButton.textContent = CHOICE_BUTTON_LABELS[input.value] ?? CHOICE_BUTTON_LABELS.guest;
             });
         }
 
         const choose = async (choice) => {
-            if (choice !== 'guest' && choice !== 'account') return;
+            if (!CHOICE_BUTTON_LABELS[choice]) return;
             if (choiceLocked && choiceLocked !== choice) {
-                overlay.setStatus(`Your ${choiceLocked === 'guest' ? 'Guest' : 'Account'} choice is already protected. Retry it to continue.`);
+                overlay.setStatus(`Your ${CHOICE_NAMES[choiceLocked]} choice is already protected. Retry it to continue.`);
                 return;
             }
             overlay.setBusy(true);

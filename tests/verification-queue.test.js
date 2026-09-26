@@ -124,6 +124,39 @@ describe('verification queue', () => {
         expect(getDailyChallengeVerificationEntry('account-race')).toBeNull();
     });
 
+    it('keeps the account queue and moves the guest queue when the player merges', () => {
+        setActivePlayerOwnerId('guest:merge-choice');
+        enqueueDailyChallengeVerification({
+            challengeId: 'guest-only-race',
+            bestTime: 12,
+            replay: REPLAY,
+        });
+        setActivePlayerOwnerId(OWNER);
+        enqueueDailyChallengeVerification({
+            challengeId: 'account-only-race',
+            bestTime: 11,
+            replay: REPLAY,
+        });
+
+        expect(prepareVerificationQueueGuestProgressReconciliation({
+            transferId: 'guest-transfer:merge',
+            guestPlayerId: 'guest:merge-choice',
+            accountPlayerId: OWNER,
+            choice: 'merge',
+        })).toMatchObject({ prepared: true });
+        const result = resolveVerificationQueueAfterGuestProgressSelection({
+            transferId: 'guest-transfer:merge',
+            guestPlayerId: 'guest:merge-choice',
+            accountPlayerId: OWNER,
+            choice: 'merge',
+        });
+
+        expect(result.moved).toBe(1);
+        expect(result.removed).toBe(0);
+        expect(getDailyChallengeVerificationEntry('guest-only-race')).toMatchObject({ ownerPlayerId: OWNER });
+        expect(getDailyChallengeVerificationEntry('account-only-race')).toMatchObject({ ownerPlayerId: OWNER });
+    });
+
     it('derives legacy expiry from challengeDate or daily-gp challenge ids', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-07-18T12:00:00.000Z'));

@@ -14,6 +14,13 @@ import {
   writeQueueState,
 } from "./verification-queue.js";
 
+// Keep guest drops the account's queued runs and moves the guest's; Keep
+// account drops the guest's; Merge keeps the account's and moves the guest's,
+// keeping the faster run where both queued one.
+function isTransferChoice(choice) {
+  return choice === "guest" || choice === "account" || choice === "merge";
+}
+
 function transferReceiptKey({ transferId, guestPlayerId, accountPlayerId }) {
   return normalizedTransferValue(transferId)
     || `guest-progress:${guestPlayerId}->${accountPlayerId}`;
@@ -71,7 +78,7 @@ export function prepareVerificationQueueGuestProgressReconciliation({
 } = {}) {
   if (!normalizedTransferValue(guestPlayerId)
     || !normalizedTransferValue(accountPlayerId)
-    || (choice !== "guest" && choice !== "account")) {
+    || !isTransferChoice(choice)) {
     return { prepared: false };
   }
   const queueState = readQueueState();
@@ -192,7 +199,7 @@ export function resolveVerificationQueueAfterGuestProgressSelection({
   if (
     typeof guestPlayerId !== "string" || !guestPlayerId.trim()
     || typeof accountPlayerId !== "string" || !accountPlayerId.trim()
-    || (choice !== "guest" && choice !== "account")
+    || !isTransferChoice(choice)
   ) {
     return { changed: false, removed: 0, moved: 0 };
   }

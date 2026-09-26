@@ -205,7 +205,8 @@
     font-variant-numeric: tabular-nums;
 }
 
-.guest-progress-selection__source-summary--empty {
+.guest-progress-selection__source-summary--empty,
+.guest-progress-selection__source-summary--note {
     display: block;
     font-family: var(--mono-font);
     font-size: .62rem;

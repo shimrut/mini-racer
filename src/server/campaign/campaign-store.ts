@@ -1123,10 +1123,14 @@ export async function mergeGuestCampaignProgress({
     verifyGuestSource,
     transactionRunner,
     raceIds,
+    classifySource = replace,
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
     replace?: boolean;
+    // Checks the guest's rows for damage before any write. On by default when
+    // the guest replaces the account.
+    classifySource?: boolean;
     // The stages either player holds a row on; every live stage when absent.
     raceIds?: readonly string[] | null;
     verifyGuestSource?: (observed?: {
@@ -1189,7 +1193,7 @@ export async function mergeGuestCampaignProgress({
         await confirmMergeOwnership();
 
         const stages = transferStages(raceIds);
-        const guestSource = replace
+        const guestSource = classifySource
             ? await captureClassifiedGuestCampaignSource(guestPlayerId, stages)
             : null;
         if (guestSource?.malformed.length) {
