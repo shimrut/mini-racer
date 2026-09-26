@@ -68,6 +68,7 @@ import {
     beginOwnedRedisLockGroupTransaction,
     beginOwnedRedisLockTransaction,
     commitOwnedRedisLockTransaction,
+    createOwnedLockGroupRunner,
     releaseRedisLockGroup,
     renewRedisLockGroup,
     startRedisLockGroupLeaseRenewal,
@@ -2213,41 +2214,19 @@ export async function selectGuestProgress({
                 );
             }
         };
+        const coordinatorRunner = createOwnedLockGroupRunner(
+            locks,
+            (reason) => new GuestProgressSelectionRetryableError(reason === 'lost'
+                ? 'Guest progress selection ownership was lost. Try again.'
+                : 'Guest progress selection was interrupted. Try again.'),
+            redis,
+        );
         const runTransferMutation: RedisLockTransactionRunner = async (
             domainLocks,
             mutate: RedisLockMutation,
         ): Promise<void> => {
-            const fencedLocks = [...new Map(
-                [...locks, ...domainLocks].map((lock) => [lock.key, lock]),
-            ).values()];
             await stopLeaseForFence();
-            if (!await renewRedisLockGroup(fencedLocks, redis)) {
-                throw new GuestProgressSelectionRetryableError(
-                    'Guest progress selection ownership was lost. Try again.',
-                );
-            }
-            const transaction = await beginOwnedRedisLockGroupTransaction(fencedLocks, redis);
-            if (!transaction) {
-                throw new GuestProgressSelectionRetryableError(
-                    'Guest progress selection ownership was lost. Try again.',
-                );
-            }
-            let committed: boolean;
-            try {
-                await mutate(transaction);
-                committed = await commitOwnedRedisLockTransaction(transaction);
-            } catch (error) {
-                try {
-                    await transaction.discard();
-                } catch (_discardError) {
-                }
-                throw error;
-            }
-            if (!committed) {
-                throw new GuestProgressSelectionRetryableError(
-                    'Guest progress selection was interrupted. Try again.',
-                );
-            }
+            await coordinatorRunner(domainLocks, mutate);
             restartLease();
         };
         const saveRecord = async (

@@ -277,6 +277,33 @@ export async function commitOwnedRedisLockTransaction(
     }
 }
 
+// Runs each mutation in one transaction that watches the owner locks and the
+// step locks, after it renews them all. It throws `failure('lost')` when a lock
+// is no longer owned, and `failure('interrupted')` when a watched key changed.
+export function createOwnedLockGroupRunner(
+    ownerLocks: readonly RedisLock[],
+    failure: (reason: 'lost' | 'interrupted') => Error,
+    client: RedisClient = redis,
+): RedisLockTransactionRunner {
+    return async (stepLocks, mutate) => {
+        const fenced = [...new Map(
+            [...ownerLocks, ...stepLocks].map((lock) => [lock.key, lock]),
+        ).values()];
+        if (!await renewRedisLockGroup(fenced, client)) throw failure('lost');
+        const transaction = await beginOwnedRedisLockGroupTransaction(fenced, client);
+        if (!transaction) throw failure('lost');
+        let committed: boolean;
+        try {
+            await mutate(transaction);
+            committed = await commitOwnedRedisLockTransaction(transaction);
+        } catch (error) {
+            await safelyDiscard(transaction);
+            throw error;
+        }
+        if (!committed) throw failure('interrupted');
+    };
+}
+
 export type RedisLockLease = {
     isOwned(): boolean;
     confirmOwnership(): Promise<boolean>;

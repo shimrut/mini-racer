@@ -5,6 +5,7 @@ vi.mock('@devvit/redis', () => ({ redis: {} }));
 const {
     acquireRedisLock,
     beginOwnedRedisLockGroupTransaction,
+    createOwnedLockGroupRunner,
     releaseRedisLock,
     renewRedisLockGroup,
     renewRedisLock,
@@ -240,5 +241,30 @@ describe('owned Redis locks', () => {
         await expect(renewRedisLockGroup([first, second], client)).resolves.toBe(false);
         expect(await client.get('first')).toBe(first.value);
         expect(await client.get('second')).toBe('successor');
+    });
+    it('runs a step write fenced by the owner and step locks', async () => {
+        const client = createVersionedRedis();
+        const owner = await acquireRedisLock('owner', 30_000, client);
+        const step = await acquireRedisLock('step', 30_000, client);
+        await client.set('payload', 'old');
+        const failure = (reason) => new Error(reason);
+        const run = createOwnedLockGroupRunner([owner], failure, client);
+
+        await run([step], async (transaction) => { await transaction.del('payload'); });
+        expect(await client.get('payload')).toBeNull();
+
+        await client.set('payload', 'old');
+        // The first EXEC renews the locks; the second one is the step write.
+        const renewExec = client.execCalls + 1;
+        client.setBeforeExec((call) => { if (call > renewExec) client.touch('step'); });
+        await expect(run([step], async (transaction) => { await transaction.del('payload'); }))
+            .rejects.toThrow('interrupted');
+        expect(await client.get('payload')).toBe('old');
+
+        client.setBeforeExec(null);
+        await client.set('owner', 'successor');
+        await expect(run([], async (transaction) => { await transaction.del('payload'); }))
+            .rejects.toThrow('lost');
+        expect(await client.get('payload')).toBe('old');
     });
 });
