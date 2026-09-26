@@ -184,6 +184,17 @@ export class RedisTestDouble {
     };
   }
 
+  async zScan(key, cursor, _pattern, count = 10) {
+    this._isExpired(key);
+    const entries = [...(this.sortedSets.get(key)?.entries() || [])];
+    const start = Math.max(0, cursor);
+    const end = Math.min(entries.length, start + count);
+    return {
+      cursor: end < entries.length ? end : 0,
+      members: entries.slice(start, end).map(([member, score]) => ({ member, score })),
+    };
+  }
+
   async zAdd(key, ...members) {
     this._isExpired(key);
     const set = this.sortedSets.get(key) || new Map();

@@ -1,4 +1,5 @@
 import express from 'express';
+import { runRacedListFill } from './player/raced-list-fill.js';
 import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
 import { isDailyGpChallengePlayable } from './daily/daily-gp-model.js';
 import {
@@ -186,6 +187,7 @@ function registerProductionRoutes(app: express.Application): void {
         ),
     });
     registerInternalRoutes(app, {
+        runRacedListFill: () => runRacedListFill(),
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

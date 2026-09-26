@@ -49,6 +49,7 @@ export type InternalRouteDependencies = {
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
     ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
+    runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
         saved: number;
@@ -363,6 +364,18 @@ export function registerInternalRoutes(
         } catch (error) {
             console.error('Failed scheduled Mini Racer daily post run:', error);
             res.status(500).json({ ok: false, error: 'Scheduled daily post run failed' });
+        }
+    });
+
+    // Fills the raced lists once for rows stored before the lists existed.
+    // After the fill is done, each run only reads the ready record.
+    app.post('/internal/scheduler/raced-list-fill', async (_req, res) => {
+        try {
+            const result = await dependencies.runRacedListFill();
+            res.status(200).json({ ok: true, ...result });
+        } catch (error) {
+            console.error('Failed scheduled raced list fill run:', error);
+            res.status(500).json({ ok: false, error: 'Scheduled raced list fill run failed' });
         }
     });
 

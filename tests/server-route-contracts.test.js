@@ -539,6 +539,22 @@ describe('server route contracts', () => {
         expect(ensureDailyMiniRacerPostForSubreddit).toHaveBeenCalledTimes(2);
     });
 
+    it('runs the raced list fill from its scheduler task and reports a failed run', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const runRacedListFill = vi.fn()
+            .mockResolvedValueOnce({ status: 'working', rows: 1000 })
+            .mockRejectedValueOnce(new Error('storage unavailable'));
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, { runRacedListFill }));
+
+        const working = await fetch(`${baseUrl}/internal/scheduler/raced-list-fill`, { method: 'POST' });
+        expect(working.status).toBe(200);
+        expect(await readJson(working)).toEqual({ ok: true, status: 'working', rows: 1000 });
+
+        const failed = await fetch(`${baseUrl}/internal/scheduler/raced-list-fill`, { method: 'POST' });
+        expect(failed.status).toBe(500);
+        expect(await readJson(failed)).toEqual({ ok: false, error: 'Scheduled raced list fill run failed' });
+    });
+
     it('preserves daily-post moderator menu success responses and side effects', async () => {
         const enableDailyAutopost = vi.fn();
         const deleteDailyAutopostSubscription = vi.fn();

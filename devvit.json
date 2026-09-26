@@ -155,6 +155,10 @@
       "daily-mini-racer-podium-posts": {
         "endpoint": "/internal/scheduler/daily-podium-posts",
         "cron": "1 * * * *"
+      },
+      "mini-racer-raced-list-fill": {
+        "endpoint": "/internal/scheduler/raced-list-fill",
+        "cron": "* * * * *"
       }
     }
   },
