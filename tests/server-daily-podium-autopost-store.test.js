@@ -21,11 +21,11 @@ vi.mock('../src/server/redis/redis-lock.js', () => mockLocking);
 
 const {
     deleteDailyPodiumAutopostSubscription,
-    parseDailyPodiumAutopostSubscription,
     readAllDailyPodiumAutopostSubscriptions,
     readDailyPodiumAutopostSubscription,
     upsertDailyPodiumAutopostSubscription,
 } = await import('../src/server/podium/daily-podium-autopost-store.ts');
+const { parseAutopostSubscription } = await import('../src/server/posts/autopost-subscription-store.ts');
 
 describe('daily podium autopost store', () => {
     beforeEach(() => {
@@ -69,11 +69,11 @@ describe('daily podium autopost store', () => {
     });
 
     it('parses valid subscriptions and rejects malformed records', () => {
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', null)).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', undefined)).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify('enabled'))).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', '{')).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({
+        expect(parseAutopostSubscription('MiniRacer', null)).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', undefined)).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify('enabled'))).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', '{')).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify({
             enabled: false,
             lastPostUrl: 'https://reddit.com/podium',
         }))).toEqual({
@@ -193,7 +193,7 @@ describe('daily podium autopost store', () => {
     });
 
     it('keeps string fields only when they are non-empty strings', () => {
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify({
             enabled: true,
             enabledAt: '',
             updatedAt: '',
@@ -212,7 +212,7 @@ describe('daily podium autopost store', () => {
     });
 
     it('preserves populated string schedule fields verbatim', () => {
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify({
             enabled: true,
             enabledAt: '2026-07-01T00:00:00.000Z',
             updatedAt: '2026-07-02T00:00:00.000Z',
@@ -231,13 +231,13 @@ describe('daily podium autopost store', () => {
     });
 
     it('defaults enabled to true unless explicitly false', () => {
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({})).enabled).toBe(true);
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({ enabled: false })).enabled).toBe(false);
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify({})).enabled).toBe(true);
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify({ enabled: false })).enabled).toBe(false);
     });
 
     it('rejects empty raw strings and non-object JSON payloads', () => {
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', '')).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify(null))).toBeNull();
-        expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify(5))).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', '')).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify(null))).toBeNull();
+        expect(parseAutopostSubscription('MiniRacer', JSON.stringify(5))).toBeNull();
     });
 });

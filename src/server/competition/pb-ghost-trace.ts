@@ -4,7 +4,6 @@ import { createPbGhostPoseRecorder } from '../../../game/shared/pb-ghost-recorde
 import { getStoredTrackGroundKey } from '../../../game/track/grounds.js';
 
 export const PB_GHOST_SCHEMA_VERSION = ghostFormat.PB_GHOST_SCHEMA_VERSION as 2;
-export const PB_GHOST_SAMPLE_RATE_HZ = ghostFormat.PB_GHOST_SAMPLE_RATE_HZ as 20;
 export const PB_GHOST_SAMPLE_INTERVAL_MS: number = ghostFormat.PB_GHOST_SAMPLE_INTERVAL_MS;
 export const PB_GHOST_SIMULATION_REVISION = ghostFormat.PB_GHOST_SIMULATION_REVISION as 1;
 export const PB_GHOST_MAX_SAMPLES: number = ghostFormat.PB_GHOST_MAX_SAMPLES;

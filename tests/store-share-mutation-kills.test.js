@@ -155,7 +155,7 @@ describe('daily-gp-store mutation kills', () => {
 
     describe('parseStoredEntry and parseStoredPlayerProfile guards', () => {
         it('clears non-strict validation methods and keeps strict-replay literals', async () => {
-            const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
+            const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
             const base = {
                 playerId: 'reddit:strict',
                 bestTimeMs: 12000,
@@ -180,7 +180,7 @@ describe('daily-gp-store mutation kills', () => {
         });
 
         it('uses the expected track when the stored entry omits or blanks trackKey', async () => {
-            const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
+            const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
             const base = {
                 playerId: 'reddit:track',
                 bestTimeMs: 9000,

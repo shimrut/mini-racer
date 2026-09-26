@@ -28,10 +28,8 @@ vi.mock('../src/server/competition/replay-validator.js', () => ({
     validateDailyGpReplayDetailed: vi.fn(),
 }));
 
-const {
-    parseStoredChallenge,
-    parseStoredEntry,
-} = await import('../src/server/daily/daily-gp-store.ts');
+const { parseStoredChallenge } = await import('../src/server/daily/daily-gp-store.ts');
+const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
 const { parseStoredPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
 
 const VALID_CHALLENGE = {

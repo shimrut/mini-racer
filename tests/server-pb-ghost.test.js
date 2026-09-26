@@ -72,7 +72,6 @@ import {
     isValidPbGhostTrace,
     PB_GHOST_MAX_SAMPLES,
     PB_GHOST_SAMPLE_INTERVAL_MS,
-    PB_GHOST_SAMPLE_RATE_HZ,
     PB_GHOST_SIMULATION_REVISION,
 } from '../src/server/competition/pb-ghost-trace.ts';
 import {

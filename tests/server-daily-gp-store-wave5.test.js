@@ -83,7 +83,7 @@ describe('server daily gp store wave5', () => {
     });
 
     it('preserves strict-replay metadata on stored leaderboard entries (L450-L455)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
         const base = {
             playerId: 'reddit:Strict',
             trackKey: 'circuit',

@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
     normalizeLimit,
     normalizeOffset,
-    normalizePlayerPreferences,
     parseStoredChallenge,
-    parseStoredEntry,
 } from '../src/server/daily/daily-gp-store.ts';
 import {
+    normalizePlayerPreferences,
     parseStoredPlayerProfile,
     salvagePlayerPreferences,
 } from '../src/server/competition/competition-identity.ts';
+import { parseStoredEntry } from '../src/server/competition/competition-leaderboard.ts';
 import {
     formatDailyGpShareComment,
     getValidShareRequestContext,

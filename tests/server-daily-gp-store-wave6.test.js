@@ -136,7 +136,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored entries missing required player fields (L418-L425)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
 
         expect(parseStoredEntry(JSON.stringify({
             ...buildStoredEntry(),
@@ -153,7 +153,7 @@ describe('server daily gp store wave6', () => {
     });
 
     it('rejects stored entries whose track disagrees with the expected track (L430-L434)', async () => {
-        const { parseStoredEntry } = await import('../src/server/daily/daily-gp-store.ts');
+        const { parseStoredEntry } = await import('../src/server/competition/competition-leaderboard.ts');
 
         expect(parseStoredEntry(JSON.stringify({
             ...buildStoredEntry(),

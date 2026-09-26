@@ -32,8 +32,7 @@ import {
     createTrackFingerprint,
     isValidPbGhostTrace,
 } from '../src/server/competition/pb-ghost-trace.ts';
-import { parseDailyAutopostSubscription } from '../src/server/daily/daily-autopost-store.ts';
-import { parseDailyPodiumAutopostSubscription } from '../src/server/podium/daily-podium-autopost-store.ts';
+import { parseAutopostSubscription } from '../src/server/posts/autopost-subscription-store.ts';
 
 const VERIFICATION_STORAGE_KEY = 'VectorGpVerificationQueue';
 const DAILY_CHALLENGE_STORAGE_KEY = 'VectorGpDailyChallengeData';
@@ -393,7 +392,7 @@ describe('mutation soft spots wave 6', () => {
 
     describe('daily post stores', () => {
         it('keeps autopost string fields only when they are non-empty strings', () => {
-            expect(parseDailyAutopostSubscription('MiniRacer', JSON.stringify({
+            expect(parseAutopostSubscription('MiniRacer', JSON.stringify({
                 enabled: true,
                 enabledAt: '2026-07-01T00:00:00.000Z',
                 updatedAt: '2026-07-02T00:00:00.000Z',
@@ -404,7 +403,7 @@ describe('mutation soft spots wave 6', () => {
                 enabledAt: '2026-07-01T00:00:00.000Z',
                 lastPostUrl: null,
             });
-            expect(parseDailyPodiumAutopostSubscription('MiniRacer', JSON.stringify({
+            expect(parseAutopostSubscription('MiniRacer', JSON.stringify({
                 enabled: true,
                 lastPostUrl: ['https://reddit.com/post'],
             }))).toMatchObject({

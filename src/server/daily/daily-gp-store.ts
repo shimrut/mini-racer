@@ -129,9 +129,7 @@ import {
 import { playerFieldHash } from '../redis/redis-names.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
-export { normalizePlayerPreferences } from '../competition/competition-identity.js';
 import { recordAnalyticsRace, recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
-export { parseStoredEntry } from '../competition/competition-leaderboard.js';
 
 export type GuestProgressSelection = {
     required: boolean;
