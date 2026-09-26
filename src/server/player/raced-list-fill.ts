@@ -31,11 +31,17 @@ const RACED_LIST_FILL_LOCK_TTL_MS = 55_000;
 const RACED_LIST_FILL_ROWS_PER_RUN = 1_000;
 const RACED_LIST_FILL_PAGE_SIZE = 200;
 const RACED_LIST_FILL_WRITE_CONCURRENCY = 25;
+// While a deploy rolls out, a request still running on the old version can
+// write a row without listing it. The walk waits this long after its first
+// run, so every such row exists before the walk reaches its board.
+const RACED_LIST_FILL_START_DELAY_MS = 10 * 60 * 1000;
 
 const PARTS = ['entries', 'ranks', 'pbs'] as const;
 type FillPart = (typeof PARTS)[number];
 
 type FillState = {
+    // The walk starts at this time, not before (see RACED_LIST_FILL_START_DELAY_MS).
+    notBeforeMs?: number;
     boards: string[];
     boardIndex: number;
     part: FillPart;
@@ -79,7 +85,8 @@ function parseFillState(raw: string | null | undefined): FillState | null {
     if (!raw) return null;
     try {
         const state = JSON.parse(raw);
-        const valid = Array.isArray(state?.boards)
+        const valid = (state?.notBeforeMs === undefined || Number.isFinite(state.notBeforeMs))
+            && Array.isArray(state?.boards)
             && state.boards.every((board: unknown) => typeof board === 'string')
             && Number.isInteger(state.boardIndex)
             && PARTS.includes(state.part)
@@ -128,8 +135,24 @@ export async function runRacedListFill(
     const lock = await acquireRedisLock(RACED_LIST_FILL_LOCK_KEY, RACED_LIST_FILL_LOCK_TTL_MS, redis);
     if (!lock) return { status: 'busy', rows: 0 };
     try {
-        const state = parseFillState(await redis.get(RACED_LIST_FILL_STATE_KEY))
-            ?? { boards: await listBoards(), boardIndex: 0, part: 'entries', cursor: 0 };
+        const stored = parseFillState(await redis.get(RACED_LIST_FILL_STATE_KEY));
+        if (!stored) {
+            await redis.set(RACED_LIST_FILL_STATE_KEY, JSON.stringify({
+                notBeforeMs: nowMs + RACED_LIST_FILL_START_DELAY_MS,
+                boards: [],
+                boardIndex: 0,
+                part: 'entries',
+                cursor: 0,
+            } satisfies FillState));
+            return { status: 'working', rows: 0 };
+        }
+        if (stored.notBeforeMs !== undefined && nowMs < stored.notBeforeMs) {
+            return { status: 'working', rows: 0 };
+        }
+        // The boards are listed once, when the walk starts.
+        const state: FillState = stored.notBeforeMs !== undefined
+            ? { boards: await listBoards(), boardIndex: 0, part: 'entries', cursor: 0 }
+            : stored;
         let rows = 0;
         while (state.boardIndex < state.boards.length && rows < rowsPerRun) {
             const board = state.boards[state.boardIndex];

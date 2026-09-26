@@ -20,6 +20,8 @@ const { toCampaignCompetition } = await import("../src/server/competition/compet
 
 const HISTORY_KEY = "dailygp:challenges";
 const NOW_MS = Date.parse("2026-09-26T12:00:00.000Z");
+// The walk starts 10 minutes after the first run.
+const START_MS = NOW_MS + 10 * 60 * 1000;
 
 function codedName(playerId) {
   return createHash("sha256").update(playerId, "utf8").digest("base64url");
@@ -30,10 +32,11 @@ async function storeDay(day) {
 }
 
 async function runUntilReady(rowsPerRun) {
+  await runRacedListFill(NOW_MS, rowsPerRun);
   let runs = 0;
   for (;;) {
     runs += 1;
-    const result = await runRacedListFill(NOW_MS, rowsPerRun);
+    const result = await runRacedListFill(START_MS, rowsPerRun);
     if (result.status === "ready") return runs;
     if (runs > 500) throw new Error("fill did not finish");
   }
@@ -72,7 +75,7 @@ describe("raced list fill", () => {
     await runUntilReady(1000);
 
     expect(await redis.zScore(DAILY_GUEST_EXPIRY_KEY, "guest:old"))
-      .toBe(NOW_MS + DAILY_GUEST_ROW_KEEP_SECONDS * 1000);
+      .toBe(START_MS + DAILY_GUEST_ROW_KEEP_SECONDS * 1000);
     expect(await redis.zScore(DAILY_GUEST_EXPIRY_KEY, "reddit:account")).toBeFalsy();
     expect(await redis.expireTime(racedListKey("guest:old"))).toBeGreaterThan(0);
     expect(await redis.expireTime(racedListKey("reddit:account"))).toBeLessThan(0);
@@ -87,16 +90,32 @@ describe("raced list fill", () => {
       }
     }
 
-    const first = await runRacedListFill(NOW_MS, 3);
-    expect(first.status).toBe("working");
+    await runRacedListFill(NOW_MS, 3);
+    const first = await runRacedListFill(START_MS, 3);
+    // The budget is checked after each page, so a run ends after the page
+    // that reached it.
+    expect(first).toEqual({ status: "working", rows: 5 });
     expect(await isRacedListFillReady()).toBe(false);
 
-    expect(await runUntilReady(3)).toBeGreaterThan(1);
+    await runUntilReady(3);
     for (const day of days) {
       for (let index = 0; index < 5; index += 1) {
         expect(await redis.hGet(racedListKey(`reddit:racer-${index}`), `daily:${day}`)).toBeTruthy();
       }
     }
+  });
+
+  it("waits 10 minutes after its first run before it walks any board", async () => {
+    const day = "daily-gp-2026-04-01";
+    await storeDay(day);
+    await redis.hSet(`dailygp:leaderboard:${day}:entries`, { "reddit:early": "{}" });
+
+    expect(await runRacedListFill(NOW_MS)).toEqual({ status: "working", rows: 0 });
+    expect(await runRacedListFill(START_MS - 1)).toEqual({ status: "working", rows: 0 });
+    expect(await redis.hGet(racedListKey("reddit:early"), `daily:${day}`)).toBeFalsy();
+
+    expect((await runRacedListFill(START_MS)).status).toBe("ready");
+    expect(await redis.hGet(racedListKey("reddit:early"), `daily:${day}`)).toBeTruthy();
   });
 
   it("does not run twice at the same time, and does nothing once ready", async () => {
