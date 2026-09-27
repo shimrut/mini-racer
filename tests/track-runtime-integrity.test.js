@@ -247,7 +247,8 @@ describe('track runtime integrity', () => {
         );
         // Mountain Peak, Shark Fin, Twisted Clover, Hook Loop, Crooked Arrow and
         // Winding Road were reshaped on purpose on 2026-09-25. The next three hashes
-        // include those shapes.
+        // include those shapes. They also include the start of Slingshot Run, which
+        // was turned to face the race direction on 2026-09-27.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -255,16 +256,16 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            'f109f808b9e540c23f2aad5edd7a4d66b8faec027630c462020d435472c5571c',
+            'ca1dd6b301663822bb687e477ac3084f04e02017d96dbaf8f4619ad0c583eff6',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            '2f60ee457ab712625bf53cc984025e61f4f6803ea849a66f1fd584ac68469602',
+            '1d9732a4471025ab3cf6be7c31f7eeb9a07753eb2e2af34a2c942e2e2ba16653',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '60ba3b1fdc1a019cc68771099a3b279dfc50c8e6400d4941be1d7a6279e6ba35',
+            'd5b9e7cb5032dda4218e91cdc9885bd7f669fd4f16b97acdb85d9f647699bd40',
         );
     });
 
