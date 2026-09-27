@@ -32,15 +32,5 @@ describe('author medal', () => {
         const tm = await import('../game/medals/medal-timing.js');
         const t = tm.getTrackMedalThresholds('circuit');
         expect(tm.getMedalForLapTime('circuit', t.gold - 0.1)).toBe('gold');
-        expect(tm.getNextMedalTarget('circuit', 'gold')).toBe(null);
-    });
-
-    it('next tier after gold is author when configured', async () => {
-        vi.doMock('../game/medals/medal-times.json', () => ({
-            default: circuitFixture
-        }));
-        const tm = await import('../game/medals/medal-timing.js');
-        expect(tm.getNextMedalTarget('circuit', 'gold')).toEqual({ tier: 'author', maxSeconds: 4 });
-        expect(tm.getNextMedalTarget('circuit', 'author')).toBe(null);
     });
 });

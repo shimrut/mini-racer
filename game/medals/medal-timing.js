@@ -107,20 +107,6 @@ export function shouldShowPersonalBestMedalHero(
     return lapTimeSec < prevPb;
 }
 
-export function getNextMedalTarget(trackKey, currentMedal) {
-    const t = getTrackMedalThresholds(trackKey);
-    if (!t) return null;
-    const authorSec = getAuthorMedalSeconds(trackKey);
-    if (currentMedal === 'author') return null;
-    if (currentMedal === 'gold') {
-        if (authorSec != null) return { tier: 'author', maxSeconds: authorSec };
-        return null;
-    }
-    if (currentMedal === 'silver') return { tier: 'gold', maxSeconds: t.gold };
-    if (currentMedal === 'bronze') return { tier: 'silver', maxSeconds: t.silver };
-    return { tier: 'bronze', maxSeconds: t.bronze };
-}
-
 export function formatMedalLabel(medal) {
     if (medal === 'author') return 'Author';
     if (medal === 'gold') return 'Gold';

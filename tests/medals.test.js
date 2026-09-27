@@ -18,7 +18,6 @@ import {
     getAuthorMedalSeconds,
     getMedalForLapTime,
     getMedalForRaceTime,
-    getNextMedalTarget,
     getRaceMedalThresholds,
     getTrackMedalThresholds,
     getCombinedMedalStackTiers,
@@ -92,21 +91,6 @@ describe('medals', () => {
         expect(maxMedalTier('gold', 'author')).toBe('author');
     });
 
-    it('next medal target steps white → bronze → silver → gold (→ author when set)', () => {
-        const tk = 'circuit';
-        const th = getTrackMedalThresholds(tk);
-        const authorSec = getAuthorMedalSeconds(tk);
-        expect(getNextMedalTarget(tk, null)).toEqual({ tier: 'bronze', maxSeconds: th.bronze });
-        expect(getNextMedalTarget(tk, 'bronze')).toEqual({ tier: 'silver', maxSeconds: th.silver });
-        expect(getNextMedalTarget(tk, 'silver')).toEqual({ tier: 'gold', maxSeconds: th.gold });
-        if (authorSec != null) {
-            expect(getNextMedalTarget(tk, 'gold')).toEqual({ tier: 'author', maxSeconds: authorSec });
-            expect(getNextMedalTarget(tk, 'author')).toBe(null);
-        } else {
-            expect(getNextMedalTarget(tk, 'gold')).toBe(null);
-        }
-    });
-
     it('win overlay layout: large medal is best unlocked on track; small row is all other unlocked tiers', () => {
         const tk = 'circuit';
         const th = getTrackMedalThresholds(tk);
@@ -119,11 +103,6 @@ describe('medals', () => {
         const filled = slots.filter((s) => s.filled).map((s) => s.tier);
         expect(filled).toEqual(['bronze', 'silver', 'gold']);
         expect(getWinOverlayAllMedalsUnlocked(tk, lapMedal)).toBe(false);
-        if (authorSec != null) {
-            expect(getNextMedalTarget(tk, lapMedal)).toEqual({ tier: 'author', maxSeconds: authorSec });
-        } else {
-            expect(getNextMedalTarget(tk, lapMedal)).toBe(null);
-        }
     });
 
     it.skipIf(getAuthorMedalSeconds('circuit') == null)(
@@ -138,7 +117,6 @@ describe('medals', () => {
             const bestStored = maxMedalTier(lapMedal, 'author');
             expect(bestStored).toBe('author');
             expect(getWinOverlayAllMedalsUnlocked(tk, bestStored)).toBe(true);
-            expect(getNextMedalTarget(tk, bestStored)).toBe(null);
             const slots = getMedalRowSlots(tk, bestStored);
             expect(slots.map((s) => s.tier)).toEqual(['bronze', 'silver', 'gold', 'author']);
             expect(slots.every((s) => s.filled)).toBe(true);
@@ -152,7 +130,6 @@ describe('medals', () => {
             const bestStored = maxMedalTier('author', null);
             expect(bestStored).toBe('author');
             expect(getWinOverlayAllMedalsUnlocked(tk, bestStored)).toBe(true);
-            expect(getNextMedalTarget(tk, bestStored)).toBe(null);
         },
     );
 
