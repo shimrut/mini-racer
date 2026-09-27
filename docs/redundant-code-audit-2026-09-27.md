@@ -278,6 +278,22 @@ The order is by simplicity and by the harm to players if a removal goes wrong.
 7. **As on 09-26.** Groups 3 and 4 of the 09-26 audit, and the copies in §3.3, keep their
    earlier order and notes.
 
+## 8. One "faster time wins" rule (done)
+
+Decided on 2026-09-27: the Campaign way, with one change. A time counts on a board if it has
+the same player, track and lap count. A time with no lap count or an older check label
+still counts, because the server checked it on the day of the race.
+
+- `009d151`: the source check read the empty lap count of Daily saves from 2026-07-08 to
+  07-23 as damage, so a Merge that reached such a guest time stopped for review. Found
+  while checking the rule; the full history transfer had not shipped.
+- `6761ca2`: one shared step, `src/server/guest-transfer/board-merge.ts`, for Campaign and
+  Daily. The Campaign progress check and the choice screen use the same rule. A Daily
+  ranking out of step is now repaired, as on Campaign. Five recordings changed on purpose.
+- Checked: the full suite (only the 2 older failures), every bundle, the planted-bug run
+  on the shared step (97%), and a Merge on r/mini_racer_dev at 18:05 on 2026-09-27: done
+  in 1.9 s, no server error, and the boards were right on the tested account.
+
 ## 7. Safety nets before the medium and high risk work
 
 Added on 2026-09-27 on `chore/redundant-code-quick-wins`, before any medium or high risk
