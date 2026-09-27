@@ -1,7 +1,7 @@
 import { CONFIG } from '../game/config.js';
 import { getIntersection } from '../game/track/geometry.js';
 import { smoothPoly } from '../game/track/runtime.js';
-import { clamp, distance, distanceSq, lerp, midpoint } from './geometry.js';
+import { clamp, distance, distanceSq, isFinitePoint, lerp, midpoint } from './geometry.js';
 
 const DT = 1 / 60;
 const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
@@ -23,10 +23,6 @@ function pointInPolygon(point, polygon) {
         }
     }
     return inside;
-}
-
-function isFinitePoint(point) {
-    return point && Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 function rotateArray(points, startIndex) {

@@ -23,6 +23,7 @@ import { getTrackGround, getTrackGroundMaxSpeedKph } from '../game/track/grounds
 import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
+import { isFinitePoint } from './geometry.js';
 import { FLOW_LIMITS, summarizeDriveFlow } from './mapmaker/track-flow.js';
 import {
     DRAFT_LAP_LIMIT,
@@ -87,12 +88,8 @@ const coarsePointer = typeof window.matchMedia === 'function'
 const heldKeys = new Set();
 const heldButtons = { left: false, right: false };
 
-function finitePoint(point) {
-    return point && Number.isFinite(point.x) && Number.isFinite(point.y);
-}
-
 function validGate(gate) {
-    return finitePoint(gate?.p1) && finitePoint(gate?.p2);
+    return isFinitePoint(gate?.p1) && isFinitePoint(gate?.p2);
 }
 
 function readDraft() {
@@ -105,8 +102,8 @@ function readDraft() {
     const track = saved?.track;
     if (!track || !Array.isArray(track.outer) || !Array.isArray(track.inner)
         || track.outer.length < 3 || track.inner.length < 3
-        || !track.outer.every(finitePoint) || !track.inner.every(finitePoint)
-        || !finitePoint(track.startPos) || !Number.isFinite(track.startAngle)
+        || !track.outer.every(isFinitePoint) || !track.inner.every(isFinitePoint)
+        || !isFinitePoint(track.startPos) || !Number.isFinite(track.startAngle)
         || !validGate(track.startLine)
         || !Array.isArray(track.checkpoints) || !track.checkpoints.every(validGate)) {
         throw new Error('No drivable draft is available. Return to Mapmaker and choose Drive Draft.');

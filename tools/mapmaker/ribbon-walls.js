@@ -1,4 +1,4 @@
-import { clonePoint, distance, normalizeVector } from '../geometry.js';
+import { clonePoint, distance, normalizeVector, subtract } from '../geometry.js';
 
 const STRAIGHT_DOT = 0.985;
 const MERGE_DISTANCE = 0.04;
@@ -28,10 +28,6 @@ function scale(vec, amount) {
 
 function add(a, b) {
     return { x: a.x + b.x, y: a.y + b.y };
-}
-
-function sub(a, b) {
-    return { x: a.x - b.x, y: a.y - b.y };
 }
 
 function pushUnique(points, point) {
@@ -190,7 +186,7 @@ export function filletCenterline(points, filletRadius) {
             radius = tanHalf > 1e-6 ? trim / tanHalf : 0;
 
             if (radius > 1e-4 && trim > 1e-4) {
-                const t1 = sub(curr, scale(frame.incoming, trim));
+                const t1 = subtract(curr, scale(frame.incoming, trim));
                 const side = frame.turnAngle >= 0 ? 1 : -1;
                 const inLeft = leftNormal(frame.incoming);
                 center = add(t1, scale(inLeft, side * radius));
@@ -261,7 +257,7 @@ export function filletCenterline(points, filletRadius) {
         const edgeLen = distance(curr, next);
         if (edgeLen > exitTrim + enterTrim + MERGE_DISTANCE) {
             const a = add(curr, scale(edgeDir, exitTrim));
-            const b = sub(next, scale(edgeDir, enterTrim));
+            const b = subtract(next, scale(edgeDir, enterTrim));
             pushSample(a, edgeDir);
             pushSample(b, edgeDir);
         }

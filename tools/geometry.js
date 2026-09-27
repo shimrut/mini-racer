@@ -21,6 +21,14 @@ export function distance(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+export function subtract(a, b) {
+    return { x: a.x - b.x, y: a.y - b.y };
+}
+
+export function isFinitePoint(point) {
+    return Number.isFinite(point?.x) && Number.isFinite(point?.y);
+}
+
 export function distanceSq(a, b) {
     const dx = a.x - b.x;
     const dy = a.y - b.y;

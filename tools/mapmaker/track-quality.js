@@ -1,29 +1,14 @@
 import { CONFIG } from '../../game/config.js';
 import { buildTrackGeometry } from '../../game/track/runtime.js';
+import { distance, isFinitePoint, midpoint, subtract } from '../geometry.js';
 import { closestPointOnPolygon } from './lane-gate.js';
 
 const EPSILON = 1e-7;
 const SEAM_TOLERANCE = 0.2;
 const CAR_RADIUS = CONFIG.carRadius;
 
-function finitePoint(point) {
-    return Number.isFinite(point?.x) && Number.isFinite(point?.y);
-}
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function midpoint(a, b) {
-    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
 function cross(a, b) {
     return a.x * b.y - a.y * b.x;
-}
-
-function subtract(a, b) {
-    return { x: a.x - b.x, y: a.y - b.y };
 }
 
 function segmentIntersection(a, b, c, d) {
@@ -143,8 +128,8 @@ function issue(code, severity, title, detail, hotspot = null) {
 }
 
 function checkGate(label, code, gate, outer, inner, issues) {
-    if (!finitePoint(gate?.p1) || !finitePoint(gate?.p2) || distance(gate.p1, gate.p2) < 0.25) {
-        issues.push(issue(`${code}-invalid`, 'error', `${label} is incomplete`, 'Place a line with two distinct endpoints.', finitePoint(gate?.p1) ? gate.p1 : null));
+    if (!isFinitePoint(gate?.p1) || !isFinitePoint(gate?.p2) || distance(gate.p1, gate.p2) < 0.25) {
+        issues.push(issue(`${code}-invalid`, 'error', `${label} is incomplete`, 'Place a line with two distinct endpoints.', isFinitePoint(gate?.p1) ? gate.p1 : null));
         return null;
     }
     const middle = midpoint(gate.p1, gate.p2);
@@ -196,10 +181,10 @@ export function validateTrackQuality(track) {
     const issues = [];
     const rawOuter = track?.outer;
     const rawInner = track?.inner;
-    if (!Array.isArray(rawOuter) || rawOuter.length < 3 || rawOuter.some((point) => !finitePoint(point))) {
+    if (!Array.isArray(rawOuter) || rawOuter.length < 3 || rawOuter.some((point) => !isFinitePoint(point))) {
         issues.push(issue('outer-invalid', 'error', 'Outer wall is incomplete', 'Draw at least three points with valid coordinates.'));
     }
-    if (!Array.isArray(rawInner) || rawInner.length < 3 || rawInner.some((point) => !finitePoint(point))) {
+    if (!Array.isArray(rawInner) || rawInner.length < 3 || rawInner.some((point) => !isFinitePoint(point))) {
         issues.push(issue('inner-invalid', 'error', 'Inner wall is incomplete', 'Draw at least three points with valid coordinates.'));
     }
     if (issues.length) return { issues, hasErrors: true, minClearance: null };
@@ -236,7 +221,7 @@ export function validateTrackQuality(track) {
         issues.push(issue('road-narrow', 'warning', 'Road has a narrow section', `The narrowest gap is ${gap.distance.toFixed(2)} units. Test it at racing speed.`, gap.hotspot));
     }
 
-    if (!finitePoint(track.startPos)) {
+    if (!isFinitePoint(track.startPos)) {
         issues.push(issue('start-invalid', 'error', 'Start position is missing', 'Place the car on the road.'));
     } else if (!onRoad(track.startPos, outer, inner)) {
         issues.push(issue('start-off-road', 'error', 'Start position is off road', 'Move the car between the two walls.', track.startPos));

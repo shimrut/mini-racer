@@ -1,6 +1,7 @@
 import { CONFIG } from '../../game/config.js';
 import { KPH_PER_WORLD_UNIT } from '../../game/car/handling.js';
 import { buildTrackGeometry } from '../../game/track/runtime.js';
+import { distance } from '../geometry.js';
 
 // Five flow rules, measured on the fast line with the car's real steering limits.
 // Of the 124 Daily tracks on 2026-09-24, they pass exactly the six that play as
@@ -38,10 +39,6 @@ const EPSILON = 1e-9;
 
 const TOP_SPEED = CONFIG.maxSpeed / KPH_PER_WORLD_UNIT;
 const ACCELERATION = CONFIG.accel / KPH_PER_WORLD_UNIT;
-
-function distance(a, b) {
-    return Math.hypot(a.x - b.x, a.y - b.y);
-}
 
 function loopLength(points) {
     let total = 0;
