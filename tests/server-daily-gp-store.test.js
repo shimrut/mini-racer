@@ -1116,6 +1116,46 @@ describe('server daily gp store submissions', () => {
         }
     });
 
+    it.each([
+        ['a hidden track', 'circuit', 'sunlitTemple'],
+        ['the end of the schedule', 'sunlitTemple', 'circuit'],
+        ['a hidden track as the last day', 'waterCircuit', 'sunlitTemple'],
+    ])('skips tracks on a ground that players cannot see after %s', async (_case, priorTrackKey, expected) => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-11T12:00:00.000Z'));
+        const scheduleSnapshot = [...TRACK_SCHEDULE_KEYS];
+        TRACK_SCHEDULE_KEYS.splice(
+            0,
+            TRACK_SCHEDULE_KEYS.length,
+            'circuit',
+            'waterCircuit',
+            'snowCircuit',
+            'sunlitTemple',
+            'spaceCircuit',
+            'gripCircuit',
+        );
+        mockRedis.hGetAll.mockResolvedValue({
+            'daily-gp-2030-01-10': JSON.stringify({
+                id: 'daily-gp-2030-01-10',
+                challengeDate: '2030-01-10',
+                trackKey: priorTrackKey,
+                startsAt: '2030-01-10T00:00:00.000Z',
+                endsAt: '2030-01-11T00:00:00.000Z',
+                availableUntil: '2030-01-17T00:00:00.000Z',
+            }),
+        });
+
+        try {
+            const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
+            const challenge = await getServerDailyGpChallenge();
+
+            expect(challenge.trackKey).toBe(expected);
+        } finally {
+            TRACK_SCHEDULE_KEYS.splice(0, TRACK_SCHEDULE_KEYS.length, ...scheduleSnapshot);
+            vi.useRealTimers();
+        }
+    });
+
     it('keeps an already-published day frozen when the future schedule changes', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2030-01-12T12:00:00.000Z'));

@@ -8,6 +8,8 @@ import {
     TRACK_SCHEDULE_KEYS,
 } from '../../../game/track/catalog.js';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { getTrackGround } from '../../../game/track/grounds.js';
+import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { formatRaceTime } from '../shared/format-race-time.js';
 import {
     resolveLeaderboardDisplayName,
@@ -774,11 +776,18 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
     return entries;
 }
 
+// A scheduled track on a ground that players cannot see yet keeps its place.
+// The schedule skips it until its ground is live.
+function isScheduleTrackLive(trackKey: string): boolean {
+    return isLiveGround(getTrackGround(TRACKS[trackKey]).key);
+}
+
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
     const pool = TRACK_SCHEDULE_KEYS;
     if (pool.length === 0) {
         return DEFAULT_TRACK_KEY;
     }
+    const firstTrackKey = pool.find(isScheduleTrackLive) ?? DEFAULT_TRACK_KEY;
 
     const todayMs = todayStartsAt.getTime();
     const priorEntries = (await readStoredChallengeEntries())
@@ -787,16 +796,20 @@ async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
 
     const playhead = priorEntries[0]?.trackKey;
     if (!playhead) {
-        return pool[0] || DEFAULT_TRACK_KEY;
+        return firstTrackKey;
     }
 
     const playheadIndex = pool.indexOf(playhead);
     if (playheadIndex === -1) {
-        return pool[0] || DEFAULT_TRACK_KEY;
+        return firstTrackKey;
     }
 
-    const nextIndex = (playheadIndex + 1) % pool.length;
-    return pool[nextIndex] || pool[0] || DEFAULT_TRACK_KEY;
+    // The next live track after the last day's track, from the start again after the end.
+    for (let step = 1; step <= pool.length; step += 1) {
+        const trackKey = pool[(playheadIndex + step) % pool.length];
+        if (isScheduleTrackLive(trackKey)) return trackKey;
+    }
+    return firstTrackKey;
 }
 
 function getTodayChallengeId(): string {
