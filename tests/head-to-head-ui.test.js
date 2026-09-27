@@ -140,7 +140,7 @@ describe('Head to Head lobby and finish', () => {
             expect.objectContaining({
                 challengeConfirmPhase: 'lost',
                 challengeConfirmError: null,
-                challengeVerdict: { opponentName: 'shimroot', deltaSec: 0.4 },
+                challengeVerdict: { deltaSec: 0.4 },
             }),
             expect.anything(),
         );
@@ -507,7 +507,7 @@ describe('Head to Head lobby and finish', () => {
             challengeFinish: true,
             challengeConfirmPhase: phase,
             challengeConfirmStatus: null,
-            challengeVerdict: { opponentName: 'shimroot', deltaSec },
+            challengeVerdict: { deltaSec },
             showGlobalLeaderboard: false,
         });
         const pendingOptions = expect.objectContaining({
@@ -559,7 +559,7 @@ describe('Head to Head lobby and finish', () => {
                 lapMedal: null,
                 challengeFinish: true,
                 challengeConfirmPhase: 'pending',
-                challengeVerdict: { opponentName: 'shimroot', deltaSec: -0.5 },
+                challengeVerdict: { deltaSec: -0.5 },
                 showGlobalLeaderboard: false,
             }),
             pendingOptions,
@@ -570,7 +570,7 @@ describe('Head to Head lobby and finish', () => {
         await vi.waitFor(() => {
             expect(winUpdateHero).toHaveBeenCalledWith({
                 phase: 'won',
-                verdict: { opponentName: 'shimroot', deltaSec: -0.5 },
+                verdict: { deltaSec: -0.5 },
             });
         });
         expect(winShowModal).toHaveBeenCalledTimes(1);
@@ -614,7 +614,7 @@ describe('Head to Head lobby and finish', () => {
         await vi.waitFor(() => {
             expect(deferredUpdateHero).toHaveBeenCalledWith({
                 phase: 'won',
-                verdict: { opponentName: 'shimroot', deltaSec: -0.5 },
+                verdict: { deltaSec: -0.5 },
             });
         });
 
@@ -1032,7 +1032,7 @@ describe('Head to Head lobby and finish', () => {
         await vi.waitFor(() => {
             expect(updateChallengeFinishHero).toHaveBeenCalledWith(expect.objectContaining({
                 phase: 'lost',
-                verdict: { opponentName: 'shimroot', deltaSec: 0.4 },
+                verdict: { deltaSec: 0.4 },
                 shareRequest: { kind: 'challenge-brag', acceptToken: null },
             }));
         });

@@ -411,14 +411,14 @@ describe('medals', () => {
 
             renderChallengeFinishHero(overlay, {
                 phase: 'won',
-                verdict: { opponentName: 'shimroot', deltaSec: -0.305 },
+                verdict: { deltaSec: -0.305 },
             });
             expect(children[0].children[0].children[0].textContent).toBe('YOU WON');
             expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, {
                 phase: 'lost',
-                verdict: { opponentName: 'shimroot', deltaSec: 0.546 },
+                verdict: { deltaSec: 0.546 },
             });
             expect(children[0].children[0].children[0].textContent).toBe('YOU LOST');
             expect(children[0].children).toHaveLength(1);

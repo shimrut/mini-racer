@@ -393,10 +393,7 @@ export const headToHeadEngineMethods = {
             : null;
         const buildVerdict = (differenceMs) => (
             Number.isFinite(differenceMs)
-                ? {
-                    opponentName: challenge.challengerUsername || null,
-                    deltaSec: differenceMs / 1000,
-                }
+                ? { deltaSec: differenceMs / 1000 }
                 : null
         );
         const localDifferenceMs = finalTimeMs !== null && targetTimeMs !== null
