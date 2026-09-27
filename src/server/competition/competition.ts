@@ -26,7 +26,6 @@ export type Competition = {
     ttlSeconds: number | null;
     guestExpiryKey: string | null;
     guestRetentionSeconds: number | null;
-    allowGuests: boolean;
 };
 
 const SHARED_STANDINGS_CACHE_VERSION = 'v1';
@@ -74,7 +73,6 @@ export function toDailyCompetition(
         ttlSeconds: getDailyGpCompetitionTtlSeconds(challenge, now),
         guestExpiryKey: null,
         guestRetentionSeconds: null,
-        allowGuests: true,
     };
 }
 
@@ -109,6 +107,5 @@ export function toCampaignCompetition(
         ttlSeconds: null,
         guestExpiryKey: CAMPAIGN_GUEST_EXPIRY_KEY,
         guestRetentionSeconds: CAMPAIGN_GUEST_TTL_SECONDS,
-        allowGuests: true,
     };
 }

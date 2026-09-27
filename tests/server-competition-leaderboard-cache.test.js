@@ -40,7 +40,6 @@ const competition = {
     standingsRevisionKey: 'dailygp:leaderboard:daily-gp-2026-08-08:standings-revision',
     pbHashKey: 'dailygp:challenge-pbs:daily-gp-2026-08-08',
     ttlSeconds: 3600,
-    allowGuests: true,
 };
 
 const entries = {

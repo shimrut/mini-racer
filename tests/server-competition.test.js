@@ -90,7 +90,6 @@ describe('toDailyCompetition', () => {
         expect(competition.mode).toBe('daily');
         expect(competition.lapCount).toBe(3);
         expect(competition.objectiveType).toBe('multi_lap_total');
-        expect(competition.allowGuests).toBe(true);
     });
 
     it('expires with the competition deadline rather than never', () => {

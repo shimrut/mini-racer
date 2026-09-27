@@ -60,7 +60,6 @@ const competition = {
     ttlSeconds: 86_400,
     guestExpiryKey: null,
     guestRetentionSeconds: null,
-    allowGuests: true,
 };
 
 function validReplayOutcome(bestTimeMs = 12_345) {
