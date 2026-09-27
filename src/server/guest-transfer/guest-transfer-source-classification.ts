@@ -71,7 +71,6 @@ export type ClassifiedCampaignProgress = {
     startedAt: string | null;
     updatedAt: string | null;
     rows: Record<string, CampaignProgressRow>;
-    obsoleteRaceIds: string[];
 };
 
 export function classifyStoredCampaignProgress(
@@ -88,7 +87,6 @@ export function classifyStoredCampaignProgress(
     }
 
     const rows: Record<string, CampaignProgressRow> = Object.create(null);
-    const obsoleteRaceIds: string[] = [];
     const results = value.resultsByRaceId;
     if (results !== undefined && results !== null) {
         if (typeof results !== 'object' || Array.isArray(results)) {
@@ -97,10 +95,6 @@ export function classifyStoredCampaignProgress(
         for (const [raceId, candidate] of Object.entries(results as Record<string, unknown>)) {
             const row = classifyCampaignResultRow(raceId, candidate, seriesId);
             if (row.state === 'malformed') return { state: 'malformed', reason: row.reason };
-            if (row.state === 'obsolete') {
-                obsoleteRaceIds.push(raceId);
-                continue;
-            }
             if (row.state === 'valid') rows[raceId] = row.record;
         }
     }
@@ -111,7 +105,6 @@ export function classifyStoredCampaignProgress(
             startedAt: typeof value.startedAt === 'string' ? value.startedAt : null,
             updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
             rows,
-            obsoleteRaceIds,
         },
     };
 }

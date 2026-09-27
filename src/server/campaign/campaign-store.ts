@@ -1023,7 +1023,6 @@ type GuestCampaignSourceSnapshot = {
     stages: Map<string, GuestCampaignStageSource>;
     rawProgressBySeries: Record<string, string | null>;
     malformed: string[];
-    obsolete: string[];
     newestUpdatedAt: string | null;
 };
 
@@ -1032,7 +1031,6 @@ async function captureClassifiedGuestCampaignSource(
     stagesToRead: readonly CampaignStage[] = CAMPAIGN_LIVE_STAGES,
 ): Promise<GuestCampaignSourceSnapshot> {
     const malformed: string[] = [];
-    const obsolete: string[] = [];
     let newestUpdatedAt: string | null = null;
     const observeTimestamp = (value: string | null | undefined) => {
         if (!value) return;
@@ -1057,9 +1055,6 @@ async function captureClassifiedGuestCampaignSource(
             malformed.push(`${label}:${progressClass.reason}`);
         } else if (progressClass.state === 'valid') {
             for (const row of Object.values(progressClass.record.rows)) observeTimestamp(row.updatedAt);
-            for (const raceId of progressClass.record.obsoleteRaceIds) {
-                obsolete.push(`${label}:${raceId}`);
-            }
         }
     }
 
@@ -1083,13 +1078,9 @@ async function captureClassifiedGuestCampaignSource(
         observeTimestamp(readStoredUpdatedAt(rawPb));
         if (entryClass.state === 'malformed') {
             malformed.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
-        } else if (entryClass.state === 'obsolete') {
-            obsolete.push(`campaign:entry:${stage.raceId}:${entryClass.reason}`);
         }
         if (pbClass.state === 'malformed') {
             malformed.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
-        } else if (pbClass.state === 'obsolete') {
-            obsolete.push(`campaign:pb:${stage.raceId}:${pbClass.reason}`);
         }
         stages.set(stage.raceId, {
             rawEntry: rawEntry ?? null,
@@ -1109,7 +1100,6 @@ async function captureClassifiedGuestCampaignSource(
         rawProgressBySeries,
         stages,
         malformed,
-        obsolete,
         newestUpdatedAt,
     };
 }
