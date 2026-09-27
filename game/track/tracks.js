@@ -100,7 +100,7 @@ import twistedClover from './definitions/twisted-clover.js';
 import hookLoop from './definitions/hook-loop.js';
 import crookedArrow from './definitions/crooked-arrow.js';
 import windingRoad from './definitions/winding-road.js';
-import gunSlinger from './definitions/gun-slinger.js';
+import waterPistol from './definitions/water-pistol.js';
 import lightningHook from './definitions/lightning-hook.js';
 import doubleTrouble from './definitions/double-trouble.js';
 import brokenWing from './definitions/broken-wing.js';
@@ -258,7 +258,7 @@ const TRACK_GEOMETRY = {
     hookLoop,
     crookedArrow,
     windingRoad,
-    gunSlinger,
+    waterPistol,
     lightningHook,
     doubleTrouble,
     brokenWing,

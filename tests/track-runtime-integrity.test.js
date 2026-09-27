@@ -156,7 +156,7 @@ describe('track runtime integrity', () => {
             'hookLoop',
             'crookedArrow',
             'windingRoad',
-            'gunSlinger',
+            'waterPistol',
             'lightningHook',
             'doubleTrouble',
             'brokenWing',
@@ -247,8 +247,8 @@ describe('track runtime integrity', () => {
         );
         // Mountain Peak, Shark Fin, Twisted Clover, Hook Loop, Crooked Arrow and
         // Winding Road were reshaped on purpose on 2026-09-25. The next three hashes
-        // include those shapes. They also include the start of Slingshot Run, which
-        // was turned to face the race direction on 2026-09-27.
+        // include those shapes. They also include the reshapes of 2026-09-27: 12
+        // Daily tracks, and Water Pistol in place of Gun Slinger, which was never live.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -256,16 +256,16 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            'ca1dd6b301663822bb687e477ac3084f04e02017d96dbaf8f4619ad0c583eff6',
+            '42c6a51f5db317a2cd8abce9935d3d5990d2afc2b504972a58cc55f89840633d',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            '1d9732a4471025ab3cf6be7c31f7eeb9a07753eb2e2af34a2c942e2e2ba16653',
+            '6908df0c6a28a66ca7e0ccb5176900da4733787fe11cf9435a8d6fd13730a701',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'd5b9e7cb5032dda4218e91cdc9885bd7f669fd4f16b97acdb85d9f647699bd40',
+            '3b9baa144fd310187ad6e69d4a884f80ecfcda83fc7bb8698bba6d7d449df4cd',
         );
     });
 

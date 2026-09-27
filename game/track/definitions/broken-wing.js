@@ -2,11 +2,10 @@ import { Point } from '../geometry.js';
 
 export default {
     cornerRadius: 1.5,
-    drawWidth: 4,
+    drawWidth: 3.85,
     lineSmoothing: 0.35,
     outer: [
-        Point(16.046, 23.344),
-        Point(16.716, 23.018),
+        Point(17.84, 23.897),
         Point(24.684, 29.375),
         Point(20.907, 44.684),
         Point(20.824, 46.164),
@@ -21,7 +20,7 @@ export default {
         Point(41.654, 45.679),
         Point(41.663, 44.34),
         Point(41.229, 43.074),
-        Point(38.224, 37.547),
+        Point(39.718, 37.715),
         Point(47.216, 29.194),
         Point(47.973, 28.235),
         Point(48.406, 27.092),
@@ -53,28 +52,23 @@ export default {
         Point(6.606, 26.269),
         Point(7.918, 26.509),
         Point(11.978, 26.564),
-        Point(13.467, 26.299),
-        Point(14.751, 25.499),
-        Point(15.646, 24.28)
+        Point(13.199, 25.965),
+        Point(14.395, 24.964),
+        Point(15.7, 23.944)
     ],
     inner: [
-        Point(12.76, 21.03),
-        Point(13.582, 19.886),
-        Point(14.753, 19.103),
-        Point(16.125, 18.781),
-        Point(17.523, 18.962),
+        Point(14.004, 20.623),
+        Point(15.552, 19.786),
         Point(18.767, 19.622),
         Point(27.16, 26.233),
         Point(28.152, 27.381),
         Point(28.645, 28.817),
         Point(28.568, 30.333),
         Point(24.79, 45.642),
-        Point(37.715, 44.984),
-        Point(34.71, 39.458),
-        Point(34.28, 38.216),
-        Point(34.276, 36.902),
-        Point(34.699, 35.657),
-        Point(35.501, 34.617),
+        Point(37.381, 44.974),
+        Point(35.316, 37.097),
+        Point(35.584, 35.658),
+        Point(36.391, 34.703),
         Point(44.493, 26.263),
         Point(43.963, 15.477),
         Point(39.374, 17.807),
@@ -90,10 +84,10 @@ export default {
         Point(12.032, 22.565)
     ],
     startLine: { p1: Point(23.044, 32.892), p2: Point(28.384, 34.21) },
-    startPos: Point(26.013, 32.338),
+    startPos: Point(26.014, 32.337),
     startAngle: 1.813,
     checkpoints: [
-        { p1: Point(40.458, 36.496), p2: Point(36.714, 32.466) },
+        { p1: Point(41.896, 36.61), p2: Point(37.538, 32.426) },
         { p1: Point(31.014, 10.586), p2: Point(28.681, 15.567) },
         { p1: Point(5.281, 17.186), p2: Point(10.226, 19.593) }
     ]
