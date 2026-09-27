@@ -34,6 +34,30 @@ them. Every client entry, the Mapmaker, Runner Lab and the server bundle with es
 caught one missed rename in the Mapmaker playtest that the tests and the bundle did not
 catch. The Campaign screen draws its track preview as before on :8000.
 
+The low-risk items (priority 2 in §6, and group 3 of the 09-26 audit) followed on the same
+branch, one commit for each:
+
+- `e4d22de`: the four carousel card labels and the meta line builder.
+- `9378059`: `goldCount` and `gapMs` in the lobby states.
+- `ce0c378`: `opponentName` in the Head to Head verdict.
+- `35480d5`: `_modalSecondaryAction`.
+- `feaea2a`: `data-challenge-phase`. Its tests now check the outcome text and the
+  accessible label.
+- `561bf8a`: `resultLabel` in the Head to Head win reply. The game stopped reading it on
+  2026-07-25 (`65980295`), so no open game page needs it.
+- `ec899a6`: `allowGuests` on the competition shape.
+- `af4ea28`: `notCounted` in the storage view. The page hid it on 2026-09-08. Its four
+  points are now a comment on the storage walk.
+- `fb1ab39`: one grid function for the checkered and the painted finish line. A recording
+  of every drawing call, for both styles and 16 lines, is the same before and after.
+- `4fe9f77`: a new find of the same kind. The Head to Head finish hero reads only the phase
+  and the error. The finish screen still passed it a status text, the viewer's avatar and
+  the verdict, through four layers. No caller set the status text. The avatar stays in the
+  lobby, and the verdict still sets the opponent gap.
+
+Each commit passed the same checks as above. The Daily and Campaign carousels on :8000
+show the track, the day or stage, and the laps as before.
+
 The uncommitted ground tuning stays out of these commits.
 
 ## Why this audit
