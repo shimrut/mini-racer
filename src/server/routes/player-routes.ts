@@ -15,7 +15,7 @@ export type PlayerRouteDependencies = {
     updateServerPlayerPreferences(input: Record<string, unknown>): Promise<PlayerPayload>;
 };
 
-function sendPlayerAuthorizationFailure(
+export function sendPlayerAuthorizationFailure(
     res: Response,
     { playerId, guestToken }: { playerId?: unknown; guestToken?: unknown },
 ): void {

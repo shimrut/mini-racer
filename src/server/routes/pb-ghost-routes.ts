@@ -1,5 +1,5 @@
-import type { Application, Response } from 'express';
-import { hasText } from '../shared/value-guards.js';
+import type { Application } from 'express';
+import { sendPlayerAuthorizationFailure } from './player-routes.js';
 
 type TrackPbPayload = {
     playerId: string | null;
@@ -18,17 +18,6 @@ export type PbGhostRouteDependencies = {
     getServerPlayerTrackPbSummaries(input: Record<string, unknown>): Promise<TrackPbPayload>;
     getServerPlayerPbGhost(input: Record<string, unknown>): Promise<PbGhostPayload>;
 };
-
-function sendAuthorizationFailure(
-    res: Response,
-    { playerId, guestToken }: { playerId?: unknown; guestToken?: unknown },
-): void {
-    if (hasText(playerId) || hasText(guestToken)) {
-        res.status(401).json({ error: 'Guest token is required for this player.' });
-        return;
-    }
-    res.status(400).json({ error: 'Invalid player identity.' });
-}
 
 function parseChallengeIds(value: unknown): string[] {
     if (typeof value !== 'string') return [];
@@ -53,7 +42,7 @@ export function registerPbGhostRoutes(
                 redditUsername: dependencies.getRequestUsername(),
             });
             if (!payload.playerId) {
-                sendAuthorizationFailure(res, { playerId, guestToken });
+                sendPlayerAuthorizationFailure(res, { playerId, guestToken });
                 return;
             }
             res.status(200).json({ trackPbs: payload.trackPbs ?? {} });
@@ -73,7 +62,7 @@ export function registerPbGhostRoutes(
                 redditUsername: dependencies.getRequestUsername(),
             });
             if (!payload.playerId) {
-                sendAuthorizationFailure(res, { playerId, guestToken });
+                sendPlayerAuthorizationFailure(res, { playerId, guestToken });
                 return;
             }
             if (!payload.challengeId || !payload.trackKey) {
