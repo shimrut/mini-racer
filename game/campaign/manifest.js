@@ -62,7 +62,8 @@ function buildSeries(definition) {
     });
 }
 
-// Every series in the data file, also the hidden ones. Only the Mapmaker and tests use this.
+// Every series in the data file, also the hidden ones. The series screen shows
+// the hidden ones as "Coming soon".
 export const CAMPAIGN_ALL_SERIES = Object.freeze(
     (Array.isArray(seriesData?.series) ? seriesData.series : []).map(buildSeries),
 );

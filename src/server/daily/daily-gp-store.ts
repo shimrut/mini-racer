@@ -205,8 +205,8 @@ type GuestProgressSelectionRecord = {
     completedAt?: string;
 };
 
-// Keep guest replaces the account's progress, Keep account drops the guest's,
-// and Merge keeps the faster time on every board.
+// Keep account drops the guest's progress, and Merge keeps the faster time on
+// every board. 'guest' is the retired Keep guest, which runs as Merge.
 export type GuestTransferChoice = 'guest' | 'account' | 'merge';
 
 function isGuestTransferChoice(value: unknown): value is GuestTransferChoice {
