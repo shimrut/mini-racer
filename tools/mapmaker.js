@@ -30,7 +30,8 @@ import {
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
     getTrackModuleFilename,
-    isValidTrackKey
+    isValidTrackKey,
+    trackKeyFromName
 } from './mapmaker/track-source.js';
 import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geometry.js';
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
@@ -853,10 +854,12 @@ class MapmakerApp {
         });
 
         this.trackNameInput.addEventListener('input', () => {
-            this.track.name = this.trackNameInput.value || 'Untitled Track';
+            const typed = this.trackNameInput.value;
+            this.track.name = typed.trim() || 'Untitled Track';
+            const derived = this.applyDerivedTrackKey(typed);
             this.syncTrackSelectText();
             this.updateStageText();
-            this.markDirty('Updated track name.');
+            this.markDirty('Updated track name.', derived);
         });
 
         this.trackDestinationSelect.addEventListener('change', () => {
@@ -918,13 +921,6 @@ class MapmakerApp {
         });
         this.lineSmoothingInput.addEventListener('blur', () => {
             this.lineSmoothingInput.value = formatNumber(this.getLineSmoothing());
-        });
-
-        this.trackKeyInput.addEventListener('change', () => {
-            this.renameTrackKey(this.trackKeyInput.value.trim());
-        });
-        this.trackKeyInput.addEventListener('blur', () => {
-            this.trackKeyInput.value = this.state.selectedTrackKey;
         });
 
         const updateSelectedCoordinate = () => {
@@ -1452,7 +1448,7 @@ class MapmakerApp {
         }
     }
 
-    renameTrackKey(nextKey) {
+    renameTrackKey(nextKey, options = {}) {
         const currentKey = this.state.selectedTrackKey;
         if (!nextKey || nextKey === currentKey) {
             this.trackKeyInput.value = currentKey;
@@ -1509,26 +1505,49 @@ class MapmakerApp {
         this.populateTrackSelect();
         this.trackSelect.value = nextKey;
         this.trackKeyInput.value = nextKey;
+        if (options.silent) {
+            this.state.dirtyTrackKeys.add(nextKey);
+            return true;
+        }
         this.markDirty(
             `Renamed track key to ${nextKey}. Save & Integrate will replace the old definition and integration entries.`
         );
+        return true;
+    }
+
+    applyDerivedTrackKey(name) {
+        const nextKey = trackKeyFromName(name);
+        if (!nextKey || nextKey === this.state.selectedTrackKey) {
+            this.trackKeyInput.value = this.state.selectedTrackKey;
+            return true;
+        }
+        if (!isValidTrackKey(nextKey)) {
+            this.trackKeyInput.value = this.state.selectedTrackKey;
+            this.setStatus('That name cannot be a track key.', true);
+            return false;
+        }
+        if (this.state.tracks[nextKey]) {
+            this.trackKeyInput.value = this.state.selectedTrackKey;
+            this.setStatus('That name is already used by another track.', true);
+            return false;
+        }
+        return this.renameTrackKey(nextKey, { silent: true });
     }
 
     createTrack() {
-        const rawKey = window.prompt('New track key', 'newCircuit');
-        if (!rawKey) {
-            return;
-        }
-        const key = rawKey.trim();
+        const typed = window.prompt('Track display name', 'New Circuit');
+        if (typed == null) return;
+        const name = typed.trim();
+        if (!name) return;
+        const key = trackKeyFromName(name);
         if (!isValidTrackKey(key)) {
-            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
+            this.setStatus('That name cannot be a track key.', true);
             return;
         }
         if (this.state.tracks[key]) {
-            this.setStatus('That track key already exists.', true);
+            this.setStatus('That name is already used by another track.', true);
             return;
         }
-        const name = (window.prompt('Track display name', 'New Circuit') || 'New Circuit').trim() || 'New Circuit';
         this.state.tracks[key] = createBlankTrack(name);
         this.populateTrackSelect();
         this.loadTrack(key);
@@ -1537,22 +1556,20 @@ class MapmakerApp {
 
     duplicateTrack() {
         const sourceKey = this.state.selectedTrackKey;
-        const rawKey = window.prompt('Clone track key', `${sourceKey}Copy`);
-        if (!rawKey) {
-            return;
-        }
-        const key = rawKey.trim();
+        const copy = cloneTracks(this.track);
+        const typed = window.prompt('Clone display name', `${copy.name} Copy`);
+        if (typed == null) return;
+        const name = typed.trim();
+        if (!name) return;
+        const key = trackKeyFromName(name);
         if (!isValidTrackKey(key)) {
-            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
+            this.setStatus('That name cannot be a track key.', true);
             return;
         }
         if (this.state.tracks[key]) {
-            this.setStatus('That track key already exists.', true);
+            this.setStatus('That name is already used by another track.', true);
             return;
         }
-
-        const copy = cloneTracks(this.track);
-        const name = (window.prompt('Clone display name', `${copy.name} Copy`) || `${copy.name} Copy`).trim() || `${copy.name} Copy`;
         copy.name = name;
         this.state.tracks[key] = copy;
         this.populateTrackSelect();

@@ -303,6 +303,10 @@ select {
     outline: none;
 }
 
+input[readonly] {
+    color: var(--maker-muted);
+}
+
 input:focus,
 select:focus {
     border-color: rgba(56, 189, 248, 0.55);

@@ -7,7 +7,8 @@ import {
     generateTrackIntegrationSnippet,
     generateTrackModuleSource,
     getTrackModuleFilename,
-    isValidTrackKey
+    isValidTrackKey,
+    trackKeyFromName
 } from '../tools/mapmaker/track-source.js';
 
 const TRACK = {
@@ -59,6 +60,16 @@ describe('Mapmaker track source serializer', () => {
         expect(isValidTrackKey('newCircuit')).toBe(true);
         expect(isValidTrackKey('class')).toBe(false);
         expect(() => getTrackModuleFilename('class')).toThrow(/non-reserved/);
+    });
+
+    it('derives a camelCase track key from the display name', () => {
+        expect(trackKeyFromName('Spade Kingdom')).toBe('spadeKingdom');
+        expect(trackKeyFromName('spade-kingdom')).toBe('spadeKingdom');
+        expect(trackKeyFromName("King's Cup")).toBe('kingsCup');
+        expect(trackKeyFromName('Number 5')).toBe('number5');
+        expect(trackKeyFromName('3rd Street')).toBe('t3rdStreet');
+        expect(trackKeyFromName('   ')).toBe('');
+        expect(isValidTrackKey(trackKeyFromName('Class'))).toBe(false);
     });
 
     it('emits a default-exported geometry-only module', () => {

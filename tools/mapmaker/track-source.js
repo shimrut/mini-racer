@@ -88,6 +88,23 @@ export function isValidTrackKey(value) {
     return TRACK_KEY_RE.test(value) && !RESERVED_TRACK_KEYS.has(value);
 }
 
+// "Spade Kingdom" -> spadeKingdom. A leading digit is prefixed so the result
+// can be a JavaScript identifier.
+export function trackKeyFromName(name) {
+        const words = String(name)
+        .normalize('NFKD')
+        .replace(/\p{M}/gu, '')
+        .replace(/['’]/g, '')
+        .match(/[A-Za-z0-9]+/g);
+    if (!words?.length) return '';
+    const key = words.map((word, index) => {
+        const lower = word.toLowerCase();
+        if (index === 0) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join('');
+    return /^[0-9]/.test(key) ? `t${key}` : key;
+}
+
 export function getTrackModuleFilename(trackKey) {
     if (!isValidTrackKey(trackKey)) {
         throw new Error('Track key must be a valid non-reserved JavaScript identifier.');
