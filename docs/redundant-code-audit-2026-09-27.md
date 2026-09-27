@@ -278,6 +278,63 @@ The order is by simplicity and by the harm to players if a removal goes wrong.
 7. **As on 09-26.** Groups 3 and 4 of the 09-26 audit, and the copies in §3.3, keep their
    earlier order and notes.
 
+## 7. Safety nets before the medium and high risk work
+
+Added on 2026-09-27 on `chore/redundant-code-quick-wins`, before any medium or high risk
+change. Each is test code only. Each was checked with planted changes: it must fail when
+the rule it guards changes.
+
+| Guards | Test | What it fixes |
+|---|---|---|
+| Raced-list owner, fill removal | `tests/raced-list-names.test.js` | The list key, the board fields, the guest clean-up and fill keys, and the commands of each kind of race save, written out in full. |
+| Transfer options, copies, "faster time wins" | `tests/guest-transfer-recording.test.js` | 21 player cases, each with Merge and Keep account: the choice screen, the replies, and every stored key the transfer changed. A transfer stopped at each saved step and run again must end with the same data. |
+| Replay format in posts | `tests/replay-post-tokens.test.js` | Five saved replay posts, read only, from the body, the text fallback and with Windows line ends. Each must give the stored fingerprint and envelope. |
+| Ghost size check | `tests/pb-ghost-size-limit.test.js` | The limit on both sides, and today's one difference. |
+| Lost-post lookup | `tests/post-recovery-lookup.test.js` | Today's answers of both lookups for podium posts, Daily posts with and without a type, other days and other subreddits. |
+| Engine values, replay check | `tests/replay-verdict-recording.test.js` | The server's full answer for four finished tarmac runs and eight changed replays. |
+
+**Planted-bug runs on the transfer code** (Stryker, only the transfer functions, a
+scratchpad config; the project config is unchanged). The share of planted bugs that the
+tests catch:
+
+| File (transfer part) | Before | With 14 cases | With 21 cases |
+|---|---|---|---|
+| `campaign-store.ts` | 59.1% | 71.1% | 72.3% |
+| `daily-gp-store.ts` | 64.0% | 71.3% | 71.9% |
+| `car-unlock-store.ts` | 50.7% | 55.1% | 55.1% |
+| `guest-transfer-source-classification.ts` | 51.7% | 52.3% | 52.8% |
+| `daily-guest-cleanup.ts` | 60.2% | 60.2% | 60.2% |
+| `raced-list-fill.ts` | 81.3% | 81.3% | 81.3% |
+| `raced-list.ts` | 79.4% | 79.4% | 79.4% |
+
+The seven added cases closed the gaps they aimed at, in both merges: the tie rule for
+equal times, a series the guest only started, an old Daily entry, a board the guest never
+raced, and a best time that moves alone. Most planted bugs that still survive are in three
+kinds of code: the paths that only tests
+reach (§2, which the refactor removes), return values that nothing stores, and the lock
+and lease handling, which no recording stresses. A refactor of the lock handling needs its
+own test of a lost lock before it starts.
+
+**Found while building them:**
+
+- Head to Head posts made before 2026-08-08 name their replay
+  `MINIRACER-CHALLENGE-REPLAY-V1`. Today's reader accepts only
+  `MINIRACER-HEAD-TO-HEAD-REPLAY-V1`, so it cannot read those posts. The code cannot tell
+  if any such post is still live.
+- The Daily lost-post lookup takes a newer podium post of the same day. The podium lookup
+  checks the post type. This is the 09-23 drift, now fixed in a test.
+- The server's replay check ignores input after the finish line.
+- A Merge does not move a guest's personal best in an old ghost format (schema 1). The
+  clean-up then deletes it with the guest's other rows.
+
+**Still to do at refactor time:**
+
+- The grounds are still being tuned, so no test fixes ground runs. Before a change to the
+  race code, record the autopilot runs on every ground track, and compare them after the
+  change.
+- Check "done" on the analytics page of each subreddit before the fill removal.
+- Decide the two "faster time wins" differences (§3.1) before the rules become one.
+
 ## Checked, not reported
 
 - **Tables.** The drawn car skins, the trackside items, the grounds, the track art, and the
