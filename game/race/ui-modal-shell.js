@@ -104,7 +104,6 @@ export class ModalShell {
         this._modalCloseTransitionEndHandler = null;
         this._modalKind = null;
         this._modalPrimaryAction = null;
-        this._modalSecondaryAction = null;
         this._modalRunsPayload = null;
         this._onRaceOpponent = null;
         this._runsViewMode = 'close';
@@ -1209,7 +1208,6 @@ export class ModalShell {
         this.modal.classList.toggle('modal--win', this._modalKind === 'win');
         this.modal.classList.toggle('modal--pause', this._modalKind === 'pause');
         this._modalPrimaryAction = options.primaryAction || this.getDefaultPrimaryAction();
-        this._modalSecondaryAction = options.secondaryAction || null;
         this._modalRunsPayload = buildModalRunsPayload(lapData, {
             currentTrackKey: this.getCurrentTrackKey()
         });
@@ -1769,7 +1767,6 @@ export class ModalShell {
             this._setActiveView(null);
             this._modalKind = null;
             this._modalPrimaryAction = this.getDefaultPrimaryAction();
-            this._modalSecondaryAction = null;
             this._modalRunsPayload = null;
             this._onRaceOpponent = null;
             this._runsReturnView = null;
