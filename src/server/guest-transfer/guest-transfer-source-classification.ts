@@ -204,8 +204,10 @@ export function classifyStoredLeaderboardEntry(
     if (value.trackKey !== undefined && (typeof value.trackKey !== 'string' || !value.trackKey)) {
         return { state: 'malformed', reason: 'missing_fields' };
     }
+    // Daily saves from 2026-07-08 to 07-23 wrote an empty lap count (null).
+    const hasLapCount = value.completedLaps !== undefined && value.completedLaps !== null;
     if (
-        value.completedLaps !== undefined
+        hasLapCount
         && (typeof value.completedLaps !== 'number' || !Number.isInteger(value.completedLaps))
     ) {
         return { state: 'malformed', reason: 'missing_fields' };
@@ -219,7 +221,7 @@ export function classifyStoredLeaderboardEntry(
         if (trackKey && trackKey !== stage.trackKey) {
             return { state: 'obsolete', reason: 'track_retired', updatedAt };
         }
-        if (value.completedLaps !== undefined && value.completedLaps !== stage.lapCount) {
+        if (hasLapCount && value.completedLaps !== stage.lapCount) {
             return { state: 'obsolete', reason: 'stage_redefined', updatedAt };
         }
     }

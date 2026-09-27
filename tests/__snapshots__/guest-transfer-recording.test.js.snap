@@ -1,5 +1,736 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`guest transfer recordings > Daily times from July with an empty lap count (account) 1`] = `
+{
+  "changes": {
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-19",
+            "daily-gp-2026-09-20",
+            "daily-gp-2026-09-21",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-27",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-19",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+            {
+              "id": "daily-gp-2026-09-20",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "twinRise",
+            },
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "sakuraWeave",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "sortedSet": {
+          "reddit:recorded": 42000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 42000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19:entries": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "completedLaps": null,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "sortedSet": {
+          "reddit:recorded": 39000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "sortedSet": {
+          "guest:recorded": 40000,
+          "reddit:recorded": 39000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20:entries": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 39000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "basic-sanity",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 40000,
+            "completedLaps": null,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 39000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "basic-sanity",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "twinRise",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": null,
+      "dailySavedResults": 2,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": null,
+      "dailySavedResults": 3,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > Daily times from July with an empty lap count (merge) 1`] = `
+{
+  "changes": {
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-19",
+            "daily-gp-2026-09-20",
+            "daily-gp-2026-09-21",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-27",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-19",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+            {
+              "id": "daily-gp-2026-09-20",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "twinRise",
+            },
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "sakuraWeave",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {},
+            "daily": {
+              "daily-gp-2026-09-19": "UF2ghWr0gH8oOSPRmtYjv2lKakenMlnTXoPQm6U6uH4",
+              "daily-gp-2026-09-20": "3tbBDQwWGvblJt5yrAWyN7zRUfBMYqOnYKnIOkQVFTI",
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "ROYDlr2hIKDPp-cAQhsb0pdlRYzhWx0ylknyQRtaHq0",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "sortedSet": {
+          "reddit:recorded": 41000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 42000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19:entries": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": null,
+            "completedLaps": null,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "completedLaps": null,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "circuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-19:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576065600,
+        "string": "2",
+      },
+      "before": {
+        "expiresInSeconds": 1576065600,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "sortedSet": {
+          "reddit:recorded": 39000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "sortedSet": {
+          "guest:recorded": 40000,
+          "reddit:recorded": 39000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20:entries": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 39000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "basic-sanity",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 40000,
+            "completedLaps": null,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 39000,
+            "completedLaps": null,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "sunlitTemple",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "basic-sanity",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-20:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576152000,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576152000,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 43000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "completedLaps": null,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "twinRise",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "twinRise",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "2",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+    "miniracer:raced:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "hash": {
+          "daily:daily-gp-2026-09-19": "1",
+          "daily:daily-gp-2026-09-20": "1",
+          "daily:daily-gp-2026-09-26": "1",
+        },
+      },
+      "before": {
+        "hash": {
+          "daily:daily-gp-2026-09-19": "1",
+          "daily:daily-gp-2026-09-20": "1",
+        },
+      },
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": null,
+      "dailySavedResults": 2,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": null,
+      "dailySavedResults": 3,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
 exports[`guest transfer recordings > a guest row is damaged (account) 1`] = `
 {
   "changes": {

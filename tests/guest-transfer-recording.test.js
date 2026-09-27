@@ -394,6 +394,16 @@ const CASES = {
         await seedStage(NUMBERS[0], g, { entryMs: 33000 });
         await seedDay(playable[5], g, { entryMs: 43000 });
     },
+    'Daily times from July with an empty lap count': async (g, a) => {
+        // From 2026-07-08 to 07-23, a Daily save wrote completedLaps: null.
+        const { archived, playable } = await seedDays(2);
+        await seedDay(archived[0], g, { entryMs: 41000, entryExtra: { completedLaps: null, validationMethod: 'strict-replay' } });
+        await seedDay(archived[0], a, { entryMs: 42000, entryExtra: { completedLaps: null, validationMethod: 'strict-replay' } });
+        await seedDay(archived[1], a, { entryMs: 39000, entryExtra: { completedLaps: null, validationMethod: 'basic-sanity' } });
+        await seedDay(archived[1], g, { entryMs: 40000, entryExtra: { completedLaps: null, validationMethod: 'strict-replay' } });
+        await seedDay(playable[5], g, { entryMs: 43000 });
+        await markFillReady();
+    },
     'a long Daily history that moves in pieces': async (g, a) => {
         const { archived } = await seedDays(70);
         for (const [index, day] of archived.entries()) {
