@@ -1,0 +1,242 @@
+{
+  "headToHead": [
+    {
+      "name": "Numbers stage, named by campaign and race",
+      "postData": {
+        "postType": "head-to-head",
+        "challengeId": "h2h-numbers-03",
+        "campaignId": "numbered-v1",
+        "raceId": "numbered-v1-03",
+        "challengerUsername": "RaceFan",
+        "challengerUserId": "t2_racefan",
+        "challengerAvatarUrl": null,
+        "trackKey": "numberThree",
+        "lapCount": 1,
+        "targetTimeMs": 25640,
+        "medal": "gold",
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-number-three",
+        "createdAt": "2026-08-20T12:00:00.000Z",
+        "replayDataHash": "df7b9c1cd647ef8b1e83e0a4cbb312d685ff22f763947904ea452aa254bdadde"
+      },
+      "text": "# Head to Head · RaceFan\n\nBeat **25.640** on **Number Three** (1 lap).\n\nOpen Mini Racer and race the frozen verified ghost.\n\nChallenge replay data:\n\n```text\nMINIRACER-HEAD-TO-HEAD-REPLAY-V1\n__gz:b64url__:H4sIAAAAAAACE51Y227jNhD9Fz2TBTWja96CbYoG7bZFECzQLvZBtZXYqC-B7AQogvx7KZIzQ9LyPhQIoqNzjmiZl7n4vXg6TvvhXNwUn-9_u3-4_XT3oH--u_1RP_7urw93f_x6-6f-UhaqWG2G3W48PI_3a_vABjb68Lr_e5xO2qCVz9Ow-ueX8V-ref5xM42jFXbDy6fj68F-Smldw_Q8nh-3-_HzqbiBuqmMKvbjetjZ556Pu7V9YHrdjaeH8W172h4P_ql57J-29rOnl2k7D1U8vYSP1-fwOatpHM7j-nZWwUCjTafBPJZwY4z9-8EY85e1PW-OJ2t5L06rzbgfvtgv4D4GVHEa9i-78f5wHqe3YTe_YG3f7ml72J422Ssfp-3z1j71tWyhVGVd1grqtvymivW4Ow_W-FWjFewfKIfAI3AcMoLryHgfMoeqJzCLgjAWKwFdxGDKBFAL03pPPQO4AprM06g6kphBB5ipMrNjMJVy0CokD5KEJEEEvAcupJKeCtPNTCQZYgx5mNFs0mXMYaJaBAs-fnUNMRd8uOATtVpGwcczeA355dFNrlqOV1HzMqZcQLwjNG-JiEsQ5lyfI3QIc472LwgMLF4aymsQ3dFKWKADx6zxLHkxYSFhofcQgyFlF6BfGOg8jFgIrJ99aMXbpuwlnHeSXyAHUzaDtXirlPULG7OVZ2cviiGDfiUBxAspG2B5AWevEXaGvcCURXchQ9l9D_q3mh8t_VuxoRE2QFxkwc0iw0q8lXv9mAW3vsyieCMWFmHpod-7OQsJ27vJLNEj4TzqvBqQH7JlTlDDTzQ8XsNqzajKuXl7L6iwoAKjMkcYceYCsIk9cAGQPJgxoKoMoOLvw187YZyH56YlDzM8lT0xPOE54xJu0GTRIo5XWpY_Qpggt3tko8k-i1DN4_E2lb2bIn8i5lMQOD4PEccnRw7Z9xAqOaJybuWIywmXCBCpQBGEAggqiSqLiCMRxS_hIOY4uknIy1AdI-vjMBqhLuFcFI44jtcSxCULiCrpQFIAcXb_lpRNxBdxJWUgSUuRymlNslrGuVV1SdGrGHM9izFlXVWkeVBFoCOPW0RO8SHrM4OKqwQuEnLGeppI8oAqj8RTpVIMqtRDBVPylJ_rWAIyxwCvSCU9VYZxTKoQ0fhykArFyEgj0AA0NAQ-uncvgZlO712F56N7d60TXe5pJqN7tzA01TT3dG2D3sp9dHXFP2b37tonOvI97SO6-jqN25AFQG1O6GOYiQEFSe6OuGFCiq5oIg8dPz5p4fAZxedWPHSm-cAnTAYoeHA84YAhDAUijk2J5Bkf1CrFMY0DXsK4ABmiJ5IHIkDBlmMth1qO0sFjIqZPwPy_C0kgMJ0AzhScUDifBE-jOOuEJMZMrTiFJYxLdJz7gNZOGF5EExaRE2oCXAIOZYRRlKQ5IXtLpyhpe4Hu26C3ch-KBO9rFNUTnqdrlVznmoRKkvQKQQd6w-xqgm4Ul0vLYK4OiKHBhaHXEKlOJWZc1ceFINeGQaKvr1vF5SVXl6G47ImhudQ87UHzuUdq2mvIF8pSHEtJLRU1-SolFbmU6eSjHaV5t2negK4C6KkfIF-rpEeQHkIQ-Xrm-nB4Ii4cn1C5cYdDahlzHTVI0h9RKyUcKmm6pNGS9ixFvpGTPo7UWknzRw0fRSDNIUhzwNIhhmHCdUrazYjjJlZ62EXkG2PhQgQWNXDcbKdc-B72xnz7UMVq2L8M2-eD-zXR_5Q3rvXb_EvjNKzGnPY_MtLPbu_F_rgerYNGKf7XgB8f_wEHm4ggAxUAAA\n```",
+      "envelope": {
+        "format": "MINIRACER-HEAD-TO-HEAD-REPLAY-V1",
+        "challengeId": "h2h-numbers-03",
+        "trackKey": "numberThree",
+        "lapCount": 1,
+        "targetTimeMs": 25640,
+        "medal": "gold",
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-number-three",
+        "createdAt": "2026-08-20T12:00:00.000Z",
+        "ghost": "0933bb38c7bbdcf75c5d25461adb036a0bfdd3e42f00e3259ef16b7810a0eff1",
+        "campaignId": "numbered-v1",
+        "raceId": "numbered-v1-03",
+        "origin": {
+          "mode": "campaign",
+          "campaignId": "numbered-v1",
+          "raceId": "numbered-v1-03"
+        }
+      }
+    },
+    {
+      "name": "Daily day, named by origin",
+      "postData": {
+        "postType": "head-to-head",
+        "challengeId": "h2h-daily-0920",
+        "origin": {
+          "mode": "daily",
+          "challengeId": "daily-gp-2026-09-20"
+        },
+        "challengerUsername": "SpeedyRacer",
+        "challengerAvatarUrl": "https://i.redd.it/snoovatar/avatars/x.png",
+        "trackKey": "circuit",
+        "lapCount": 3,
+        "targetTimeMs": 61002,
+        "medal": "author",
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-circuit",
+        "createdAt": "2026-09-20T08:15:00.000Z",
+        "replayDataHash": "7dd918227b5fada9c4ef398d2d4377fd70607a81a54edf27b61b263eb176f00e"
+      },
+      "text": "# Head to Head · SpeedyRacer\n\nBeat **61.002** on **Classic Circuit** (3 laps).\n\nOpen Mini Racer and race the frozen verified ghost.\n\nChallenge replay data:\n\n```text\nMINIRACER-HEAD-TO-HEAD-REPLAY-V1\n__gz:b64url__:H4sIAAAAAAACE5WaW2_bRhCF_wufyWK5lyHlNyN1UaNNWxhBgLbIg2AzllDZMiQ5QBDkv5eX5e7M7CzpIIBmzznf2aURG6JpfSs-H09P20txVby__eP27vrdzV316831z9WHP6d5d_PX79d_Vx_roizud9vDoXt-7G4f-sJO76qH7f7wtVIbrfr4ctre__db97XP7ven-9f9pTcP25d3x9fn_gTTE9vTY3f5sH_q3p-LK6iV0mXx1D1sD31n-3rZHU995fR66M533Zf9eX98Lq5qv_Mv-_7k08tpP2xWfH6p4iH3p2576R6uh0ArDf0VVVp9UO1V7a6U-kkp9U-PPe6O5x75Vpzvd93T9mN3mk7oL-K8fXo5dLfPl-70ZXsYrs6psvi8f96fd-x6j6f9475v_VvVyrZlDaYpjWvqT2Xx0B0u2_MY2bKypSvXF5CL3Lgwi3U31lPGzHXRQTtDPiItuoB89JaFrwONtARDEsFY16iV7rPQggwjRmhB6nUermXH15slxi8a2gqOlplhoRJnZEhdSfUmU1dzXeXhzAJWmXZYbLLtjSdCsokzCeJekIIbdhbnW8a1jBPy1veabI5mk_byucA3w9YLHJqRg-gD6-f8UQs9WNKQz13UG69Jz2V4YcYc0txK3OxDyr1pQj43SxqiznFkIl6nef89LgTaFwWfFsQ5_GTmwDrVPQgxkIEYKMzBSj7KMWY1ZicjhlDSjWvalMJQScbY9FKjEEKoSUWHEUNgjBGYMAxpaNKY__eN1DAcHYZNTWCmlUhsAkP8cFkTkGoT0hGSIn6AVAdSAF5AJiATiHJMNYRsCCIqPGCuC1nYuiWFliCiagn51gGlfyfz5oYgQhYKG4IIKpDzGzRF57dcBDVTB6dvmcNRSzlg7e9iqKY5ZH2Ifp3hRQ3R1ymX-lDOt2Y4J1P0IeWE6aSekXyX-v5uO-xj2L6G-ajv8Dk_NFHPprlNfMj4k7aZ3vCrS9A25pwnPRt7VurZ4S2V-5Dn3ErPRT_Hp77cI5P4Mq9Xehr3BF5nfVjJ-ZT5epgg8XMu9MD3hH1qdl6dzbm_zHutsJwvL2KKtiQZS4pASjxIpShvUCXuTc-vFwq1jPhdIEVqqVejrYc7lzypianJCVpGMKklMjMgmxlZjT_w1BRJkyUt6wUTMkhQlmXjCTaL-IyTdBjJtAsFPMysXFowpcuSSAkkN4Gba2OloEtISWSOyheAKQikZj3B1KyAR52YkMm4amYTJFNQwYRlUs3K31ZlsqjEwvrYzHxLPSRCAl4I-YatIzrd9-KUOsO9Nfdbv55fIXGk1waRDfOH1w0jsT-tgfEQfM5QZzN-A0SfrqPjEOlQ6hA_MQ75Lvj01Y5fBXXiK3dg5CljE8Ygh679b7ocxa86cUw5_fKMyjpBNYZ0AtV-HWIIVozr0j8ZoAHMgSIsaii0oUpZxQMIFgoqDFdoM0gizOMBSagTZjQjA4HRaeh4aObG_FiJhwlq6K6GoOkYH8cJmZWUJUfYlTE-IRSyYLZIOXItjo1WMv0zUpwBKYBEwkwuKwiqkciGZf65MDYbiWxmEiOt1GtJoSXm2hAK_sG7QHpzei-YM2oiBQtZVP5dhjVmN6apDbQstMKs5ZqYyxpIr0Y-1TKvAweLfV3Of2mivGa8ZnM-T2dyaU68W-HmP9tFDUxj3gj87EPGz01YyaVpQ88mvhN9S86bNecln_Iyl_pmpRc57g89l_hU45zyxueWaZNoEHKJm6bO9LTY53zUmu2vM3PqQTbnsw4anwdCznsgcpSHxF_uwYKerk-tcIqdoxiX03GCsB_nJA1sn8mvchtV_AoTMm_ku1UtsGkEb2_pfEsnLZ2p-6ddGfhtC2CH_lBr_vEUGJN3DD0U75NrWakuRSst7FjKLEc2OVRiVuqeUcO_T9_jB4m-FU_Hh664KsZPUyWfs5o-Y_X4UsVPNhXfv_8P05fHUbolAAA\n```",
+      "envelope": {
+        "format": "MINIRACER-HEAD-TO-HEAD-REPLAY-V1",
+        "challengeId": "h2h-daily-0920",
+        "trackKey": "circuit",
+        "lapCount": 3,
+        "targetTimeMs": 61002,
+        "medal": "author",
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-circuit",
+        "createdAt": "2026-09-20T08:15:00.000Z",
+        "ghost": "1c01cc990f6b86d5413e02c6f627960442853a59b6da0b32a1d529592b38e674",
+        "origin": {
+          "mode": "daily",
+          "challengeId": "daily-gp-2026-09-20"
+        }
+      }
+    },
+    {
+      "name": "Stage of a later series, no medal",
+      "postData": {
+        "postType": "head-to-head",
+        "challengeId": "h2h-series-stage",
+        "origin": {
+          "mode": "campaign",
+          "campaignId": "dirt-v1",
+          "raceId": "dirt-v1-00"
+        },
+        "challengerUsername": "DirtRat",
+        "challengerAvatarUrl": null,
+        "trackKey": "countryRoad",
+        "lapCount": 1,
+        "targetTimeMs": 18400,
+        "medal": null,
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-series-stage",
+        "createdAt": "2026-09-26T19:45:00.000Z",
+        "replayDataHash": "847b40871d2acd34b0476c7d7966d4bb6c3f6f2a6206e4529bf4a697173df136"
+      },
+      "text": "# Head to Head · DirtRat\n\nBeat **18.400** on **Country Road** (1 lap).\n\nOpen Mini Racer and race the frozen verified ghost.\n\nChallenge replay data:\n\n```text\nMINIRACER-HEAD-TO-HEAD-REPLAY-V1\n__gz:b64url__:H4sIAAAAAAACE3WX227jNhCG30XXnAVPkqjcBdssGrTbFkawQFvshWAztlAfAskJsAjy7uVphpSsvdLnn7I5pDn_DN-r58t46q_VXfX18Y_Hzf3nhw38-nD_Czz9GZ-bh79-v_8bvomKVdtDfzza894-7twXDvIAkx0HO8F07ffWvXAd--1_v9kfbnR7eT1fxx-bS79zA8f-5bMXqjvh3urHvb0-DSf7dXKC0Zyz6mR3_bG6O78ej6waX4922ti3YRou5_gd_8tfBjf3-DIO_oeq55fl9NvR9le7u_ejkssGeAeyeRLdna7vOP_EOf_HvbY_XCb3yns1bQ_21H-zY5xGsmrqTy9H-3i-2vGtP_rwahfb83AepsMi4Ms47Af3rX_dFC1nstZM1634zqqdPV77yY-0DBRnwj0aRyJQTaRpVJGWSdCoQI0jpDHDJCr0PV1C-D5N3aDSomJQ6RAEXyG5QgpDEDSRcEuTXaBmhcwKdTMynqRYIUXkIpBtIB3JbUJNWqaGyK3WfZqTj6AO1KHm1pA05efVREtNzUgF0pEMkdN8LDJQs0I-lvjPmRXyUfE5aRef6BbkohJhX7SMZIiSFvZAqxmF9WpNVM-0mrSwSt38hMIqtT-fkihrIsRiIrUluRUJThpHrZuBSzswqBhUWoTmRglR1yKAQYhDGocIFIKcgywUkYAvniK9ieMyP8O8-Nv41CkMnBzDwoBxKfhs06pxZbgLXX6a_Nkw2kHa1LTPIV0TkKLm0BSg0_-eoZ6DDmACNOkw0alKIAsw6Ygm4IwObQR3tumQZwVTIQ0FG_CJFXI_5lCC-gY0o3xMoFjKVckopTPUKfEXIE0BTbCY4CjRQxI0jDyHDCmBKgBdiywtAU_gFp4B7VF2adPIRBPUGciHk6IYeXQCwcjJF2AY-j8WBCwVKmx2zbCGRF0xrDJYf9IPMixMVLRSzZKMChpVuwxYE5PSsFhKoEUFA3NmgEWQr5BcIUVEE9G2Ae1kSbjfSG2w14JMXJJYIUUk058OdA6AjkZJDREepZLiyYsFMml0LIHOLtDhLTVVkoqkVwjTBSiVSsKEA5-D6T_MhClbECV2SZj1QEawoLgHZByB4nrJXsBbT0g_SN6TtLhK8qwFxVWS_QG5HZATArlkSWihQK4K6LeAhgvoyF4xqLQIzY0So0bfLyBVBMASAVgzAIsKYFUBV25IEQj8BiCNSSKsbAtSK6QxLKBwYi0FKq9BoyUW1OKOAK0baJeg-zlRBwC5LYDcK0BuLyB3FZBbjRk2c9R4XmZY36CeY4PHEfLJJJRzNDEc6sIgt2ZR7TBXIKfNTKUEoxfarLbYLUJuHCH3lTOkvhNyMwq5VwUlM4o51mgzK5g75YhkWGtIPTfkRhxynw6hjW_ROCE7J2RjJeSE-W4A-cIA-RYB4X2ydcJ6hrk-kEp3GMgXG3_GIFeaFTR0RcPr0_ePfB18r06XnfUXYHeV7If92d9LE4Zr824Yr_Dmr9PuSmtLCTivPj7-B5SqjOCTDwAA\n```",
+      "envelope": {
+        "format": "MINIRACER-HEAD-TO-HEAD-REPLAY-V1",
+        "challengeId": "h2h-series-stage",
+        "trackKey": "countryRoad",
+        "lapCount": 1,
+        "targetTimeMs": 18400,
+        "medal": null,
+        "rulesRevision": 1,
+        "trackFingerprint": "fp-series-stage",
+        "createdAt": "2026-09-26T19:45:00.000Z",
+        "ghost": "ca76d27163b33dd1b96f0264b56478de3a804e4cd16c39c19532e670ba15a734",
+        "origin": {
+          "mode": "campaign",
+          "campaignId": "dirt-v1",
+          "raceId": "dirt-v1-00"
+        }
+      }
+    }
+  ],
+  "podium": [
+    {
+      "name": "Three ghosts",
+      "postData": {
+        "postType": "daily-podium",
+        "challengeId": "daily-gp-2026-09-19",
+        "podium": {
+          "challengeId": "daily-gp-2026-09-19",
+          "challengeDate": "2026-09-19",
+          "trackName": "Circuit",
+          "lapCount": 1,
+          "positions": [
+            {
+              "rank": 1,
+              "displayName": "u/RaceFan",
+              "identityType": "reddit",
+              "formattedTime": "0:21.004",
+              "avatarUrl": null
+            },
+            {
+              "rank": 2,
+              "displayName": "u/SpeedyRacer",
+              "identityType": "reddit",
+              "formattedTime": "0:21.310",
+              "avatarUrl": null
+            },
+            {
+              "rank": 3,
+              "displayName": "A racer",
+              "identityType": "private",
+              "formattedTime": "0:22.001",
+              "avatarUrl": null
+            }
+          ]
+        },
+        "replayDataHash": "5ea073b284c425b88101ec2c339f9930f60b3cc91c72dccfe337c32cc5756a87"
+      },
+      "text": "# Mini Racer Final Podium\n\nTrack: **Circuit**\nDate: 19 Sep 2026\nRace format: 1 lap\n\n1. Gold - RaceFan - 0:21.004\n2. Silver - SpeedyRacer - 0:21.310\n3. Bronze - A racer - 0:22.001\n\nThese are the final verified results after the track left the seven-day playable window.\n\nPodium replay data:\n\n```text\nMINIRACER-PODIUM-REPLAY-V1\n__gz:b64url__:H4sIAAAAAAACE62aXY_dthGG_8u5FgGRHFKS74I0BYzWbRC0AYrAFwt7bS-y_sDaKRAE_u_VEWfemSF10gAtDETPeck90qEoko-Y3y5vPj69v_tyeXZ58fxvz3_45tvvfgjf__1Pz__5Ivzw3fd__eZf4cd4mS6v3t09Pt5_eHv__PVe9fXdw-Ov4e2nkOZUw7yFuO11vjzdvfr5L_e_7hVePTy9-uXhyx4-3n369uMvH_YTRK7x54f9a54-PT1cw8ubT0Erv3338fOXz5dnP_12ebr78PPxN0d2efbb5fOrd_fv7368f_r88PHD5VmaLp_v3n96vH_-4cv907_vHl_sf1jm6fLm4cPD53f_eHh_f01SnGeaLh-fHt4-7H_1U4ilxinEXNNUyhJfTpfX949f7q5nzbQXrFMsUy47LSdUD6ontDSiRuXIVtA1oy7brpcBopPsIJp3Sh1Fl0VkPaWd5t-jzUOewnobjnYgOoCOpEoyQhmAPBSTZEk62IuSJFFAkrkvmd1x_3L-LMfkjnQ90vWznFTOKddH7jNN5caxcgMt3efV5fp55Ubf3DHzcb9auT0MexLPgK63Hz2iwd5x0DPQlU5AemMPx7X2UD2UCd1fk8UDGWjPVD6D4yfnJBAPIJPMU5rPIW1TOlojrUOyTCkJtKRKMkIR2HvE0T77fxmQJANHQ-1fq9CKZknm63deW287kqMFOFm5zt44nFQD1SdkoBVlA60oSRINtHs3SyKw8nHjGosej7zy56LH1pWPz8TH63PSjknO1B3lfEEChTQA3QY5f5ALC4uBVrRKskkCuP7uBcRZBLWWo2OclUyaNaDJLRWU1hNaQOs5Ufvh8-9SAkWQdMdzIpB05IM4a72cGsWWLai3IFtB25jhmTunCJLHtqO1UUaWkZGlpacCqpZqTws_JgHDlqXVEvUko2LAsBgwrAaMol3GJAPyTWrtgqE8yGhvI54QTBkSnjtMcswuZIt4vnFQBuAfVgRMkiXJXcIzZZCp1CQ8yQaZXV0CCFH-PqBWSOdErR5OHXBZgU6y8gep9iTrmI7WP0KyTgq6iHIYb6ZRek5oE3fQJVzQdZ1FXQG2NGuKLox09WkZcDlFLF9vIVa_DrFObrjIMx30QXeIgQAYG5Iipzq4nOA-NAUdm5CuPsXQhrRqeo5tQOXRFClpmhWTRxpw1gqzT3kq2FraWjHoBCF146KpwarYLh-IKSvoPOawyIwXdBo8w_lotzaJBkynAVOtlK7IFmQVpFdXkFEjAh0PvVAGRUe1rSaCLC96SAPgm3AaXA0uBle6WOAVEif4hfj52jjaYoa4bWnSVtam11ujt07vnCHcY73x2kcMbdJZlLSHpSg98CDqCH35lNDpU5EnQR8PeWZo0qdHH7SDEq_IA9bmAYtzzvSJPqVoCYIglF22smIwzce_YwDb69SXX79O8ioh_R9eJeS9D-irhJjL9QKXvSlq9yZhH_3F8Y51hvnsna-tEMhIH2A2ihdNUlT62PVIpe_E9dYDyCveqevRIXRFzK4Mitfeb5RB-uB6-QDyird4xWvLQRqk7-gDDsi73mxcjyYsThWs60XupJyUwfUKr4ud6yXveq2IjOKdut4xliNRxeuAbkgfcVOn4xacS18xQDekrxjXo2lT1zPuR3A9Mamq7neUe-c7jlWd7_rOpH027sejdCsf3c8qX1u7wres8smMwdOEdb_q3U9-SliNBNZe9Gbo3TzpBOg1kJzy3ZC_Nnx7-aNz-WurISmF8vF7ACW6IX9x0qVF63oBvdESWQ1kvXPyN5A8EgGvPTr5m63ykcu2Tvmo00BdvnkiJ39OAx3RDflzGsg9p5zIH6ZTpkED6UQIW-ueauBqhZDNBMqHoTZgPA54Hddl8zmRVb2oPrhJUS9_PmnyVwdBRFKkzk0LzBOJcFEnfwYgZb0FklpglDqzFPXQLJCcBRLcrydvgT2R88EMUuPLBxFocD9nga25Rx9M1vhW1BssMPY-SF4CDc6nEtilxvy8D5LXvc2bn5dAYsejQQ3rIIHk0zJIIPmUvAR6pJsSmAYk74PzoIYmpVEC51sSSN4HOwn0SKMEplMJ5BE2_xEf5FE73pTALMN_0Hki6PTQSyAx0iCBnQ9imgo6nzk19BJIjKMazoMaUrPA8t98kJoPVvhgPfdBsll2Fugyao5YvRnOcjInhnXwwbZatWJYz8SQJlxptYZYjQaS-uDqfNAR2SzC1QYfpEn93Dji4IN02wzJOiJN2oVumqEsUkczRK_Vrmwow-kI9ciZYU94uowZVueDjqh3xM4HJSPrg2eEkcWYYb5BzVLoZJeX-r1dur3zW7r9Xr_LSzYjm-ku79rv8tKko7_SuMtLfTaf06GW_S6vBfHTfpdXpkXMlLrdm4dd3paQ2dzNZ_u-Wepkv-9ri2Rvljd1TTJLldht85rtXtJtX7qx3Uv4nPlKzTYv6XZv7rZ5eV0lC62TI_vP9V85lnWrfQGR__cXEGmeo3kBkWnd722Z9zN37x9YB2nqoQliYUF0R9mqEpNZJhkdW24EsagoHpuChQWRR9x2THJC_ixHOb8VxcpjPU9ip6LIyzopktMGua5QpQ4S7MitUgR13GBuM8ztjJJ1R7IZuyP1nkioVzpSdyRHi7ieMcYV2dYRGyOWEbI6idYYE4wx2YxgjGyRvAoilGpW4H_OHZVmWOQs6y5erZlsEydkIkt4z3PQCp9cZWdAV4qy1EyTrDTPKE-6UJXVa09cWuCTWAbL4rlYnySUZpglFtmy8l7EEzljs0zwSS7dxBOvWbRZsaVXi5yldINszlK4dRDFD-O0mqTBIkWLSZrQVEmqSEyVojJAr47JQSvKol5JimzS6sShzjwUzQOIOSbYZLaEbw_4VqEMc0ywyWaOnA2k5phgkxGU4JCJZ72jtFqb5AxNH1absfhtfWnLBmKDPFYD6BVBewPSFTIpKweTCia1wqSumG9h8WlVxazqlUXTol5pkLxB-lS0sao2Li4VV1wUV3XFRbcRV7hih14mryvKDtkgdfwKOqgBF7XNqqmRyaIViqbk0chkVJk0aVKDxOANHe0M0mBSg8R84fYZs8pkVsXEbNSjeCWpV5LMcMDsbZOcV3aKGbVC1AozcFBMamJZIJaOVDGpUenEUqWYUC-D9MI0i47KIJu8juGvTdY6IZttkWhls0pSjGw2KEY2acJPXDvALiRNG5RPBRNNGJM0sbawEUzcIb2D-mJAb7Ch6ihb_WTpzFY_aZLuVybtiNpRtZ_K-xGatJ9LNycrndllEfoZIZ2Rt0xGqlDIxSnpLNSefH3EdQjQIUJfTR3ZajNW0hW0QElVRBdLTj8xvOlIqAOhDpSin0wEYZUtOxHMgVhTMzRVRTRBTrPNBooQ0Qg5VZpt1jR1g5vOQpsvkwnvmqwmadK6SLKImC5SVCUZoYizFknIg7wrdkmWOkmcNUtRkqJokqPOLIGUyP-sKwVxPB5_KF-ZOE_8d3JOuRq5PLle-SVlPB7llVtMGqNye0lL9kdparkJmx6L_YwbiNvcViIMLYmytRz9PrSsebE0xq6KJrKSxuKa19tlwsJbQQYprNixiMcKHwt89gAykIYt6jjh0cRTzW-Iok-O4QCjAQYNHikMYLTBENODSJVuUZcJoxoPamR2pqOAjJC6RZ1kZzr5LWoxQkgiDBIC6Taks4AM9Pz6UPwUGguLheKy_5LuTLe3H7KT-vLr15df_wOWvbq5YzIAAA\n```",
+      "envelope": {
+        "format": "MINIRACER-PODIUM-REPLAY-V1",
+        "challengeId": "daily-gp-2026-09-19",
+        "trackKey": "circuit",
+        "lapCount": 1,
+        "trackFingerprint": "fp-circuit",
+        "ghosts": [
+          {
+            "rank": 1,
+            "ghost": "9865060a54f5da22b6af73306384bf6642739daebf459365c3334b52e3750b98"
+          },
+          {
+            "rank": 2,
+            "ghost": "74b3e4b603c442caadc682df127e9b9776fc7345d9b25a97465fd3ebef14971c"
+          },
+          {
+            "rank": 3,
+            "ghost": "d4807ddf780c456753d3308815603c6ba62007cc6d3959f49dee757b03fd39cb"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Winner ghost only, three laps",
+      "postData": {
+        "postType": "daily-podium",
+        "challengeId": "daily-gp-2026-09-12",
+        "podium": {
+          "challengeId": "daily-gp-2026-09-12",
+          "challengeDate": "2026-09-12",
+          "trackName": "Alloy Ring",
+          "lapCount": 3,
+          "positions": [
+            {
+              "rank": 1,
+              "displayName": "u/DirtRat",
+              "identityType": "reddit",
+              "formattedTime": "1:04.500",
+              "avatarUrl": null
+            },
+            {
+              "rank": 2,
+              "displayName": "",
+              "identityType": "empty",
+              "formattedTime": null,
+              "avatarUrl": null
+            },
+            {
+              "rank": 3,
+              "displayName": "",
+              "identityType": "empty",
+              "formattedTime": null,
+              "avatarUrl": null
+            }
+          ]
+        },
+        "replayDataHash": "3181708dc1e5aebd709c31b3dee7c59af7464d3181cb5372e9654e681bce9f66"
+      },
+      "text": "# Mini Racer Final Podium\n\nTrack: **Alloy Ring**\nDate: 12 Sep 2026\nRace format: 3 laps\n\n1. Gold - DirtRat - 1:04.500\n2. Silver - \n3. Bronze - \n\nThese are the final verified results after the track left the seven-day playable window.\n\nPodium replay data:\n\n```text\nMINIRACER-PODIUM-REPLAY-V1\n__gz:b64url__:H4sIAAAAAAACE5Wa3WvbSBTF_xc9SzAfd_SRt9J2Iex2t4TdwlLyYFo3MXWc4KQLpfR_X8ma0dyvkd0XX53fOeeOUtKgOP5RfXk8Pmxeqqvq3fWf1zevXr-9ad7_9eb6n3fNzdv3f7z6t_lgq7r6dL_Z77eHu-315zH6ebPbf2_unhpnXNuYobFuzLwcN5--_r79PgbG8OP3m93hbsT7zdPrx2-H8QgfM7-Nxvb4dNxNsPry1JzizXHO390_Pr88V1cff1THzeFrdWUjq65-VM-f7rcPmw_b4_Pu8VBdubp63jw87bfXh5ft8b_N_t1YDKauvuwOu-f7v3cP24m0EMwIH4-7u93Y-uiG1tXW9r7uQ2dv6-rzdv-ymc5srKnbOtTT7KY5jBKy5PaKzhyQtsJPvGO6Xe3Zwsx-OPXtmfyUm6ZTOO67mDuv555TONZrPpCcPr3goPa94msca1jx_aL5vtQDNZfzOocL-3n6pUfP51zX-Vy_cEA5zNc0LL2yr82cc6QPiF-qgWiaC4LLCRfkQqEHtVX9EHnO85xl59piju7LGs74mpY9U-gZ1jPsvnnPsJwp7DOsX-qVeJO-AB5sbGFjY9nRS7KxpahYhh0oZH-NOLpHDbuLCIjNgW12wnK0Lo-QF2rdi9tYqfu1Ot_jCxlftmhL36PWtQycbUHB8slabsPrFiHnLGBnQaFeuIALww6RUNjjdCuoVoEAPsJp4ZJFM6Bal1zY1XqbM5dY88NS04ojZJgRnGnTHs3SFxYy5H6MyJwj87Nn0xUy-KIrL0zPvqw1iJJYgyN0S3KGUoVWZ3D6gnjgojn2-oLfS90Ljvp9IbfCe63fsZyqQfpo8t5ptqxf6rWS94JD3tdqvsLJhOn7W_dP_7Q6V3uB9YLk2QfJodDnHOL5Kp_nqva5r-Z8Qft43yq_TJ_6jnFFk77DHPUdy6_w07Tx61b5PDknPSu52o_T0LpRXUO7Rpog4TQs6WMISPUkiXrUiz3qOV4YZtgTNfWcVnCk4AiM34FOS3pNeXIQhnFZQcX_KtSD8yr2sArn1AKhDgQGkgwExp8lgeyMquUF2aMRVbXSA93rVnod6XXc68SWWOhIpOMRBHukQIMF1SMFaWfPIwgOCMKKV1AD6Q2_NiCp9DRBM-lRYphNJKdq6hRS3J41qL7as9I_9e2ZXEnb3Od-EDl9Tv8l0qMs5Ug7TYPqh6hLPPuw6q9On-87cSjmFB_1QcuVdPy1Kf3-g_fBJdOxfppwYR-d7ws9zrNGPXSu13oK9-xcda76oOZcIe-EhjO-wkPuuULOLbmSD6u-1frxPRh83zynapUD2WfZ_rIG6cuc0dcYfKpIaXKhht6w0TOqAgnVLfQmY8FqEXrDNnnAT-CFggLpOaR4wZGCY155S-w5klTr1IvfaxH6YnIpeHReoeDlsvkvDKLgi8NnBSueUPOfMNh58987WIFDSAM0iA8CWfACnhku9YLmrUPgkUWFtFqFuce9whAFqydb5oEGT6qVyuYtsKjFwxEO1wp4GKGg6HWyZ7IHhQJJDoyh2mJ1PI5KwNEseDa_gsL7FTI9J_cs05PXnhBgpGf5biGAroNynV4TSZtbJZOT7ULS_hZlWpTBSUzwa1DIwPJBJMOSnK-BZDJPryDymIDIJDIsSUDcCzJf-7h5WDI-ZjjJ18D4_Ht9X7jOebeQlOEEGJnfd-hVYuthyVvG-WvOz8QgblDSxNecN4JTEt_7maM9RUj0ChvmN5-QJUZ834t7pyc83HNpKAVHCo4UvAZj0pOeTwUewQP3PIkAK8Q3IrkC7sEZBdLDkUBgIL1A4KKUepu9Uq8ldalggWqSjk4rIK-sOtTr9NHpEBbVaxEKkYJF9cxT4PwDPsEhw8C3UG9IvQ55MqIOWPHQJ55oA398i3yaaxy3P3_W6bNlbvls2eHbfp-5p_z25_9qZYXbKScAAA\n```",
+      "envelope": {
+        "format": "MINIRACER-PODIUM-REPLAY-V1",
+        "challengeId": "daily-gp-2026-09-12",
+        "trackKey": "alloyRing",
+        "lapCount": 3,
+        "trackFingerprint": "fp-alloy-ring",
+        "ghosts": [
+          {
+            "rank": 1,
+            "ghost": "3db66958f187249f45d83ab3ed24da93f0a81bcdc7487d258da605a088712e83"
+          },
+          {
+            "rank": 2,
+            "ghost": null
+          },
+          {
+            "rank": 3,
+            "ghost": null
+          }
+        ]
+      }
+    }
+  ]
+}
