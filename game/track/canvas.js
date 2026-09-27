@@ -23,20 +23,34 @@ function drawDesertBackdrop(ctx, width, height, presentation = {}) {
     ctx.fillRect(0, 0, width, height);
 }
 
-export function drawCheckeredLine(ctx, p1, p2, width, colors = {}) {
+// The grid of a finish line: two rows of squares across the road, from p1 to
+// p2. Null when the line is too short to draw.
+function finishLineGrid(p1, p2, width) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const length = Math.hypot(dx, dy);
-    if (length < 1) return;
+    if (length < 1) return null;
 
     const tx = dx / length;
     const ty = dy / length;
-    const nx = -ty;
-    const ny = tx;
     const rows = 2;
     const columns = Math.max(2, Math.ceil(length / Math.max(6, width * 0.8)));
-    const cellLength = length / columns;
-    const rowHeight = width / rows;
+    return {
+        tx,
+        ty,
+        nx: -ty,
+        ny: tx,
+        rows,
+        columns,
+        cellLength: length / columns,
+        rowHeight: width / rows,
+    };
+}
+
+export function drawCheckeredLine(ctx, p1, p2, width, colors = {}) {
+    const grid = finishLineGrid(p1, p2, width);
+    if (!grid) return;
+    const { tx, ty, nx, ny, rows, columns, cellLength, rowHeight } = grid;
 
     ctx.save();
     ctx.lineCap = 'butt';
@@ -688,19 +702,9 @@ const FINISH_PAINT_JITTER = 0.14;
 // The corners of the squares move a little, so the paint looks uneven. With
 // no second colour, the road shows between the painted squares.
 function drawPaintedFinishLine(ctx, p1, p2, width, presentation) {
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const length = Math.hypot(dx, dy);
-    if (length < 1) return;
-
-    const tx = dx / length;
-    const ty = dy / length;
-    const nx = -ty;
-    const ny = tx;
-    const rows = 2;
-    const columns = Math.max(2, Math.ceil(length / Math.max(6, width * 0.8)));
-    const cellLength = length / columns;
-    const rowHeight = width / rows;
+    const grid = finishLineGrid(p1, p2, width);
+    if (!grid) return;
+    const { tx, ty, nx, ny, rows, columns, cellLength, rowHeight } = grid;
     const jitter = Math.min(cellLength, rowHeight) * FINISH_PAINT_JITTER;
     const random = createSeededRandom(`${presentation.key || 'track'}:finish`);
     const corners = [];
