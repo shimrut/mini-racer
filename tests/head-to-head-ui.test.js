@@ -89,7 +89,6 @@ describe('Head to Head lobby and finish', () => {
             expect.objectContaining({
                 lapMedal: null,
                 challengeConfirmPhase: 'error',
-                challengeConfirmStatus: null,
                 challengeConfirmError: stallMessage,
             }),
             expect.objectContaining({
@@ -506,7 +505,6 @@ describe('Head to Head lobby and finish', () => {
             lapMedal: null,
             challengeFinish: true,
             challengeConfirmPhase: phase,
-            challengeConfirmStatus: null,
             challengeVerdict: { deltaSec },
             showGlobalLeaderboard: false,
         });

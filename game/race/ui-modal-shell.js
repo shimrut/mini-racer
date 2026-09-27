@@ -1301,9 +1301,7 @@ export class ModalShell {
             lapMedal: lapData.lapMedal ?? null,
             challengeFinish: Boolean(lapData.challengeFinish),
             challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
-            challengeConfirmStatus: lapData.challengeConfirmStatus ?? null,
             challengeConfirmError: lapData.challengeConfirmError ?? null,
-            challengeViewerAvatarUrl: lapData.challengeViewerAvatarUrl ?? null,
             challengeVerdict: lapData.challengeVerdict ?? null,
             challengeBestUpdate: lapData.challengeBestUpdate ?? null,
             challengeViewerBest: lapData.challengeViewerBest ?? null,
@@ -1488,7 +1486,6 @@ export class ModalShell {
                 lapMedal: lapData.lapMedal,
                 challengeFinish: Boolean(lapData.challengeFinish),
                 challengeConfirmPhase: lapData.challengeConfirmPhase ?? null,
-                challengeConfirmStatus: lapData.challengeConfirmStatus ?? null,
                 challengeConfirmError: lapData.challengeConfirmError ?? null,
                 previousPersonalBestSec: lapData.previousPersonalBestSec,
                 previousTrackMedal: lapData.previousTrackMedal ?? null,
@@ -1500,7 +1497,6 @@ export class ModalShell {
 
     updateChallengeFinishHero({
         phase,
-        statusText = null,
         error = null,
         shareRequest = undefined,
         verdict = undefined,
@@ -1521,13 +1517,7 @@ export class ModalShell {
             const nextVerdict = verdict === undefined
                 ? (lapData?.challengeVerdict ?? null)
                 : verdict;
-            renderChallengeFinishHero(heroMedalEl, {
-                phase: nextPhase,
-                statusText,
-                error,
-                avatarUrl: lapData?.challengeViewerAvatarUrl ?? null,
-                verdict: nextVerdict,
-            });
+            renderChallengeFinishHero(heroMedalEl, { phase: nextPhase, error });
             this._challengeFinishPhase = nextPhase;
             if (lapData) {
                 lapData.challengeConfirmPhase = nextPhase;

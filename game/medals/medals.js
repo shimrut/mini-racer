@@ -341,10 +341,7 @@ export function renderWinCombinedMedalOverlay(
         lapMedal = null,
         challengeFinish = false,
         challengeConfirmPhase = null,
-        challengeConfirmStatus = null,
         challengeConfirmError = null,
-        challengeViewerAvatarUrl = null,
-        challengeVerdict = null,
         previousTrackMedal = null,
         lapCount = 1,
     } = {},
@@ -355,22 +352,12 @@ export function renderWinCombinedMedalOverlay(
     if (challengeFinish || challengeConfirmPhase) {
         const phase = challengeConfirmPhase
             || (lapMedal === 'challenge' ? 'won' : 'pending');
-        renderChallengeFinishHero(overlayEl, {
-            phase,
-            statusText: challengeConfirmStatus,
-            error: challengeConfirmError,
-            avatarUrl: challengeViewerAvatarUrl,
-            verdict: challengeVerdict,
-        });
+        renderChallengeFinishHero(overlayEl, { phase, error: challengeConfirmError });
         return;
     }
 
     if (lapMedal === 'challenge') {
-        renderChallengeFinishHero(overlayEl, {
-            phase: 'won',
-            avatarUrl: challengeViewerAvatarUrl,
-            verdict: challengeVerdict,
-        });
+        renderChallengeFinishHero(overlayEl, { phase: 'won' });
         return;
     }
 
