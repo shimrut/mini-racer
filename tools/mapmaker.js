@@ -1537,7 +1537,7 @@ class MapmakerApp {
 
     duplicateTrack() {
         const sourceKey = this.state.selectedTrackKey;
-        const rawKey = window.prompt('Duplicate track key', `${sourceKey}Copy`);
+        const rawKey = window.prompt('Clone track key', `${sourceKey}Copy`);
         if (!rawKey) {
             return;
         }
@@ -1552,12 +1552,12 @@ class MapmakerApp {
         }
 
         const copy = cloneTracks(this.track);
-        const name = (window.prompt('Duplicate display name', `${copy.name} Copy`) || `${copy.name} Copy`).trim() || `${copy.name} Copy`;
+        const name = (window.prompt('Clone display name', `${copy.name} Copy`) || `${copy.name} Copy`).trim() || `${copy.name} Copy`;
         copy.name = name;
         this.state.tracks[key] = copy;
         this.populateTrackSelect();
         this.loadTrack(key);
-        this.markDirty(`Duplicated ${sourceKey} into ${key}.`);
+        this.markDirty(`Cloned ${sourceKey} into ${key}.`);
     }
 
     confirmTrackRemoval(message) {

@@ -303,7 +303,7 @@ and the catalog lines. If the clipboard is unavailable, it downloads the file.
 
 ## Removing A Track
 
-**Remove Track** in the local Mapmaker discards a new, unsaved track from the
+**Remove** in the local Mapmaker discards a new, unsaved track from the
 editor. For an integrated track, it asks for confirmation and removes the
 definition module, catalog entry, Daily schedule entry, registry import, and
 medal-times row. The repository operation refuses the default track, tracks

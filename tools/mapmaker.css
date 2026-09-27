@@ -152,11 +152,6 @@ button:hover {
     background: rgba(127, 29, 29, 0.9);
 }
 
-.remove-track-btn {
-    width: 100%;
-    margin-top: 0.65rem;
-}
-
 .maker-dialog {
     width: min(32rem, calc(100vw - 2rem));
     border: 1px solid var(--maker-panel-border);
@@ -322,6 +317,15 @@ select:focus {
 
 .button-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.button-row.button-row-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.button-row.button-row-3 button {
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
 }
 
 .tool-grid {
@@ -512,7 +516,7 @@ select:focus {
     }
 
     .field-grid,
-    .button-row,
+    .button-row:not(.button-row-3),
     .tool-grid:not(.stage-tool-grid) {
         grid-template-columns: 1fr;
     }
