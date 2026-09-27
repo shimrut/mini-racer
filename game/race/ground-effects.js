@@ -2,6 +2,7 @@ import { CONFIG } from "../config.js";
 import { RingBuffer } from "./ring-buffer.js";
 import { getCarRearAxleWorldPoint } from "./simulation.js";
 import { KPH_PER_WORLD_UNIT } from "../car/handling.js";
+import { getTrackGround } from "../track/grounds.js";
 
 // Look-only effects that keep the car on the ground on a loose surface:
 // tyre tracks behind the rear wheels, lumps of earth or snow thrown from the
@@ -38,6 +39,15 @@ const SPRAY_FRONT_POP = 0.12;
 const SPRAY_FRONT_SPREAD_SCALE = 0.3;
 const SPRAY_FRONT_MIN_SIZE = 2.3;
 const SPRAY_FRONT_MAX_SIZE = 3;
+// Dust and snow follow the speed. Just above SPRAY_MIN_SPEED, the wheels
+// throw a few small lumps, also in a slide. At the top speed of the ground,
+// they throw more lumps at full size. A front lump never grows past the tire
+// width.
+const SPRAY_SLOW_SIZE = 0.3;
+const SPRAY_FAST_SIZE = 1;
+// At the top speed, this part of the amount of the style, so that the lumps
+// stay apart and do not join into one long plume.
+const SPRAY_FAST_AMOUNT = 0.5;
 
 // Spray: flat shapes, with a shade to the lower right and a light top to the
 // upper left when the ground gives those colours. Each lump keeps some of the
@@ -48,6 +58,7 @@ const SPRAY_FRONT_MAX_SIZE = 3;
 // - dust: puffs of dust from all four wheels that stay close behind them,
 //   overlap into one flat cloud, and grow more slowly.
 // frontShare: the part of the rear wheel spray that each front wheel throws.
+// followsSpeed: the amount and the size of the lumps follow the speed.
 const SPRAY_LUMPS = Object.freeze({
   baseChance: 0.45,
   slipChance: 0.9,
@@ -64,7 +75,7 @@ const SPRAY_LUMPS = Object.freeze({
 });
 const SPRAY_STYLES = Object.freeze({
   lumps: SPRAY_LUMPS,
-  snow: Object.freeze({ ...SPRAY_LUMPS, frontShare: 0.5 }),
+  snow: Object.freeze({ ...SPRAY_LUMPS, frontShare: 0.5, followsSpeed: true }),
   dust: Object.freeze({
     baseChance: 0.6,
     slipChance: 0.8,
@@ -77,6 +88,7 @@ const SPRAY_STYLES = Object.freeze({
     lifeRange: 0.15,
     pop: 0.35,
     frontShare: 0.5,
+    followsSpeed: true,
   }),
 });
 const SPRAY_DRAG = 3;
@@ -116,12 +128,24 @@ function getSlipRatio(engine) {
   return Math.abs(-vy * engine.velocity.x + vx * engine.velocity.y) / speed;
 }
 
-function spawnSpray(engine, heading, slipRatio, maxSpeedWorld, presentation) {
+function spawnSpray(engine, heading, slipRatio, maxSpeedWorld, groundMaxSpeedWorld, presentation) {
   const style = SPRAY_STYLES[presentation.sprayStyle] || SPRAY_STYLES.lumps;
-  const speedRatio = Math.min(1, engine.cachedSpeed / maxSpeedWorld);
   const lowQuality = engine.frameSkip > 0 || engine.qualityLevel > 0;
-  const chance = (style.baseChance * speedRatio + style.slipChance * slipRatio)
-    * (lowQuality ? 0.5 : 1);
+  let chance;
+  let rearSize = 1;
+  let frontSize = 1;
+  if (style.followsSpeed) {
+    // 0 at SPRAY_MIN_SPEED, 1 at the top speed of the ground.
+    const speedShare = Math.max(0, Math.min(1,
+      (engine.cachedSpeed - SPRAY_MIN_SPEED) / Math.max(0.001, groundMaxSpeedWorld - SPRAY_MIN_SPEED)));
+    chance = (style.baseChance + style.slipChance * slipRatio) * speedShare * SPRAY_FAST_AMOUNT;
+    rearSize = SPRAY_SLOW_SIZE + (SPRAY_FAST_SIZE - SPRAY_SLOW_SIZE) * speedShare;
+    frontSize = Math.min(1, rearSize);
+  } else {
+    const speedRatio = Math.min(1, engine.cachedSpeed / maxSpeedWorld);
+    chance = style.baseChance * speedRatio + style.slipChance * slipRatio;
+  }
+  if (lowQuality) chance *= 0.5;
 
   const axles = [{
     ahead: -SPRAY_BEHIND_CENTER,
@@ -129,8 +153,8 @@ function spawnSpray(engine, heading, slipRatio, maxSpeedWorld, presentation) {
     chance,
     spreadScale: 1,
     pop: style.pop,
-    minSize: style.minSize,
-    maxSize: style.maxSize,
+    minSize: style.minSize * rearSize,
+    maxSize: style.maxSize * rearSize,
   }];
   if (style.frontShare > 0) {
     axles.push({
@@ -139,8 +163,8 @@ function spawnSpray(engine, heading, slipRatio, maxSpeedWorld, presentation) {
       chance: chance * style.frontShare,
       spreadScale: SPRAY_FRONT_SPREAD_SCALE,
       pop: SPRAY_FRONT_POP,
-      minSize: SPRAY_FRONT_MIN_SIZE,
-      maxSize: SPRAY_FRONT_MAX_SIZE,
+      minSize: SPRAY_FRONT_MIN_SIZE * frontSize,
+      maxSize: SPRAY_FRONT_MAX_SIZE * frontSize,
     });
   }
   for (const axle of axles) {
@@ -275,7 +299,8 @@ export function recordGroundEffects(engine, presentation, config, events = null)
 
   if (sprayColor && engine.cachedSpeed > SPRAY_MIN_SPEED && Array.isArray(engine.particles)) {
     const maxSpeedWorld = Math.max(0.001, (Number(config?.maxSpeed) || 220) / KPH_PER_WORLD_UNIT);
-    spawnSpray(engine, heading, getSlipRatio(engine), maxSpeedWorld, presentation);
+    const groundMaxSpeedWorld = maxSpeedWorld * getTrackGround(engine.currentTrack).maxSpeed;
+    spawnSpray(engine, heading, getSlipRatio(engine), maxSpeedWorld, groundMaxSpeedWorld, presentation);
   }
 }
 

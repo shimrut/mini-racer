@@ -65,6 +65,28 @@ describe('ground effects', () => {
         }
     });
 
+    it('throws fewer and smaller dirt and snow lumps from a slow car, also in a slide', () => {
+        for (const ground of ['dirt', 'snow']) {
+            const look = resolveTrackPresentation('circuit', { ground });
+            const spray = (speed) => {
+                // A slide: the car moves at 30 degrees to its heading.
+                const engine = createEngine({
+                    currentTrack: { ground },
+                    velocity: { x: speed * Math.cos(Math.PI / 6), y: speed * Math.sin(Math.PI / 6) },
+                    cachedSpeed: speed,
+                });
+                for (let step = 0; step < 600; step++) recordGroundEffects(engine, look, CONFIG);
+                return engine.particles;
+            };
+            const slow = spray(4);
+            const fast = spray(13);
+
+            expect(slow.length, ground).toBeLessThan(fast.length / 3);
+            expect(Math.max(...slow.map((lump) => lump.size)), ground)
+                .toBeLessThan(Math.max(...fast.map((lump) => lump.size)) / 2);
+        }
+    });
+
     it('throws the water spray from behind the jet ski only', () => {
         const engine = createEngine({ angle: Math.PI / 2 });
         const water = resolveTrackPresentation('circuit', { ground: 'water' });
