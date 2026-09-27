@@ -13,6 +13,7 @@ import {
     normalizeCarSkinGround,
 } from './car-skin-grounds.js';
 import { DRAWN_CAR_SKINS, isDrawnCarAsset } from './drawn-car-skins.js';
+import { isLiveGround } from '../track/live-grounds.js';
 
 export const PLAYER_CAR_SKIN_STORAGE_KEY = 'MiniRacerPlayerCarSkin';
 
@@ -106,9 +107,11 @@ export const PLAYER_CAR_SKINS = Object.freeze(
     )
 );
 
+// The garage shows only the cars of live grounds.
 function buildPlayerCarSkinSections() {
     const byId = new Map(PLAYER_CAR_SKIN_SECTION_META.map((m) => [m.id, []]));
     for (const skin of PLAYER_CAR_SKINS) {
+        if (!isLiveGround(skin.ground)) continue;
         const bucket = byId.get(skin.series) ?? byId.get('mini');
         bucket.push(skin);
     }

@@ -1,6 +1,7 @@
 import { readdirSync } from 'node:fs';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import {
+    PLAYER_CAR_SKIN_SECTION_META,
     PLAYER_CAR_SKIN_SECTIONS,
     PLAYER_CAR_SKIN_STORAGE_KEY,
     PLAYER_CAR_SKINS,
@@ -117,17 +118,16 @@ describe('player car skin', () => {
         }
     });
 
-    it('offers the Snow cars drawn in code as snow skins, and drives the white one by default', () => {
-        const snow = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === 'snow');
-        expect(snow.title).toBe('Snow cars');
-        expect(snow.skins.map((s) => s.label)).toEqual(['White', 'Red', 'Black', 'Teal', 'Purple']);
-        for (const skin of snow.skins) {
+    it('keeps the Snow cars drawn in code as snow skins, and drives the white one by default', () => {
+        const snowSkins = PLAYER_CAR_SKINS.filter((s) => s.series === 'snow');
+        expect(snowSkins.map((s) => s.label)).toEqual(['White', 'Red', 'Black', 'Teal', 'Purple']);
+        for (const skin of snowSkins) {
             expect(DRAWN_CAR_ASSET_NAMES).toContain(skin.assetName);
             expect(skin.ground).toBe('snow');
         }
-        expect(readPlayerCarSkinAssetName('snow')).toBe(snow.skins[0].assetName);
+        expect(readPlayerCarSkinAssetName('snow')).toBe(snowSkins[0].assetName);
 
-        const teal = snow.skins[3].assetName;
+        const teal = snowSkins[3].assetName;
         expect(writePlayerCarSkinAssetName(teal)).toBe(teal);
         expect(readPlayerCarSkinAssetName('snow')).toBe(teal);
         expect(readPlayerCarSkinAssetName('dirt')).not.toBe(teal);
@@ -152,17 +152,17 @@ describe('player car skin', () => {
         ['grip', 'Circuit cars', 'circuit'],
         ['water', 'Jet skis', 'jetski'],
         ['space', 'Spaceships', 'spaceship'],
-    ])('offers the %s vehicles drawn in code as %s, and drives the first one by default', (ground, title, model) => {
-        const section = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === ground);
-        expect(section.title).toBe(title);
-        expect(section.skins).toHaveLength(5);
-        for (const skin of section.skins) {
+    ])('keeps the %s vehicles drawn in code as %s, and drives the first one by default', (ground, title, model) => {
+        const skins = PLAYER_CAR_SKINS.filter((s) => s.series === ground);
+        expect(PLAYER_CAR_SKIN_SECTION_META.find((meta) => meta.id === ground).title).toBe(title);
+        expect(skins).toHaveLength(5);
+        for (const skin of skins) {
             expect(DRAWN_CAR_SKINS[skin.assetName].car).toBe(model);
             expect(skin.ground).toBe(ground);
         }
-        expect(readPlayerCarSkinAssetName(ground)).toBe(section.skins[0].assetName);
+        expect(readPlayerCarSkinAssetName(ground)).toBe(skins[0].assetName);
 
-        const last = section.skins[4].assetName;
+        const last = skins[4].assetName;
         expect(writePlayerCarSkinAssetName(last)).toBe(last);
         expect(readPlayerCarSkinAssetName(ground)).toBe(last);
         expect(readPlayerCarSkinAssetName('snow')).not.toBe(last);
@@ -178,11 +178,10 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    it('groups skins into Formula, Extra, MR, Cyberpunk, Steampunk, Circuit, Dirt, Snow, Jet ski and Spaceship garage sections without gaps', () => {
-        const expectedIds = ['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'grip', 'dirt', 'snow', 'water', 'space'].filter((id) =>
-            PLAYER_CAR_SKINS.some((s) => s.series === id)
-        );
-        expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id)).toEqual(expectedIds);
+    it('groups the skins of live grounds into Formula, Extra, MR, Cyberpunk, Steampunk and Dirt garage sections without gaps', () => {
+        expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id))
+            .toEqual(['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'dirt']);
+        const liveSkins = PLAYER_CAR_SKINS.filter((s) => ['tarmac', 'dirt'].includes(s.ground));
 
         const seen = new Set();
         let n = 0;
@@ -194,6 +193,6 @@ describe('player car skin', () => {
                 n += 1;
             }
         }
-        expect(n).toBe(PLAYER_CAR_SKINS.length);
+        expect(n).toBe(liveSkins.length);
     });
 });
