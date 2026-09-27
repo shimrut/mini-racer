@@ -291,10 +291,7 @@ export function drawInnerDebris(ctx, inner, mapTrackPoint, presentation) {
     });
 }
 
-export function fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, width, height, presentation = {}) {
-    void outerPath;
-    void width;
-    void height;
+export function fillTrackPresentation(ctx, surfacePath, innerPath, presentation = {}) {
     ctx.fillStyle = presentation.trackColor || CONFIG.trackColor;
     ctx.fill(surfacePath, 'evenodd');
     ctx.fillStyle = presentation.infieldColor || CONFIG.offTrackColor;
@@ -1195,7 +1192,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
     const mappedOuter = outer.map(mapTrackPoint);
     const mappedInner = inner.map(mapTrackPoint);
 
-    fillTrackPresentation(ctx, surfacePath, innerPath, outerPath, canvas.width, canvas.height, presentation);
+    fillTrackPresentation(ctx, surfacePath, innerPath, presentation);
     drawSurfaceTexture(ctx, surfacePath, mappedOuter, mappedInner, outerPath, innerPath, canvas.width, canvas.height, presentation);
 
     const startLine = track.startLine;

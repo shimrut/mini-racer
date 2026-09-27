@@ -2922,15 +2922,7 @@ class MapmakerApp {
         const curbWidth = clamp(viewport.scale * 0.18, 2, 6);
         const finishWidth = clamp(viewport.scale * 0.35, 4, 12);
 
-        fillTrackPresentation(
-            this.ctx,
-            surfacePath,
-            innerPath,
-            outerPath,
-            viewport.width,
-            viewport.height,
-            presentation,
-        );
+        fillTrackPresentation(this.ctx, surfacePath, innerPath, presentation);
 
         const startLine = this.track.startLine;
         if (startLine?.p1 && startLine?.p2) {

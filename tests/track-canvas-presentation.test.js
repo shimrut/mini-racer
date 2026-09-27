@@ -86,7 +86,7 @@ describe('track canvas presentation', () => {
         const surfacePath = { id: 'surface' };
         const innerPath = { id: 'inner' };
 
-        fillTrackPresentation(ctx, surfacePath, innerPath, { id: 'outer' }, 320, 200, {
+        fillTrackPresentation(ctx, surfacePath, innerPath, {
             trackColor: '#334155',
             infieldColor: '#0f172a'
         });
