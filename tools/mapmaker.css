@@ -92,6 +92,11 @@ button:disabled {
     background: rgba(244, 63, 94, 0.09);
 }
 
+.quality-issues li[data-severity="info"] {
+    border-color: var(--maker-green);
+    background: rgba(34, 197, 94, 0.06);
+}
+
 .flow-head {
     margin-top: 1.1rem;
     padding-top: 0.9rem;

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.20">
+    <link rel="stylesheet" href="mapmaker.css?v=2.21">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -190,6 +190,16 @@
                 <ul id="flow-rules" class="quality-issues flow-rules" aria-labelledby="flow-title"></ul>
             </section>
 
+            <section class="maker-panel" aria-labelledby="bot-check-title">
+                <div class="panel-head">
+                    <h2 id="bot-check-title">Bot Check</h2>
+                    <span id="bot-check-count" class="pill">Not run</span>
+                </div>
+                <p id="bot-check-summary" class="panel-note">Runs the Runner Lab bots on the drawing on screen. It does not save the track.</p>
+                <button id="run-bots-btn" type="button">Run bots</button>
+                <ul id="bot-check-issues" class="quality-issues"></ul>
+            </section>
+
             <section class="maker-panel">
                 <div class="panel-head">
                     <h2>Checkpoints</h2>
@@ -306,6 +316,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.19"></script>
+    <script type="module" src="mapmaker.js?v=2.20"></script>
 </body>
 </html>

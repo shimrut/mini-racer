@@ -728,7 +728,8 @@ These are useful, but they are not on the critical player path:
   Manual module and integration exports remain available as fallbacks, as
   described in `docs/track-authoring.md`.
 - `tools/runner.*`
-  Auxiliary workflow tooling.
+  Bot checks for a track. The Mapmaker **Run bots** button uses the same check
+  on the drawing on screen. Runner Lab still opens saved tracks on its own page.
 - `pages/preview.html`, `pages/daily.html`, `pages/preview.js`, `pages/preview.css`
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable

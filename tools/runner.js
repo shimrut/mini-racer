@@ -994,6 +994,43 @@ function buildSummary(report) {
     return [header, ...issueLines].join('\n');
 }
 
+export function runTrackBotCheck(track, settings = {}) {
+    const resolved = {
+        botCount: clamp(Number(settings.botCount) || 18, 1, 48),
+        laps: clamp(Number(settings.laps) || 1, 1, 5),
+        maxSeconds: clamp(Number(settings.maxSeconds) || 40, 5, 180),
+        pathSamples: clamp(Number(settings.pathSamples) || 360, 120, 900),
+    };
+    const prepared = prepareTrack(track, resolved.pathSamples);
+    const structure = validateStructure(prepared);
+    const simulation = structure.fatal ? null : simulateSwarm(prepared, resolved);
+    const issues = [...structure.issues];
+    if (simulation) {
+        issues.push(...deriveSimulationIssues(prepared, simulation));
+    }
+    issues.sort((a, b) => {
+        const severityDelta = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+        if (severityDelta !== 0) return severityDelta;
+        return a.title.localeCompare(b.title);
+    });
+    assignIssueMarkers(issues);
+    if (!issues.length) {
+        issues.push(makeIssue('info', 'No obvious issues found in this pass', 'The current run did not surface structural or simulation-level problems.', {
+            code: 'clean-pass',
+            source: 'analysis',
+        }));
+    }
+    return {
+        track,
+        settings: resolved,
+        prepared,
+        structure,
+        simulation,
+        issues,
+        summary: buildSummary({ track, settings: resolved, simulation, issues }),
+    };
+}
+
 async function loadTracksFresh() {
     const module = await import(/* @vite-ignore */ `../game/track/tracks.js?v=${Date.now()}`);
     return module.TRACKS;
@@ -1143,43 +1180,11 @@ class RunnerApp {
         const settings = this.getSettings();
         this.setStatus(`Running ${settings.botCount} bots on ${track.name}...`, 'running');
 
-        const prepared = prepareTrack(track, settings.pathSamples);
-        const structure = validateStructure(prepared);
-        const simulation = structure.fatal ? null : simulateSwarm(prepared, settings);
-        let issues = [...structure.issues];
+        const report = runTrackBotCheck(track, settings);
+        this.state.prepared = report.prepared;
+        this.state.report = report;
 
-        if (simulation) {
-            issues = issues.concat(deriveSimulationIssues(prepared, simulation));
-        }
-
-        issues.sort((a, b) => {
-            const severityDelta = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
-            if (severityDelta !== 0) {
-                return severityDelta;
-            }
-            return a.title.localeCompare(b.title);
-        });
-        assignIssueMarkers(issues);
-
-        if (!issues.length) {
-            issues.push(makeIssue('info', 'No obvious issues found in this pass', 'The current run did not surface structural or simulation-level problems.', {
-                code: 'clean-pass',
-                source: 'analysis'
-            }));
-        }
-
-        this.state.prepared = prepared;
-        this.state.report = {
-            track,
-            settings,
-            prepared,
-            structure,
-            simulation,
-            issues,
-            summary: buildSummary({ track, settings, simulation, issues })
-        };
-
-        const stateKind = issues.some((issue) => issue.severity === 'error') ? 'issues' : 'clean';
+        const stateKind = report.issues.some((issue) => issue.severity === 'error') ? 'issues' : 'clean';
         this.setStatus(`Validation finished for ${track.name}.`, stateKind);
         this.renderReport();
     }
@@ -1419,4 +1424,6 @@ class RunnerApp {
     }
 }
 
-new RunnerApp();
+if (typeof document !== 'undefined' && document.getElementById('runner-canvas')) {
+    new RunnerApp();
+}

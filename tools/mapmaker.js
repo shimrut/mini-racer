@@ -14,6 +14,7 @@ import {
 } from './mapmaker/lane-gate.js';
 import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
 import { validateTrackQuality } from './mapmaker/track-quality.js';
+import { runTrackBotCheck } from './runner.js';
 import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/track-flow.js';
 import {
     clearDraftRecovery,
@@ -349,6 +350,10 @@ class MapmakerApp {
         this.flowCount = document.getElementById('flow-count');
         this.flowSummary = document.getElementById('flow-summary');
         this.flowRules = document.getElementById('flow-rules');
+        this.runBotsBtn = document.getElementById('run-bots-btn');
+        this.botCheckCount = document.getElementById('bot-check-count');
+        this.botCheckSummary = document.getElementById('bot-check-summary');
+        this.botCheckIssues = document.getElementById('bot-check-issues');
 
         const initialTrackKey = Object.keys(TRACKS)[0];
         this.state = {
@@ -584,6 +589,7 @@ class MapmakerApp {
             this.qualityIssues.appendChild(item);
         }
         this.scheduleFlowCheck();
+        if (this.botReport) this.renderBotReport();
         this.draw();
         return report;
     }
@@ -986,6 +992,7 @@ class MapmakerApp {
         this.undoEditBtn.addEventListener('click', () => this.undoEdit());
         this.redoEditBtn.addEventListener('click', () => this.redoEdit());
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
+        this.runBotsBtn.addEventListener('click', () => this.runBots());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
         this.downloadTrackBtn.addEventListener('click', () => this.downloadTrackModule());
         this.copyIntegrationBtn.addEventListener('click', () => this.copyTrackIntegration());
@@ -1401,6 +1408,9 @@ class MapmakerApp {
             this.baselineGeometryByKey.set(trackKey, geometrySignature(TRACKS[originalTrackKey]));
         }
         if (this.state.selectedTrackKey !== trackKey) {
+            this.botReport = null;
+            this.botReportSignature = '';
+            this.renderBotReport();
             if (this.state.draftLoop.length) {
                 this.draftLoopsByKey.set(this.state.selectedTrackKey, cloneTracks(this.state.draftLoop));
             } else {
@@ -3276,6 +3286,76 @@ class MapmakerApp {
             console.error(error);
         }
         this.setStatus('Clipboard write is not available here.', true);
+    }
+
+    renderBotReport() {
+        const report = this.botReport;
+        this.botCheckIssues.replaceChildren();
+        if (!report) {
+            this.botCheckCount.textContent = 'Not run';
+            this.botCheckCount.className = 'pill';
+            this.botCheckSummary.textContent = 'Runs the Runner Lab bots on the drawing on screen. It does not save the track.';
+            return;
+        }
+        const issueCount = report.issues.filter((issue) => issue.severity !== 'info').length;
+        this.botCheckCount.textContent = issueCount
+            ? `${issueCount} issue${issueCount === 1 ? '' : 's'}`
+            : 'Clean';
+        this.botCheckCount.className = `pill${
+            report.issues.some((issue) => issue.severity === 'error')
+                ? ' pill-danger'
+                : issueCount
+                    ? ' pill-warn'
+                    : ' pill-ok'
+        }`;
+        const finishers = report.simulation ? report.simulation.aggregate.finishers : 0;
+        const crashes = report.simulation ? report.simulation.aggregate.crashes : 0;
+        const crashLabel = crashes === 1 ? '1 crash' : `${crashes} crashes`;
+        let summary = report.simulation
+            ? `${finishers} of ${report.settings.botCount} finished. ${crashLabel}.`
+            : 'Bots did not run. The drawing has a problem that blocks them.';
+        if (geometrySignature(this.track) !== this.botReportSignature) {
+            summary = `The drawing changed since this check. ${summary}`;
+        }
+        this.botCheckSummary.textContent = summary;
+        for (const issue of report.issues) {
+            const item = document.createElement('li');
+            item.dataset.severity = issue.severity;
+            item.textContent = `${issue.title}. ${issue.detail}`;
+            this.botCheckIssues.appendChild(item);
+        }
+    }
+
+    async runBots() {
+        if (!this.hasTrackGeometry()) {
+            this.setStatus('Draw a closed road before running bots.', true);
+            return;
+        }
+        const trackKey = this.state.selectedTrackKey;
+        const snapshot = cloneTracks(this.track);
+        const signature = geometrySignature(snapshot);
+        this.runBotsBtn.disabled = true;
+        this.botCheckSummary.textContent = `Running bots on ${snapshot.name}...`;
+        this.setStatus(`Running bots on ${snapshot.name}...`);
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+        try {
+            const report = runTrackBotCheck(snapshot);
+            if (trackKey !== this.state.selectedTrackKey) return;
+            this.botReport = report;
+            this.botReportSignature = signature;
+            this.renderBotReport();
+            const finishers = report.simulation ? report.simulation.aggregate.finishers : 0;
+            this.setStatus(report.simulation
+                ? `Bot check finished. ${finishers} of ${report.settings.botCount} finished.`
+                : 'Bot check finished. The drawing blocked the bots.');
+        } catch (error) {
+            console.error(error);
+            this.setStatus('Bot check failed.', true);
+        } finally {
+            this.runBotsBtn.disabled = false;
+        }
     }
 
     driveDraft() {

@@ -79,8 +79,9 @@ geometry is unchanged. Geometry edits must resolve any remaining hard error.
 Use **Drive Draft** to test the current unsaved track with the real race
 simulation before integration. The draft drive runs only in the browser and
 does not publish or save a definition. It reports checkpoint progress, lap
-completion, and wall contacts. **Runner Lab** remains useful for its approximate
-bot swarm and hotspot report after integration.
+completion, and wall contacts. **Run bots** checks that same drawing with the
+Runner Lab bots and lists who finished, the crashes, and the issues. It does
+not save the track. **Runner Lab** still opens a saved track on its own page.
 
 ### Flow checks
 
