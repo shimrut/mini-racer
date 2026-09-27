@@ -394,6 +394,24 @@ const CASES = {
         await seedStage(NUMBERS[0], g, { entryMs: 33000 });
         await seedDay(playable[5], g, { entryMs: 43000 });
     },
+    'an early Campaign time without labels': async (g, a) => {
+        await seedDays();
+        // Campaign rows saved from 2026-07-23 to 07-29 had a lapCount field and
+        // no completedLaps or check label.
+        const stage = NUMBERS[0];
+        const board = toCampaignCompetition(stage.seriesId, stage);
+        await redis.hSet(board.entryHashKey, {
+            [a]: JSON.stringify({
+                raceId: stage.raceId, trackKey: stage.trackKey, lapCount: stage.lapCount,
+                rulesRevision: stage.rulesRevision, bestTimeMs: 30000, medal: 'gold',
+                checkpointTimesSec: null, updatedAt: '2026-07-25T10:00:00.000Z',
+                playerId: a, displayName: 'Account racer',
+            }),
+        });
+        await redis.zAdd(board.leaderboardKey, { member: a, score: 30000 });
+        await redis.hSet(racedListKey(a), { [`campaign:${stage.raceId}`]: '1' });
+        await seedStage(stage, g, { entryMs: 32000 });
+    },
     'Daily times from July with an empty lap count': async (g, a) => {
         // From 2026-07-08 to 07-23, a Daily save wrote completedLaps: null.
         const { archived, playable } = await seedDays(2);

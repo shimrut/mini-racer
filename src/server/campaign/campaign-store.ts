@@ -35,6 +35,7 @@ import {
     type StoredRecordClassification,
 } from '../guest-transfer/guest-transfer-source-classification.js';
 import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
+import { boardMergeWrite, decideBoardMerge, timeFitsBoard } from '../guest-transfer/board-merge.js';
 import { campaignProgressKey } from './campaign-progress-key.js';
 import { prepareCompetitionOpponentRace } from '../competition/competition-opponent-race.js';
 import { resolveAuthorizedPlayerIdentity } from '../competition/competition-identity.js';
@@ -78,7 +79,6 @@ import {
 import { recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
 import { isPlayerProgressSelectionPending, isProgressTransferPending } from '../player/guest-retirement.js';
 import { playerFieldHash } from '../redis/redis-names.js';
-import { queueRacedBoard } from '../player/raced-list.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
 
@@ -218,14 +218,11 @@ function campaignResultFromEntry(
     entry: DailyGpLeaderboardEntry | null,
     expectedPlayerId: string,
 ): CampaignBestResult | null {
+    // The same rule as a guest transfer: an early time with no lap count or
+    // check label still counts.
     if (
-        !entry
-        || entry.playerId !== expectedPlayerId
-        || entry.trackKey !== stage.trackKey
+        !timeFitsBoard(entry, stage, expectedPlayerId)
         || !Number.isSafeInteger(entry.bestTimeMs)
-        || entry.bestTimeMs <= 0
-        || entry.completedLaps !== stage.lapCount
-        || entry.validationMethod !== 'strict-replay'
     ) return null;
     return {
         raceId: stage.raceId,
@@ -1292,9 +1289,6 @@ export async function mergeGuestCampaignProgress({
                 guestResult
                 && (!redditResult || guestResult.bestTimeMs < redditResult.bestTimeMs),
             );
-            const guestCanSupplyWinningPb = Boolean(
-                guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
-            );
             const selectedResult = fasterCampaignResult(redditResult, guestResult);
             if (selectedResult) {
                 mergedResults[stage.raceId] = selectedResult;
@@ -1302,20 +1296,18 @@ export async function mergeGuestCampaignProgress({
             if (guestWins && guestResult) {
                 mergedRaceIds.push(stage.raceId);
             }
-            const guestEntryWins = Boolean(
-                guestEntry
-                && guestEntryResult
-                && (!redditEntryResult || guestEntry.bestTimeMs < redditEntryResult.bestTimeMs),
-            );
-            // The guest's faster entry moves; otherwise the account's entry is
-            // written again only when its ranking lost step with it.
-            const entryToWrite = guestEntryWins
-                ? { ...guestEntry!, playerId: redditPlayerId }
-                : (redditEntry && redditEntryResult && Number(redditRankedScore) !== redditEntry.bestTimeMs
-                    ? redditEntry
-                    : null);
+            const { entryToWrite, guestPbWins } = decideBoardMerge({
+                board: competition,
+                guestPlayerId,
+                redditPlayerId,
+                guestEntry,
+                guestPb,
+                redditEntry,
+                redditPb,
+                redditRankedScore,
+            });
             let rawGuestPb: string | undefined;
-            if (guestCanSupplyWinningPb) {
+            if (guestPbWins) {
                 const validated = guestSource ? stageSource?.rawPb ?? null : null;
                 rawGuestPb = validated !== null
                     ? encodeRedisCompressedValue(validated)
@@ -1324,23 +1316,8 @@ export async function mergeGuestCampaignProgress({
                     throw new Error(`Campaign guest PB disappeared during promotion: ${stage.raceId}`);
                 }
             }
-            if (!entryToWrite && !rawGuestPb) continue;
-            stageWrites.push({
-                raceId: stage.raceId,
-                // At most 5 queued commands: an account entry is never a guest's,
-                // so writeEntry queues 4 (with the raced list), and the PB queues 1.
-                mutate: async (transaction) => {
-                    if (entryToWrite) {
-                        await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
-                    }
-                    if (rawGuestPb) {
-                        await transaction.hSet(competition.pbHashKey, {
-                            [playerFieldHash(redditPlayerId)]: rawGuestPb,
-                        });
-                        if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
-                    }
-                },
-            });
+            const mutate = boardMergeWrite(competition, redditPlayerId, entryToWrite, rawGuestPb);
+            if (mutate) stageWrites.push({ raceId: stage.raceId, mutate });
         }
 
         // Write the stages in groups, one fenced transaction for each group.

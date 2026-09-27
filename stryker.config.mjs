@@ -38,6 +38,7 @@ export default {
         'game/shared/race-time-text.js',
 
         'src/server/daily/daily-gp-store.ts',
+        'src/server/guest-transfer/board-merge.ts',
         'src/server/competition/replay-validator.ts',
         'src/server/player/player-token.ts',
         'src/server/request/request-rate-limit-identity.ts',

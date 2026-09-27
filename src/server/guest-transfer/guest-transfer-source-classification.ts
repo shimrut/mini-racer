@@ -16,8 +16,7 @@ export type ObsoleteReason =
     | 'track_retired'
     | 'stage_retired'
     | 'stage_redefined'
-    | 'race_identity'
-    | 'validation_method';
+    | 'race_identity';
 
 export type MalformedReason =
     | 'unparseable'
@@ -225,9 +224,8 @@ export function classifyStoredLeaderboardEntry(
             return { state: 'obsolete', reason: 'stage_redefined', updatedAt };
         }
     }
-    if (value.validationMethod !== undefined && value.validationMethod !== 'strict-replay') {
-        return { state: 'obsolete', reason: 'validation_method', updatedAt };
-    }
+    // The check label never makes a time old: every label came from the
+    // server's own check on the day of the race (see board-merge.ts).
 
     return {
         state: 'valid',

@@ -45,7 +45,6 @@ import {
     readEntryByPlayerId,
     readPlayerRank,
     readSnapshot,
-    writeEntry,
     type SnapshotPayload,
 } from '../competition/competition-leaderboard.js';
 import {
@@ -62,6 +61,7 @@ import {
 } from '../competition/pb-ghost-store.js';
 import { classifyStoredLeaderboardEntry } from '../guest-transfer/guest-transfer-source-classification.js';
 import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
+import { boardMergeWrite, decideBoardMerge } from '../guest-transfer/board-merge.js';
 import {
     acquireRedisLock,
     createOwnedLockGroupRunner,
@@ -120,7 +120,6 @@ import {
     type RankedSubmitReuseOptions,
 } from '../competition/competition-submit.js';
 import { playerFieldHash } from '../redis/redis-names.js';
-import { queueRacedBoard } from '../player/raced-list.js';
 import { carryGuestSettings } from '../player/transfer-settings.js';
 import { cleanupExpiredDailyGuestsBestEffort } from './daily-guest-cleanup.js';
 import { dailyBoardKeys, readTransferBoards } from '../player/raced-list-fill.js';
@@ -1355,32 +1354,15 @@ export async function mergeGuestDailyProgress({
                 dailyDay: { challengeId: challenge.id, ...guestSource.observed },
             });
         }
-        const {
-            guestEntry,
-            redditEntry,
-            guestPb,
-            redditPb,
-            redditRankedScore,
-        } = day.state;
-        if (!guestEntry && !guestPb) continue;
-
-        const guestWinsLeaderboard = Boolean(
-            guestEntry
-            && (!redditEntry || guestEntry.bestTimeMs < redditEntry.bestTimeMs),
-        );
-        const guestCanSupplyWinningPb = Boolean(
-            guestPb && (!redditPb || guestPb.bestTimeMs < redditPb.bestTimeMs),
-        );
-        // The guest's faster entry moves; otherwise the account's entry is
-        // written again only when its ranking lost step with it.
-        const entryToWrite = guestWinsLeaderboard
-            ? { ...guestEntry!, playerId: redditPlayerId }
-            : (redditEntry && Number(redditRankedScore) !== redditEntry.bestTimeMs
-                ? redditEntry
-                : null);
+        const { guestEntryWins, entryToWrite, guestPbWins } = decideBoardMerge({
+            board: competition,
+            guestPlayerId,
+            redditPlayerId,
+            ...day.state,
+        });
 
         let rawGuestPb: string | undefined;
-        if (guestCanSupplyWinningPb) {
+        if (guestPbWins) {
             if (guestSource) {
                 rawGuestPb = guestSource.decodedPb === null
                     ? undefined
@@ -1395,22 +1377,9 @@ export async function mergeGuestDailyProgress({
                 throw new Error(`Daily guest PB disappeared during promotion: ${challenge.id}`);
             }
         }
-        if (entryToWrite || rawGuestPb) {
-            // At most 5 queued commands: an account entry is never a guest's,
-            // so writeEntry queues 4 (with the raced list), and the PB queues 1.
-            dayWrites.push(async (transaction) => {
-                if (entryToWrite) {
-                    await writeEntry(competition, redditPlayerId, entryToWrite, transaction);
-                }
-                if (rawGuestPb) {
-                    await transaction.hSet(competition.pbHashKey, {
-                        [playerFieldHash(redditPlayerId)]: rawGuestPb,
-                    });
-                    if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
-                }
-            });
-        }
-        if (guestWinsLeaderboard) {
+        const mutate = boardMergeWrite(competition, redditPlayerId, entryToWrite, rawGuestPb);
+        if (mutate) dayWrites.push(mutate);
+        if (guestEntryWins) {
             mergedChallengeIds.push(challenge.id);
         }
     }

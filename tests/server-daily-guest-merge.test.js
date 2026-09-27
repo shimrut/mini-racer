@@ -6,6 +6,7 @@ import {
     DAY_MS,
     formatUtcChallengeDate,
     getUtcDayIndex,
+    selectDailyGpLapCount,
 } from '../src/server/daily/daily-gp-model.ts';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 
@@ -136,6 +137,8 @@ describe('mergeGuestDailyProgress', () => {
     it('moves a faster guest Daily time while retaining the source for transfer retry', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
+        // The day's own lap count: a time with another lap count does not fit it.
+        const dayLaps = selectDailyGpLapCount(challengeId, trackKey);
         const guestPlayerId = 'guest:daily-guest-merge';
         const redditPlayerId = 'reddit:daily-claimed';
         const entryHashKey = `dailygp:leaderboard:${challengeId}:entries`;
@@ -146,7 +149,7 @@ describe('mergeGuestDailyProgress', () => {
             trackKey,
             bestTimeMs: 9000,
             updatedAt,
-            completedLaps: 1,
+            completedLaps: dayLaps,
             checkpointTimesSec: [4.5],
             validationMethod: 'strict-replay',
         };
@@ -198,6 +201,8 @@ describe('mergeGuestDailyProgress', () => {
     it('retains a slower guest row without overwriting a faster Reddit time', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
+        // The day's own lap count: a time with another lap count does not fit it.
+        const dayLaps = selectDailyGpLapCount(challengeId, trackKey);
         const guestPlayerId = 'guest:daily-guest-slow';
         const redditPlayerId = 'reddit:daily-fast';
         const entryHashKey = `dailygp:leaderboard:${challengeId}:entries`;
@@ -208,7 +213,7 @@ describe('mergeGuestDailyProgress', () => {
             trackKey,
             bestTimeMs: 12000,
             updatedAt,
-            completedLaps: 1,
+            completedLaps: dayLaps,
             checkpointTimesSec: [6],
             validationMethod: 'strict-replay',
         };
@@ -217,7 +222,7 @@ describe('mergeGuestDailyProgress', () => {
             trackKey,
             bestTimeMs: 8000,
             updatedAt,
-            completedLaps: 1,
+            completedLaps: dayLaps,
             checkpointTimesSec: [4],
             validationMethod: 'strict-replay',
         };
