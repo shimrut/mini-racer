@@ -9,7 +9,11 @@ vi.mock("@devvit/redis", () => ({
   redisCompressed: redis,
 }));
 
-const { runRacedListFill, isRacedListFillReady } = await import("../src/server/player/raced-list-fill.ts");
+const {
+  runRacedListFill,
+  isRacedListFillReady,
+  readRacedListFillStatus,
+} = await import("../src/server/player/raced-list-fill.ts");
 const {
   DAILY_GUEST_EXPIRY_KEY,
   DAILY_GUEST_ROW_KEEP_SECONDS,
@@ -116,6 +120,32 @@ describe("raced list fill", () => {
 
     expect((await runRacedListFill(START_MS)).status).toBe("ready");
     expect(await redis.hGet(racedListKey("reddit:early"), `daily:${day}`)).toBeTruthy();
+  });
+
+  it("reports its progress, and logs one line when it is done", async () => {
+    const days = ["daily-gp-2026-05-01", "daily-gp-2026-05-02"];
+    for (const day of days) {
+      await storeDay(day);
+      await redis.hSet(`dailygp:leaderboard:${day}:entries`, { "reddit:progress": "{}" });
+    }
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    expect(await readRacedListFillStatus()).toEqual({ state: "waiting" });
+    await runRacedListFill(NOW_MS);
+    expect(await readRacedListFillStatus()).toEqual({ state: "waiting" });
+    await runRacedListFill(START_MS, 1);
+    const working = await readRacedListFillStatus();
+    expect(working.state).toBe("working");
+    expect(working.boards).toBe(CAMPAIGN_LIVE_STAGES.length + days.length);
+
+    while ((await runRacedListFill(START_MS)).status !== "ready");
+    expect(await readRacedListFillStatus()).toEqual({
+      state: "done",
+      completedAt: new Date(START_MS).toISOString(),
+      boards: CAMPAIGN_LIVE_STAGES.length + days.length,
+    });
+    expect(log.mock.calls.filter(([message]) => message === "Raced list fill ready:")).toHaveLength(1);
+    log.mockRestore();
   });
 
   it("does not run twice at the same time, and does nothing once ready", async () => {

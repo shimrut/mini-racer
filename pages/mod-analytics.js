@@ -472,17 +472,32 @@ function renderMonths(doc, months) {
     return nodes;
 }
 
-function renderStorage(doc, storage) {
+// The one-time walk that lists races saved before the raced lists existed.
+// The Daily archive must wait until it says done.
+function racedListFillText(fill) {
+    if (fill?.state === 'done') return 'Old races recorded: done';
+    if (fill?.state === 'working') {
+        return `Old races recorded: ${formatCount(fill.boardsDone)} of ${formatCount(fill.boards)} boards`;
+    }
+    if (fill?.state === 'waiting') return 'Old races recorded: not started';
+    return null;
+}
+
+function renderStorage(doc, storage, racedListFill = null) {
+    const fillText = racedListFillText(racedListFill);
+    const fillNode = fillText ? [element(doc, 'p', 'analytics-note', fillText)] : [];
     if (!storage || typeof storage !== 'object') {
         return [
             cardHeading(doc, 'Redis'),
             element(doc, 'p', 'analytics-note', 'Unavailable'),
+            ...fillNode,
         ];
     }
 
     const groups = Array.isArray(storage.groups) ? storage.groups : [];
     const nodes = [cardHeading(doc, 'Redis')];
     nodes.push(element(doc, 'p', 'analytics-storage-total analytics-count', formatBytes(storage.totalBytes)));
+    nodes.push(...fillNode);
 
     if (groups.length === 0) {
         nodes.push(element(doc, 'p', 'analytics-note', 'No named keys held data.'));
@@ -626,7 +641,7 @@ export function renderAnalyticsSummary(root, summary) {
     modesNode.replaceChildren(...renderModes(root, days));
     cohortsNode?.replaceChildren(...renderCohorts(root, cohorts));
     monthsNode.replaceChildren(...renderMonths(root, months));
-    storageNode?.replaceChildren(...renderStorage(root, summary?.storage));
+    storageNode?.replaceChildren(...renderStorage(root, summary?.storage, summary?.racedListFill));
 
     const dayHead = cardHeading(root, 'Daily breakdown');
     if (stored.length === 0) {

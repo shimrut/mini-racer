@@ -6,10 +6,13 @@ describe('moderator analytics summary payload', () => {
         const summary = { from: '2026-07-02', to: '2026-08-15', today: { players: 4 }, days: [], months: [] };
         const storage = { totalBytes: 2048, groups: [], notCounted: [] };
 
+        const racedListFill = { state: 'working', boardsDone: 3, boards: 40 };
+
         await expect(getModeratorAnalyticsSummary({
             getSummary: async () => summary,
             getStorage: async () => storage,
-        })).resolves.toEqual({ ...summary, storage });
+            getRacedListFill: async () => racedListFill,
+        })).resolves.toEqual({ ...summary, storage, racedListFill });
     });
 
     it('keeps player counts when Redis occupancy fails', async () => {
@@ -21,6 +24,9 @@ describe('moderator analytics summary payload', () => {
             getStorage: async () => {
                 throw new Error('Redis walk failed');
             },
-        })).resolves.toEqual({ ...summary, storage: null });
+            getRacedListFill: async () => {
+                throw new Error('Redis read failed');
+            },
+        })).resolves.toEqual({ ...summary, storage: null, racedListFill: null });
     });
 });

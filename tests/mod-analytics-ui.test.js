@@ -170,6 +170,21 @@ describe('moderator analytics page', () => {
         expect(window.document.querySelectorAll('.analytics-chart__hit')).toHaveLength(45);
     });
 
+    it('shows how far the recording of old races has come', () => {
+        for (const [racedListFill, text] of [
+            [{ state: 'waiting' }, 'Old races recorded: not started'],
+            [{ state: 'working', boardsDone: 120, boards: 1400 }, 'Old races recorded: 120 of 1,400 boards'],
+            [{ state: 'done', completedAt: '2026-09-27T10:00:00.000Z', boards: 1400 }, 'Old races recorded: done'],
+        ]) {
+            const { window } = analyticsDom();
+            renderAnalyticsSummary(window.document, summaryFixture({
+                storage: { totalBytes: 1536, groups: [], notCounted: [] },
+                racedListFill,
+            }));
+            expect(window.document.getElementById('analytics-storage').textContent).toContain(text);
+        }
+    });
+
     it('shows Redis occupancy by family when the summary includes it', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture({

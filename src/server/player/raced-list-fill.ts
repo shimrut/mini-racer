@@ -177,17 +177,45 @@ export async function runRacedListFill(
             await redis.set(RACED_LIST_FILL_STATE_KEY, JSON.stringify(state));
         }
         if (state.boardIndex < state.boards.length) return { status: 'working', rows };
-        await redis.set(RACED_LIST_FILL_READY_KEY, JSON.stringify({
+        const ready = {
             completedAt: new Date(nowMs).toISOString(),
             boards: state.boards.length,
-        }));
+        };
+        await redis.set(RACED_LIST_FILL_READY_KEY, JSON.stringify(ready));
         await redis.del(RACED_LIST_FILL_STATE_KEY);
+        console.log('Raced list fill ready:', JSON.stringify(ready));
         return { status: 'ready', rows };
     } finally {
         await releaseRedisLock(lock, redis).catch((error) => {
             console.error('Raced list fill lock cleanup failed:', error);
         });
     }
+}
+
+export type RacedListFillStatus =
+    | { state: 'done'; completedAt: string | null; boards: number | null }
+    | { state: 'working'; boardsDone: number; boards: number }
+    | { state: 'waiting' };
+
+// How far the fill has come, for the moderator analytics page. `waiting` means
+// the first run has not happened yet, or the walk has not started.
+export async function readRacedListFillStatus(): Promise<RacedListFillStatus> {
+    const [rawReady, rawState] = await redis.mGet([RACED_LIST_FILL_READY_KEY, RACED_LIST_FILL_STATE_KEY]);
+    if (rawReady) {
+        let ready: { completedAt?: unknown; boards?: unknown } = {};
+        try {
+            ready = JSON.parse(rawReady) ?? {};
+        } catch (_error) {
+        }
+        return {
+            state: 'done',
+            completedAt: typeof ready.completedAt === 'string' ? ready.completedAt : null,
+            boards: Number.isInteger(ready.boards) ? Number(ready.boards) : null,
+        };
+    }
+    const state = parseFillState(rawState);
+    if (!state || state.notBeforeMs !== undefined) return { state: 'waiting' };
+    return { state: 'working', boardsDone: state.boardIndex, boards: state.boards.length };
 }
 
 export async function isRacedListFillReady(): Promise<boolean> {
