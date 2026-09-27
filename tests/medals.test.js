@@ -399,14 +399,12 @@ describe('medals', () => {
                 phase: 'pending',
                 statusText: 'Submitting...',
             });
-            expect(children[0].dataset.challengePhase).toBe('pending');
             expect(children[0].children[0].children[0].textContent).toBe('VERIFYING');
             expect(children[0].textContent).not.toContain('CHALLENGE');
             expect(children[0].textContent).not.toContain('Submitting');
             expect(children[0].children).toHaveLength(1);
 
             renderChallengeFinishHero(overlay, { phase: 'won' });
-            expect(children[0].dataset.challengePhase).toBe('won');
             expect(children[0].children[0].children[0].textContent).toBe('YOU WON');
 
             renderChallengeFinishHero(overlay, {
@@ -435,12 +433,10 @@ describe('medals', () => {
                 phase: 'error',
                 error: 'Could not confirm.',
             });
-            expect(children[0].dataset.challengePhase).toBe('error');
             expect(children[0].children[0].children[0].textContent).toBe('UNVERIFIED');
             expect(children[0].children[1].textContent).toBe('Could not confirm.');
 
             renderChallengeFinishHero(overlay, { phase: 'lost' });
-            expect(children[0].dataset.challengePhase).toBe('lost');
             expect(children[0].children[0].children[0].textContent).toBe('YOU LOST');
 
             renderChallengeFinishHero(overlay, { phase: 'tie' });
@@ -468,7 +464,7 @@ describe('medals', () => {
         expect(outcomes.map((el) => el.textContent)).toEqual(['VERIFYING', 'YOU WON']);
         expect(outcomes[0].classList.contains('is-outgoing')).toBe(true);
         expect(outcomes[1].classList.contains('is-incoming')).toBe(true);
-        expect(overlay.querySelector('[data-challenge-phase="won"]')).toBeTruthy();
+        expect(overlay.querySelector('[aria-label="YOU WON"]')).toBeTruthy();
 
         outcomes[1].dispatchEvent(new dom.window.Event('animationend'));
         expect(overlay.querySelectorAll('.challenge-result-lockup__outcome')).toHaveLength(1);

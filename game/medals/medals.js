@@ -253,7 +253,6 @@ function finishChallengeOutcomePush(lockup) {
 
 function syncChallengeFinishHeroChrome(root, phase, accessibleLabel) {
     if (!root) return;
-    root.dataset.challengePhase = phase;
     root.setAttribute('role', phase === 'error' ? 'alert' : 'status');
     root.setAttribute('aria-label', accessibleLabel);
     if (phase === 'pending') root.setAttribute('aria-live', 'polite');
