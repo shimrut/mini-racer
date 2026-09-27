@@ -13314,6 +13314,855 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
 }
 `;
 
+exports[`guest transfer recordings > equal personal bests with different details (account) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 31000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+          "reddit:recorded": 31000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:pbs:numbered-v1-00": {
+      "after": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.1,
+              20.2,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-20T10:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.1,
+              20.2,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-20T10:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 41000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 41000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > equal personal bests with different details (merge) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 31000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+          "reddit:recorded": 31000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:pbs:numbered-v1-00": {
+      "after": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": [
+              10.1,
+              20.2,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 2,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "oaSu2FY8Jxa8WaoHS01uFADhbLo5kRmgWp-0ng4Rtp0",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-20T10:00:00.000Z",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {
+            "numbered-v1-00": {
+              "bestTimeMs": 31000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "numberZero",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.5,
+              20.9,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-21T10:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 41000,
+            "checkpointTimesSec": [
+              10.1,
+              20.2,
+            ],
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "x3_f3XZgybbriueKdU3JeFUFUYAOGQ0arX27EqZ_vmk",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-20T10:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "OYhUFgln5zRzl-Gm2VrrFltExdf773DOQdSXotTF9HU",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "TIF-4ALCsJ0IHxmIO0VEo6n41f2CAxFaOEqmVkKSVLY",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 41000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 41000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
 exports[`guest transfer recordings > only the account has progress (account) 1`] = `
 {
   "changes": {
@@ -14485,6 +15334,1240 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
 }
 `;
 
+exports[`guest transfer recordings > the account's old entry lost step with its ranking (account) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 35000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 33000,
+          "reddit:recorded": 35000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "legacy-physics",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 33000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "legacy-physics",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the account's old entry lost step with its ranking (merge) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 33000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 33000,
+          "reddit:recorded": 35000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 33000,
+            "checkpointTimesSec": null,
+            "completedLaps": 2,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 33000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "legacy-physics",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "2",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {
+            "numbered-v1-00": {
+              "bestTimeMs": 33000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "numberZero",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "2rXrtvyiEEytXTzvoBvi9SZ6d3FmMijY8rljLs8y4xk",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "cRm20lehug5M_p3TWQHOewc-fGJTZk981j9vOYBdNy4",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 43000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "completedLaps": null,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "2",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+    "miniracer:raced:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "hash": {
+          "campaign:numbered-v1-00": "1",
+          "daily:daily-gp-2026-09-26": "1",
+        },
+      },
+      "before": {
+        "hash": {
+          "campaign:numbered-v1-00": "1",
+        },
+      },
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the account's ranking lost step where the guest never raced (account) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {},
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 33000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {},
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 33000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the account's ranking lost step where the guest never raced (merge) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 33000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 33000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 33000,
+            "checkpointTimesSec": null,
+            "completedLaps": 2,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 33000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "2",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-01": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 30000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "reddit:recorded": 36000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-01:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "checkpointTimesSec": null,
+            "completedLaps": 2,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "numberOne",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberOne",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-01:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {
+            "numbered-v1-00": {
+              "bestTimeMs": 33000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "numberZero",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+            "numbered-v1-01": {
+              "bestTimeMs": 30000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-01",
+              "rulesRevision": 1,
+              "trackKey": "numberOne",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "2rXrtvyiEEytXTzvoBvi9SZ6d3FmMijY8rljLs8y4xk",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "cRm20lehug5M_p3TWQHOewc-fGJTZk981j9vOYBdNy4",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 43000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "completedLaps": null,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "2",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+    "miniracer:raced:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "hash": {
+          "campaign:numbered-v1-00": "1",
+          "campaign:numbered-v1-01": "1",
+          "daily:daily-gp-2026-09-23": "1",
+          "daily:daily-gp-2026-09-26": "1",
+        },
+      },
+      "before": {
+        "hash": {
+          "campaign:numbered-v1-01": "1",
+          "daily:daily-gp-2026-09-23": "1",
+        },
+      },
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
 exports[`guest transfer recordings > the account's ranking lost step with its entry (account) 1`] = `
 {
   "changes": {
@@ -15101,6 +17184,744 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
 }
 `;
 
+exports[`guest transfer recordings > the guest has old Daily rows and an old ghost format (account) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {},
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {},
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-25": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 1,
+            "simulationRevision": 1,
+            "trackFingerprint": "bvF8AMRCYnKsN1qeAzU80O8VOj5--X6HeqWZs4yMVHc",
+            "trackKey": "harborParkLoop",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "sortedSet": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25:entries": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "harborParkLoop",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 42000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 42000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "legacy-physics",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 2,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest has old Daily rows and an old ghost format (merge) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 31000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 31000,
+            "checkpointTimesSec": null,
+            "completedLaps": 2,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "2",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {
+            "numbered-v1-00": {
+              "bestTimeMs": 31000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "numberZero",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-25": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 1,
+            "simulationRevision": 1,
+            "trackFingerprint": "bvF8AMRCYnKsN1qeAzU80O8VOj5--X6HeqWZs4yMVHc",
+            "trackKey": "harborParkLoop",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "uF_Ch0q8nKRPmWKBVYBx0nHQPsg6n7faDyx32T5uXBw",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "8yo6ODDeL50jH0EPco4Rm-g9S6ESbUszloIjtZC3Emc",
+              "daily-gp-2026-09-26": "PIO-_L9J8Rwm5UB-gULz6jKFipMG8WQfqhjccdKY7uE",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "sortedSet": {
+          "reddit:recorded": 43000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "sortedSet": {
+          "guest:recorded": 43000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25:entries": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 43000,
+            "checkpointTimesSec": null,
+            "completedLaps": null,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "harborParkLoop",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 43000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "harborParkLoop",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-25:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576584000,
+        "string": "2",
+      },
+      "before": {
+        "expiresInSeconds": 1576584000,
+        "string": "0",
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "reddit:recorded": 42000,
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "sortedSet": {
+          "guest:recorded": 41000,
+          "reddit:recorded": 42000,
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:entries": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 41000,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "legacy-physics",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 42000,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "jadeSpiralCircuit",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-26:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576670400,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576670400,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+    "miniracer:raced:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "hash": {
+          "campaign:numbered-v1-00": "1",
+          "daily:daily-gp-2026-09-25": "1",
+          "daily:daily-gp-2026-09-26": "1",
+        },
+      },
+      "before": {
+        "hash": {
+          "daily:daily-gp-2026-09-26": "1",
+        },
+      },
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 2,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
 exports[`guest transfer recordings > the guest has old rows (account) 1`] = `
 {
   "changes": {
@@ -15687,6 +18508,541 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
 }
 `;
 
+exports[`guest transfer recordings > the guest holds a personal best where the account never raced (account) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-02:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:pbs:numbered-v1-02": {
+      "after": {
+        "hash": {},
+      },
+      "before": {
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 34000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "GBC_QXZU0TVkFQfcGvv5e1dve3sc_-aRondXhYItLi8",
+            "trackKey": "numberTwo",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-24": {
+      "after": {
+        "expiresInSeconds": 1576497600,
+        "hash": {},
+      },
+      "before": {
+        "expiresInSeconds": 1576497600,
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 45000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "p7N8tGlorSjsbnrFHi-Mq2_tWlnXE_bfIwwkeY2zENw",
+            "trackKey": "mistwoodSerpent",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-24:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576497600,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576497600,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest holds a personal best where the account never raced (merge) 1`] = `
+{
+  "changes": {
+    "campaign:numbered-v1:leaderboard:numbered-v1-02:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:pbs:numbered-v1-02": {
+      "after": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 34000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "GBC_QXZU0TVkFQfcGvv5e1dve3sc_-aRondXhYItLi8",
+            "trackKey": "numberTwo",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 34000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "GBC_QXZU0TVkFQfcGvv5e1dve3sc_-aRondXhYItLi8",
+            "trackKey": "numberTwo",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {},
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:challenge-pbs:daily-gp-2026-09-24": {
+      "after": {
+        "expiresInSeconds": 1576497600,
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 45000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "p7N8tGlorSjsbnrFHi-Mq2_tWlnXE_bfIwwkeY2zENw",
+            "trackKey": "mistwoodSerpent",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "expiresInSeconds": 1576497600,
+        "hash": {
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 45000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "p7N8tGlorSjsbnrFHi-Mq2_tWlnXE_bfIwwkeY2zENw",
+            "trackKey": "mistwoodSerpent",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "bChPB0D272H2C-0M3rC5xyE8CAhF46lGlyeigEkBEZY",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "YsrrXTvMkXu5rZGp4bF8wH_krwH5entJHEfKLCOCCa4",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:leaderboard:daily-gp-2026-09-24:standings-revision": {
+      "after": {
+        "expiresInSeconds": 1576497600,
+        "string": "1",
+      },
+      "before": {
+        "expiresInSeconds": 1576497600,
+        "string": "0",
+      },
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+    "miniracer:raced:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "hash": {
+          "campaign:numbered-v1-02": "1",
+          "daily:daily-gp-2026-09-24": "1",
+        },
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 1,
+      "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
 exports[`guest transfer recordings > the guest holds only personal bests (account) 1`] = `
 {
   "changes": {
@@ -16256,6 +19612,675 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
       "dailyPlaylistSize": 7,
       "dailySavedResults": 1,
       "hasDailyResults": true,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest is faster on a later-series stage the account raced (account) 1`] = `
+{
+  "changes": {
+    "campaign:dirt-v1:leaderboard:dirt-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 52000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 50000,
+          "reddit:recorded": 52000,
+        },
+      },
+    },
+    "campaign:dirt-v1:leaderboard:dirt-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 52000,
+            "completedLaps": 1,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 50000,
+            "completedLaps": 1,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 52000,
+            "completedLaps": 1,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:dirt-v1:leaderboard:dirt-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:dirt-v1:pbs:dirt-v1-00": {
+      "after": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 52000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 52000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 50000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "campaign:dirt-v1:progress:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": null,
+      "before": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {
+            "dirt-v1-00": {
+              "bestTimeMs": 50000,
+              "checkpointTimesSec": null,
+              "lapCount": 1,
+              "medal": "silver",
+              "raceId": "dirt-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "countryRoad",
+              "updatedAt": "2026-09-01T09:30:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-01T09:00:00.000Z",
+          "updatedAt": "2026-09-01T09:30:00.000Z",
+        },
+      },
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 1,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 44,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 1,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 5,
+      "carsTotal": 52,
+      "carsUnlocked": 44,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest is faster on a later-series stage the account raced (merge) 1`] = `
+{
+  "changes": {
+    "campaign:dirt-v1:leaderboard:dirt-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 50000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 50000,
+          "reddit:recorded": 52000,
+        },
+      },
+    },
+    "campaign:dirt-v1:leaderboard:dirt-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 50000,
+            "checkpointTimesSec": null,
+            "completedLaps": 1,
+            "playerId": "reddit:recorded",
+            "strictReplayFailureReason": null,
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 50000,
+            "completedLaps": 1,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 52000,
+            "completedLaps": 1,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:dirt-v1:leaderboard:dirt-v1-00:standings-revision": {
+      "after": {
+        "string": "2",
+      },
+      "before": null,
+    },
+    "campaign:dirt-v1:pbs:dirt-v1-00": {
+      "after": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 50000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+            "bestTimeMs": 52000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+          "xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+            "bestTimeMs": 50000,
+            "checkpointTimesSec": null,
+            "ghost": null,
+            "lapCompletionTimesSec": null,
+            "lapCount": 1,
+            "rulesRevision": 1,
+            "schemaVersion": 2,
+            "simulationRevision": 1,
+            "trackFingerprint": "aczVKQQnMaHM09QgOy0vX-QUSnXwTtvSmdIlZxWufGM",
+            "trackKey": "countryRoad",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+          },
+        },
+      },
+    },
+    "campaign:dirt-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {
+            "dirt-v1-00": {
+              "bestTimeMs": 50000,
+              "checkpointTimesSec": null,
+              "lapCount": 1,
+              "medal": "silver",
+              "raceId": "dirt-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "countryRoad",
+              "updatedAt": "2026-09-01T09:30:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-01T09:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {
+            "dirt-v1-00": {
+              "bestTimeMs": 52000,
+              "checkpointTimesSec": null,
+              "lapCount": 1,
+              "medal": "bronze",
+              "raceId": "dirt-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "countryRoad",
+              "updatedAt": "2026-09-01T09:30:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-01T09:00:00.000Z",
+          "updatedAt": "2026-09-01T09:30:00.000Z",
+        },
+      },
+    },
+    "campaign:dirt-v1:progress:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": null,
+      "before": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {
+            "dirt-v1-00": {
+              "bestTimeMs": 50000,
+              "checkpointTimesSec": null,
+              "lapCount": 1,
+              "medal": "silver",
+              "raceId": "dirt-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "countryRoad",
+              "updatedAt": "2026-09-01T09:30:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-01T09:00:00.000Z",
+          "updatedAt": "2026-09-01T09:30:00.000Z",
+        },
+      },
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {},
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "vAOmUIaLxpQg_YJmNK3qHgTWlIYaOIlqMuCrWHJOi4s",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "zZfLaGeCweGiIi4TN3Hr5-ya3Fld14-r-OSEN02AE10",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": true,
+    "accountSummary": {
+      "campaignResults": 1,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 44,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 1,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 5,
+      "carsTotal": 52,
+      "carsUnlocked": 44,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
       "unlocks": false,
     },
     "required": true,
@@ -16874,6 +20899,536 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
       "campaignUnlockedTracks": 4,
       "carsTotal": 52,
       "carsUnlocked": 44,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest started a later series without results (account) 1`] = `
+{
+  "changes": {
+    "campaign:dirt-v1:progress:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": null,
+      "before": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {},
+          "startedAt": "2026-09-25T09:00:00.000Z",
+          "updatedAt": "2026-09-25T09:00:00.000Z",
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 30000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+          "reddit:recorded": 30000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "cleanedDomains": [],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "account",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "account",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "required": true,
+    "sourceGuestPlayerId": "guest:recorded",
+    "state": "choice_required",
+    "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+  },
+}
+`;
+
+exports[`guest transfer recordings > the guest started a later series without results (merge) 1`] = `
+{
+  "changes": {
+    "campaign:dirt-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {},
+          "startedAt": "2026-09-25T09:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "campaign:dirt-v1:progress:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": null,
+      "before": {
+        "string": {
+          "campaignId": "dirt-v1",
+          "resultsByRaceId": {},
+          "startedAt": "2026-09-25T09:00:00.000Z",
+          "updatedAt": "2026-09-25T09:00:00.000Z",
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00": {
+      "after": {
+        "sortedSet": {
+          "reddit:recorded": 30000,
+        },
+      },
+      "before": {
+        "sortedSet": {
+          "guest:recorded": 31000,
+          "reddit:recorded": 30000,
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:entries": {
+      "after": {
+        "hash": {
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+      "before": {
+        "hash": {
+          "guest:recorded": {
+            "bestTimeMs": 31000,
+            "completedLaps": 2,
+            "displayName": "Guest racer",
+            "playerId": "guest:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+          "reddit:recorded": {
+            "bestTimeMs": 30000,
+            "completedLaps": 2,
+            "displayName": "Account racer",
+            "playerId": "reddit:recorded",
+            "trackKey": "numberZero",
+            "updatedAt": "2026-09-27T12:00:00.000Z",
+            "validationMethod": "strict-replay",
+          },
+        },
+      },
+    },
+    "campaign:numbered-v1:leaderboard:numbered-v1-00:standings-revision": {
+      "after": {
+        "string": "1",
+      },
+      "before": null,
+    },
+    "campaign:numbered-v1:progress:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": {
+          "campaignId": "numbered-v1",
+          "resultsByRaceId": {
+            "numbered-v1-00": {
+              "bestTimeMs": 30000,
+              "checkpointTimesSec": null,
+              "lapCount": 2,
+              "medal": null,
+              "raceId": "numbered-v1-00",
+              "rulesRevision": 1,
+              "trackKey": "numberZero",
+              "updatedAt": "2026-09-27T12:00:00.000Z",
+            },
+          },
+          "startedAt": "2026-09-27T12:00:00.000Z",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-selection:v1:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "cleanedDomains": [
+            "campaign",
+            "daily",
+          ],
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "completedDomains": [
+            "campaign",
+            "daily",
+            "unlocks",
+          ],
+          "dailyChallengeIds": [
+            "daily-gp-2026-09-27",
+            "daily-gp-2026-09-26",
+            "daily-gp-2026-09-25",
+            "daily-gp-2026-09-24",
+            "daily-gp-2026-09-23",
+            "daily-gp-2026-09-22",
+            "daily-gp-2026-09-21",
+          ],
+          "dailyChallengeSpecs": [
+            {
+              "id": "daily-gp-2026-09-27",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "cedarRidgeCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-26",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "jadeSpiralCircuit",
+            },
+            {
+              "id": "daily-gp-2026-09-25",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "harborParkLoop",
+            },
+            {
+              "id": "daily-gp-2026-09-24",
+              "lapCount": 1,
+              "objectiveType": "single_lap_fastest",
+              "rulesRevision": 1,
+              "trackKey": "mistwoodSerpent",
+            },
+            {
+              "id": "daily-gp-2026-09-23",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "royalPlateau",
+            },
+            {
+              "id": "daily-gp-2026-09-22",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "sunlitTemple",
+            },
+            {
+              "id": "daily-gp-2026-09-21",
+              "lapCount": 2,
+              "objectiveType": "multi_lap_total",
+              "rulesRevision": 1,
+              "trackKey": "circuit",
+            },
+          ],
+          "guestPlayerId": "guest:recorded",
+          "phase": "completed",
+          "redditPlayerId": "reddit:recorded",
+          "sourceInventory": {
+            "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            "campaignSeriesProgress": {
+              "dirt-v1": "CXM-nKsOk4K_4Rugqnb1hWgw_PdeT3Yl__IuKDXnuL8",
+              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
+            },
+            "campaignStages": {
+              "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-00": "uF_Ch0q8nKRPmWKBVYBx0nHQPsg6n7faDyx32T5uXBw",
+              "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-03": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-04": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-05": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-06": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-10": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-11": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-12": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "daily": {
+              "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-22": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-23": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-24": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-25": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-26": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+              "daily-gp-2026-09-27": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
+            },
+            "unlockFields": {},
+            "unlocks": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
+          },
+          "status": "completed",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "updatedAt": "2026-09-27T12:00:00.000Z",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-index:v1:fJXU6n68qTEEAdEbY3fFRFbzyySZO7qaQFCqvJh7iM8": {
+      "after": {
+        "string": [
+          "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+        ],
+      },
+      "before": null,
+    },
+    "dailygp:guest-progress-transfer-receipt:v1:zllZtAmnUz3bCBixG-Y-e_h2pB5C1Zw9i5DXWde7lfw": {
+      "after": {
+        "string": {
+          "choice": "merge",
+          "completedAt": "2026-09-27T12:00:00.000Z",
+          "guestPlayerId": "guest:recorded",
+          "redditPlayerId": "reddit:recorded",
+          "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+          "version": 4,
+        },
+      },
+      "before": null,
+    },
+    "miniracer:car-unlocks:promotion:v1:xs-oybSrdbifqDmBHcdorUJ4cAxPw5-vshKDK0IFc50": {
+      "after": {
+        "string": "reddit:recorded",
+      },
+      "before": null,
+    },
+  },
+  "replies": [
+    {
+      "choice": "merge",
+      "completedAt": "2026-09-27T12:00:00.000Z",
+      "sourceGuestPlayerId": "guest:recorded",
+      "status": "completed",
+      "transferId": "guest-transfer:BCjsrg6hXiBYI5WpMcSTRfwLnhzpCe0Imej9oFZX4vk",
+    },
+  ],
+  "selection": {
+    "accountHasProgress": false,
+    "accountSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
+      "dailyPlaylistSize": 7,
+      "dailySavedResults": 0,
+      "hasDailyResults": false,
+      "unlocks": false,
+    },
+    "guestHasProgress": true,
+    "guestSummary": {
+      "campaignResults": 0,
+      "campaignTotalStages": 29,
+      "campaignUnlockedTracks": 4,
+      "carsTotal": 52,
+      "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
       "dailySavedResults": 0,
       "hasDailyResults": false,

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
 
@@ -314,6 +315,84 @@ const CASES = {
         await seedDay(archived[0], g, { entryMs: 41000 });
         await seedDay(archived[1], a, { entryMs: 39000 });
         await seedDay(playable[5], g, { entryMs: 42000 });
+    },
+    'equal personal bests with different details': async (g, a) => {
+        const { playable } = await seedDays();
+        await seedStage(NUMBERS[0], g, { entryMs: 31000 });
+        await seedStage(NUMBERS[0], a, { entryMs: 31000 });
+        await seedDay(playable[5], g, { entryMs: 41000 });
+        await seedDay(playable[5], a, { entryMs: 41000 });
+        for (const [playerId, checkpointTimesSec, updatedAt] of [
+            [g, [10.1, 20.2], '2026-09-20T10:00:00.000Z'],
+            [a, [10.5, 20.9], '2026-09-21T10:00:00.000Z'],
+        ]) {
+            for (const [competition, track] of [
+                [toCampaignCompetition(NUMBERS[0].seriesId, NUMBERS[0]), TRACKS[NUMBERS[0].trackKey]],
+                [toDailyCompetition(playable[5]), TRACKS[playable[5].trackKey]],
+            ]) {
+                await upsertPlayerTrackPersonalBest({
+                    playerId,
+                    competition,
+                    track,
+                    bestTimeMs: competition.mode === 'daily' ? 41000 : 31000,
+                    checkpointTimesSec,
+                    ghost: null,
+                    updatedAt,
+                });
+            }
+        }
+    },
+    'the guest started a later series without results': async (g, a) => {
+        await seedDays();
+        await redis.set(campaignProgressKey(g, OTHER_SERIES.id), JSON.stringify({
+            campaignId: OTHER_SERIES.id,
+            startedAt: '2026-09-25T09:00:00.000Z',
+            resultsByRaceId: {},
+            updatedAt: '2026-09-25T09:00:00.000Z',
+        }));
+        await seedStage(NUMBERS[0], g, { entryMs: 31000 });
+        await seedStage(NUMBERS[0], a, { entryMs: 30000 });
+    },
+    'the guest is faster on a later-series stage the account raced': async (g, a) => {
+        await seedDays();
+        await seedStage(OTHER_STAGE, g, { entryMs: 50000, pbMs: 50000 });
+        await seedStage(OTHER_STAGE, a, { entryMs: 52000, pbMs: 52000 });
+        await seedProgress(g, OTHER_SERIES.id, [[OTHER_STAGE, 50000, 'silver']]);
+        await seedProgress(a, OTHER_SERIES.id, [[OTHER_STAGE, 52000, 'bronze']]);
+    },
+    'the guest holds a personal best where the account never raced': async (g) => {
+        const { playable } = await seedDays();
+        await seedStage(NUMBERS[2], g, { pbMs: 34000 });
+        await seedDay(playable[3], g, { pbMs: 45000 });
+    },
+    "the account's ranking lost step where the guest never raced": async (g, a) => {
+        const { playable } = await seedDays();
+        await seedStage(NUMBERS[1], a, { entryMs: 30000, rankMs: 36000 });
+        await seedDay(playable[2], a, { entryMs: 40000, rankMs: 46000 });
+        await seedStage(NUMBERS[0], g, { entryMs: 33000 });
+        await seedDay(playable[5], g, { entryMs: 43000 });
+    },
+    'the guest has old Daily rows and an old ghost format': async (g, a) => {
+        const { playable } = await seedDays();
+        await seedDay(playable[5], g, { entryMs: 41000, entryExtra: { validationMethod: 'legacy-physics' } });
+        await seedDay(playable[5], a, { entryMs: 42000 });
+        // A real stored personal best, with the ghost format of an older version.
+        await seedDay(playable[4], g, { entryMs: 43000, pbMs: 43000 });
+        const board = toDailyCompetition(playable[4]);
+        const field = createHash('sha256').update(g, 'utf8').digest('base64url');
+        const stored = JSON.parse(await redis.hGet(board.pbHashKey, field));
+        await redis.hSet(board.pbHashKey, { [field]: JSON.stringify({ ...stored, schemaVersion: 1 }) });
+        await seedStage(NUMBERS[0], g, { entryMs: 31000 });
+    },
+    "the account's old entry lost step with its ranking": async (g, a) => {
+        const { playable } = await seedDays();
+        await seedStage(NUMBERS[0], a, {
+            entryMs: 30000,
+            rankMs: 35000,
+            entryExtra: { validationMethod: 'legacy-physics' },
+        });
+        await seedStage(NUMBERS[0], g, { entryMs: 33000 });
+        await seedDay(playable[5], g, { entryMs: 43000 });
     },
     'a long Daily history that moves in pieces': async (g, a) => {
         const { archived } = await seedDays(70);
