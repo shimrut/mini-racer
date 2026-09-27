@@ -63,7 +63,6 @@ export type StorageUsage = {
     measuredAt: string;
     totalBytes: number;
     groups: StorageUsageGroup[];
-    notCounted: string[];
 };
 
 type KeyGroup = {
@@ -428,13 +427,6 @@ function buildKeyGroups({
     ];
 }
 
-const NOT_COUNTED = [
-    'Head to Head create locks, 10-minute post identity, and share previews — short-lived, and none of them is listed anywhere.',
-    'Locks, rate limits and share links — all short-lived, and none of them is listed anywhere.',
-    'Signed-out guest records — a guest is only listed once they have Campaign progress.',
-    'Redis adds its own overhead per key and per row on top of the stored data measured here.',
-];
-
 function readSubredditName(subredditName?: unknown): string {
     const named = typeof subredditName === 'string' ? subredditName.trim() : '';
     if (named) return named;
@@ -445,6 +437,12 @@ function readSubredditName(subredditName?: unknown): string {
     }
 }
 
+// The walk does not count these keys:
+// - Head to Head create locks, the 10-minute post identity, and share previews.
+//   They are short-lived, and no list names them.
+// - Locks, rate limits and share links. They are short-lived, and no list names them.
+// - Signed-out guest records. A guest is listed only after Campaign progress.
+// Redis also adds its own overhead for each key and each row.
 async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> {
     const windowChallengeIds = analyticsRetentionWindow(now).dates.map((date) => createDailyChallengeId(date));
     const storedDailyChallengeIds = await readStoredDailyChallengeIds(windowChallengeIds);
@@ -458,7 +456,6 @@ async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> 
         measuredAt: now.toISOString(),
         totalBytes: groups.reduce((bytes, group) => bytes + group.bytes, 0),
         groups: [...groups].sort((first, second) => second.bytes - first.bytes),
-        notCounted: NOT_COUNTED,
     };
 }
 

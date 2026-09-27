@@ -247,12 +247,4 @@ describe('server storage usage', () => {
         expect(groupById(usage, 'ghosts').bytes).toBe(0);
         expect(groupById(usage, 'leaderboards').bytes).toBeGreaterThan(0);
     });
-
-    it('says out loud what it could not reach', async () => {
-        const usage = await measure();
-
-        expect(usage.notCounted.length).toBeGreaterThan(0);
-        expect(usage.notCounted.join(' ')).toMatch(/Head to Head/);
-        expect(usage.notCounted.join(' ')).toMatch(/overhead/);
-    });
 });

@@ -178,7 +178,7 @@ describe('moderator analytics page', () => {
         ]) {
             const { window } = analyticsDom();
             renderAnalyticsSummary(window.document, summaryFixture({
-                storage: { totalBytes: 1536, groups: [], notCounted: [] },
+                storage: { totalBytes: 1536, groups: [] },
                 racedListFill,
             }));
             expect(window.document.getElementById('analytics-storage').textContent).toContain(text);
@@ -207,7 +207,6 @@ describe('moderator analytics page', () => {
                         estimated: false,
                     },
                 ],
-                notCounted: ['Head to Head records expire quickly.'],
             },
         }));
         const storage = window.document.getElementById('analytics-storage').textContent;
@@ -216,7 +215,6 @@ describe('moderator analytics page', () => {
         expect(storage).toContain('Ghost replays');
         expect(storage).toContain('~1.0 KB');
         expect(storage).toContain('Analytics');
-        expect(storage).not.toContain('Head to Head records expire quickly.');
         expect(window.document.querySelector('#analytics-storage .analytics-table')).toBeTruthy();
     });
 
