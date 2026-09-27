@@ -862,6 +862,13 @@ class MapmakerApp {
             this.markDirty('Updated track name.', derived);
         });
 
+        this.trackKeyInput.addEventListener('change', () => {
+            this.renameTrackKey(this.trackKeyInput.value.trim());
+        });
+        this.trackKeyInput.addEventListener('blur', () => {
+            this.trackKeyInput.value = this.state.selectedTrackKey;
+        });
+
         this.trackDestinationSelect.addEventListener('change', () => {
             const destination = this.getSelectedDestination();
             this.destinationByKey.set(this.state.selectedTrackKey, destination);

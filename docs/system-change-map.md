@@ -727,7 +727,8 @@ These are useful, but they are not on the critical player path:
   line and checkpoint edits snap perpendicular across outer/inner walls.
   **Copy backup** copies the track file and the catalog lines when Save cannot
   reach the local server, as described in `docs/track-authoring.md`. The track
-  key follows the display name (`Spade Kingdom` becomes `spadeKingdom`).
+  key follows the display name (`Spade Kingdom` becomes `spadeKingdom`) and can
+  still be edited.
 - `tools/runner.*`
   Bot checks for a track. The Mapmaker **Run bots** button uses the same check
   on the drawing on screen. Runner Lab still opens saved tracks at

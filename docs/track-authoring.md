@@ -129,7 +129,7 @@ automatically in the same tab.
 
 1. Build and validate the layout in `tools/mapmaker.html`.
    The track key follows the display name: "Spade Kingdom" becomes `spadeKingdom`.
-   **New** and **Clone** ask for the name only.
+   **New** and **Clone** ask for the name only. The key box can still be edited.
 2. Run `npm run mapmaker`, open
    `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
    **Save & Integrate**. It writes the definition module and updates
