@@ -1733,10 +1733,9 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         lobby.setDailySelectedChallenge(
             { trackName: 'Classic Circuit', objectiveParams: { lapCount: 1 } },
-            { trackName: 'Classic Circuit', laps: 1, billingLabel: 'Today' },
+            { trackName: 'Classic Circuit', laps: 1 },
         );
         expect(selectionTrack.textContent).toBe('Classic Circuit');
-        expect(selectionTrack.textContent).not.toBe('Today');
         expect(selectionLaps.textContent).toBe('1 Lap');
         expect(selectionLaps.hidden).toBe(false);
         expect(selection.hidden).toBe(false);

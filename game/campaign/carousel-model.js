@@ -1,22 +1,11 @@
 import { getCombinedMedalStackTiers } from '../medals/medal-timing.js';
 import { hasTrack } from '../track/catalog.js';
-import { formatLapsLabel } from '../shared/laps-label.js';
 
 export function formatCampaignStageLabel(stage) {
     const number = typeof stage?.numberLabel === 'string' && stage.numberLabel.trim()
         ? stage.numberLabel.trim()
         : null;
     return number ? `Stage ${number}` : 'Stage';
-}
-
-function buildMetaLabel(stage, lapsLabel) {
-    if (!stage.unlocked) {
-        if (stage.unlockProgress && !stage.unlockProgress.awaitingPreviousMedal) return lapsLabel;
-        return stage.unlockRequirementLabel || 'Locked';
-    }
-    return stage.bestTimeMs === null
-        ? lapsLabel
-        : `${lapsLabel} · PB ${stage.bestTimeLabel}`;
 }
 
 function buildLockMeter(stage) {
@@ -36,7 +25,6 @@ export function buildCampaignCarouselCards(campaignState = {}) {
 
     for (const stage of stages) {
         if (!stage?.id || !stage.trackKey || !hasTrack(stage.trackKey)) continue;
-        const lapsLabel = formatLapsLabel(stage.laps);
 
         cards.push({
             challengeId: stage.id,
@@ -44,13 +32,9 @@ export function buildCampaignCarouselCards(campaignState = {}) {
             trackKey: stage.trackKey,
             trackName: stage.trackName,
             skin: null,
-            modeLabel: 'Campaign',
-            billingLabel: formatCampaignStageLabel(stage),
             isCurrent: Boolean(stage.isNext && stage.unlocked),
             laps: stage.laps,
-            lapsLabel,
             bestLabel: stage.bestTimeMs === null ? null : stage.bestTimeLabel,
-            metaLabel: buildMetaLabel(stage, lapsLabel),
             verificationError: stage.verificationError || null,
             medal: stage.medal || null,
             medalTiers: getCombinedMedalStackTiers(stage.trackKey, stage.medal || null),

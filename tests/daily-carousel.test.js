@@ -111,12 +111,9 @@ describe('daily carousel card model', () => {
         ], { nowMs: NOW });
 
         expect(multiLap.laps).toBe(3);
-        expect(multiLap.lapsLabel).toBe('3 Laps');
-        expect(multiLap.modeLabel).toBe('Daily');
-        expect(multiLap.billingLabel).toBe('Today');
+        expect(multiLap.isCurrent).toBe(true);
         expect(multiLap.bestLabel).toBe('42.500');
-        expect(multiLap.metaLabel).toBe('3 Laps · PB 42.500');
-        expect(noBest.lapsLabel).toBe('1 Lap');
+        expect(noBest.laps).toBe(1);
         expect(noBest.bestLabel).toBe(null);
         expect(noBest.medal).toBe(null);
     });

@@ -5,7 +5,6 @@ import {
     getMedalForRaceTime,
 } from '../medals/medal-timing.js';
 import { hasTrack } from '../track/catalog.js';
-import { formatLapsLabel } from '../shared/laps-label.js';
 import { DAY_MS } from '../shared/utc-day.js';
 
 
@@ -63,7 +62,6 @@ export function buildDailyCarouselCards(challenges = [], {
             ? getMedalForRaceTime(challenge.trackKey, bestTime, requiredLaps)
             : null;
         const dayLabel = formatDailyCarouselDayLabel(challenge, nowMs);
-        const lapsLabel = formatLapsLabel(requiredLaps);
         const bestLabel = hasBestTime ? bestTime.toFixed(3) : null;
 
         cards.push({
@@ -72,13 +70,9 @@ export function buildDailyCarouselCards(challenges = [], {
             trackKey: challenge.trackKey,
             trackName: getDailyChallengeTrackName(challenge),
             skin: challenge.skin || null,
-            modeLabel: 'Daily',
-            billingLabel: dayLabel,
             isCurrent: dayLabel === 'Today',
             laps: requiredLaps,
-            lapsLabel,
             bestLabel,
-            metaLabel: bestLabel ? `${lapsLabel} · PB ${bestLabel}` : lapsLabel,
             medal,
             medalTiers: getCombinedMedalStackTiers(challenge.trackKey, medal),
             rankLabel,

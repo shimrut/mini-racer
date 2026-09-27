@@ -41,8 +41,6 @@ describe('campaign carousel card model', () => {
             'numbered-v1-03',
         ]);
         expect(cards.map((card) => card.locked)).toEqual([false, true, true, true]);
-        expect(cards[0].modeLabel).toBe('Campaign');
-        expect(cards[0].billingLabel).toBe('Stage 00');
     });
 
     it('marks the stage the campaign is asking for next', () => {
@@ -65,12 +63,10 @@ describe('campaign carousel card model', () => {
         expect(cards.map((card) => card.isCurrent)).toEqual([false, false, false, false]);
     });
 
-    it('states the gate on a locked stage rather than its lap count', () => {
+    it('states the gate on a locked stage', () => {
         const cards = buildCampaignCarouselCards(campaignState());
 
-        expect(cards[0].metaLabel).toBe('1 Lap');
         expect(cards[1].locked).toBe(true);
-        expect(cards[1].metaLabel).toContain('Earn any medal on');
         expect(cards[1].lockedLabel).toContain('Earn any medal on');
     });
 
@@ -100,7 +96,7 @@ describe('campaign carousel card model', () => {
         ]);
     });
 
-    it('hands the medal count to the card and stops repeating it in the meta', () => {
+    it('hands the medal count to the card', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, medal: 'gold' },
             {
@@ -111,11 +107,10 @@ describe('campaign carousel card model', () => {
         ]));
 
         expect(cards[1].lockMeter).toEqual({ label: 'Medals', remainingMedals: 9, ratio: 0.25 });
-        expect(cards[1].metaLabel).toBe('3 Laps');
         expect(cards[1].lockedLabel).toBe('9 more medals needed');
     });
 
-    it('keeps the sentence on the meta line while the run before is unmedalled', () => {
+    it('shows the full medal need while the run before is unmedalled', () => {
         const cards = buildCampaignCarouselCards(campaignState([
             { unlocked: true, medal: null },
             {
@@ -124,7 +119,6 @@ describe('campaign carousel card model', () => {
             },
         ]));
 
-        expect(cards[1].metaLabel).toBe('Earn any medal on Number 0');
         expect(cards[1].lockMeter).toEqual({ label: 'Medals', remainingMedals: 12, ratio: 0 });
     });
 
@@ -149,8 +143,8 @@ describe('campaign carousel card model', () => {
             { unlocked: true, bestTimeMs: 18_400, medal: 'silver', laps: 3 },
         ]));
 
-        expect(cards[0].lapsLabel).toBe('3 Laps');
-        expect(cards[0].metaLabel).toBe('3 Laps · PB 0:18.400');
+        expect(cards[0].laps).toBe(3);
+        expect(cards[0].bestLabel).toBe('0:18.400');
         expect(cards[0].medal).toBe('silver');
     });
 
