@@ -177,6 +177,22 @@ describe('the Keep Progress chooser without numbers', () => {
         expect(JSON.parse(fetchMock.mock.calls[0][1].body).choice).toBe('account');
     });
 
+    it('shows every Daily day raced when the server sends no playable-day total', async () => {
+        startWithQueue({});
+        const { requestGuestProgressSelection } = await import('../game/player/guest-progress-selection.js');
+        void requestGuestProgressSelection({
+            required: true,
+            guestHasProgress: true,
+            accountHasProgress: true,
+            guestSummary: { dailySavedResults: 2, dailyPlaylistSize: null },
+            accountSummary: { dailySavedResults: 43, dailyPlaylistSize: null },
+        });
+
+        const text = document.querySelector('.guest-progress-selection__sources').textContent;
+        expect(text).toContain('Daily43');
+        expect(text).not.toContain('Daily43/');
+    });
+
     it('offers Merge by default when both sides show what they hold', async () => {
         startWithQueue({});
         const { requestGuestProgressSelection } = await import('../game/player/guest-progress-selection.js');

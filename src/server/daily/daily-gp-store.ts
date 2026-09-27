@@ -1516,8 +1516,14 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
         : initialCampaign;
     const campaignResults = Object.keys(campaign.resultsByRaceId).length;
     const campaignUnlockedTracks = getCampaignUnlockedRaceIds(campaign.resultsByRaceId).length;
+    // Once the raced lists are complete, count every Daily day the player
+    // raced, archived days too. The list only grows, so a day whose rows were
+    // removed since still counts.
+    const listed = await readTransferBoards([playerId]);
     const [dailySavedResults, carUnlocks] = await Promise.all([
-        countDailyProgressResults(playerId, dailyPlaylist),
+        listed
+            ? Promise.resolve(listed.dailyChallengeIds.length)
+            : countDailyProgressResults(playerId, dailyPlaylist),
         getCarUnlockSnapshot(playerId, campaign.resultsByRaceId),
     ]);
     return {
@@ -1525,7 +1531,7 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
         campaignUnlockedTracks,
         campaignTotalStages: CAMPAIGN_LIVE_STAGES.length,
         dailySavedResults,
-        dailyPlaylistSize: dailyPlaylist.length,
+        dailyPlaylistSize: listed ? null : dailyPlaylist.length,
         carsUnlocked: carUnlocks.unlockedAssets.length,
         carsTotal: PLAYER_SELECTABLE_CAR_ASSETS.length,
         hasDailyResults: Boolean(profile?.hasAnyData),

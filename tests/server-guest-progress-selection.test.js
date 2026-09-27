@@ -875,6 +875,22 @@ describe("guest transfer cost and recovery", () => {
     expect(await redis.hGet(board.entryHashKey, guestPlayerId)).toBe("{ not json");
   });
 
+  it("counts every Daily day raced on the choice screen once the raced lists are complete", async () => {
+    const archived = await seedArchivedDay();
+    const [recent] = await getServerDailyGpPlaylist();
+    const guestPlayerId = "guest:day-count";
+    const redditPlayerId = "reddit:day-count";
+    await seedDailyRow(archived, guestPlayerId, 41000);
+    await seedDailyRow(recent, guestPlayerId, 42000);
+
+    const before = await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+    expect(before.guestSummary).toMatchObject({ dailySavedResults: 1, dailyPlaylistSize: 7 });
+
+    await markFillReady();
+    const after = await getGuestProgressSelection({ guestPlayerId, redditPlayerId });
+    expect(after.guestSummary).toMatchObject({ dailySavedResults: 2, dailyPlaylistSize: null });
+  });
+
   it("waits for a race save still running on an archived day", async () => {
     const archived = await seedArchivedDay();
     const guestPlayerId = "guest:archive-saving";

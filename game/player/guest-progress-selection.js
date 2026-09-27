@@ -13,10 +13,14 @@ function summaryMetrics(summary) {
     const metrics = [];
     const dailySavedResults = nonNegativeInteger(summary?.dailySavedResults);
     const dailyPlaylistSize = nonNegativeInteger(summary?.dailyPlaylistSize);
-    if (dailySavedResults !== null && dailyPlaylistSize !== null) {
+    // "Daily 43" counts every Daily day raced; "Daily 2/7" counts the
+    // playable days only, until the server can list older days.
+    if (dailySavedResults !== null) {
         metrics.push({
             label: 'Daily',
-            value: `${dailySavedResults}/${dailyPlaylistSize}`,
+            value: dailyPlaylistSize === null
+                ? `${dailySavedResults}`
+                : `${dailySavedResults}/${dailyPlaylistSize}`,
         });
     }
 
