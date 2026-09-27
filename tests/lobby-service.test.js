@@ -277,13 +277,11 @@ describe('lobby service', () => {
             available: true,
             canRace: true,
             targetTimeLabel: '0:25.640',
-            gapMs: -472,
             winMarginLabel: '0.472',
         });
 
         expect(normalizeChallengeLobbyState({ ...base, outcome: 'won' })).toMatchObject({
             beaten: true,
-            gapMs: null,
             winMarginLabel: null,
         });
 

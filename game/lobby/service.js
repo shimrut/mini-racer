@@ -192,7 +192,6 @@ export function normalizeCampaignLobbyState(state = {}) {
         resolved,
         stages,
         complete: completed,
-        goldCount,
         progressLabel: typeof state.progressLabel === 'string'
             ? state.progressLabel
             : `${goldCount} / ${stages.length} Gold`,
@@ -228,7 +227,6 @@ export function normalizeChallengeLobbyState(state = {}) {
         canRace,
         available,
         beaten,
-        gapMs,
         winMarginLabel: gapMs === null ? null : formatLobbyGap(gapMs).slice(1),
         canAccept: canRace && available && !beaten && !challengeLoading,
         canRetry,
