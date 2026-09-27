@@ -7,6 +7,7 @@ import {
 } from '../game/track/canvas.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
+import { isLiveGround } from '../game/track/live-grounds.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
@@ -1145,9 +1146,9 @@ class MapmakerApp {
         };
         addOption(DAILY_DESTINATION, 'Daily Challenge');
         for (const series of this.seriesData.series) {
-            const state = isCampaignSeriesLive(series)
-                ? 'live'
-                : `hidden, ${series.stages.length}/${getCampaignSeriesMinStages(series)} stages`;
+            let state = `hidden, ${series.stages.length}/${getCampaignSeriesMinStages(series)} stages`;
+            if (isCampaignSeriesLive(series)) state = 'live';
+            else if (!isLiveGround(series.ground)) state = 'hidden, ground not live';
             addOption(seriesDestination(series.id), `Campaign · ${series.name} (${state})`);
         }
         if (this.getSavedDestination(trackKey) === UNUSED_DESTINATION) {

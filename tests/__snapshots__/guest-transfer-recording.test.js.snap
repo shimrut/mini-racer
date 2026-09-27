@@ -310,8 +310,8 @@ exports[`guest transfer recordings > Daily times from July with an empty lap cou
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -322,8 +322,8 @@ exports[`guest transfer recordings > Daily times from July with an empty lap cou
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -439,8 +439,6 @@ exports[`guest transfer recordings > Daily times from July with an empty lap cou
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {},
             "daily": {
@@ -702,8 +700,8 @@ exports[`guest transfer recordings > Daily times from July with an empty lap cou
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -714,8 +712,8 @@ exports[`guest transfer recordings > Daily times from July with an empty lap cou
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -941,8 +939,8 @@ exports[`guest transfer recordings > a guest row is damaged (account) 1`] = `
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -953,8 +951,8 @@ exports[`guest transfer recordings > a guest row is damaged (account) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -1058,8 +1056,6 @@ exports[`guest transfer recordings > a guest row is damaged (merge) 1`] = `
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -1072,8 +1068,6 @@ exports[`guest transfer recordings > a guest row is damaged (merge) 1`] = `
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "vj0yMVaebbqFU54rvXQJBUYE2PnCCw-TeZM92eHu82I",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -1090,7 +1084,6 @@ exports[`guest transfer recordings > a guest row is damaged (merge) 1`] = `
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -1124,8 +1117,8 @@ exports[`guest transfer recordings > a guest row is damaged (merge) 1`] = `
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -1136,8 +1129,8 @@ exports[`guest transfer recordings > a guest row is damaged (merge) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -5076,8 +5069,8 @@ exports[`guest transfer recordings > a long Daily history that moves in pieces (
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -5088,8 +5081,8 @@ exports[`guest transfer recordings > a long Daily history that moves in pieces (
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -5749,8 +5742,6 @@ exports[`guest transfer recordings > a long Daily history that moves in pieces (
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {},
             "daily": {
@@ -9782,8 +9773,8 @@ exports[`guest transfer recordings > a long Daily history that moves in pieces (
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -9794,8 +9785,8 @@ exports[`guest transfer recordings > a long Daily history that moves in pieces (
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -9999,8 +9990,8 @@ exports[`guest transfer recordings > an early Campaign time without labels (acco
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -10011,8 +10002,8 @@ exports[`guest transfer recordings > an early Campaign time without labels (acco
     "guestHasProgress": false,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -10196,8 +10187,6 @@ exports[`guest transfer recordings > an early Campaign time without labels (merg
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -10210,8 +10199,6 @@ exports[`guest transfer recordings > an early Campaign time without labels (merg
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "PWZ-nFLB8KniqqZ_RxQEM-d1cSthQ4BnzPiY-BRxaF8",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -10228,7 +10215,6 @@ exports[`guest transfer recordings > an early Campaign time without labels (merg
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -10291,8 +10277,8 @@ exports[`guest transfer recordings > an early Campaign time without labels (merg
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -10303,8 +10289,8 @@ exports[`guest transfer recordings > an early Campaign time without labels (merg
     "guestHasProgress": false,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -10542,8 +10528,8 @@ exports[`guest transfer recordings > archived days, raced lists complete (accoun
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -10554,8 +10540,8 @@ exports[`guest transfer recordings > archived days, raced lists complete (accoun
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -10671,8 +10657,6 @@ exports[`guest transfer recordings > archived days, raced lists complete (merge)
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {},
             "daily": {
@@ -10856,8 +10840,8 @@ exports[`guest transfer recordings > archived days, raced lists complete (merge)
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -10868,8 +10852,8 @@ exports[`guest transfer recordings > archived days, raced lists complete (merge)
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": null,
@@ -11051,8 +11035,8 @@ exports[`guest transfer recordings > archived days, raced lists not complete (ac
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11063,8 +11047,8 @@ exports[`guest transfer recordings > archived days, raced lists not complete (ac
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11164,8 +11148,6 @@ exports[`guest transfer recordings > archived days, raced lists not complete (me
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -11178,8 +11160,6 @@ exports[`guest transfer recordings > archived days, raced lists not complete (me
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -11196,7 +11176,6 @@ exports[`guest transfer recordings > archived days, raced lists not complete (me
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -11324,8 +11303,8 @@ exports[`guest transfer recordings > archived days, raced lists not complete (me
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11336,8 +11315,8 @@ exports[`guest transfer recordings > archived days, raced lists not complete (me
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11693,8 +11672,8 @@ exports[`guest transfer recordings > both raced with equal times (account) 1`] =
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11705,8 +11684,8 @@ exports[`guest transfer recordings > both raced with equal times (account) 1`] =
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -11984,8 +11963,6 @@ exports[`guest transfer recordings > both raced with equal times (merge) 1`] = `
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -11998,8 +11975,6 @@ exports[`guest transfer recordings > both raced with equal times (merge) 1`] = `
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "AC306c9MbMGltOQk1X_NuHmTEfhi3eZK8XStyD2aaes",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -12016,7 +11991,6 @@ exports[`guest transfer recordings > both raced with equal times (merge) 1`] = `
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -12137,8 +12111,8 @@ exports[`guest transfer recordings > both raced with equal times (merge) 1`] = `
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -12149,8 +12123,8 @@ exports[`guest transfer recordings > both raced with equal times (merge) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -12528,8 +12502,8 @@ exports[`guest transfer recordings > both raced, the account is faster (account)
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -12540,8 +12514,8 @@ exports[`guest transfer recordings > both raced, the account is faster (account)
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -12859,8 +12833,6 @@ exports[`guest transfer recordings > both raced, the account is faster (merge) 1
             "campaignProgress": "Uiw7alD3Yo6xmQyYfaihEEawrh8cHS-f2f15f0z1Pwg",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -12873,8 +12845,6 @@ exports[`guest transfer recordings > both raced, the account is faster (merge) 1
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "6DCqUiDwBbJaNca8V0zZwJFr81lRTn4raU4acjtzsE0",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -12891,7 +12861,6 @@ exports[`guest transfer recordings > both raced, the account is faster (merge) 1
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -13012,8 +12981,8 @@ exports[`guest transfer recordings > both raced, the account is faster (merge) 1
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -13024,8 +12993,8 @@ exports[`guest transfer recordings > both raced, the account is faster (merge) 1
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -13344,8 +13313,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (a Keep gue
             "campaignProgress": "I5GbgUSUI7skGv2kb9mgIEpOlMwhlaHbFmYr_CE82Fg",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -13358,8 +13325,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (a Keep gue
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "M4ZUC2FuOrGEg9Zqbz8y6DmkjAWlqxwJoNpGE-ty4JY",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -13376,7 +13341,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (a Keep gue
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -13569,8 +13533,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (a Keep gue
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 45,
       "dailyPlaylistSize": 7,
@@ -13581,8 +13545,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (a Keep gue
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -13968,8 +13932,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (account) 1
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 45,
       "dailyPlaylistSize": 7,
@@ -13980,8 +13944,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (account) 1
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -14300,8 +14264,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
             "campaignProgress": "I5GbgUSUI7skGv2kb9mgIEpOlMwhlaHbFmYr_CE82Fg",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -14314,8 +14276,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "M4ZUC2FuOrGEg9Zqbz8y6DmkjAWlqxwJoNpGE-ty4JY",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -14332,7 +14292,6 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -14525,8 +14484,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 45,
       "dailyPlaylistSize": 7,
@@ -14537,8 +14496,8 @@ exports[`guest transfer recordings > both raced, the guest is faster (merge) 1`]
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -14912,8 +14871,8 @@ exports[`guest transfer recordings > equal personal bests with different details
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -14924,8 +14883,8 @@ exports[`guest transfer recordings > equal personal bests with different details
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -15221,8 +15180,6 @@ exports[`guest transfer recordings > equal personal bests with different details
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15235,8 +15192,6 @@ exports[`guest transfer recordings > equal personal bests with different details
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "OYhUFgln5zRzl-Gm2VrrFltExdf773DOQdSXotTF9HU",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15253,7 +15208,6 @@ exports[`guest transfer recordings > equal personal bests with different details
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15374,8 +15328,8 @@ exports[`guest transfer recordings > equal personal bests with different details
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -15386,8 +15340,8 @@ exports[`guest transfer recordings > equal personal bests with different details
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -15537,8 +15491,8 @@ exports[`guest transfer recordings > only the account has progress (account) 1`]
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -15549,8 +15503,8 @@ exports[`guest transfer recordings > only the account has progress (account) 1`]
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -15650,8 +15604,6 @@ exports[`guest transfer recordings > only the account has progress (merge) 1`] =
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15664,8 +15616,6 @@ exports[`guest transfer recordings > only the account has progress (merge) 1`] =
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15682,7 +15632,6 @@ exports[`guest transfer recordings > only the account has progress (merge) 1`] =
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -15763,8 +15712,8 @@ exports[`guest transfer recordings > only the account has progress (merge) 1`] =
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -15775,8 +15724,8 @@ exports[`guest transfer recordings > only the account has progress (merge) 1`] =
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -16068,8 +16017,8 @@ exports[`guest transfer recordings > only the guest has progress (account) 1`] =
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -16080,8 +16029,8 @@ exports[`guest transfer recordings > only the guest has progress (account) 1`] =
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -16346,8 +16295,6 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
             "campaignProgress": "tAR_Kz7XpWcBybX0oUuP1xUlHSGCIIVTHqDdLKmCjy0",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -16360,8 +16307,6 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "AC306c9MbMGltOQk1X_NuHmTEfhi3eZK8XStyD2aaes",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -16378,7 +16323,6 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -16545,8 +16489,8 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -16557,8 +16501,8 @@ exports[`guest transfer recordings > only the guest has progress (merge) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -16796,8 +16740,8 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -16808,8 +16752,8 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -16987,8 +16931,6 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17001,8 +16943,6 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "2rXrtvyiEEytXTzvoBvi9SZ6d3FmMijY8rljLs8y4xk",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17019,7 +16959,6 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17147,8 +17086,8 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -17159,8 +17098,8 @@ exports[`guest transfer recordings > the account's old entry lost step with its 
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -17376,8 +17315,8 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -17388,8 +17327,8 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -17615,8 +17554,6 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17629,8 +17566,6 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "2rXrtvyiEEytXTzvoBvi9SZ6d3FmMijY8rljLs8y4xk",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17647,7 +17582,6 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -17830,8 +17764,8 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -17842,8 +17776,8 @@ exports[`guest transfer recordings > the account's ranking lost step where the g
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18099,8 +18033,8 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18111,8 +18045,8 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18291,8 +18225,6 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -18305,8 +18237,6 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "2rXrtvyiEEytXTzvoBvi9SZ6d3FmMijY8rljLs8y4xk",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -18323,7 +18253,6 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -18446,8 +18375,8 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18458,8 +18387,8 @@ exports[`guest transfer recordings > the account's ranking lost step with its en
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18758,8 +18687,8 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18770,8 +18699,8 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -18964,8 +18893,6 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -18978,8 +18905,6 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "uF_Ch0q8nKRPmWKBVYBx0nHQPsg6n7faDyx32T5uXBw",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -18996,7 +18921,6 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -19186,8 +19110,8 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -19198,8 +19122,8 @@ exports[`guest transfer recordings > the guest has old Daily rows and an old gho
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -19443,8 +19367,8 @@ exports[`guest transfer recordings > the guest has old rows (account) 1`] = `
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -19455,8 +19379,8 @@ exports[`guest transfer recordings > the guest has old rows (account) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -19652,8 +19576,6 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
             "campaignProgress": "mr3SkGGlYfsOQVkblaM6dAHcRoN5LDqjZepZvRKxQHM",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -19666,8 +19588,6 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "lpR2IYSjijPa-FWLa19ofkHfEP_z8kOhzSLyr4pQ-sI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -19684,7 +19604,6 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -19808,8 +19727,8 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -19820,8 +19739,8 @@ exports[`guest transfer recordings > the guest has old rows (merge) 1`] = `
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -20025,8 +19944,8 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20037,8 +19956,8 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20229,8 +20148,6 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -20243,8 +20160,6 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "bChPB0D272H2C-0M3rC5xyE8CAhF46lGlyeigEkBEZY",
@@ -20261,7 +20176,6 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -20343,8 +20257,8 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20355,8 +20269,8 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20587,8 +20501,8 @@ exports[`guest transfer recordings > the guest holds only personal bests (accoun
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20599,8 +20513,8 @@ exports[`guest transfer recordings > the guest holds only personal bests (accoun
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20804,8 +20718,6 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -20818,8 +20730,6 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "rLHEfTELTfWmvnbjayxR-U6rMIZxo4jCRBx-sTiCBFk",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -20836,7 +20746,6 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -20922,8 +20831,8 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -20934,8 +20843,8 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -21204,8 +21113,8 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -21216,8 +21125,8 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -21496,8 +21405,6 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "vAOmUIaLxpQg_YJmNK3qHgTWlIYaOIlqMuCrWHJOi4s",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "zZfLaGeCweGiIi4TN3Hr5-ya3Fld14-r-OSEN02AE10",
@@ -21510,8 +21417,6 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -21528,7 +21433,6 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -21591,8 +21495,8 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -21603,8 +21507,8 @@ exports[`guest transfer recordings > the guest is faster on a later-series stage
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -21824,8 +21728,8 @@ exports[`guest transfer recordings > the guest raced another series (account) 1`
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -21836,8 +21740,8 @@ exports[`guest transfer recordings > the guest raced another series (account) 1`
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -22104,8 +22008,6 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "rd2pfZzM9mIFsI-8WBJybPkeCagR53QD0T3F4o0N8tI",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "wRvmmEbbx0i3mZ4XS3Ku23oXjkXXg4wE7BFGc_Jh7bk",
@@ -22118,8 +22020,6 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -22136,7 +22036,6 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -22212,8 +22111,8 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
     "accountHasProgress": true,
     "accountSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 5,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 3,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -22224,8 +22123,8 @@ exports[`guest transfer recordings > the guest raced another series (merge) 1`] 
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 1,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 44,
       "dailyPlaylistSize": 7,
@@ -22434,8 +22333,8 @@ exports[`guest transfer recordings > the guest started a later series without re
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -22446,8 +22345,8 @@ exports[`guest transfer recordings > the guest started a later series without re
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -22647,8 +22546,6 @@ exports[`guest transfer recordings > the guest started a later series without re
             "campaignProgress": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             "campaignSeriesProgress": {
               "dirt-v1": "CXM-nKsOk4K_4Rugqnb1hWgw_PdeT3Yl__IuKDXnuL8",
-              "grip-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
-              "snow-v1": "dCNOmK_nSY-12vHzasLXiswzlGT5UHA7jAGYkvmCuQs",
             },
             "campaignStages": {
               "dirt-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -22661,8 +22558,6 @@ exports[`guest transfer recordings > the guest started a later series without re
               "dirt-v1-07": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-08": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "dirt-v1-09": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "grip-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-00": "uF_Ch0q8nKRPmWKBVYBx0nHQPsg6n7faDyx32T5uXBw",
               "numbered-v1-01": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-02": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -22679,7 +22574,6 @@ exports[`guest transfer recordings > the guest started a later series without re
               "numbered-v1-13": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-14": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
               "numbered-v1-15": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
-              "snow-v1-00": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
             },
             "daily": {
               "daily-gp-2026-09-21": "g00V1j24-2IBt9bbnosR8WWNq-xVjAUBnew3qjbfOqI",
@@ -22742,8 +22636,8 @@ exports[`guest transfer recordings > the guest started a later series without re
     "accountHasProgress": false,
     "accountSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,
@@ -22754,8 +22648,8 @@ exports[`guest transfer recordings > the guest started a later series without re
     "guestHasProgress": true,
     "guestSummary": {
       "campaignResults": 0,
-      "campaignTotalStages": 29,
-      "campaignUnlockedTracks": 4,
+      "campaignTotalStages": 26,
+      "campaignUnlockedTracks": 2,
       "carsTotal": 52,
       "carsUnlocked": 43,
       "dailyPlaylistSize": 7,

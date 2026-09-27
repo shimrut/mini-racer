@@ -12,7 +12,7 @@ import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby
 import { LobbyUi } from '../game/lobby/ui.js';
 
 describe('Campaign series screen', () => {
-    it('lists every series with its ground, stage count and medals', () => {
+    it('lists every series on a live ground with its ground, stage count and medals', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
@@ -20,8 +20,6 @@ describe('Campaign series screen', () => {
         expect(rows.map((row) => [row.name, row.comingSoon, row.infoParts])).toEqual([
             ['Numbers', false, ['Street · 16 stages', '23/64 medals']],
             ['Mini Rally', false, ['Dirt · 10 stages', '0/40 medals']],
-            ['Sliders', false, ['Snow · 1 stages', '0/4 medals']],
-            ['Formula Mini', false, ['Circuit · 2 stages', '0/8 medals']],
         ]);
         expect(rows[0].current).toBe(true);
     });
@@ -29,7 +27,7 @@ describe('Campaign series screen', () => {
     it('pictures the first stage, or a track of the ground while a series has no stages', () => {
         const rows = buildCampaignSeriesRows({});
         expect(rows.map((row) => row.previewTrackKey))
-            .toEqual(['numberZero', 'countryRoad', 'snowCircuit', 'gripCircuit']);
+            .toEqual(['numberZero', 'countryRoad']);
     });
 
     it('shows medals in gold for a finished series', () => {
@@ -45,7 +43,7 @@ describe('Campaign series screen', () => {
         const rows = buildCampaignSeriesRows({ seriesId: 'numbered-v1', series: [] });
         renderCampaignSeriesList(container, rows, { onChoose });
         const buttons = [...container.querySelectorAll('button')];
-        expect(buttons.map((button) => button.disabled)).toEqual([false, false, false, false]);
+        expect(buttons.map((button) => button.disabled)).toEqual([false, false]);
         expect(buttons[0].querySelector('.lobby-mode-action__label').textContent).toBe('Numbers');
 
         buttons[0].click();

@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
     CAMPAIGN_ID,
     CAMPAIGN_NUMBERS_SERIES_ID,
+    CAMPAIGN_SERIES,
     countCampaignMedals,
     getCampaignSeriesStages,
     getCampaignStage,
     getCampaignStageMedalCount,
     getCampaignUnlockedRaceIds,
 } from '../game/campaign/manifest.js';
+import { isCampaignSeriesLive } from '../game/campaign/series-rules.js';
 import { normalizeRaceSpec } from '../game/race/race-spec.js';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
@@ -19,6 +21,15 @@ function getNumbersUnlockedRaceIds(results) {
 }
 
 describe('Campaign manifest', () => {
+    it('lets players see only the series on a live ground', () => {
+        expect(CAMPAIGN_SERIES.map((series) => series.id)).toEqual(['numbered-v1', 'dirt-v1']);
+        const tenStages = Array.from({ length: 10 }, (_, index) => ({ trackKey: `t${index}` }));
+        expect(isCampaignSeriesLive({ id: 'dirt-v1', ground: 'dirt', stages: tenStages })).toBe(true);
+        for (const ground of ['grip', 'snow', 'water', 'space']) {
+            expect(isCampaignSeriesLive({ id: `${ground}-v1`, ground, stages: tenStages }), ground).toBe(false);
+        }
+    });
+
     it('defines the immutable numbered-v1 stage order, laps, and medal-total gates', () => {
         expect(CAMPAIGN_ID).toBe('numbered-v1');
         expect(NUMBERS_STAGES.map((stage) => ({

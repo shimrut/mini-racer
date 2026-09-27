@@ -1,5 +1,6 @@
 import { CAMPAIGN_ALL_SERIES } from '../campaign/manifest.js';
 import { DEFAULT_TRACK_KEY, hasTrack } from '../track/catalog.js';
+import { isLiveGround } from '../track/live-grounds.js';
 import { renderTrackPreviewCanvas, trackPreviewPixelScale } from '../ui/track-carousel.js';
 import { formatSeriesMedals, getSeriesGroundLabel } from './campaign-series-picker.js';
 
@@ -24,13 +25,14 @@ function previewTrackKeyFor(series) {
     return groundTrackKey && hasTrack(groundTrackKey) ? groundTrackKey : DEFAULT_TRACK_KEY;
 }
 
-// Every series in the data file, in its order. A series that is not live yet is
-// "Coming soon". Medals come from the bootstrap summary of the live series.
+// Every series on a live ground, in data file order. A series that is not live
+// yet is "Coming soon". A series on another ground is not listed. Medals come
+// from the bootstrap summary of the live series.
 export function buildCampaignSeriesRows(state = {}) {
     const summaries = new Map(
         (Array.isArray(state?.series) ? state.series : []).map((summary) => [summary.id, summary]),
     );
-    return CAMPAIGN_ALL_SERIES.map((series) => {
+    return CAMPAIGN_ALL_SERIES.filter((series) => isLiveGround(series.ground)).map((series) => {
         const summary = summaries.get(series.id) ?? null;
         const comingSoon = !series.live;
         const medals = formatSeriesMedals({

@@ -51,19 +51,20 @@ function buildSeries(definition) {
                 : Object.freeze({ type: 'start' }),
         });
     }));
+    const ground = typeof definition.ground === 'string' ? definition.ground : 'tarmac';
     return Object.freeze({
         id,
         name: typeof definition.name === 'string' && definition.name.trim()
             ? definition.name.trim()
             : id,
-        ground: typeof definition.ground === 'string' ? definition.ground : 'tarmac',
-        live: isCampaignSeriesLive({ id, stages }),
+        ground,
+        live: isCampaignSeriesLive({ id, ground, stages }),
         stages,
     });
 }
 
 // Every series in the data file, also the hidden ones. The series screen shows
-// the hidden ones as "Coming soon".
+// the hidden ones on a live ground as "Coming soon".
 export const CAMPAIGN_ALL_SERIES = Object.freeze(
     (Array.isArray(seriesData?.series) ? seriesData.series : []).map(buildSeries),
 );

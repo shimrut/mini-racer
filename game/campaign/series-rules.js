@@ -1,5 +1,6 @@
-// Rules for the Campaign series list. This file has no imports, so the Mapmaker
-// server can use it without watching the series data file.
+// Rules for the Campaign series list. This file imports only the live grounds,
+// so the Mapmaker server can use it without watching the series data file.
+import { isLiveGround } from '../track/live-grounds.js';
 
 // A series stays hidden from players until it has this many stages. After that,
 // its stages are fixed, and new stages go after the last one.
@@ -20,8 +21,11 @@ export function getMaxRequiredMedals(stageIndex) {
     return Math.max(0, stageIndex) * 3;
 }
 
+// A series on a ground that is not live stays hidden, whatever its stage count.
 export function isCampaignSeriesLive(series) {
-    return Array.isArray(series?.stages) && series.stages.length >= getCampaignSeriesMinStages(series);
+    return isLiveGround(series?.ground)
+        && Array.isArray(series?.stages)
+        && series.stages.length >= getCampaignSeriesMinStages(series);
 }
 
 // Returns an error text, or null when the medal target fits its position.
