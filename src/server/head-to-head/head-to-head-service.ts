@@ -1087,7 +1087,6 @@ export function createHeadToHeadService(
                 status: 'accepted',
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 bestTimeMs: verified.bestTimeMs,
                 targetTimeMs: challenge.targetTimeMs,
                 differenceMs,

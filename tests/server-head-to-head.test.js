@@ -853,7 +853,6 @@ describe('head-to-head service', () => {
         expect(win.body).toMatchObject({
             accepted: true,
             outcome: 'won',
-            resultLabel: 'Challenge Won',
             differenceMs: -640,
         });
         expect(typeof win.body.acceptToken).toBe('string');

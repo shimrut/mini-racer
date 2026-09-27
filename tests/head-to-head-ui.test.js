@@ -536,7 +536,6 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 differenceMs: -500,
             },
         });
@@ -607,7 +606,6 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 differenceMs: -500,
             },
         });
@@ -692,7 +690,6 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 differenceMs: -500,
                 acceptToken: 'accept-token-1',
             },
@@ -907,7 +904,6 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 differenceMs: -500,
             },
         });
@@ -953,7 +949,6 @@ describe('Head to Head lobby and finish', () => {
             body: {
                 accepted: true,
                 outcome: 'won',
-                resultLabel: 'Challenge Won',
                 bestTimeMs: 7_528,
                 differenceMs: -472,
             },
