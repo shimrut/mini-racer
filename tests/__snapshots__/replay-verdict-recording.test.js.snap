@@ -1,0 +1,188 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`replay verdict recordings > alloyRing over 1 lap(s): the finished run 1`] = `
+{
+  "ok": true,
+  "run": {
+    "bestTimeMs": 14856,
+    "bestTimeSec": 14.85572262563468,
+    "checkpointTimesSec": [
+      3.2781935824119395,
+      6.0761803482770835,
+      9.010052901180954,
+      11.70269286066,
+    ],
+    "completedLaps": 1,
+    "ghost": "5082d21730ed8bd6a340f68f29b6a435d31a48b4b37a36f8ee12ee708a41e4cb",
+    "lapCompletionTimesSec": [
+      14.85572262563468,
+    ],
+    "method": "finish",
+  },
+}
+`;
+
+exports[`replay verdict recordings > carbonBend over 1 lap(s): the finished run 1`] = `
+{
+  "ok": true,
+  "run": {
+    "bestTimeMs": 9362,
+    "bestTimeSec": 9.362160664678404,
+    "checkpointTimesSec": [
+      2.2885136073999375,
+      3.557664559755973,
+      5.578340453831384,
+      7.313754909200511,
+    ],
+    "completedLaps": 1,
+    "ghost": "9aad732bf77af1827673e505efaebaea0d43f0b6f6ef5a842ab30c37a0efa51c",
+    "lapCompletionTimesSec": [
+      9.362160664678404,
+    ],
+    "method": "finish",
+  },
+}
+`;
+
+exports[`replay verdict recordings > circuit over 1 lap(s): the finished run 1`] = `
+{
+  "ok": true,
+  "run": {
+    "bestTimeMs": 6468,
+    "bestTimeSec": 6.468003737943669,
+    "checkpointTimesSec": [
+      1.576156182931128,
+      3.483549821154424,
+      4.986365746731765,
+    ],
+    "completedLaps": 1,
+    "ghost": "e9ea64b6e4dedde302392324b4ebec69b5baaff6ae634bc3c0247a38aeed2fe2",
+    "lapCompletionTimesSec": [
+      6.468003737943669,
+    ],
+    "method": "finish",
+  },
+}
+`;
+
+exports[`replay verdict recordings > circuit over 3 lap(s): the finished run 1`] = `
+{
+  "ok": true,
+  "run": {
+    "bestTimeMs": 18509,
+    "bestTimeSec": 18.508889010248502,
+    "checkpointTimesSec": [
+      1.576156182931128,
+      3.483549821154424,
+      4.986365746731765,
+      7.398494937629872,
+      9.224303006522218,
+      10.611251813276613,
+      13.381933052694299,
+      15.392827013265373,
+      16.850297706911444,
+    ],
+    "completedLaps": 3,
+    "ghost": "466e905b0a5d259c06f1be6bc51c3023db1fb0bcf5c27a1b4d76352551d11f3d",
+    "lapCompletionTimesSec": [
+      6.468003737943669,
+      12.413225438565917,
+      18.508889010248502,
+    ],
+    "method": "finish",
+  },
+}
+`;
+
+exports[`replay verdict recordings > circuit: a changed steering input gives another answer 1`] = `
+{
+  "failure": {
+    "checkpointIndex": 3,
+    "frameCount": 389,
+    "position": {
+      "x": 9.555,
+      "y": 5.633,
+    },
+    "reason": "no_finish",
+    "simulatedTimeSec": 6.483,
+    "speed": 7.717,
+    "status": "playing",
+  },
+  "ok": false,
+}
+`;
+
+exports[`replay verdict recordings > circuit: the runs it rejects, and input after the finish 1`] = `
+{
+  "a broken segment": {
+    "failure": {
+      "reason": "invalid_replay_segment",
+    },
+    "ok": false,
+  },
+  "an unknown track": {
+    "failure": {
+      "reason": "unknown_track",
+    },
+    "ok": false,
+  },
+  "another lap count": {
+    "failure": {
+      "reason": "target_lap_mismatch",
+    },
+    "ok": false,
+  },
+  "another rules revision": {
+    "failure": {
+      "reason": "rules_revision_mismatch",
+    },
+    "ok": false,
+  },
+  "input after the finish is ignored": {
+    "ok": true,
+    "run": {
+      "bestTimeMs": 6468,
+      "bestTimeSec": 6.468003737943669,
+      "checkpointTimesSec": [
+        1.576156182931128,
+        3.483549821154424,
+        4.986365746731765,
+      ],
+      "completedLaps": 1,
+      "ghost": "e9ea64b6e4dedde302392324b4ebec69b5baaff6ae634bc3c0247a38aeed2fe2",
+      "lapCompletionTimesSec": [
+        6.468003737943669,
+      ],
+      "method": "finish",
+    },
+  },
+  "no inputs": {
+    "failure": {
+      "reason": "missing_replay_inputs",
+    },
+    "ok": false,
+  },
+  "stops before the finish": {
+    "failure": {
+      "checkpointIndex": 3,
+      "frameCount": 381,
+      "position": {
+        "x": 8.532,
+        "y": 3.462,
+      },
+      "reason": "no_finish",
+      "simulatedTimeSec": 6.35,
+      "speed": 12.228,
+      "status": "playing",
+    },
+    "ok": false,
+  },
+  "too long for one lap": {
+    "failure": {
+      "frameCount": 5000,
+      "reason": "replay_too_long",
+    },
+    "ok": false,
+  },
+}
+`;
