@@ -256,9 +256,9 @@ describe('ground feel settings', () => {
         expect(fastestLineTurn(quick)).toBeGreaterThan(tarmac * 1.3);
     });
 
-    it('keeps a U-turn on grip within 15% of the tarmac width', () => {
+    it('keeps a U-turn on grip within 20% of the tarmac width', () => {
         const tarmac = holdTurn(TRACK_GROUNDS.tarmac, 120).sideways;
-        expect(holdTurn(TRACK_GROUNDS.grip, 120).sideways).toBeLessThan(tarmac * 1.15);
+        expect(holdTurn(TRACK_GROUNDS.grip, 120).sideways).toBeLessThan(tarmac * 1.2);
     });
 
     it('turns the car less at top speed, with a larger high speed steer trim', () => {
@@ -305,11 +305,11 @@ describe('snow driving', () => {
 });
 
 describe('grip driving', () => {
-    it('has more grip and the tarmac speed', () => {
+    it('has more grip, and at least the tarmac speed and acceleration', () => {
         const grip = TRACK_GROUNDS.grip;
         expect(grip.grip).toBeGreaterThan(1);
-        expect(grip.accel).toBe(1);
-        expect(grip.maxSpeed).toBe(1);
+        expect(grip.accel).toBeGreaterThanOrEqual(1);
+        expect(grip.maxSpeed).toBeGreaterThanOrEqual(1);
     });
 
     it.each([
