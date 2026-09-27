@@ -93,55 +93,114 @@ export class InteractionsUi {
         onRightDown,
         onRightUp,
     }) {
-        this.bindTouchButton(this.leftTouchBtn, onLeftDown, onLeftUp);
-        this.bindTouchButton(this.rightTouchBtn, onRightDown, onRightUp);
+        this.steeringSides = [
+            this.bindSteeringSide(this.leftTouchBtn, onLeftDown, onLeftUp),
+            this.bindSteeringSide(this.rightTouchBtn, onRightDown, onRightUp),
+        ].filter(Boolean);
+
+        // Each touch event lists the fingers that are still down. A finger
+        // whose lift the browser lost is not in the list at the next touch.
+        // This listener runs after the handlers of each side.
+        const dropLostFingers = (e) => {
+            if (!e.touches) return;
+            const down = new Set(Array.from(e.touches, (touch) => touch.identifier));
+            this.steeringSides.forEach((side) => side.keepFingers(down));
+        };
+        ["touchstart", "touchmove", "touchend", "touchcancel"].forEach((type) => {
+            window.addEventListener(type, dropLostFingers, { passive: true });
+        });
     }
 
-    bindTouchButton(button, onDown, onUp) {
-        if (!button) return;
+    bindSteeringSide(button, onDown, onUp) {
+        if (!button) return null;
 
+        // Fingers steer from touch events. Pointer events steer only for a
+        // mouse or a pen, so that one finger does not count two times.
+        const fingersUseTouchEvents = "ontouchstart" in window;
+        const fingers = new Set();
+        const pointers = new Set();
         let isPressed = false;
 
-        const press = (e) => {
+        const update = () => {
+            const shouldPress = fingers.size > 0 || pointers.size > 0;
+            if (shouldPress === isPressed) return;
+            isPressed = shouldPress;
+            button.classList.toggle("active", isPressed);
+            if (isPressed) onDown?.();
+            else onUp?.();
+        };
+
+        const touchDown = (e) => {
+            if (e.cancelable) e.preventDefault();
+            Array.from(e.changedTouches || [], (touch) => fingers.add(touch.identifier));
+            update();
+        };
+
+        // A lift also ends the older fingers on this side. Thus a tap stops a
+        // turn when the browser lost a lift but still lists the finger.
+        const touchUp = (e) => {
+            if (e.cancelable) e.preventDefault();
+            Array.from(e.changedTouches || [], (touch) => {
+                if (!fingers.has(touch.identifier)) return;
+                for (const id of fingers) {
+                    fingers.delete(id);
+                    if (id === touch.identifier) break;
+                }
+            });
+            update();
+        };
+
+        const pointerDown = (e) => {
+            if (e.pointerType === "touch" && fingersUseTouchEvents) return;
             if (e.button !== undefined && e.button !== 0) return;
             e.preventDefault();
-            if (isPressed) return;
-            isPressed = true;
-            onDown?.();
-            button.classList.add("active");
+            pointers.add(e.pointerId);
+            update();
             if (e.pointerId !== undefined) {
                 button.setPointerCapture?.(e.pointerId);
             }
         };
 
-        const release = (e) => {
-            e?.preventDefault?.();
-            if (!isPressed) return;
-            isPressed = false;
-            onUp?.();
-            button.classList.remove("active");
-            if (e?.pointerId !== undefined && button.hasPointerCapture?.(e.pointerId)) {
+        const pointerUp = (e) => {
+            if (!pointers.delete(e.pointerId)) return;
+            if (e.pointerId !== undefined && button.hasPointerCapture?.(e.pointerId)) {
                 button.releasePointerCapture?.(e.pointerId);
             }
+            update();
         };
 
+        button.addEventListener("touchstart", touchDown, { passive: false });
+        button.addEventListener("touchend", touchUp, { passive: false });
+        button.addEventListener("touchcancel", touchUp, { passive: false });
         if (window.PointerEvent) {
-            button.addEventListener("pointerdown", press);
-            button.addEventListener("pointerup", release);
-            button.addEventListener("pointercancel", release);
-            button.addEventListener("lostpointercapture", release);
-            return;
+            button.addEventListener("pointerdown", pointerDown);
+            button.addEventListener("pointerup", pointerUp);
+            button.addEventListener("pointercancel", pointerUp);
+            button.addEventListener("lostpointercapture", pointerUp);
+        } else {
+            button.addEventListener("mousedown", pointerDown);
+            button.addEventListener("mouseup", pointerUp);
+            button.addEventListener("mouseleave", pointerUp);
         }
 
-        button.addEventListener("touchstart", press, { passive: false });
-        button.addEventListener("touchend", release, { passive: false });
-        button.addEventListener("touchcancel", release, { passive: false });
-        button.addEventListener("mousedown", press);
-        button.addEventListener("mouseup", release);
-        button.addEventListener("mouseleave", release);
+        return {
+            keepFingers(down) {
+                fingers.forEach((id) => {
+                    if (!down.has(id)) fingers.delete(id);
+                });
+                update();
+            },
+            // A finger or a pointer that is down now must lift and touch again.
+            reset() {
+                fingers.clear();
+                pointers.clear();
+                isPressed = false;
+                button.classList.remove("active");
+            },
+        };
     }
+
     resetTouchControls() {
-        if (this.leftTouchBtn) this.leftTouchBtn.classList.remove("active");
-        if (this.rightTouchBtn) this.rightTouchBtn.classList.remove("active");
+        this.steeringSides?.forEach((side) => side.reset());
     }
 }

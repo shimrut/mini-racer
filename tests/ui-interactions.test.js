@@ -120,3 +120,165 @@ describe('ui interaction helpers', () => {
         });
     });
 });
+
+function createSteeringButton() {
+    const button = createEventTarget();
+    const classes = new Set();
+    button.classList = {
+        toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)),
+        remove: (name) => classes.delete(name),
+        contains: (name) => classes.has(name),
+    };
+    button.setPointerCapture = vi.fn();
+    button.hasPointerCapture = vi.fn(() => false);
+    return button;
+}
+
+function withSteering({ touchEvents = true } = {}, run) {
+    const originalWindow = globalThis.window;
+    const page = createEventTarget();
+    page.PointerEvent = function PointerEvent() {};
+    if (touchEvents) page.ontouchstart = null;
+    globalThis.window = page;
+    try {
+        const left = createSteeringButton();
+        const right = createSteeringButton();
+        const ui = Object.create(InteractionsUi.prototype, {
+            leftTouchBtn: { value: left },
+            rightTouchBtn: { value: right },
+        });
+        const steer = { left: false, right: false };
+        ui.bindSteeringControls({
+            onLeftDown: () => { steer.left = true; },
+            onLeftUp: () => { steer.left = false; },
+            onRightDown: () => { steer.right = true; },
+            onRightUp: () => { steer.right = false; },
+        });
+        // The browser sends a touch event to the element where the finger
+        // first touched, then to the page. `down` lists the fingers that the
+        // browser thinks are down after the event.
+        const touch = (button, type, id, down) => {
+            const event = {
+                changedTouches: [{ identifier: id }],
+                touches: down.map((identifier) => ({ identifier })),
+                cancelable: true,
+                preventDefault: vi.fn(),
+            };
+            button?.listeners.get(type)?.(event);
+            page.listeners.get(type)(event);
+        };
+        const pointer = (button, type, pointerType) => {
+            button.listeners.get(type)({
+                pointerType,
+                pointerId: 1,
+                button: 0,
+                preventDefault: vi.fn(),
+            });
+        };
+        run({ ui, left, right, steer, touch, pointer });
+    } finally {
+        globalThis.window = originalWindow;
+    }
+}
+
+describe('steering controls', () => {
+    it('turns while a finger is down on a side', () => {
+        withSteering({}, ({ left, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            expect(steer.left).toBe(true);
+            expect(left.classList.contains('active')).toBe(true);
+
+            touch(left, 'touchend', 1, []);
+            expect(steer.left).toBe(false);
+            expect(left.classList.contains('active')).toBe(false);
+        });
+    });
+
+    it('stops a turn at the next touch in the page when the browser drops a lost lift', () => {
+        withSteering({}, ({ left, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            // The lift of finger 1 is lost, and the browser does not list it.
+            touch(null, 'touchstart', 2, [2]);
+
+            expect(steer.left).toBe(false);
+        });
+    });
+
+    it('stops a turn at the next touch on the other side when the browser drops a lost lift', () => {
+        withSteering({}, ({ left, right, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            touch(right, 'touchstart', 2, [2]);
+
+            expect(steer.left).toBe(false);
+            expect(steer.right).toBe(true);
+        });
+    });
+
+    it('stops a turn at the next lift on that side when the browser still lists a lost finger', () => {
+        withSteering({}, ({ left, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            touch(left, 'touchstart', 2, [1, 2]);
+            expect(steer.left).toBe(true);
+
+            touch(left, 'touchend', 2, [1]);
+            expect(steer.left).toBe(false);
+        });
+    });
+
+    it('keeps turning when the first of two fingers on a side lifts', () => {
+        withSteering({}, ({ left, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            touch(left, 'touchstart', 2, [1, 2]);
+            touch(left, 'touchend', 1, [2]);
+            expect(steer.left).toBe(true);
+
+            touch(left, 'touchend', 2, []);
+            expect(steer.left).toBe(false);
+        });
+    });
+
+    it('does not steer from a finger held through a clear, but steers from a new finger', () => {
+        withSteering({}, ({ ui, left, steer, touch }) => {
+            touch(left, 'touchstart', 1, [1]);
+            // The engine clears its own steering, then the controls.
+            steer.left = false;
+            ui.resetTouchControls();
+            expect(left.classList.contains('active')).toBe(false);
+
+            touch(left, 'touchmove', 1, [1]);
+            expect(steer.left).toBe(false);
+
+            touch(left, 'touchstart', 2, [1, 2]);
+            expect(steer.left).toBe(true);
+
+            touch(left, 'touchend', 1, [2]);
+            expect(steer.left).toBe(true);
+
+            touch(left, 'touchend', 2, []);
+            expect(steer.left).toBe(false);
+        });
+    });
+
+    it('steers from a mouse, but not from the pointer events of a finger', () => {
+        withSteering({}, ({ left, steer, pointer }) => {
+            pointer(left, 'pointerdown', 'touch');
+            expect(steer.left).toBe(false);
+
+            pointer(left, 'pointerdown', 'mouse');
+            expect(steer.left).toBe(true);
+
+            pointer(left, 'pointerup', 'mouse');
+            expect(steer.left).toBe(false);
+        });
+    });
+
+    it('steers fingers from pointer events when the browser has no touch events', () => {
+        withSteering({ touchEvents: false }, ({ left, steer, pointer }) => {
+            pointer(left, 'pointerdown', 'touch');
+            expect(steer.left).toBe(true);
+
+            pointer(left, 'pointerup', 'touch');
+            expect(steer.left).toBe(false);
+        });
+    });
+});
