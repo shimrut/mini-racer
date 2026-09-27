@@ -188,6 +188,7 @@ describe('server storage usage', () => {
 
     it('counts rows exactly and marks a size it worked out from a sample', async () => {
         const rowValue = 'x'.repeat(500);
+        putHash('dailygp:challenges', { [CHALLENGE_ID]: '{}' });
         putHash(`dailygp:challenge-pbs:${CHALLENGE_ID}`, Object.fromEntries(
             Array.from({ length: 50 }, (_unused, index) => [`ghost-${String(index).padStart(2, '0')}`, rowValue]),
         ));
@@ -195,11 +196,34 @@ describe('server storage usage', () => {
         const usage = await measure();
         const ghosts = groupById(usage, 'ghosts');
 
+        // The day-list entry belongs to the Daily challenges family.
+        const dayListBytes = 'dailygp:challenges'.length + CHALLENGE_ID.length + '{}'.length;
         expect(ghosts.rows).toBe(50);
         expect(ghosts.estimated).toBe(true);
-        expect(ghosts.bytes).toBe(seededBytes());
-        expect(mockRedis.hMGet).toHaveBeenCalledTimes(1);
-        expect(mockRedis.hMGet.mock.calls[0][1]).toHaveLength(20);
+        expect(ghosts.bytes).toBe(seededBytes() - dayListBytes);
+        const ghostSamples = mockRedis.hMGet.mock.calls
+            .filter(([key]) => String(key).startsWith('dailygp:challenge-pbs:'));
+        expect(ghostSamples).toHaveLength(1);
+        expect(ghostSamples[0][1]).toHaveLength(20);
+    });
+
+    it('measures a spread of the stored Daily days and scales up to all of them', async () => {
+        // 180 stored days, older than the analytics window too, one ghost each.
+        const days = Array.from({ length: 180 }, (_unused, index) => (
+            `daily-gp-${new Date(Date.UTC(2024, 0, 1 + index)).toISOString().slice(0, 10)}`
+        ));
+        putHash('dailygp:challenges', Object.fromEntries(days.map((day) => [day, '{}'])));
+        for (const day of days) putHash(`dailygp:challenge-pbs:${day}`, { ghost: 'trace' });
+
+        const usage = await measure();
+        const ghosts = groupById(usage, 'ghosts');
+
+        expect(ghosts.keys).toBe(180);
+        expect(ghosts.rows).toBe(180);
+        expect(ghosts.estimated).toBe(true);
+        const measuredBoards = mockRedis.hLen.mock.calls
+            .filter(([key]) => String(key).startsWith('dailygp:challenge-pbs:'));
+        expect(measuredBoards).toHaveLength(60);
     });
 
     it('scales the player records it sampled up to every player it knows about', async () => {

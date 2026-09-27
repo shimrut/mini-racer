@@ -45,6 +45,9 @@ const SAMPLED_PLAYERS = 40;
 const READ_CONCURRENCY = 8;
 const SORTED_SET_SCORE_BYTES = 8;
 const STORAGE_USAGE_CACHE_TTL_SECONDS = 5 * 60;
+// Daily boards are kept for the archive, so their number only grows. The
+// ghost and leaderboard families measure a spread of stored days and scale up.
+const SAMPLED_DAILY_DAYS = 60;
 
 export type StorageUsageGroup = {
     id: string;
@@ -70,6 +73,8 @@ type KeyGroup = {
     strings: string[];
     hashes: string[];
     sortedSets: string[];
+    // The part stands for this many times its size (a sample of Daily days).
+    scale?: number;
 };
 
 type Tally = {
@@ -222,15 +227,47 @@ async function measureKeyGroup(group: KeyGroup): Promise<StorageUsageGroup> {
         ),
     ]);
     const tally = [hashes, sortedSets].reduce(addTallies, strings);
+    const scale = group.scale ?? 1;
     return {
         id: group.id,
         label: group.label,
         detail: group.detail,
-        bytes: tally.bytes,
-        keys: tally.keys,
-        rows: tally.rows,
-        estimated: tally.estimated,
+        bytes: Math.round(tally.bytes * scale),
+        keys: Math.round(tally.keys * scale),
+        rows: Math.round(tally.rows * scale),
+        estimated: tally.estimated || (scale > 1 && tally.keys > 0),
     };
+}
+
+// Adds up the parts measured under one family id, in first-seen order.
+function mergeGroupParts(parts: readonly StorageUsageGroup[]): StorageUsageGroup[] {
+    const merged = new Map<string, StorageUsageGroup>();
+    for (const part of parts) {
+        const known = merged.get(part.id);
+        merged.set(part.id, known
+            ? {
+                ...known,
+                bytes: known.bytes + part.bytes,
+                keys: known.keys + part.keys,
+                rows: known.rows + part.rows,
+                estimated: known.estimated || part.estimated,
+            }
+            : part);
+    }
+    return [...merged.values()];
+}
+
+// Every stored Daily day, oldest first; the analytics window if the day list
+// cannot be read.
+async function readStoredDailyChallengeIds(fallback: readonly string[]): Promise<string[]> {
+    try {
+        const ids = (await redis.hKeys(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY))
+            .filter((id) => id.startsWith('daily-gp-'))
+            .sort();
+        return ids.length > 0 ? ids : [...fallback];
+    } catch (_error) {
+        return [...fallback];
+    }
 }
 
 const PLAYER_RECORDS_GROUP = {
@@ -279,44 +316,61 @@ async function readLedgerSample(ledgerKey: string): Promise<string[]> {
 function buildKeyGroups({
     subredditName,
     now,
+    storedDailyChallengeIds,
 }: {
     subredditName: string;
     now: Date;
+    // Every stored Daily day; the analytics window when not given.
+    storedDailyChallengeIds?: readonly string[];
 }): KeyGroup[] {
     const scope = analyticsScope(subredditName);
     const { dates, months } = analyticsRetentionWindow(now);
+    // Post records still expire with the analytics window.
     const challengeIds = dates.map((date) => createDailyChallengeId(date));
+    const storedDays = storedDailyChallengeIds ?? challengeIds;
+    const sampledDays = pickSpread(storedDays, SAMPLED_DAILY_DAYS);
+    const dailyScale = sampledDays.length > 0 ? storedDays.length / sampledDays.length : 1;
     const campaigns = CAMPAIGN_LIVE_STAGES.map((stage) => toCampaignCompetition(stage.seriesId, stage));
     const guestExpiryKeys = [...new Set(
         campaigns.flatMap((competition) => (competition.guestExpiryKey ? [competition.guestExpiryKey] : [])),
     )];
+    const ghosts = {
+        id: 'ghosts',
+        label: 'Ghost replays',
+        detail: 'One saved run per player per race, compressed',
+    };
+    const leaderboards = {
+        id: 'leaderboards',
+        label: 'Leaderboards',
+        detail: 'Standings order, the row behind each place, and the change counter',
+    };
 
     return [
         {
-            id: 'ghosts',
-            label: 'Ghost replays',
-            detail: 'One saved run per player per race, compressed',
+            ...ghosts,
             strings: [],
-            hashes: [
-                ...challengeIds.map((challengeId) => challengeCollectionKey(challengeId)),
-                ...campaigns.map((competition) => competition.pbHashKey),
-            ],
+            hashes: sampledDays.map((challengeId) => challengeCollectionKey(challengeId)),
+            sortedSets: [],
+            scale: dailyScale,
+        },
+        {
+            ...ghosts,
+            strings: [],
+            hashes: campaigns.map((competition) => competition.pbHashKey),
             sortedSets: [],
         },
         {
-            id: 'leaderboards',
-            label: 'Leaderboards',
-            detail: 'Standings order, the row behind each place, and the change counter',
-            strings: [
-                ...challengeIds.map((challengeId) => createRedisChallengeStandingsRevisionKey(challengeId)),
-                ...campaigns.map((competition) => competition.standingsRevisionKey),
-            ],
-            hashes: [
-                ...challengeIds.map((challengeId) => createRedisChallengeEntryHashKey(challengeId)),
-                ...campaigns.map((competition) => competition.entryHashKey),
-            ],
+            ...leaderboards,
+            strings: sampledDays.map((challengeId) => createRedisChallengeStandingsRevisionKey(challengeId)),
+            hashes: sampledDays.map((challengeId) => createRedisChallengeEntryHashKey(challengeId)),
+            sortedSets: sampledDays.map((challengeId) => createRedisChallengeLeaderboardKey(challengeId)),
+            scale: dailyScale,
+        },
+        {
+            ...leaderboards,
+            strings: campaigns.map((competition) => competition.standingsRevisionKey),
+            hashes: campaigns.map((competition) => competition.entryHashKey),
             sortedSets: [
-                ...challengeIds.map((challengeId) => createRedisChallengeLeaderboardKey(challengeId)),
                 ...campaigns.map((competition) => competition.leaderboardKey),
                 ...guestExpiryKeys,
             ],
@@ -392,10 +446,13 @@ function readSubredditName(subredditName?: unknown): string {
 }
 
 async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> {
-    const groups = await Promise.all([
-        ...buildKeyGroups({ subredditName: subreddit, now }).map((group) => measureKeyGroup(group)),
+    const windowChallengeIds = analyticsRetentionWindow(now).dates.map((date) => createDailyChallengeId(date));
+    const storedDailyChallengeIds = await readStoredDailyChallengeIds(windowChallengeIds);
+    const groups = mergeGroupParts(await Promise.all([
+        ...buildKeyGroups({ subredditName: subreddit, now, storedDailyChallengeIds })
+            .map((group) => measureKeyGroup(group)),
         measurePlayerRecords(analyticsScope(subreddit)),
-    ]);
+    ]));
 
     return {
         measuredAt: now.toISOString(),
