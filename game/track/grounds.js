@@ -73,8 +73,8 @@ export const TRACK_GROUNDS = Object.freeze({
     grip: Object.freeze({
         key: 'grip',
         label: 'Circuit',
-        accel: 1,
-        maxSpeed: 1.15,
+        accel: 1.02,
+        maxSpeed: 1.14,
         grip: 2,
         steerGripScale: 1,
         turnRate: 0.9,
