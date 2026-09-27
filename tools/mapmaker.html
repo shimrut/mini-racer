@@ -4,17 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.21">
+    <link rel="stylesheet" href="mapmaker.css?v=2.22">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
-        <div>
-            <p class="maker-kicker">Track Authoring Suite</p>
-            <h1>Mini Racer Mapmaker</h1>
-        </div>
+        <h1>Mini Racer Mapmaker</h1>
         <div class="maker-header-actions">
-            <a class="maker-link ghost-btn" href="tiktok-studio.html">TikTok Studio</a>
-            <a class="maker-link ghost-btn" href="runner.html">Runner Lab</a>
             <a class="maker-link" href="../pages/game.html">Back to Game</a>
             <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
             <button id="save-track-btn" type="button">Save &amp; Integrate</button>
@@ -26,7 +21,6 @@
             <section class="maker-panel">
                 <div class="panel-head">
                     <h2>Track</h2>
-                    <button id="download-track-btn" type="button" class="ghost-btn">Download Module</button>
                 </div>
 
                 <label class="field">
@@ -53,10 +47,6 @@
                 <label class="field">
                     <span>Use For</span>
                     <select id="track-destination-select"></select>
-                    <p class="field-hint" id="track-destination-hint">
-                        Daily Challenge adds this track to the future Daily GP rotation.
-                        A Campaign series adds it as a stage of that series.
-                    </p>
                 </label>
 
                 <div id="series-stage-fields" class="series-stage-fields" hidden>
@@ -75,7 +65,7 @@
                             <input id="series-target-input" type="number" min="0" step="1">
                         </label>
                     </div>
-                    <p id="series-stage-hint" class="field-hint"></p>
+                    <p id="series-stage-hint" class="field-hint" hidden></p>
                     <ol id="series-stage-list" class="series-stage-list"></ol>
                 </div>
 
@@ -87,20 +77,17 @@
                         <option value="3" selected>Rounded</option>
                         <option value="5">Soft</option>
                     </select>
-                    <p class="field-hint">How rounded wall corners look in race. Does not change how wide the lane is.</p>
                 </label>
 
                 <label class="field">
                     <span>Ground</span>
                     <select id="ground-select"></select>
-                    <p class="field-hint">Changes how the car drives on the whole track, and how the road looks.</p>
                 </label>
             </section>
 
             <section class="maker-panel">
                 <div class="panel-head">
                     <h2>Edit Tools</h2>
-                    <button id="reframe-btn" type="button" class="ghost-btn">Reframe</button>
                 </div>
 
                 <label class="field">
@@ -113,26 +100,14 @@
                     <input id="line-smoothing-input" type="number" min="0" max="1" step="0.05">
                 </label>
 
-                <p id="draw-metrics-label" class="panel-note">Road width 3.85u. Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.</p>
-
-                <div class="button-row">
-                    <button id="undo-edit-btn" type="button" class="ghost-btn" disabled>Undo</button>
-                    <button id="redo-edit-btn" type="button" class="ghost-btn" disabled>Redo</button>
-                </div>
+                <p id="draw-metrics-label" class="panel-note">Road width 3.85u.</p>
 
                 <div class="button-row">
                     <button id="insert-point-btn" type="button">Insert Point</button>
                     <button id="delete-point-btn" type="button" class="danger-btn">Delete Point</button>
                 </div>
 
-                <div class="button-row">
-                    <button id="reverse-polygon-btn" type="button" class="ghost-btn">Reverse Wall</button>
-                    <button id="copy-track-btn" type="button" class="ghost-btn">Copy Module</button>
-                </div>
-
-                <div class="button-row">
-                    <button id="copy-integration-btn" type="button" class="ghost-btn">Copy Integration</button>
-                </div>
+                <button id="reverse-polygon-btn" type="button" class="ghost-btn">Reverse Wall</button>
 
                 <label class="field">
                     <span>Selected X</span>
@@ -152,7 +127,6 @@
                     <h2 id="medal-times-title">Medal Times</h2>
                     <span id="medal-times-state" class="pill">Not set</span>
                 </div>
-                <p id="draft-laps-note" class="panel-note">Drive Draft keeps your 10 best laps on this layout. Pick one, or the average, as the author time.</p>
                 <div id="draft-laps-list" class="draft-laps-list"></div>
                 <div class="medal-time-grid">
                     <label class="field">
@@ -172,7 +146,7 @@
                         <input id="medal-bronze-input" type="number" min="0" step="0.01">
                     </label>
                 </div>
-                <p id="medal-times-hint" class="field-hint">Times are for one lap. A new author time fills gold, silver and bronze with the usual gaps. You can change each one.</p>
+                <p id="medal-times-hint" class="field-hint" hidden></p>
             </section>
 
             <section class="maker-panel" aria-labelledby="quality-title">
@@ -188,19 +162,16 @@
                 </div>
                 <p id="flow-summary" class="panel-note">Draw a closed road to check how it flows.</p>
                 <ul id="flow-rules" class="quality-issues flow-rules" aria-labelledby="flow-title"></ul>
-            </section>
-
-            <section class="maker-panel" aria-labelledby="bot-check-title">
-                <div class="panel-head">
-                    <h2 id="bot-check-title">Bot Check</h2>
+                <div class="panel-head flow-head">
+                    <h3 id="bot-check-title">Bots</h3>
                     <span id="bot-check-count" class="pill">Not run</span>
                 </div>
-                <p id="bot-check-summary" class="panel-note">Runs the Runner Lab bots on the drawing on screen. It does not save the track.</p>
+                <p id="bot-check-summary" class="panel-note" hidden></p>
                 <button id="run-bots-btn" type="button">Run bots</button>
                 <ul id="bot-check-issues" class="quality-issues"></ul>
             </section>
 
-            <section class="maker-panel">
+            <section id="checkpoint-panel" class="maker-panel" hidden>
                 <div class="panel-head">
                     <h2>Checkpoints</h2>
                     <span id="checkpoint-count" class="pill">0 total</span>
@@ -223,23 +194,7 @@
                     <span id="dirty-badge" class="pill pill-warn">Saved</span>
                 </div>
                 <p id="status-text" class="panel-note">Ready.</p>
-                <ul class="shortcut-list">
-                    <li><kbd>Save &amp; Integrate</kbd> writes the selected definition and updates the catalog, schedule, registry, Campaign series and medal times. New Daily tracks are appended to the schedule. New series tracks go after the last stage of the series.</li>
-                    <li><kbd>Remove Track</kbd> discards an unsaved track or permanently removes a saved track from the repository after confirmation. Published race records can depend on saved tracks.</li>
-                    <li><kbd>Line Build</kbd> keeps the road open as you add points and previews each new bend. Hover over the first point to see the closed result, then click it to finish. Reframe fits the result on screen.</li>
-                    <li>The ghost car at the finished start position matches its race collision size.</li>
-                    <li>Click any wall, checkpoint, or start marker to select it.</li>
-                    <li><kbd>Backspace</kbd> removes the last draft point while building a new loop.</li>
-                    <li><kbd>Ctrl/Cmd</kbd> + <kbd>Z</kbd> and <kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> undo and redo committed edits.</li>
-                    <li><kbd>Esc</kbd> clears the current draft loop.</li>
-                    <li>Drag a start line or checkpoint (the line or its end dots) to slide it along the track. End dots show length; dragging always moves the whole gate. Gates stay perpendicular and stick out past both walls.</li>
-                    <li>Drag wall handles to move points.</li>
-                    <li><kbd>Shift</kbd> + click on a wall to insert a point.</li>
-                    <li><kbd>Delete</kbd> removes the selected wall point.</li>
-                    <li><kbd>Arrow keys</kbd> nudge the selected point.</li>
-                    <li><kbd>Wheel</kbd> or trackpad pinch zooms. Two-finger trackpad scroll pans.</li>
-                    <li><kbd>Space</kbd> + drag pans.</li>
-                </ul>
+                <button id="copy-backup-btn" type="button" class="ghost-btn">Copy backup</button>
             </section>
         </aside>
 
@@ -249,6 +204,12 @@
                     <p id="stage-title" class="stage-title">Classic Circuit</p>
                     <p id="stage-subtitle" class="stage-subtitle">Editing outer wall</p>
                 </div>
+                <div class="stage-toolbar">
+                    <div class="stage-edit-actions">
+                        <button id="undo-edit-btn" type="button" class="ghost-btn" disabled>Undo</button>
+                        <button id="redo-edit-btn" type="button" class="ghost-btn" disabled>Redo</button>
+                        <button id="reframe-btn" type="button" class="ghost-btn">Reframe</button>
+                    </div>
                 <div id="tool-buttons" class="tool-grid stage-tool-grid">
                     <button type="button" data-tool="draw" class="tool-icon-btn" aria-label="Line Build" title="Line Build">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
@@ -283,6 +244,7 @@
                         <span class="tool-icon-label">checkpoints</span>
                     </button>
                 </div>
+                </div>
             </div>
 
             <div class="canvas-shell">
@@ -316,6 +278,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.20"></script>
+    <script type="module" src="mapmaker.js?v=2.21"></script>
 </body>
 </html>

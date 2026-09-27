@@ -81,7 +81,7 @@ simulation before integration. The draft drive runs only in the browser and
 does not publish or save a definition. It reports checkpoint progress, lap
 completion, and wall contacts. **Run bots** checks that same drawing with the
 Runner Lab bots and lists who finished, the crashes, and the issues. It does
-not save the track. **Runner Lab** still opens a saved track on its own page.
+not save the track. Open `tools/runner.html` for the same check on a saved track.
 
 ### Flow checks
 
@@ -298,8 +298,8 @@ Rules:
 
 The repository-writing endpoint exists only in the dedicated local Mapmaker
 Vite configuration and accepts requests only from localhost. It is not part of
-the Devvit playtest or production build. **Download Module**, **Copy Module**,
-and **Copy Integration** remain available as manual fallbacks.
+the Devvit playtest or production build. **Copy backup** copies the track file
+and the catalog lines. If the clipboard is unavailable, it downloads the file.
 
 ## Removing A Track
 

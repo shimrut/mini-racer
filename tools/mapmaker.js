@@ -299,7 +299,6 @@ class MapmakerApp {
         this.trackKeyInput = document.getElementById('track-key-input');
         this.trackNameInput = document.getElementById('track-name-input');
         this.trackDestinationSelect = document.getElementById('track-destination-select');
-        this.trackDestinationHint = document.getElementById('track-destination-hint');
         this.seriesStageFields = document.getElementById('series-stage-fields');
         this.seriesStageLabel = document.getElementById('series-stage-label');
         this.seriesLapsSelect = document.getElementById('series-laps-select');
@@ -322,10 +321,11 @@ class MapmakerApp {
         this.selectionLabel = document.getElementById('selection-label');
         this.checkpointSelect = document.getElementById('checkpoint-select');
         this.checkpointCount = document.getElementById('checkpoint-count');
+        this.checkpointPanel = document.getElementById('checkpoint-panel');
         this.statusText = document.getElementById('status-text');
         this.dirtyBadge = document.getElementById('dirty-badge');
         this.saveTrackBtn = document.getElementById('save-track-btn');
-        this.downloadTrackBtn = document.getElementById('download-track-btn');
+        this.copyBackupBtn = document.getElementById('copy-backup-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.duplicateTrackBtn = document.getElementById('duplicate-track-btn');
         this.removeTrackBtn = document.getElementById('remove-track-btn');
@@ -334,8 +334,6 @@ class MapmakerApp {
         this.insertPointBtn = document.getElementById('insert-point-btn');
         this.deletePointBtn = document.getElementById('delete-point-btn');
         this.reversePolygonBtn = document.getElementById('reverse-polygon-btn');
-        this.copyTrackBtn = document.getElementById('copy-track-btn');
-        this.copyIntegrationBtn = document.getElementById('copy-integration-btn');
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.removeCheckpointBtn = document.getElementById('remove-checkpoint-btn');
         this.reframeBtn = document.getElementById('reframe-btn');
@@ -794,7 +792,7 @@ class MapmakerApp {
             const straightNote = straights.length
                 ? ` Longest straight ${Math.round(longest)}u (flow guide: ${FLOW_DRAW_GUIDE.maxStraight}u or less).`
                 : '';
-            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u.${straightNote} Move the pointer to extend the open road. Hover over the first point only when you're ready to close it.`;
+            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u.${straightNote}`;
         }
     }
 
@@ -865,7 +863,6 @@ class MapmakerApp {
             const destination = this.getSelectedDestination();
             this.destinationByKey.set(this.state.selectedTrackKey, destination);
             this.stageSettingsByKey.delete(this.state.selectedTrackKey);
-            this.syncDestinationHint();
             this.syncSeriesStageFields();
             const series = this.getDestinationSeries(destination);
             this.markDirty(
@@ -985,7 +982,7 @@ class MapmakerApp {
         this.insertPointBtn.addEventListener('click', () => this.insertPointAfterSelection());
         this.deletePointBtn.addEventListener('click', () => this.deleteSelectedPoint());
         this.reversePolygonBtn.addEventListener('click', () => this.reverseActivePolygon());
-        this.copyTrackBtn.addEventListener('click', () => this.copyCurrentTrack());
+        this.copyBackupBtn.addEventListener('click', () => this.copyBackup());
         this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
         this.removeCheckpointBtn.addEventListener('click', () => this.removeCheckpoint());
         this.reframeBtn.addEventListener('click', () => this.resetView());
@@ -994,8 +991,6 @@ class MapmakerApp {
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
         this.runBotsBtn.addEventListener('click', () => this.runBots());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
-        this.downloadTrackBtn.addEventListener('click', () => this.downloadTrackModule());
-        this.copyIntegrationBtn.addEventListener('click', () => this.copyTrackIntegration());
 
         this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
         this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
@@ -1082,6 +1077,7 @@ class MapmakerApp {
         this.toolButtons.forEach((button) => {
             button.dataset.active = String(button.dataset.tool === this.state.tool);
         });
+        this.checkpointPanel.hidden = this.state.tool !== 'checkpoints';
         this.updateCanvasHint();
     }
 
@@ -1165,21 +1161,7 @@ class MapmakerApp {
     syncDestinationControl(trackKey = this.state.selectedTrackKey) {
         this.syncDestinationOptions(trackKey);
         this.trackDestinationSelect.value = this.getDestinationForTrackKey(trackKey);
-        this.syncDestinationHint();
         this.syncSeriesStageFields();
-    }
-
-    syncDestinationHint() {
-        if (!this.trackDestinationHint) {
-            return;
-        }
-        const destination = this.getSelectedDestination();
-        const series = this.getDestinationSeries(destination);
-        this.trackDestinationHint.textContent = series
-            ? `Keeps this track out of Daily and makes it a stage of ${series.name}.`
-            : destination === DAILY_DESTINATION
-                ? 'Adds this track to the future Daily GP rotation when you Save & Integrate.'
-                : 'Keeps this track out of Daily and out of every Campaign series.';
     }
 
     // The stage that the selected track has, or gets when it is saved.
@@ -1207,27 +1189,17 @@ class MapmakerApp {
         if (!planned) return;
         const { series, stageIndex, fixed } = planned;
         const stageNumber = String(stageIndex).padStart(2, '0');
-        const live = isCampaignSeriesLive(series);
         this.seriesStageLabel.textContent = `${series.name} · Stage ${stageNumber}${planned.isNew ? ' (new)' : ''}`;
         this.seriesLapsSelect.value = String(planned.laps);
         this.seriesTargetInput.value = String(planned.requiredMedals);
         this.seriesLapsSelect.disabled = fixed;
         this.seriesTargetInput.disabled = fixed || stageIndex === 0;
-        const notes = [];
-        if (fixed) {
-            notes.push(`${series.name} is live, so this stage is fixed.`);
-        } else if (live) {
-            notes.push(`${series.name} is live. New tracks go after the last stage.`);
-        } else {
-            notes.push(`${series.name} stays hidden until it has ${getCampaignSeriesMinStages(series)} stages.`);
-        }
-        notes.push('Medal Target: the medals from this series that a player needs to open this stage.');
         const ground = getTrackGround(this.track).key;
         const groundWarning = ground !== series.ground
             ? `This track is ${TRACK_GROUNDS[ground]?.label ?? ground}, but ${series.name} is a ${TRACK_GROUNDS[series.ground]?.label ?? series.ground} series.`
-            : null;
-        if (groundWarning) notes.unshift(groundWarning);
-        this.seriesStageHint.textContent = notes.join(' ');
+            : '';
+        this.seriesStageHint.hidden = !groundWarning;
+        this.seriesStageHint.textContent = groundWarning;
         this.seriesStageHint.classList.toggle('series-stage-hint-warn', Boolean(groundWarning));
         this.renderSeriesStageList(series, planned);
     }
@@ -1350,14 +1322,11 @@ class MapmakerApp {
             notes.push('This track is a stage of a live series, so its medal times are fixed.');
         } else if (row && error) {
             notes.push(error);
-        } else if (!row) {
-            notes.push('Times are for one lap. A Campaign stage needs all four times.');
-        } else {
-            notes.push('Times are for one lap. A new author time fills gold, silver and bronze with the usual gaps.');
         }
         if (Number.isFinite(bronze) && bronze >= BRONZE_WARNING_SEC) {
             notes.push(`Keep a bronze lap under ${BRONZE_WARNING_SEC} s, because the server refuses very long laps.`);
         }
+        this.medalTimesHint.hidden = notes.length === 0;
         this.medalTimesHint.textContent = notes.join(' ');
         this.medalTimesHint.classList.toggle(
             'medal-times-hint-warn',
@@ -3268,24 +3237,34 @@ class MapmakerApp {
         handles.forEach((handle) => this.drawHandle(handle, viewport));
     }
 
-    async copyCurrentTrack() {
+    async copyBackup() {
         const invalidTrack = this.validateTrack(this.track);
         if (invalidTrack) {
-            this.setStatus(`Finish ${this.track.name} before copying: ${invalidTrack}.`, true);
+            this.setStatus(`Finish ${this.track.name} before copying a backup: ${invalidTrack}.`, true);
             return;
         }
 
-        const text = generateTrackModuleSource(this.track);
+        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
+        const moduleSource = generateTrackModuleSource(this.track);
+        const text = `${moduleSource}\n${generateTrackIntegrationSnippet(this.state.selectedTrackKey, this.track.name)}`;
         try {
             if (navigator.clipboard?.writeText) {
                 await navigator.clipboard.writeText(text);
-                this.setStatus(`Copied ${getTrackModuleFilename(this.state.selectedTrackKey)} module source.`);
+                this.setStatus(`Copied ${filename} and the catalog lines.`);
                 return;
             }
         } catch (error) {
             console.error(error);
         }
-        this.setStatus('Clipboard write is not available here.', true);
+
+        const blob = new Blob([moduleSource], { type: 'text/javascript;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.setStatus(`Downloaded ${filename}.`);
     }
 
     renderBotReport() {
@@ -3294,7 +3273,8 @@ class MapmakerApp {
         if (!report) {
             this.botCheckCount.textContent = 'Not run';
             this.botCheckCount.className = 'pill';
-            this.botCheckSummary.textContent = 'Runs the Runner Lab bots on the drawing on screen. It does not save the track.';
+            this.botCheckSummary.hidden = true;
+            this.botCheckSummary.textContent = '';
             return;
         }
         const issueCount = report.issues.filter((issue) => issue.severity !== 'info').length;
@@ -3317,6 +3297,7 @@ class MapmakerApp {
         if (geometrySignature(this.track) !== this.botReportSignature) {
             summary = `The drawing changed since this check. ${summary}`;
         }
+        this.botCheckSummary.hidden = false;
         this.botCheckSummary.textContent = summary;
         for (const issue of report.issues) {
             const item = document.createElement('li');
@@ -3335,6 +3316,7 @@ class MapmakerApp {
         const snapshot = cloneTracks(this.track);
         const signature = geometrySignature(snapshot);
         this.runBotsBtn.disabled = true;
+        this.botCheckSummary.hidden = false;
         this.botCheckSummary.textContent = `Running bots on ${snapshot.name}...`;
         this.setStatus(`Running bots on ${snapshot.name}...`);
         await new Promise((resolve) => {
@@ -3377,40 +3359,6 @@ class MapmakerApp {
             this.setStatus('Draft Drive could not open in this browser.', true);
             console.error(error);
         }
-    }
-
-    async copyTrackIntegration() {
-        const text = generateTrackIntegrationSnippet(this.state.selectedTrackKey, this.track.name);
-        try {
-            if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(text);
-                this.setStatus('Copied catalog, import, and registry integration lines.');
-                return;
-            }
-        } catch (error) {
-            console.error(error);
-        }
-        this.setStatus('Clipboard write is not available here.', true);
-    }
-
-    downloadTrackModule() {
-        const invalidTrack = this.validateTrack(this.track);
-        if (invalidTrack) {
-            this.setStatus(`Cannot export ${this.track.name}: ${invalidTrack}.`, true);
-            return;
-        }
-
-        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
-        const blob = new Blob([generateTrackModuleSource(this.track)], { type: 'text/javascript;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        this.setStatus(
-            `Downloaded ${filename}. Repository integration is still required.`,
-        );
     }
 
     async saveAndIntegrateTrack() {
@@ -3535,7 +3483,7 @@ class MapmakerApp {
         } catch (error) {
             console.error(error);
             this.setStatus(
-                `${error.message} Run Mapmaker through the local Vite server, or use Download Module and Copy Integration.`,
+                `${error.message} Run Mapmaker through the local Vite server, or use Copy backup.`,
                 true,
             );
         } finally {

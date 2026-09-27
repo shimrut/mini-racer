@@ -725,11 +725,12 @@ These are useful, but they are not on the critical player path:
   whether the track is for **Daily Challenge** (also updates
   `TRACK_SCHEDULE_KEYS`) or **Campaign only** (catalog/registry only). Start
   line and checkpoint edits snap perpendicular across outer/inner walls.
-  Manual module and integration exports remain available as fallbacks, as
-  described in `docs/track-authoring.md`.
+  **Copy backup** copies the track file and the catalog lines when Save cannot
+  reach the local server, as described in `docs/track-authoring.md`.
 - `tools/runner.*`
   Bot checks for a track. The Mapmaker **Run bots** button uses the same check
-  on the drawing on screen. Runner Lab still opens saved tracks on its own page.
+  on the drawing on screen. Runner Lab still opens saved tracks at
+  `tools/runner.html`.
 - `pages/preview.html`, `pages/daily.html`, `pages/preview.js`, `pages/preview.css`
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable

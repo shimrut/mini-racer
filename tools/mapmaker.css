@@ -48,15 +48,6 @@ button:disabled {
     backdrop-filter: blur(18px);
 }
 
-.maker-kicker {
-    margin: 0 0 0.3rem;
-    color: var(--maker-blue);
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 0.72rem;
-    font-weight: 700;
-}
-
 .maker-header h1 {
     margin: 0;
     font-size: 2rem;
@@ -235,6 +226,23 @@ button:hover {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+}
+
+.stage-toolbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.stage-edit-actions {
+    display: flex;
+    gap: 0.45rem;
+}
+
+.stage-edit-actions button {
+    padding: 0.55rem 0.85rem;
 }
 
 .panel-head h2,
@@ -474,24 +482,6 @@ select:focus {
 
 .legend-inner {
     background: var(--maker-blue);
-}
-
-.shortcut-list {
-    margin: 0.9rem 0 0;
-    padding-left: 1rem;
-    color: var(--maker-muted);
-    line-height: 1.7;
-}
-
-kbd {
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    border-bottom-width: 2px;
-    border-radius: 8px;
-    padding: 0.12rem 0.4rem;
-    background: rgba(15, 23, 42, 0.8);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.8rem;
-    color: var(--maker-text);
 }
 
 @media (max-width: 1100px) {
