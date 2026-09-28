@@ -209,6 +209,7 @@ describe('track runtime integrity', () => {
             'dirtSnake',
             'wildCrest',
             'dirtValley',
+            'warpedLoop',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -249,6 +250,8 @@ describe('track runtime integrity', () => {
         // Winding Road were reshaped on purpose on 2026-09-25. The next three hashes
         // include those shapes. They also include the reshapes of 2026-09-27: 12
         // Daily tracks, and Water Pistol in place of Gun Slinger, which was never live.
+        // Hook Loop, Shark Fin, Twin Wings and Winding Road were reshaped again later
+        // on 2026-09-27, before they were ever a live Daily day.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -256,16 +259,16 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            '42c6a51f5db317a2cd8abce9935d3d5990d2afc2b504972a58cc55f89840633d',
+            '43893a1ac13a7a024c73e276c6f0bceae9389b662e3f54cfd10bd010664df4e8',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            '6908df0c6a28a66ca7e0ccb5176900da4733787fe11cf9435a8d6fd13730a701',
+            'c892b7b28b034225efb2670ad447d5a810391131f2a41469c88359556b5726d7',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '3b9baa144fd310187ad6e69d4a884f80ecfcda83fc7bb8698bba6d7d449df4cd',
+            '9eeb16a56cdb2dc6b3c304179af248f8c1766bfc38dddc35bd28f00a8c0d3c7c',
         );
     });
 

@@ -154,6 +154,7 @@ export const TRACK_CATALOG = {
     dirtSnake: { name: "Dirt Snake" },
     wildCrest: { name: "Wild Crest" },
     dirtValley: { name: "Dirt Valley" },
+    warpedLoop: { name: "Warped Loop" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -283,6 +284,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'anvilCircuit',
     'waterCircuit',
     'spaceCircuit',
+    'warpedLoop',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

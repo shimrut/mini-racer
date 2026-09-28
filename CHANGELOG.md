@@ -1,3 +1,5 @@
+- **Warped Loop** joins the Daily rotation.
+
 - **Shark Bite** joins the Daily rotation.
 
 - A mid-margin Head to Head Brag now says “I had a good pace”, not “page”.

@@ -582,10 +582,10 @@
     "bronze": 11.04
   },
   "sharkFin": {
-    "author": 10,
-    "gold": 10.26,
-    "silver": 10.41,
-    "bronze": 10.76
+    "author": 11.71,
+    "gold": 12,
+    "silver": 12.35,
+    "bronze": 12.74
   },
   "twistedClover": {
     "author": 7.62,
@@ -594,10 +594,10 @@
     "bronze": 8.07
   },
   "hookLoop": {
-    "author": 6.65,
-    "gold": 6.79,
-    "silver": 6.98,
-    "bronze": 7.21
+    "author": 7.39,
+    "gold": 7.57,
+    "silver": 7.8,
+    "bronze": 8.04
   },
   "crookedArrow": {
     "author": 10.5,
@@ -606,10 +606,10 @@
     "bronze": 11.12
   },
   "windingRoad": {
-    "author": 10.03,
-    "gold": 10.21,
-    "silver": 10.48,
-    "bronze": 10.79
+    "author": 9.67,
+    "gold": 9.81,
+    "silver": 10.1,
+    "bronze": 10.34
   },
   "lightningHook": {
     "author": 12.15,
@@ -630,10 +630,10 @@
     "bronze": 12.27
   },
   "twinWings": {
-    "author": 9.09,
-    "gold": 9.21,
-    "silver": 9.45,
-    "bronze": 9.82
+    "author": 12.01,
+    "gold": 12.31,
+    "silver": 12.67,
+    "bronze": 13.07
   },
   "halfLife": {
     "author": 11.27,
@@ -928,5 +928,11 @@
     "gold": 9.39,
     "silver": 9.72,
     "bronze": 10.03
+  },
+  "warpedLoop": {
+    "author": 7.77,
+    "gold": 7.91,
+    "silver": 8.1,
+    "bronze": 8.35
   }
 }
