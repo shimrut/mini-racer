@@ -106,12 +106,14 @@ describe('player car skin', () => {
         expect(PLAYER_SELECTABLE_CAR_ASSETS.slice(imageAssets.length)).toEqual(DRAWN_CAR_ASSET_NAMES);
     });
 
-    it('offers the Formula cars drawn in code as unlocked tarmac skins in the first garage section', () => {
-        const [first] = PLAYER_CAR_SKIN_SECTIONS;
-        expect(first).toMatchObject({ id: 'formula', title: 'Formula cars' });
-        expect(first.skins.map((s) => s.label)).toEqual(['Red', 'Gold', 'Lime', 'Arctic']);
+    // The Formula cars are held back from the garage for now, but stay valid.
+    it('keeps the Formula cars drawn in code as unlocked tarmac skins, out of the garage', () => {
+        const formulaSkins = PLAYER_CAR_SKINS.filter((s) => s.series === 'formula');
+        expect(PLAYER_CAR_SKIN_SECTION_META[0]).toEqual({ id: 'formula', title: 'Formula cars' });
+        expect(PLAYER_CAR_SKIN_SECTIONS.some((s) => s.id === 'formula')).toBe(false);
+        expect(formulaSkins.map((s) => s.label)).toEqual(['Red', 'Gold', 'Lime', 'Arctic']);
 
-        for (const skin of first.skins) {
+        for (const skin of formulaSkins) {
             expect(skin.ground).toBe('tarmac');
             expect(writePlayerCarSkinAssetName(skin.assetName)).toBe(skin.assetName);
             expect(readPlayerCarSkinAssetName()).toBe(skin.assetName);
@@ -178,11 +180,12 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    // Dirt is not live for now, so the garage has no Dirt cars.
-    it('groups the skins of live grounds into Formula, Extra, MR, Cyberpunk and Steampunk garage sections without gaps', () => {
+    // Dirt is not live and the Formula cars are held back for now, so the
+    // garage has neither.
+    it('groups the skins of live grounds into Extra, MR, Cyberpunk and Steampunk garage sections without gaps', () => {
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id))
-            .toEqual(['formula', 'extra', 'mini', 'cyberpunk', 'steampunk']);
-        const liveSkins = PLAYER_CAR_SKINS.filter((s) => s.ground === 'tarmac');
+            .toEqual(['extra', 'mini', 'cyberpunk', 'steampunk']);
+        const liveSkins = PLAYER_CAR_SKINS.filter((s) => s.ground === 'tarmac' && s.series !== 'formula');
 
         const seen = new Set();
         let n = 0;

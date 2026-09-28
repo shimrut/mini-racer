@@ -107,11 +107,15 @@ export const PLAYER_CAR_SKINS = Object.freeze(
     )
 );
 
-// The garage shows only the cars of live grounds.
+// Garage sections that players do not see for now. Their cars stay valid.
+// The Formula cars are held back: remove 'formula' to show them.
+const HELD_BACK_SKIN_SECTION_IDS = Object.freeze(['formula']);
+
+// The garage shows only the cars of live grounds, and not the held-back sections.
 function buildPlayerCarSkinSections() {
     const byId = new Map(PLAYER_CAR_SKIN_SECTION_META.map((m) => [m.id, []]));
     for (const skin of PLAYER_CAR_SKINS) {
-        if (!isLiveGround(skin.ground)) continue;
+        if (!isLiveGround(skin.ground) || HELD_BACK_SKIN_SECTION_IDS.includes(skin.series)) continue;
         const bucket = byId.get(skin.series) ?? byId.get('mini');
         bucket.push(skin);
     }
