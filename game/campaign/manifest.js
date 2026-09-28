@@ -76,6 +76,10 @@ if (new Set(CAMPAIGN_ALL_SERIES.map((series) => series.id)).size !== CAMPAIGN_AL
 // The series that players can see.
 export const CAMPAIGN_SERIES = Object.freeze(CAMPAIGN_ALL_SERIES.filter((series) => series.live));
 
+// Players choose a series only when more than one is live. With one, the
+// Campaign opens its stages, with no series screen and no series choice.
+export const CAMPAIGN_HAS_SERIES_CHOICE = CAMPAIGN_SERIES.length > 1;
+
 const SERIES_BY_ID = new Map(CAMPAIGN_SERIES.map((series) => [series.id, series]));
 
 export const CAMPAIGN_LIVE_STAGES = Object.freeze(CAMPAIGN_SERIES.flatMap((series) => series.stages));

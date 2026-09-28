@@ -134,15 +134,15 @@ describe('player car skin', () => {
     });
 
     it('offers only the Rally cars drawn in code as dirt skins, and drives the red one by default', () => {
-        const dirt = PLAYER_CAR_SKIN_SECTIONS.find((s) => s.id === 'dirt');
-        expect(dirt.skins.map((s) => s.label)).toEqual(['Red', 'Blue', 'White', 'Green', 'Black']);
-        for (const skin of dirt.skins) {
+        const dirtSkins = PLAYER_CAR_SKINS.filter((s) => s.series === 'dirt');
+        expect(dirtSkins.map((s) => s.label)).toEqual(['Red', 'Blue', 'White', 'Green', 'Black']);
+        for (const skin of dirtSkins) {
             expect(DRAWN_CAR_ASSET_NAMES).toContain(skin.assetName);
             expect(skin.ground).toBe('dirt');
         }
-        expect(readPlayerCarSkinAssetName('dirt')).toBe(dirt.skins[0].assetName);
+        expect(readPlayerCarSkinAssetName('dirt')).toBe(dirtSkins[0].assetName);
 
-        const black = dirt.skins[4].assetName;
+        const black = dirtSkins[4].assetName;
         expect(writePlayerCarSkinAssetName(black)).toBe(black);
         expect(readPlayerCarSkinAssetName('dirt')).toBe(black);
         expect(readPlayerCarSkinAssetName('tarmac')).toBe(STOCK_CAR_ASSET_NAME);
@@ -178,10 +178,11 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    it('groups the skins of live grounds into Formula, Extra, MR, Cyberpunk, Steampunk and Dirt garage sections without gaps', () => {
+    // Dirt is not live for now, so the garage has no Dirt cars.
+    it('groups the skins of live grounds into Formula, Extra, MR, Cyberpunk and Steampunk garage sections without gaps', () => {
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id))
-            .toEqual(['formula', 'extra', 'mini', 'cyberpunk', 'steampunk', 'dirt']);
-        const liveSkins = PLAYER_CAR_SKINS.filter((s) => ['tarmac', 'dirt'].includes(s.ground));
+            .toEqual(['formula', 'extra', 'mini', 'cyberpunk', 'steampunk']);
+        const liveSkins = PLAYER_CAR_SKINS.filter((s) => s.ground === 'tarmac');
 
         const seen = new Set();
         let n = 0;

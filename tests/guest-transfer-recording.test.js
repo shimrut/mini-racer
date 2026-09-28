@@ -11,6 +11,9 @@ import { RedisTestDouble } from './redis-test-double.js';
 
 const redis = new RedisTestDouble();
 
+// Mini Rally is held back from players; these tests need it live.
+vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
+
 vi.mock('@devvit/redis', () => ({
     redis,
     redisCompressed: redis,

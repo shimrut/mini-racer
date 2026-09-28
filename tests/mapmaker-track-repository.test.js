@@ -17,6 +17,9 @@ import {
     parseTrackCatalogSource,
 } from '../tools/mapmaker/track-repository.js';
 
+// Mini Rally is held back from players; these rules need a live dirt series.
+vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
+
 const CATALOG_SOURCE = `export const TRACK_CATALOG = {
     circuit: { name: "Classic Circuit" },
     sunlitTemple: { name: "Sunlit Temple" },

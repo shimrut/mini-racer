@@ -18,6 +18,9 @@ vi.mock('@devvit/web/server', () => ({
     context: undefined,
 }));
 
+// Mini Rally is held back from players; the saved stage post needs it live.
+vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
+
 const { decodeHeadToHeadReplay } = await import('../src/server/head-to-head/head-to-head-replay.ts');
 const { resolveHeadToHeadRecordResult } = await import('../src/server/head-to-head/head-to-head-post.ts');
 const { decodeDailyPodiumReplay, resolveDailyPodiumReplayFromPost } = await import('../src/server/podium/daily-podium-replay.ts');

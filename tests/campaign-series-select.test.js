@@ -17,7 +17,7 @@ vi.mock('../game/campaign/series.json', async () => {
                 {
                     id: 'test-v1',
                     name: 'Test',
-                    ground: 'dirt',
+                    ground: 'tarmac',
                     stages: trackKeys.map((trackKey, index) => ({ trackKey, laps: 1, requiredMedals: index * 2 })),
                 },
             ],

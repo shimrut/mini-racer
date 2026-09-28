@@ -8,6 +8,8 @@ vi.mock('../game/ui/track-carousel.js', () => ({
     renderTrackPreviewCanvas: vi.fn(),
     trackPreviewPixelScale: () => 1,
 }));
+// Mini Rally is held back from players; these tests need it live.
+vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby/campaign-series-screen.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 

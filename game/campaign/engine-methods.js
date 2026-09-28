@@ -19,6 +19,7 @@ import {
     writeSelectedCampaignSeriesId,
 } from './service.js';
 import {
+    CAMPAIGN_HAS_SERIES_CHOICE,
     CAMPAIGN_ID,
     CAMPAIGN_SERIES,
     countCampaignMedals,
@@ -595,8 +596,9 @@ export const campaignEngineMethods = {
 
     // `view` is 'series' (the list of series) or 'stages' (the stages of one series).
     // Entering the Campaign shows the series; a return from a race shows the stages.
+    // With only one live series, the Campaign always shows the stages.
     showCampaignLobby({ refresh = true, view = 'stages' } = {}) {
-        this.campaignLobbyView = view === 'series' ? 'series' : 'stages';
+        this.campaignLobbyView = view === 'series' && CAMPAIGN_HAS_SERIES_CHOICE ? 'series' : 'stages';
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
         this.activeHeadToHead = null;
