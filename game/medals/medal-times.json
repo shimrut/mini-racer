@@ -857,6 +857,18 @@
     "silver": 18.1,
     "bronze": 18.48
   },
+  "waterCircuit": {
+    "author": 18.71,
+    "gold": 19.18,
+    "silver": 19.74,
+    "bronze": 20.36
+  },
+  "spaceCircuit": {
+    "author": 13.41,
+    "gold": 13.75,
+    "silver": 14.15,
+    "bronze": 14.59
+  },
   "forestTrail": {
     "author": 11.34,
     "gold": 11.54,
