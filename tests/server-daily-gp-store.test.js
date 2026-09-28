@@ -1776,6 +1776,7 @@ describe('server daily gp store submissions', () => {
             pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
+            quickRestartEnabled: true,
         };
 
         const saved = await updateServerPlayerPreferences({
@@ -2154,6 +2155,7 @@ describe('server daily gp store submissions', () => {
             ['a non-boolean pauseOnTimerEnabled', { pauseOnTimerEnabled: 'sure' }],
             ['an invalid pausePlacement', { pausePlacement: 'dash' }],
             ['a non-boolean hideHudEnabled', { hideHudEnabled: 'sure' }],
+            ['a non-boolean quickRestartEnabled', { quickRestartEnabled: 'sure' }],
             ['a non-finite crashRestartDelaySec', { crashRestartDelaySec: 'slow' }],
             ['a negative crashRestartDelaySec', { crashRestartDelaySec: -0.1 }],
             ['a crashRestartDelaySec above 1', { crashRestartDelaySec: 1.1 }],
@@ -2182,6 +2184,8 @@ describe('server daily gp store submissions', () => {
             ['an explicit pausePlacement of speedo', { pausePlacement: 'speedo' }, { pausePlacement: 'speedo', pauseOnTimerEnabled: false }],
             ['an omitted hideHudEnabled', { hideHudEnabled: undefined }, { hideHudEnabled: false }],
             ['an explicit hideHudEnabled of true', { hideHudEnabled: true }, { hideHudEnabled: true }],
+            ['an omitted quickRestartEnabled', { quickRestartEnabled: undefined }, { quickRestartEnabled: false }],
+            ['an explicit quickRestartEnabled of true', { quickRestartEnabled: true }, { quickRestartEnabled: true }],
         ])('accepts preferences with %s', async (_label, overrides, expected) => {
             const { updateServerPlayerPreferences } = await import('../src/server/player/player-account-store.ts');
 

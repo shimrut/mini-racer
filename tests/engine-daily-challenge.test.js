@@ -310,6 +310,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       getSelectedCarAssetName: () => "assets/cars/mr_mr_red.webp",
       modal: { showModal },
       journeys: { interaction },
+      showPauseModal: RealTimeRacer.prototype.showPauseModal,
       resumeActiveRun: vi.fn(),
       reset: vi.fn(),
     });

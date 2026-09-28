@@ -11,7 +11,12 @@ import {
     shouldCelebrateMedalTier,
     renderChallengeFinishHero,
 } from '../medals/medals.js';
-import { closeModalElement, openModalElement, runModalHandoff } from '../ui/modal-handoff.js';
+import {
+    closeModalElement,
+    closeModalElementInstantly,
+    openModalElement,
+    runModalHandoff,
+} from '../ui/modal-handoff.js';
 import { configureReusableModal } from '../ui/reusable-modal.js';
 import {
     applyMenuSelection,
@@ -228,6 +233,7 @@ export class ModalShell {
             document.getElementById('settings-hide-hud-switch'),
             document.getElementById('settings-pb-ghost-switch'),
             document.getElementById('settings-collision-auto-restart-switch'),
+            document.getElementById('settings-quick-restart-switch'),
             document.getElementById('settings-collision-restart-delay-minus'),
             document.getElementById('settings-collision-restart-delay-plus'),
         ], { requireLaidOut: false });
@@ -1256,6 +1262,8 @@ export class ModalShell {
 
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => {
+            // A quick restart can close the pause menu before this runs.
+            if (!this.isPauseModalActive()) return;
             this._syncPauseTrackPreview(options.pauseTrackPreview);
             this.resetMenuKeyboardNav?.();
             this.activateModalFocusTrap(this.modal);
@@ -1734,8 +1742,10 @@ export class ModalShell {
         });
     }
 
-    closeModal() {
+    // With `instant: true`, the modal closes with no fade-out and cleans up at once.
+    closeModal(options = {}) {
         if (!this.modal) return;
+        const instant = options?.instant === true;
 
         this._closeSharePanel({ restoreScroll: false });
         this._leaderboardRailScrollLeft = null;
@@ -1744,7 +1754,9 @@ export class ModalShell {
         this.unbindLeaderboardPagination?.();
         this.unbindLeaderboardDaySwipe?.();
         const modal = this.modal;
-        closeModalElement(modal, () => modal.classList.remove('active'));
+        const close = () => modal.classList.remove('active');
+        if (instant) closeModalElementInstantly(modal, close);
+        else closeModalElement(modal, close);
         this.cancelLeaderboardRequests?.();
 
         this.cancelPendingModalClose();
@@ -1752,6 +1764,7 @@ export class ModalShell {
         const cleanupAfterClose = () => {
             this._modalCloseTransitionEndHandler = null;
             modal.classList.remove('modal--pause');
+            modal.classList.remove('modal--quick-pause');
             modal.classList.remove('modal--win');
             this._hidePauseTrackPreview();
             this._setActiveView(null);
@@ -1764,6 +1777,11 @@ export class ModalShell {
             this._savedModalState = null;
             this.releaseModalFocusTrap(modal);
         };
+
+        if (instant) {
+            cleanupAfterClose();
+            return;
+        }
 
         const onTransitionEnd = (event) => {
             if (event.target !== modal || event.propertyName !== 'opacity') return;
@@ -1828,6 +1846,12 @@ export class ModalShell {
 
     isPauseModalActive() {
         return this.isModalActive() && this._modalKind === 'pause';
+    }
+
+    // Quick Restart: the pause menu fades in slowly at first, then fast, so a
+    // second tap that restarts the run comes before the menu really shows.
+    setQuickPauseEntrance(enabled) {
+        this.modal?.classList.toggle('modal--quick-pause', enabled === true);
     }
 
     isCombinedResultsModalActive() {

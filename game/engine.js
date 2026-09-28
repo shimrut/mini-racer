@@ -55,6 +55,7 @@ import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
 import { createProceduralMusic } from "./audio/procedural-music.js";
 import { getCollisionAutoRestartEnabled } from "./settings/collision-auto-restart-preference.js";
 import { getCollisionRestartDelaySec } from "./settings/collision-restart-delay-preference.js";
+import { isQuickRestartActive } from "./settings/quick-restart-preference.js";
 import { getCarProceduralAudioEnabled } from "./settings/car-audio-preference.js";
 import { getMusicEnabled } from "./settings/music-preference.js";
 import { getPbGhostEnabled } from "./settings/pb-ghost-preference.js";
@@ -498,11 +499,17 @@ export class RealTimeRacer {
       updateModalLeaderboardDayOptions: (options) => this.modal.updateModalLeaderboardDayOptions?.(options),
     });
     this.collisionAutoRestartEnabled = getCollisionAutoRestartEnabled();
+    this.quickRestartEnabled = isQuickRestartActive();
+    this.pauseTapTimer = null;
+    this.quickRestartTapListener = null;
     this.collisionRestartDelaySec = getCollisionRestartDelaySec();
     this.settings = new SettingsUi({
       modal: this.modal,
       onCollisionAutoRestartChanged: (value) => {
         this.collisionAutoRestartEnabled = value;
+      },
+      onQuickRestartChanged: (value) => {
+        this.quickRestartEnabled = value;
       },
       onCollisionRestartDelayChanged: (value) => {
         this.collisionRestartDelaySec = value;
@@ -568,7 +575,7 @@ export class RealTimeRacer {
       startOverlay: this.startOverlay,
       leaderboards: this.leaderboards,
       onStartDailyChallenge: () => this.handleDailyLobbyPrimaryAction(),
-      onPauseRun: () => this.pauseActiveRun(),
+      onPauseRun: (event) => this.handlePauseTap(event),
     });
     this.interactions.bindModalViewToggles();
     this.interactions.bindModalActionRowPointerFocus();
@@ -857,6 +864,7 @@ export class RealTimeRacer {
     if (!applyPlayerPreferences(playerPreferences)) return;
 
     this.collisionAutoRestartEnabled = getCollisionAutoRestartEnabled();
+    this.quickRestartEnabled = isQuickRestartActive();
     this.collisionRestartDelaySec = getCollisionRestartDelaySec();
     this.carEffectsAudio?.setEnabled?.(getCarProceduralAudioEnabled());
     this.proceduralMusic?.setEnabled?.(getMusicEnabled());
@@ -867,6 +875,7 @@ export class RealTimeRacer {
     this.settings.refreshCarAudioPanel();
     this.settings.refreshMusicPanel();
     this.settings.refreshCollisionAutoRestartPanel();
+    this.settings.refreshQuickRestartPanel();
     this.settings.refreshCollisionRestartDelayPanel();
     this.settings.refreshPausePlacementPanel();
     this.settings.refreshHideHudPanel();

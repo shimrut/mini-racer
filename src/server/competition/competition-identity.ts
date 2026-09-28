@@ -44,6 +44,7 @@ const DEFAULT_PLAYER_PREFERENCES: DailyGpPlayerPreferences = {
     pausePlacement: DEFAULT_PAUSE_PLACEMENT,
     pauseOnTimerEnabled: true,
     hideHudEnabled: false,
+    quickRestartEnabled: false,
 };
 
 function readCarSkinPreference(value: unknown): string | null {
@@ -120,6 +121,7 @@ function readPlayerPreferenceFields(value: unknown): {
     pbGhostEnabled: boolean | null;
     pausePlacement: 'separate' | 'timer' | 'speedo' | null;
     hideHudEnabled: boolean | null;
+    quickRestartEnabled: boolean | null;
 } | null {
     if (!value || typeof value !== 'object') {
         return null;
@@ -147,6 +149,10 @@ function readPlayerPreferenceFields(value: unknown): {
             preferences.hideHudEnabled,
             DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
         ),
+        quickRestartEnabled: readOptionalBooleanPreference(
+            preferences.quickRestartEnabled,
+            DEFAULT_PLAYER_PREFERENCES.quickRestartEnabled,
+        ),
     };
 }
 
@@ -171,6 +177,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         pbGhostEnabled,
         pausePlacement,
         hideHudEnabled,
+        quickRestartEnabled,
     } = fields;
     if (
         carSkin === null
@@ -182,6 +189,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         || pbGhostEnabled === null
         || pausePlacement === null
         || hideHudEnabled === null
+        || quickRestartEnabled === null
     ) {
         return null;
     }
@@ -197,6 +205,7 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
         pbGhostEnabled,
         ...withDerivedPauseFields(pausePlacement),
         hideHudEnabled,
+        quickRestartEnabled,
     };
 }
 
@@ -219,6 +228,8 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
         ...withDerivedPauseFields(pausePlacement),
         hideHudEnabled: fields.hideHudEnabled
             ?? DEFAULT_PLAYER_PREFERENCES.hideHudEnabled,
+        quickRestartEnabled: fields.quickRestartEnabled
+            ?? DEFAULT_PLAYER_PREFERENCES.quickRestartEnabled,
     };
 }
 

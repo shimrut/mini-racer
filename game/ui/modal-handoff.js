@@ -47,3 +47,13 @@ export function closeModalElement(modal, close) {
 
     runModalHandoff(close);
 }
+
+// Closes the modal with no fade-out.
+export function closeModalElementInstantly(modal, close) {
+    if (!modal || typeof close !== 'function') return;
+
+    modal.classList.add(INSTANT_MODAL_CLASS);
+    runModalHandoff(close);
+    modal.offsetHeight;
+    modal.classList.remove(INSTANT_MODAL_CLASS);
+}

@@ -348,6 +348,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
+            quickRestartEnabled: false,
         });
     });
 
@@ -373,6 +374,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
+            quickRestartEnabled: false,
         });
     });
 
@@ -407,6 +409,7 @@ describe('wave7 store parse helpers — direct coercion', () => {
             pausePlacement: 'timer',
             pauseOnTimerEnabled: true,
             hideHudEnabled: false,
+            quickRestartEnabled: false,
         });
     });
 });

@@ -37,6 +37,7 @@ describe('durable player preferences', () => {
             hideHudEnabled: false,
             crashAutoRestartEnabled: false,
             crashRestartDelaySec: 0.8,
+            quickRestartEnabled: true,
         };
 
         expect(applyPlayerPreferences(expected)).toBe(true);
@@ -56,5 +57,6 @@ describe('durable player preferences', () => {
         expect(readPlayerPreferences().pauseOnTimerEnabled).toBe(true);
         expect(readPlayerPreferences().pausePlacement).toBe('timer');
         expect(readPlayerPreferences().hideHudEnabled).toBe(false);
+        expect(readPlayerPreferences().quickRestartEnabled).toBe(false);
     });
 });

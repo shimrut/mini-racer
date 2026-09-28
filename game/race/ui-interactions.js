@@ -74,16 +74,16 @@ export class InteractionsUi {
             });
         }
         if (this.speedometer && this.onPauseRun)
-            this.speedometer.addEventListener("click", () => {
+            this.speedometer.addEventListener("click", (event) => {
                 if (getPausePlacement() !== PAUSE_PLACEMENT_SPEEDO) return;
-                this.onPauseRun();
+                this.onPauseRun(event);
             });
         if (this.pauseBtn && this.onPauseRun)
             this.pauseBtn.addEventListener("click", this.onPauseRun);
         if (this.hudStatsBtn && this.onPauseRun)
-            this.hudStatsBtn.addEventListener("click", () => {
+            this.hudStatsBtn.addEventListener("click", (event) => {
                 if (getPausePlacement() !== PAUSE_PLACEMENT_TIMER) return;
-                this.onPauseRun();
+                this.onPauseRun(event);
             });
     }
 

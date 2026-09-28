@@ -44,6 +44,22 @@ const COMPARISON_TIE_EPSILON_SEC = 0.005;
 export const MAX_SIMULATED_FRAME_DT = 0.1;
 export const RANKED_RUN_STALL_FRAME_MS = 250;
 export const RANKED_RUN_STALL_MESSAGE = "Rank disabled due to frame stalls";
+// With Quick Restart on, a second touch in this time restarts the run. It is
+// the fade-in of the pause menu that Quick Restart opens (--dur-quick-pause in
+// styles/foundation.css).
+export const QUICK_RESTART_TAP_WINDOW_MS = 180;
+// The second touch must land this close to the first tap, so that a steering
+// thumb does not restart the run.
+export const QUICK_RESTART_TAP_RADIUS_PX = 64;
+// The touch that restarts the run still ends in a click. The first click in
+// this time is dropped.
+export const QUICK_RESTART_CLICK_DROP_MS = 500;
+
+// The point of a pointer tap, or null for a click from the keyboard.
+function getTapPoint(event) {
+  if (!(event?.detail > 0) || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
+  return { x: event.clientX, y: event.clientY };
+}
 
 function finitePositive(value) {
   const number = Number(value);
@@ -671,13 +687,103 @@ export const raceEngineMethods = {
     }
   },
 
+  // A tap on the pause control. With Quick Restart on, the first tap pauses
+  // the run at once, and the pause menu fades in slowly at first, then fast.
+  // A second touch near the first tap, while the menu fades in, restarts the
+  // run at once, as a collision does, with the same delay. The menu is cut,
+  // so the restart is the only thing the player sees.
+  handlePauseTap(event) {
+    if (this.pauseTapTimer) return;
+    if (!this.quickRestartEnabled) {
+      this.pauseActiveRun();
+      return;
+    }
+    if (this.status !== "playing") return;
+
+    this.clearSteeringInput();
+    this.status = "paused";
+    this.modal?.setQuickPauseEntrance?.(true);
+    this.showPauseModal();
+    this.openQuickRestartTapWindow(getTapPoint(event));
+  },
+
+  isQuickRestartPauseOpen() {
+    return this.status === "paused" && this.modal?.isPauseModalActive?.() === true;
+  },
+
+  // The second tap counts when the finger touches, not when it lifts. The
+  // pause menu covers the pause control, so the touch is caught before it
+  // reaches the menu.
+  openQuickRestartTapWindow(tapPoint) {
+    const onPointerDown = (event) => {
+      if (!this.isQuickRestartPauseOpen()) {
+        this.endQuickRestartTapWindow();
+        return;
+      }
+      if (tapPoint && Math.hypot(event.clientX - tapPoint.x, event.clientY - tapPoint.y)
+        > QUICK_RESTART_TAP_RADIUS_PX) return;
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      this.restartFromQuickRestartTap();
+    };
+    this.quickRestartTapListener = onPointerDown;
+    globalThis.addEventListener?.("pointerdown", onPointerDown, true);
+    this.pauseTapTimer = setTimeout(() => this.endQuickRestartTapWindow(), QUICK_RESTART_TAP_WINDOW_MS);
+  },
+
+  // A pause that no second tap turned into a restart counts as a pause.
+  endQuickRestartTapWindow() {
+    this.closeQuickRestartTapWindow();
+    this.modal?.setQuickPauseEntrance?.(false);
+    if (this.isQuickRestartPauseOpen()) void this.journeys?.interaction?.("pause");
+  },
+
+  closeQuickRestartTapWindow() {
+    if (this.pauseTapTimer) clearTimeout(this.pauseTapTimer);
+    this.pauseTapTimer = null;
+    if (this.quickRestartTapListener) {
+      globalThis.removeEventListener?.("pointerdown", this.quickRestartTapListener, true);
+      this.quickRestartTapListener = null;
+    }
+  },
+
+  restartFromQuickRestartTap() {
+    this.closeQuickRestartTapWindow();
+    this.modal?.setQuickPauseEntrance?.(false);
+    if (!this.isQuickRestartPauseOpen()) return;
+    this.dropQuickRestartClick();
+    this.modal.closeModal({ instant: true });
+    this.restartCurrentRunAfterCollision();
+  },
+
+  // With the menu gone, the click of the restarting touch would reach what is
+  // under the finger, such as the pause control, and pause the new run.
+  dropQuickRestartClick() {
+    if (typeof globalThis.addEventListener !== "function") return;
+    let timer = null;
+    const finish = () => {
+      clearTimeout(timer);
+      globalThis.removeEventListener("click", drop, true);
+    };
+    const drop = (event) => {
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      finish();
+    };
+    globalThis.addEventListener("click", drop, true);
+    timer = setTimeout(finish, QUICK_RESTART_CLICK_DROP_MS);
+  },
+
   pauseActiveRun() {
     if (this.status !== "playing") return;
 
     this.clearSteeringInput();
     this.status = "paused";
     void this.journeys?.interaction?.("pause");
+    this.showPauseModal();
+  },
 
+  showPauseModal() {
     const rawBestTime = this.bestLapTime;
     const bestTime = Number.isFinite(rawBestTime) && rawBestTime > 0
       ? rawBestTime

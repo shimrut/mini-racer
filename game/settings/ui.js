@@ -52,13 +52,20 @@ import {
     getPbGhostEnabled,
     setPbGhostEnabled,
 } from './pb-ghost-preference.js';
+import {
+    QUICK_RESTART_SETTING_VISIBLE,
+    getQuickRestartEnabled,
+    isQuickRestartActive,
+    setQuickRestartEnabled,
+} from './quick-restart-preference.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 export class SettingsUi {
-    constructor({ modal, onCollisionAutoRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPausePlacementChanged, onHideHudChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
+    constructor({ modal, onCollisionAutoRestartChanged, onQuickRestartChanged, onCollisionRestartDelayChanged, onCarAudioChanged, onMusicChanged, onPausePlacementChanged, onHideHudChanged, onPbGhostChanged, onLeaderboardIdentityChanged, onPlayerPreferencesChanged } = {}) {
         this.modal = modal;
         this.onCollisionAutoRestartChanged = onCollisionAutoRestartChanged;
+        this.onQuickRestartChanged = onQuickRestartChanged;
         this.onCollisionRestartDelayChanged = onCollisionRestartDelayChanged;
         this.onCarAudioChanged = onCarAudioChanged;
         this.onMusicChanged = onMusicChanged;
@@ -73,6 +80,7 @@ export class SettingsUi {
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
+        this.refreshQuickRestartPanel();
         this.refreshCollisionRestartDelayPanel();
         this.refreshPausePlacementPanel();
         this.refreshHideHudPanel();
@@ -90,6 +98,8 @@ export class SettingsUi {
     get carAudioHeading() { return document.getElementById('settings-car-audio-heading'); }
     get collisionAutoRestartSwitch() { return document.getElementById('settings-collision-auto-restart-switch'); }
     get collisionAutoRestartHeading() { return document.getElementById('settings-collision-auto-restart-heading'); }
+    get quickRestartSwitch() { return document.getElementById('settings-quick-restart-switch'); }
+    get quickRestartHeading() { return document.getElementById('settings-quick-restart-heading'); }
     get collisionRestartDelayMeter() { return document.getElementById('settings-collision-restart-delay-meter'); }
     get collisionRestartDelayMinus() { return document.getElementById('settings-collision-restart-delay-minus'); }
     get collisionRestartDelayPlus() { return document.getElementById('settings-collision-restart-delay-plus'); }
@@ -240,6 +250,14 @@ export class SettingsUi {
                 this.refreshCollisionAutoRestartPanel();
             });
         }
+        if (this.quickRestartSwitch) {
+            this.quickRestartSwitch.addEventListener('change', () => {
+                setQuickRestartEnabled(this.quickRestartSwitch.checked);
+                this.onQuickRestartChanged?.(isQuickRestartActive());
+                this.onPlayerPreferencesChanged?.();
+                this.refreshQuickRestartPanel();
+            });
+        }
         if (this.pausePlacementGroup) {
             this.pausePlacementGroup.addEventListener('click', (event) => {
                 const option = event.target.closest('[data-pause-placement]');
@@ -366,6 +384,35 @@ export class SettingsUi {
         });
     }
 
+    refreshQuickRestartPanel() {
+        this._syncBooleanSettingRow({
+            getValue: getQuickRestartEnabled,
+            switchEl: this.quickRestartSwitch,
+            headingEl: this.quickRestartHeading,
+            title: 'Quick Restart',
+        });
+        this.syncQuickRestartRowVisibility();
+    }
+
+    // While Quick Restart is held back, its row is hidden and its switch is
+    // disabled, so keyboard navigation skips it.
+    syncQuickRestartRowVisibility() {
+        const switchEl = this.quickRestartSwitch;
+        if (!switchEl) return;
+        const hidden = !QUICK_RESTART_SETTING_VISIBLE;
+        switchEl.disabled = hidden;
+        const desc = document.getElementById('settings-quick-restart-desc');
+        const divider = desc?.nextElementSibling?.classList?.contains('modal-sheet-settings-row-divider')
+            ? desc.nextElementSibling
+            : null;
+        const rowParts = [switchEl.closest?.('.modal-sheet-settings-identity-head'), desc, divider];
+        for (const part of rowParts) {
+            if (!part) continue;
+            part.hidden = hidden;
+            part.style.display = hidden ? 'none' : '';
+        }
+    }
+
     refreshPausePlacementPanel() {
         const placement = getPausePlacement();
         if (this.pausePlacementGroup) {
@@ -470,12 +517,14 @@ export class SettingsUi {
         this.refreshCarAudioPanel();
         this.refreshMusicPanel();
         this.refreshCollisionAutoRestartPanel();
+        this.refreshQuickRestartPanel();
         this.refreshPausePlacementPanel();
         this.refreshHideHudPanel();
         this.refreshPbGhostPanel();
         this.wireCollisionRestartDelayMeter();
         this.refreshCollisionRestartDelayPanel();
         this.onCollisionAutoRestartChanged?.(getCollisionAutoRestartEnabled());
+        this.onQuickRestartChanged?.(isQuickRestartActive());
         this.onCollisionRestartDelayChanged?.(getCollisionRestartDelaySec());
         void this.syncIdentityBootstrap();
 

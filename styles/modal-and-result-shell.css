@@ -295,6 +295,13 @@
     transition: none;
 }
 
+/* Quick Restart: the pause menu fades in slowly at first, then fast. A second
+   tap that restarts the run comes before the menu really shows. The time is
+   also QUICK_RESTART_TAP_WINDOW_MS in game/race/engine-methods.js. */
+#modal.modal--quick-pause:not(.modal--instant) {
+    transition: opacity var(--dur-quick-pause) cubic-bezier(0.5, 0, 0.75, 0);
+}
+
 #modal.modal--pause:not(.modal--win),
 #modal.modal--win {
     align-items: center;

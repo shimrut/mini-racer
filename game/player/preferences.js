@@ -38,6 +38,10 @@ import {
     PAUSE_PLACEMENT_TIMER,
 } from '../settings/pause-placement-preference.js';
 import { getPbGhostEnabled, setPbGhostEnabled } from '../settings/pb-ghost-preference.js';
+import {
+    getQuickRestartEnabled,
+    setQuickRestartEnabled,
+} from '../settings/quick-restart-preference.js';
 import { isLocalEnvironment } from '../track/environment.js';
 
 let saveTimer = null;
@@ -65,6 +69,7 @@ export function readPlayerPreferences() {
         hideHudEnabled: getHideHudEnabled(),
         crashAutoRestartEnabled: getCollisionAutoRestartEnabled(),
         crashRestartDelaySec: getCollisionRestartDelaySec(),
+        quickRestartEnabled: getQuickRestartEnabled(),
     };
 }
 
@@ -87,6 +92,7 @@ export function applyPlayerPreferences(value) {
     setHideHudEnabled(value.hideHudEnabled === true);
     setCollisionAutoRestartEnabled(value.crashAutoRestartEnabled);
     setCollisionRestartDelaySec(value.crashRestartDelaySec);
+    setQuickRestartEnabled(value.quickRestartEnabled === true);
     return true;
 }
 

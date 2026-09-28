@@ -165,6 +165,7 @@ export type DailyGpPlayerPreferences = {
     pausePlacement: 'separate' | 'timer' | 'speedo';
     pauseOnTimerEnabled: boolean;
     hideHudEnabled: boolean;
+    quickRestartEnabled: boolean;
 };
 
 export function formatUtcChallengeDate(date = new Date()): string {

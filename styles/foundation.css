@@ -48,6 +48,7 @@
     --dur-base: 160ms;
     --dur-slow: 200ms;
     --dur-race-start-exit: 100ms;
+    --dur-quick-pause: 180ms;
     --dur-finish-headline: 10ms;
 
     --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
