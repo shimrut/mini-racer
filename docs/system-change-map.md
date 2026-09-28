@@ -664,8 +664,12 @@ The browser-side API route table is `game/scoreboard/api-client.js`; player ID /
 keeps tests, documentation, internal notes, editor/agent folders (`.cursor/`,
 `.claude/`, `.agents/`, `.vscode/`), generated review artwork, and unrelated
 tools out of the review source archive while retaining game/server source and
-the two asset-generator scripts required by `npm run build`. The compiled
-client and server uploads still include their source maps.
+the two asset-generator scripts required by `npm run build`. The client
+upload (`dist/client`) has no source maps: the build writes them without a
+link in the game files and moves them to `dist/client-sourcemaps`, which is
+not uploaded. To read an error from the live game, load the map from that
+folder into the browser's developer tools. The server upload still includes
+its source map.
 Vite's `public/` directory is part of the WebView upload, so it must remain free
 of local metadata such as `.DS_Store`.
 
@@ -817,7 +821,8 @@ first revision with the duplicated racer behavior.
 The client build gives source maps a content hash because Daily, Campaign, Head
 to Head, and shared challenge code all use the source basename
 `engine-methods.js`; unique map names preserve every mode's production stack
-trace instead of overwriting three maps during the build.
+trace instead of overwriting three maps during the build. The maps stay local
+in `dist/client-sourcemaps`; players do not get them.
 
 Deferred Daily and Campaign carousel work is eligible only while its matching
 lobby is ready, visible, and interactive. A pending Start or active race makes

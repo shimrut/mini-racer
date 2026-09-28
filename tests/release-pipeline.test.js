@@ -51,6 +51,13 @@ describe('release pipeline', () => {
         expect(viteConfigSource).toContain("sourcemapFileNames: '[name]-[hash].js.map'");
     });
 
+    it('keeps client source maps out of the Devvit upload folder', () => {
+        expect(devvitConfig.post.dir).toBe('dist/client');
+        expect(viteConfigSource).toContain("sourcemap: 'hidden'");
+        expect(viteConfigSource).toContain("new URL('./dist/client-sourcemaps', import.meta.url)");
+        expect(viteConfigSource).toContain('keepClientSourceMapsLocal(),');
+    });
+
     it('keeps non-product material out of the Devvit publish source archive', () => {
         expect(devvitConfig.sourceIgnores).toEqual(expect.arrayContaining([
             '**/.DS_Store',

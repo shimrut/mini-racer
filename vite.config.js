@@ -1,6 +1,15 @@
+import { mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { devvit } from '@devvit/start/vite';
 import { DEBUG_MODULE_STUBS } from './tools/debug-module-stubs.js';
+
+// A source map holds the full, readable game code. Devvit uploads all of
+// dist/client, so the client maps go to this folder next to it. The game
+// files do not link to them ('hidden'). To read an error from the live game,
+// load the map from this folder into the browser's developer tools.
+const CLIENT_SOURCEMAP_DIR = fileURLToPath(new URL('./dist/client-sourcemaps', import.meta.url));
 
 function stripDebugModules() {
     return {
@@ -14,14 +23,35 @@ function stripDebugModules() {
     };
 }
 
+function keepClientSourceMapsLocal() {
+    return {
+        name: 'mini-racer-keep-client-source-maps-local',
+        applyToEnvironment: (environment) => environment.name === 'client',
+        buildStart() {
+            rmSync(CLIENT_SOURCEMAP_DIR, { recursive: true, force: true });
+        },
+        writeBundle(options) {
+            const maps = readdirSync(options.dir, { recursive: true })
+                .filter((file) => String(file).endsWith('.map'));
+            for (const file of maps) {
+                const target = path.join(CLIENT_SOURCEMAP_DIR, file);
+                mkdirSync(path.dirname(target), { recursive: true });
+                renameSync(path.join(options.dir, file), target);
+            }
+        },
+    };
+}
+
 export default defineConfig({
     root: '.',
     plugins: [
         stripDebugModules(),
+        keepClientSourceMapsLocal(),
         devvit({
             client: {
                 build: {
                     chunkSizeWarningLimit: 2000,
+                    sourcemap: 'hidden',
                     rollupOptions: {
                         output: {
                             entryFileNames: '[name]-[hash].js',

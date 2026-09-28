@@ -1,3 +1,5 @@
+- Players no longer get the game's source maps, which held the full, readable game code. The build keeps them on the developer's computer in `dist/client-sourcemaps`.
+
 - **Warped Loop** joins the Daily rotation.
 
 - **Shark Bite** joins the Daily rotation.
