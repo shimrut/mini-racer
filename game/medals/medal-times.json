@@ -576,10 +576,10 @@
     "bronze": 14.15
   },
   "mountainPeak": {
-    "author": 10.25,
-    "gold": 10.53,
-    "silver": 10.78,
-    "bronze": 11.04
+    "author": 10.37,
+    "gold": 10.69,
+    "silver": 10.91,
+    "bronze": 11.24
   },
   "sharkFin": {
     "author": 11.71,
@@ -606,20 +606,20 @@
     "bronze": 11.12
   },
   "windingRoad": {
-    "author": 9.67,
-    "gold": 9.81,
-    "silver": 10.1,
-    "bronze": 10.34
+    "author": 9.45,
+    "gold": 9.69,
+    "silver": 9.92,
+    "bronze": 10.14
   },
   "lightningHook": {
-    "author": 12.15,
-    "gold": 12.31,
-    "silver": 12.56,
-    "bronze": 12.89
+    "author": 12.2,
+    "gold": 12.37,
+    "silver": 12.58,
+    "bronze": 12.95
   },
   "doubleTrouble": {
-    "author": 11.14,
-    "gold": 11.32,
+    "author": 11.29,
+    "gold": 11.52,
     "silver": 11.75,
     "bronze": 12.01
   },
@@ -630,10 +630,10 @@
     "bronze": 12.27
   },
   "twinWings": {
-    "author": 12.01,
+    "author": 11.98,
     "gold": 12.31,
     "silver": 12.67,
-    "bronze": 13.07
+    "bronze": 12.99
   },
   "halfLife": {
     "author": 11.27,
@@ -648,8 +648,8 @@
     "bronze": 9.99
   },
   "splitJaw": {
-    "author": 15.15,
-    "gold": 15.4,
+    "author": 15.31,
+    "gold": 15.52,
     "silver": 15.85,
     "bronze": 16.15
   },
@@ -666,10 +666,10 @@
     "bronze": 11.03
   },
   "crakowBoot": {
-    "author": 8.5,
-    "gold": 8.7,
-    "silver": 8.9,
-    "bronze": 9.1
+    "author": 8.59,
+    "gold": 8.76,
+    "silver": 8.98,
+    "bronze": 9.15
   },
   "slingshotRun": {
     "author": 7.95,

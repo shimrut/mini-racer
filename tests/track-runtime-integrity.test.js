@@ -251,7 +251,9 @@ describe('track runtime integrity', () => {
         // include those shapes. They also include the reshapes of 2026-09-27: 12
         // Daily tracks, and Water Pistol in place of Gun Slinger, which was never live.
         // Hook Loop, Shark Fin, Twin Wings and Winding Road were reshaped again later
-        // on 2026-09-27, before they were ever a live Daily day.
+        // on 2026-09-27, before they were ever a live Daily day. On 2026-09-29,
+        // Broken Antler got simpler corners, and Winding Road got rounder corners
+        // and moved gates.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -259,16 +261,16 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            '43893a1ac13a7a024c73e276c6f0bceae9389b662e3f54cfd10bd010664df4e8',
+            '368aca96ddb34f68ebbab9b5a42a5b41d6d5c4d5cfb2078fb7ca74cd925e1b77',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            'c892b7b28b034225efb2670ad447d5a810391131f2a41469c88359556b5726d7',
+            '5684b44b47f153c9192b64e94c904e8a002617c2f4f244dd076b2757a00fa5c9',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '9eeb16a56cdb2dc6b3c304179af248f8c1766bfc38dddc35bd28f00a8c0d3c7c',
+            '4d3d87b95ec1d0eefb4e9c9b8a93b754295a50ebab26e64ea81dc4803017cc32',
         );
     });
 

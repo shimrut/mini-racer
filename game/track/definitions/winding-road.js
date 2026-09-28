@@ -1,7 +1,7 @@
 import { Point } from '../geometry.js';
 
 export default {
-    cornerRadius: 1.5,
+    cornerRadius: 3,
     drawWidth: 3.85,
     lineSmoothing: 0.35,
     outer: [
@@ -86,8 +86,8 @@ export default {
     startAngle: 0.071,
     checkpoints: [
         { p1: Point(69.752, 33.721), p2: Point(64.411, 33.406) },
-        { p1: Point(52.539, 33.408), p2: Point(53.226, 28.138) },
+        { p1: Point(50.635, 33.482), p2: Point(50.454, 28.135) },
         { p1: Point(40.196, 48.466), p2: Point(40.19, 43.116) },
-        { p1: Point(37.179, 24.916), p2: Point(41.247, 28.468) }
+        { p1: Point(37.01, 25.209), p2: Point(40.998, 28.754) }
     ]
 };
