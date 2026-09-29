@@ -19,6 +19,7 @@ import { CarSpriteLoader, getDrawnCar } from '../game/car/sprite.js';
 import { buildTrackCanvas, drawViewportPresentationBackground } from '../game/track/canvas.js';
 import { getTrackGround, getTrackGroundMaxSpeedKph } from '../game/track/grounds.js';
 import { getPosterCarAssetName } from '../game/track/poster-car.js';
+import { lerpAngle } from '../game/track/geometry.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 import { isFinitePoint } from './geometry.js';
@@ -80,6 +81,10 @@ let draftLapsKey = null;
 const car = { image: null, drawn: null, drawWidth: 64, drawHeight: 32 };
 const lookAhead = { x: 0, y: 0 };
 const desiredLookAhead = { x: 0, y: 0 };
+// The car moves in fixed steps. As in the race, it is drawn between its last
+// two steps, so it moves smoothly at any screen refresh rate.
+const previousPose = { x: 0, y: 0, angle: 0 };
+const displayPose = { x: 0, y: 0, angle: 0 };
 const heldKeys = new Set();
 const heldButtons = { left: false, right: false };
 
@@ -177,6 +182,7 @@ function loadCar() {
 function resetRun() {
     if (!draft) return;
     state = makeRunState();
+    savePreviousPose();
     lookAhead.x = 0;
     lookAhead.y = 0;
     car.drawn?.resetMotion();
@@ -213,8 +219,22 @@ function setRaceFrame(frame) {
     requestAnimationFrame(() => render());
 }
 
+function savePreviousPose() {
+    previousPose.x = state.pos.x;
+    previousPose.y = state.pos.y;
+    previousPose.angle = state.angle;
+}
+
+function updateDisplayPose(alpha) {
+    const t = state.status === 'playing' && !paused ? alpha : 1;
+    displayPose.x = previousPose.x + (state.pos.x - previousPose.x) * t;
+    displayPose.y = previousPose.y + (state.pos.y - previousPose.y) * t;
+    displayPose.angle = lerpAngle(previousPose.angle, state.angle, t);
+}
+
 function tick() {
     if (!state || paused || state.status !== 'playing') return;
+    savePreviousPose();
     state.keys.left = heldKeys.has('ArrowLeft') || heldKeys.has('KeyA') || heldButtons.left;
     state.keys.right = heldKeys.has('ArrowRight') || heldKeys.has('KeyD') || heldButtons.right;
     const wasTouching = state.wallContactActive;
@@ -317,12 +337,12 @@ function drawGroundEffects(center, zoom, width, height) {
 // Draws the race car as the race does: the drawn car with its wheels and
 // ground marks, or the car image, with the race shadow.
 function drawRaceCar(map, zoom, dt) {
-    const center = map(state.pos);
+    const center = map(displayPose);
     const drawWidth = car.drawWidth * (CONFIG.carSpriteRenderScale ?? 1);
     const drawHeight = car.drawHeight * (CONFIG.carSpriteRenderScale ?? 1);
     context.save();
     context.translate(center.x, center.y);
-    context.rotate(state.angle);
+    context.rotate(displayPose.angle);
     context.scale(zoom / CONFIG.gridSize, zoom / CONFIG.gridSize);
     if (car.drawn) {
         const running = state.status === 'playing' && !paused;
@@ -354,7 +374,7 @@ function drawCar(map, zoom, dt) {
         drawRaceCar(map, zoom, dt);
         return;
     }
-    const center = map(state.pos);
+    const center = map(displayPose);
     context.save();
     context.translate(center.x, center.y);
     // Same ground shadow as the race, so the car sits on the road.
@@ -364,7 +384,7 @@ function drawCar(map, zoom, dt) {
         context.shadowOffsetX = trackPresentation.carShadowOffsetX ?? 0;
         context.shadowOffsetY = trackPresentation.carShadowOffsetY ?? 0;
     }
-    context.rotate(state.angle);
+    context.rotate(displayPose.angle);
     context.scale(zoom, zoom);
     context.fillStyle = '#07111e';
     context.fillRect(-0.4, -0.37, 0.22, 0.13);
@@ -383,7 +403,7 @@ function drawCar(map, zoom, dt) {
     context.restore();
 }
 
-function render(dt = 0) {
+function render(dt = 0, alpha = 1) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const width = Math.max(1, canvas.clientWidth);
     const height = Math.max(1, canvas.clientHeight);
@@ -397,6 +417,7 @@ function render(dt = 0) {
     context.fillStyle = '#0f172a';
     context.fillRect(0, 0, width, height);
     if (!state) return;
+    updateDisplayPose(alpha);
 
     const fit = Math.min(
         (width - 56) / Math.max(1, bounds.maxX - bounds.minX),
@@ -412,8 +433,8 @@ function render(dt = 0) {
     const center = overview
         ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
         : {
-            x: state.pos.x + lookAhead.x / CONFIG.gridSize,
-            y: state.pos.y + lookAhead.y / CONFIG.gridSize,
+            x: displayPose.x + lookAhead.x / CONFIG.gridSize,
+            y: displayPose.y + lookAhead.y / CONFIG.gridSize,
         };
     const map = (point) => ({
         x: width / 2 + (point.x - center.x) * zoom,
@@ -590,7 +611,7 @@ function frame(now) {
         tick();
         frameRemainder -= STEP;
     }
-    render(manualTime ? 0 : frameDt);
+    render(manualTime ? 0 : frameDt, manualTime ? 1 : frameRemainder / STEP);
     requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

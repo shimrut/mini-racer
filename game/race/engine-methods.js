@@ -32,6 +32,7 @@ import {
   getDailyChallengeTrackName,
 } from "../daily-challenge/service.js";
 import { getTrackName } from "../track/catalog.js";
+import { lerpAngle } from "../track/geometry.js";
 import { createPersonalBestPaceBaseline } from "../ghost/pb-pace.js";
 import {
   PbGhostSizeCapture,
@@ -131,13 +132,6 @@ export function normalizeRaceComparisonTarget(rawTarget, {
     mode: rawTarget.mode === "campaign" ? "campaign" : "daily",
     carAssetName,
   });
-}
-
-function lerpAngle(a, b, t) {
-  let delta = b - a;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  while (delta < -Math.PI) delta += 2 * Math.PI;
-  return a + delta * t;
 }
 
 const PARTICLE_ALPHA_STEPS = 12;

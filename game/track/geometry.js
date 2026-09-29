@@ -1,5 +1,13 @@
 export const Point = (x, y) => ({ x, y });
 
+// Turns from angle a toward angle b the short way round.
+export function lerpAngle(a, b, t) {
+    let delta = b - a;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    return a + delta * t;
+}
+
 const SEGMENT_EPSILON = 1e-9;
 
 function segmentIntersectionParams(A, B, C, D) {
