@@ -1,5 +1,6 @@
 import {
     applySeriesStageMove,
+    applyTrackAssignment,
     applyTrackRepositoryRemoval,
     applyTrackRepositoryUpdate,
 } from './track-repository.js';
@@ -9,7 +10,8 @@ import { parseTrackDestination } from './campaign-series.js';
 const ENDPOINT = '/__mapmaker/save-track';
 const REMOVE_ENDPOINT = '/__mapmaker/remove-track';
 const MOVE_STAGE_ENDPOINT = '/__mapmaker/move-stage';
-const ENDPOINTS = new Set([ENDPOINT, REMOVE_ENDPOINT, MOVE_STAGE_ENDPOINT]);
+const ASSIGN_ENDPOINT = '/__mapmaker/assign-track';
+const ENDPOINTS = new Set([ENDPOINT, REMOVE_ENDPOINT, MOVE_STAGE_ENDPOINT, ASSIGN_ENDPOINT]);
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
 
 function isLocalHost(host = '') {
@@ -58,15 +60,39 @@ function writeJson(response, statusCode, body) {
     response.end(JSON.stringify(body));
 }
 
-function normalizeSavePayload(payload) {
+function readPayloadTrackKey(payload) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Mapmaker save payload is invalid.');
     }
-
     const trackKey = typeof payload.trackKey === 'string' ? payload.trackKey.trim() : '';
     if (!isValidTrackKey(trackKey)) {
         throw new Error('Track key must be a valid non-reserved JavaScript identifier.');
     }
+    return trackKey;
+}
+
+function optionalInteger(value, label) {
+    if (value == null || value === '') return null;
+    const number = Number(value);
+    if (!Number.isInteger(number)) throw new Error(`${label} must be a whole number.`);
+    return number;
+}
+
+function normalizeAssignPayload(payload) {
+    const trackKey = readPayloadTrackKey(payload);
+    if (!parseTrackDestination(payload.destination)) {
+        throw new Error('Destination must be daily, not used, or a Campaign series.');
+    }
+    return {
+        trackKey,
+        destination: payload.destination,
+        laps: optionalInteger(payload.laps, 'Laps'),
+        requiredMedals: optionalInteger(payload.requiredMedals, 'The medal target'),
+    };
+}
+
+function normalizeSavePayload(payload) {
+    const trackKey = readPayloadTrackKey(payload);
 
     const rawOriginal = payload.originalTrackKey;
     const originalTrackKey = rawOriginal == null || rawOriginal === ''
@@ -81,19 +107,6 @@ function normalizeSavePayload(payload) {
         throw new Error('Track name cannot be empty.');
     }
 
-    const destination = typeof payload.destination === 'string'
-        ? payload.destination
-        : 'daily';
-    if (!parseTrackDestination(destination)) {
-        throw new Error('Destination must be daily or a Campaign series.');
-    }
-    const optionalInteger = (value, label) => {
-        if (value == null || value === '') return null;
-        const number = Number(value);
-        if (!Number.isInteger(number)) throw new Error(`${label} must be a whole number.`);
-        return number;
-    };
-
     if (!payload.track || typeof payload.track !== 'object') {
         throw new Error('Track geometry payload is required.');
     }
@@ -102,9 +115,6 @@ function normalizeSavePayload(payload) {
         trackKey,
         originalTrackKey,
         trackName,
-        destination,
-        laps: optionalInteger(payload.laps, 'Laps'),
-        requiredMedals: optionalInteger(payload.requiredMedals, 'The medal target'),
         medalRow: payload.medalRow && typeof payload.medalRow === 'object' ? payload.medalRow : null,
         track: payload.track,
     };
@@ -157,19 +167,17 @@ export function mapmakerTrackAuthoringPlugin() {
                         }));
                         return;
                     }
-                    const payload = normalizeSavePayload(await readJsonBody(request));
-                    const result = applyTrackRepositoryUpdate({
+                    if (pathname === ASSIGN_ENDPOINT) {
+                        writeJson(response, 200, applyTrackAssignment({
+                            rootDir: server.config.root,
+                            ...normalizeAssignPayload(await readJsonBody(request)),
+                        }));
+                        return;
+                    }
+                    writeJson(response, 200, applyTrackRepositoryUpdate({
                         rootDir: server.config.root,
-                        trackKey: payload.trackKey,
-                        originalTrackKey: payload.originalTrackKey,
-                        trackName: payload.trackName,
-                        destination: payload.destination,
-                        laps: payload.laps,
-                        requiredMedals: payload.requiredMedals,
-                        medalRow: payload.medalRow,
-                        track: payload.track,
-                    });
-                    writeJson(response, 200, result);
+                        ...normalizeSavePayload(await readJsonBody(request)),
+                    }));
                 } catch (error) {
                     writeJson(response, 400, {
                         error: error instanceof Error ? error.message : 'Unable to update track.',

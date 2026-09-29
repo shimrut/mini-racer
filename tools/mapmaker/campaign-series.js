@@ -5,8 +5,7 @@ import {
 } from '../../game/campaign/series-rules.js';
 
 export const DAILY_DESTINATION = 'daily';
-// Off the Daily schedule and in no series. Only a track that is already in this
-// state can keep it; the Mapmaker does not offer it for other tracks.
+// Off the Daily schedule and in no series. New tracks start here.
 export const UNUSED_DESTINATION = 'none';
 const SERIES_DESTINATION_PREFIX = 'series:';
 const SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -25,6 +24,24 @@ export function parseTrackDestination(value, seriesData = null) {
     if (!SERIES_ID_RE.test(seriesId)) return null;
     if (seriesData && !seriesData.series.some((series) => series.id === seriesId)) return null;
     return { type: 'series', seriesId };
+}
+
+// Adds the track to the end of the Daily schedule, or takes it off. Changes scheduleKeys.
+export function applyScheduleDestination(scheduleKeys, trackKey, destination) {
+    const scheduleIndex = scheduleKeys.indexOf(trackKey);
+    if (destination.type === 'daily') {
+        if (scheduleIndex === -1) {
+            scheduleKeys.push(trackKey);
+        }
+        return;
+    }
+
+    if (scheduleIndex !== -1) {
+        scheduleKeys.splice(scheduleIndex, 1);
+    }
+    if (scheduleKeys.length === 0) {
+        throw new Error('Track schedule must contain at least one key.');
+    }
 }
 
 function normalizeStage(stage) {
@@ -134,7 +151,7 @@ function liveStageError(series, action) {
 }
 
 /**
- * Applies a Mapmaker save to the series list.
+ * Applies a track save or a Campaign Planner change to the series list.
  * - destination "daily" or "none": the track leaves its series (a series that is not live only).
  * - destination "series:<id>": the track joins that series after its last stage,
  *   or keeps its stage and gets new laps and a new medal target (not live only).
@@ -148,7 +165,7 @@ export function applyTrackSeriesUpdate(data, {
     requiredMedals = null,
 }) {
     const target = parseTrackDestination(destination, data);
-    if (!target) throw new Error('Use For must be Daily Challenge or a Campaign series.');
+    if (!target) throw new Error('Use For must be Daily Challenge, Not used, or a Campaign series.');
     const next = cloneData(data);
     const lookupKey = originalTrackKey ?? trackKey;
     const current = findTrackStage(next, lookupKey);

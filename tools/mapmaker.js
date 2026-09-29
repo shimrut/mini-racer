@@ -1,5 +1,4 @@
 import { CONFIG } from '../game/config.js';
-import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import {
     drawTrackBoundaries,
     drawTrackFinishLine,
@@ -7,7 +6,6 @@ import {
 } from '../game/track/canvas.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
-import { isLiveGround } from '../game/track/live-grounds.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
@@ -35,21 +33,8 @@ import {
 import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geometry.js';
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
 import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
-import {
-    getCampaignSeriesMinStages,
-    isCampaignSeriesLive,
-} from '../game/campaign/series-rules.js';
-import {
-    applyTrackSeriesUpdate,
-    DAILY_DESTINATION,
-    findTrackStage,
-    moveSeriesStage,
-    normalizeCampaignSeriesData,
-    parseTrackDestination,
-    seriesDestination,
-    suggestRequiredMedals,
-    UNUSED_DESTINATION,
-} from './mapmaker/campaign-series.js';
+import { isCampaignSeriesLive } from '../game/campaign/series-rules.js';
+import { findTrackStage, normalizeCampaignSeriesData } from './mapmaker/campaign-series.js';
 import {
     averageDraftLap,
     BRONZE_WARNING_SEC,
@@ -61,8 +46,6 @@ import {
     readDraftLaps,
     suggestMedalTimes,
 } from './mapmaker/medal-times.js';
-
-const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
 const DEFAULT_LINE_SMOOTHING = 0.35;
@@ -279,13 +262,6 @@ class MapmakerApp {
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
         this.canvasHint = document.getElementById('canvas-hint');
         this.trackNameInput = document.getElementById('track-name-input');
-        this.trackDestinationSelect = document.getElementById('track-destination-select');
-        this.seriesStageFields = document.getElementById('series-stage-fields');
-        this.seriesStageLabel = document.getElementById('series-stage-label');
-        this.seriesLapsSelect = document.getElementById('series-laps-select');
-        this.seriesTargetInput = document.getElementById('series-target-input');
-        this.seriesStageHint = document.getElementById('series-stage-hint');
-        this.seriesStageList = document.getElementById('series-stage-list');
         this.medalTimesState = document.getElementById('medal-times-state');
         this.draftLapsList = document.getElementById('draft-laps-list');
         this.medalTimesHint = document.getElementById('medal-times-hint');
@@ -352,10 +328,8 @@ class MapmakerApp {
         ));
         this.activeHistoryEditKey = null;
         this.draftLoopsByKey = new Map();
-        this.destinationByKey = new Map();
         this.seriesData = normalizeCampaignSeriesData(seriesFileData);
         this.medalTimes = { ...medalTimesFileData };
-        this.stageSettingsByKey = new Map();
         this.medalRowByKey = new Map();
         this.autoRoadGuideByKey = new Map();
         this.recoveryTimer = null;
@@ -449,7 +423,6 @@ class MapmakerApp {
         const drafts = [...keys].filter((key) => this.state.tracks[key]).map((key) => ({
             trackKey: key,
             originalTrackKey: this.state.originalTrackKeyByKey.get(key) ?? null,
-            destination: this.destinationByKey.get(key) ?? this.getDestinationForTrackKey(key),
             track: this.state.tracks[key],
             draftLoop: this.draftLoopsByKey.get(key) ?? [],
         }));
@@ -502,7 +475,6 @@ class MapmakerApp {
             if (draft.originalTrackKey) {
                 this.state.originalTrackKeyByKey.set(draft.trackKey, draft.originalTrackKey);
             }
-            this.destinationByKey.set(draft.trackKey, draft.destination);
             this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
             this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
         }
@@ -522,7 +494,6 @@ class MapmakerApp {
         const key = this.state.selectedTrackKey;
         const report = validateTrackQuality(this.track);
         this.syncMedalTimesPanel();
-        this.syncSeriesStageFields();
         this.qualityReport = report;
         this.qualityTrackKey = key;
         const errors = report.issues.filter((issue) => issue.severity === 'error');
@@ -794,29 +765,6 @@ class MapmakerApp {
             this.markDirty('Updated track name.', derived);
         });
 
-        this.trackDestinationSelect.addEventListener('change', () => {
-            const destination = this.getSelectedDestination();
-            this.destinationByKey.set(this.state.selectedTrackKey, destination);
-            this.stageSettingsByKey.delete(this.state.selectedTrackKey);
-            this.syncSeriesStageFields();
-            const series = this.getDestinationSeries(destination);
-            this.markDirty(
-                series
-                    ? `Marked track for the ${series.name} series.`
-                    : destination === DAILY_DESTINATION
-                        ? 'Marked track for Daily Challenge.'
-                        : 'Marked track as not used.',
-            );
-        });
-
-        this.seriesLapsSelect.addEventListener('change', () => this.updateStageSettings());
-        this.seriesTargetInput.addEventListener('change', () => this.updateStageSettings());
-        this.seriesStageList.addEventListener('click', (event) => {
-            const button = event.target.closest?.('button[data-direction]');
-            if (!button) return;
-            void this.moveStage(button.dataset.trackKey, Number(button.dataset.direction));
-        });
-
         this.medalInputs.author.addEventListener('change', () => {
             this.setAuthorTime(Number(this.medalInputs.author.value));
         });
@@ -940,166 +888,6 @@ class MapmakerApp {
     getSavedStage(trackKey = this.state.selectedTrackKey) {
         const savedKey = this.state.originalTrackKeyByKey.get(trackKey);
         return savedKey ? findTrackStage(this.seriesData, savedKey) : null;
-    }
-
-    getSavedDestination(trackKey) {
-        const stage = this.getSavedStage(trackKey);
-        if (stage) return seriesDestination(stage.series.id);
-        const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey);
-        if (!originalTrackKey || SCHEDULED_TRACK_KEYS.has(originalTrackKey)) return DAILY_DESTINATION;
-        return UNUSED_DESTINATION;
-    }
-
-    getDestinationForTrackKey(trackKey) {
-        const saved = this.getSavedDestination(trackKey);
-        const chosen = this.destinationByKey.get(trackKey);
-        return chosen && parseTrackDestination(chosen, this.seriesData) ? chosen : saved;
-    }
-
-    getDestinationSeries(destination) {
-        const parsed = parseTrackDestination(destination, this.seriesData);
-        return parsed?.type === 'series'
-            ? this.seriesData.series.find((series) => series.id === parsed.seriesId) ?? null
-            : null;
-    }
-
-    getSelectedDestination() {
-        const value = this.trackDestinationSelect.value;
-        return parseTrackDestination(value, this.seriesData) ? value : DAILY_DESTINATION;
-    }
-
-    syncDestinationOptions(trackKey) {
-        const select = this.trackDestinationSelect;
-        select.replaceChildren();
-        const addOption = (value, label) => {
-            const option = document.createElement('option');
-            option.value = value;
-            option.textContent = label;
-            select.appendChild(option);
-        };
-        addOption(DAILY_DESTINATION, 'Daily Challenge');
-        for (const series of this.seriesData.series) {
-            let state = `hidden, ${series.stages.length}/${getCampaignSeriesMinStages(series)} stages`;
-            if (isCampaignSeriesLive(series)) state = 'live';
-            else if (!isLiveGround(series.ground)) state = 'hidden, ground not live';
-            addOption(seriesDestination(series.id), `Campaign · ${series.name} (${state})`);
-        }
-        if (this.getSavedDestination(trackKey) === UNUSED_DESTINATION) {
-            addOption(UNUSED_DESTINATION, 'Not used');
-        }
-        const savedStage = this.getSavedStage(trackKey);
-        const locked = Boolean(savedStage && isCampaignSeriesLive(savedStage.series));
-        select.disabled = locked;
-        select.title = locked
-            ? `${savedStage.series.name} is live, so this track stays in it.`
-            : '';
-    }
-
-    syncDestinationControl(trackKey = this.state.selectedTrackKey) {
-        this.syncDestinationOptions(trackKey);
-        this.trackDestinationSelect.value = this.getDestinationForTrackKey(trackKey);
-        this.syncSeriesStageFields();
-    }
-
-    // The stage that the selected track has, or gets when it is saved.
-    getPlannedStage(trackKey = this.state.selectedTrackKey) {
-        const series = this.getDestinationSeries(this.getDestinationForTrackKey(trackKey));
-        if (!series) return null;
-        const saved = this.getSavedStage(trackKey);
-        const existing = saved?.series.id === series.id ? saved : null;
-        const stageIndex = existing ? existing.stageIndex : series.stages.length;
-        const savedStage = existing ? series.stages[stageIndex] : null;
-        const settings = this.stageSettingsByKey.get(trackKey) ?? {};
-        return {
-            series,
-            stageIndex,
-            isNew: !existing,
-            fixed: Boolean(existing) && isCampaignSeriesLive(series),
-            laps: settings.laps ?? savedStage?.laps ?? 1,
-            requiredMedals: settings.requiredMedals ?? savedStage?.requiredMedals ?? suggestRequiredMedals(series),
-        };
-    }
-
-    syncSeriesStageFields() {
-        const planned = this.getPlannedStage();
-        this.seriesStageFields.hidden = !planned;
-        if (!planned) return;
-        const { series, stageIndex, fixed } = planned;
-        const stageNumber = String(stageIndex).padStart(2, '0');
-        this.seriesStageLabel.textContent = `${series.name} · Stage ${stageNumber}${planned.isNew ? ' (new)' : ''}`;
-        this.seriesLapsSelect.value = String(planned.laps);
-        this.seriesTargetInput.value = String(planned.requiredMedals);
-        this.seriesLapsSelect.disabled = fixed;
-        this.seriesTargetInput.disabled = fixed || stageIndex === 0;
-        const ground = getTrackGround(this.track).key;
-        const groundWarning = ground !== series.ground
-            ? `This track is ${TRACK_GROUNDS[ground]?.label ?? ground}, but ${series.name} is a ${TRACK_GROUNDS[series.ground]?.label ?? series.ground} series.`
-            : '';
-        this.seriesStageHint.hidden = !groundWarning;
-        this.seriesStageHint.textContent = groundWarning;
-        this.seriesStageHint.classList.toggle('series-stage-hint-warn', Boolean(groundWarning));
-        this.renderSeriesStageList(series, planned);
-    }
-
-    renderSeriesStageList(series, planned) {
-        const list = this.seriesStageList;
-        list.replaceChildren();
-        const live = isCampaignSeriesLive(series);
-        const trackKeys = series.stages.map((stage) => stage.trackKey);
-        if (planned.isNew) trackKeys.push(this.state.selectedTrackKey);
-        const savedKey = this.state.originalTrackKeyByKey.get(this.state.selectedTrackKey);
-        trackKeys.forEach((trackKey, index) => {
-            const item = document.createElement('li');
-            const isCurrent = trackKey === savedKey || (planned.isNew && index === trackKeys.length - 1);
-            item.dataset.current = String(isCurrent);
-            const number = document.createElement('span');
-            number.textContent = String(index).padStart(2, '0');
-            const name = document.createElement('span');
-            name.textContent = this.state.tracks[trackKey]?.name ?? TRACKS[trackKey]?.name ?? trackKey;
-            item.append(number, name);
-            const canMove = !live && !(planned.isNew && index === trackKeys.length - 1);
-            for (const [direction, label] of [[-1, 'Up'], [1, 'Down']]) {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'ghost-btn';
-                button.textContent = label;
-                button.dataset.trackKey = trackKey;
-                button.dataset.direction = String(direction);
-                const target = index + direction;
-                button.disabled = !canMove || target < 0 || target >= series.stages.length;
-                item.appendChild(button);
-            }
-            list.appendChild(item);
-        });
-    }
-
-    updateStageSettings() {
-        const trackKey = this.state.selectedTrackKey;
-        const laps = Number(this.seriesLapsSelect.value);
-        const requiredMedals = Number(this.seriesTargetInput.value);
-        this.stageSettingsByKey.set(trackKey, { laps, requiredMedals });
-        this.syncSeriesStageFields();
-        this.markDirty(`Set the stage to ${laps} lap${laps === 1 ? '' : 's'} and a target of ${requiredMedals} medals.`);
-    }
-
-    async moveStage(trackKey, direction) {
-        const series = this.getPlannedStage()?.series;
-        if (!series) return;
-        try {
-            const response = await fetch('/__mapmaker/move-stage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ seriesId: series.id, trackKey, direction }),
-            });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(result.error || `Move failed with status ${response.status}.`);
-            this.seriesData = moveSeriesStage(this.seriesData, series.id, trackKey, direction);
-            this.syncSeriesStageFields();
-            this.setStatus(`Moved ${trackKey} ${direction < 0 ? 'up' : 'down'} in ${series.name}.`);
-        } catch (error) {
-            console.error(error);
-            this.setStatus(`${error.message} Run Mapmaker through the local Vite server.`, true);
-        }
     }
 
     getSavedMedalRow(trackKey = this.state.selectedTrackKey) {
@@ -1227,7 +1015,6 @@ class MapmakerApp {
         this.state.selectedTrackKey = trackKey;
         this.trackSelect.value = trackKey;
         this.trackNameInput.value = this.track.name;
-        this.syncDestinationControl(trackKey);
         this.syncMedalTimesPanel();
         this.syncCornerRadiusControl();
         this.syncGroundControl();
@@ -1280,14 +1067,9 @@ class MapmakerApp {
         const guide = this.autoRoadGuideByKey.get(currentKey);
         this.autoRoadGuideByKey.delete(currentKey);
         if (guide) this.autoRoadGuideByKey.set(nextKey, guide);
-        const destination = this.getDestinationForTrackKey(currentKey);
-        this.destinationByKey.delete(currentKey);
-        this.destinationByKey.set(nextKey, destination);
-        for (const byKey of [this.stageSettingsByKey, this.medalRowByKey]) {
-            const value = byKey.get(currentKey);
-            byKey.delete(currentKey);
-            if (value) byKey.set(nextKey, value);
-        }
+        const medalRow = this.medalRowByKey.get(currentKey);
+        this.medalRowByKey.delete(currentKey);
+        if (medalRow) this.medalRowByKey.set(nextKey, medalRow);
         const originalTrackKey = this.state.originalTrackKeyByKey.get(currentKey) ?? null;
         this.state.originalTrackKeyByKey.delete(currentKey);
         if (originalTrackKey) {
@@ -1399,7 +1181,6 @@ class MapmakerApp {
                 if (!response.ok) {
                     throw new Error(result.error || `Removal failed with status ${response.status}.`);
                 }
-                SCHEDULED_TRACK_KEYS.delete(originalKey);
             }
 
             const keys = Object.keys(this.state.tracks);
@@ -1408,8 +1189,6 @@ class MapmakerApp {
             delete this.state.tracks[selectedKey];
             this.editHistories.delete(selectedKey);
             this.draftLoopsByKey.delete(selectedKey);
-            this.destinationByKey.delete(selectedKey);
-            this.stageSettingsByKey.delete(selectedKey);
             this.medalRowByKey.delete(selectedKey);
             this.baselineQualityCodesByKey.delete(selectedKey);
             this.baselineGeometryByKey.delete(selectedKey);
@@ -2447,7 +2226,6 @@ class MapmakerApp {
         this.syncTrackSelectText();
         this.syncDirtyBadge();
         this.setStatus(message);
-        this.syncDestinationControl();
         this.syncMedalTimesPanel();
         this.scheduleDraftRecovery();
         this.scheduleQualityCheck();
@@ -2978,11 +2756,6 @@ class MapmakerApp {
 
         const trackKey = this.state.selectedTrackKey;
         const originalTrackKey = this.state.originalTrackKeyByKey.get(trackKey) ?? null;
-        const destination = this.getSelectedDestination();
-        const currentlyScheduled = Boolean(
-            (originalTrackKey && SCHEDULED_TRACK_KEYS.has(originalTrackKey))
-            || SCHEDULED_TRACK_KEYS.has(trackKey),
-        );
         if (
             originalTrackKey
             && originalTrackKey !== trackKey
@@ -2992,34 +2765,16 @@ class MapmakerApp {
         ) {
             return;
         }
-        const plannedStage = this.getPlannedStage(trackKey);
+        const savedStage = this.getSavedStage(trackKey);
         const medalRow = this.medalRowByKey.get(trackKey) ?? null;
-        if (plannedStage) {
+        if (savedStage) {
             const rowError = getMedalRowError(this.getMedalRow(trackKey));
             if (rowError) {
-                this.setStatus(`Cannot save ${this.track.name} as a ${plannedStage.series.name} stage: ${rowError}`, true);
+                this.setStatus(`Cannot save ${this.track.name} as a ${savedStage.series.name} stage: ${rowError}`, true);
                 return;
             }
         } else if (medalRow && getMedalRowError(medalRow)) {
             this.setStatus(`Cannot save ${this.track.name}: ${getMedalRowError(medalRow)}`, true);
-            return;
-        }
-        if (
-            destination !== DAILY_DESTINATION
-            && currentlyScheduled
-            && !window.confirm(
-                `Move ${trackKey} off the Daily Challenge schedule? It will stay in the track catalog, but will not appear in future Daily GP days.`,
-            )
-        ) {
-            return;
-        }
-        if (
-            plannedStage?.isNew
-            && isCampaignSeriesLive(plannedStage.series)
-            && !window.confirm(
-                `${plannedStage.series.name} is live. After this save, ${trackKey} is fixed as Stage ${String(plannedStage.stageIndex).padStart(2, '0')}: you cannot move it, remove it, or change its laps, medal target or medal times. Continue?`,
-            )
-        ) {
             return;
         }
 
@@ -3033,9 +2788,6 @@ class MapmakerApp {
                     trackKey,
                     originalTrackKey,
                     trackName: this.track.name,
-                    destination,
-                    laps: plannedStage && !plannedStage.fixed ? plannedStage.laps : null,
-                    requiredMedals: plannedStage && !plannedStage.fixed ? plannedStage.requiredMedals : null,
                     medalRow,
                     track: this.track,
                 }),
@@ -3045,48 +2797,22 @@ class MapmakerApp {
                 throw new Error(result.error || `Save failed with status ${response.status}.`);
             }
 
-            this.seriesData = applyTrackSeriesUpdate(this.seriesData, {
-                trackKey,
-                originalTrackKey,
-                destination,
-                laps: plannedStage && !plannedStage.fixed ? plannedStage.laps : null,
-                requiredMedals: plannedStage && !plannedStage.fixed ? plannedStage.requiredMedals : null,
-            }).data;
+            if (savedStage) savedStage.series.stages[savedStage.stageIndex].trackKey = trackKey;
             if (originalTrackKey && originalTrackKey !== trackKey && this.medalTimes[originalTrackKey]) {
                 this.medalTimes[trackKey] = this.medalTimes[originalTrackKey];
                 delete this.medalTimes[originalTrackKey];
             }
             if (medalRow) this.medalTimes[trackKey] = normalizeMedalRow(medalRow);
             this.medalRowByKey.delete(trackKey);
-            this.stageSettingsByKey.delete(trackKey);
-            this.destinationByKey.delete(trackKey);
             this.state.originalTrackKeyByKey.set(trackKey, trackKey);
-            if (destination === DAILY_DESTINATION) {
-                SCHEDULED_TRACK_KEYS.add(trackKey);
-                if (originalTrackKey && originalTrackKey !== trackKey) {
-                    SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
-                }
-            } else {
-                SCHEDULED_TRACK_KEYS.delete(trackKey);
-                if (originalTrackKey) {
-                    SCHEDULED_TRACK_KEYS.delete(originalTrackKey);
-                }
-            }
-            const savedSeries = this.getDestinationSeries(destination);
-            const scheduleText = destination === DAILY_DESTINATION
-                ? (
-                    Number.isInteger(result.scheduleIndex) && result.scheduleIndex >= 0
-                        ? ` Added to Daily Challenge at schedule position ${result.scheduleIndex + 1}.`
-                        : ' Marked for Daily Challenge.'
-                )
-                : savedSeries
-                    ? ` Saved as ${savedSeries.name} Stage ${String(result.stageIndex).padStart(2, '0')}.`
-                    : ' Saved as not used (not on the Daily schedule).';
+            const useText = result.action === 'created'
+                ? ' It is not used yet. Choose Daily Challenge or a Campaign series in the Campaign Planner.'
+                : '';
             const renameText = result.removedFilename
                 ? ` Removed ${result.removedFilename}.`
                 : '';
             this.markSaved(
-                `Saved and integrated ${result.filename}.${scheduleText}${renameText}`,
+                `Saved and integrated ${result.filename}.${useText}${renameText}`,
             );
         } catch (error) {
             console.error(error);

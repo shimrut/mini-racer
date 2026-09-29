@@ -327,48 +327,11 @@ summary:focus-visible {
     margin-top: 0.5rem;
 }
 
-/* Series stage */
+/* Medal times */
 
-.series-stage-fields {
-    margin-top: 0.6rem;
-}
-
-.series-stage-fields .button-row {
-    margin-top: 0.5rem;
-}
-
-.series-stage-hint-warn,
 .medal-times-hint-warn {
     color: var(--maker-gold);
 }
-
-.series-stage-list {
-    display: grid;
-    gap: 0.3rem;
-    margin: 0.6rem 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 0.82rem;
-}
-
-.series-stage-list li {
-    display: grid;
-    grid-template-columns: 2.4rem minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 0.4rem;
-    color: var(--maker-muted);
-}
-
-.series-stage-list li[data-current="true"] {
-    color: var(--maker-text);
-    font-weight: 700;
-}
-
-.series-stage-list button {
-    padding: 0.15rem 0.5rem;
-}
-
-/* Medal times */
 
 .draft-laps-list {
     display: flex;

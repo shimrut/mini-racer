@@ -6,6 +6,7 @@ export default defineConfig({
     optimizeDeps: {
         entries: [
             'tools/mapmaker.html',
+            'tools/campaign-planner.html',
         ],
     },
     plugins: [

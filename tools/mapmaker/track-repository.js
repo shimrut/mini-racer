@@ -12,12 +12,16 @@ import {
     isValidTrackKey,
 } from './track-source.js';
 import {
+    applyScheduleDestination,
     applyTrackSeriesUpdate,
+    DAILY_DESTINATION,
     findTrackStage,
     moveSeriesStage,
     parseCampaignSeriesSource,
     parseTrackDestination,
     serializeCampaignSeries,
+    seriesDestination,
+    UNUSED_DESTINATION,
 } from './campaign-series.js';
 import { isCampaignSeriesLive } from '../../game/campaign/series-rules.js';
 import { getMedalRowError, normalizeMedalRow, sameMedalRow } from './medal-times.js';
@@ -36,7 +40,7 @@ function assertTrackKey(trackKey, label = 'Track key') {
 function assertDestination(destination, seriesData = null) {
     const parsed = parseTrackDestination(destination, seriesData);
     if (!parsed) {
-        throw new Error('Destination must be daily or a Campaign series.');
+        throw new Error('Destination must be daily, not used, or a Campaign series.');
     }
     return parsed;
 }
@@ -168,23 +172,6 @@ export function generateTracksRegistrySource(catalogKeys) {
     ].join('\n');
 }
 
-function applyScheduleDestination(scheduleKeys, trackKey, destination) {
-    const scheduleIndex = scheduleKeys.indexOf(trackKey);
-    if (destination.type === 'daily') {
-        if (scheduleIndex === -1) {
-            scheduleKeys.push(trackKey);
-        }
-        return;
-    }
-
-    if (scheduleIndex !== -1) {
-        scheduleKeys.splice(scheduleIndex, 1);
-    }
-    if (scheduleKeys.length === 0) {
-        throw new Error('Track schedule must contain at least one key.');
-    }
-}
-
 function assertSafeDefinitionFilename(filename) {
     if (
         typeof filename !== 'string'
@@ -205,6 +192,15 @@ function assertPathInsideDirectory(filePath, directoryPath, label) {
     }
 }
 
+// Where a saved track is used: a series stage, the Daily schedule, or neither.
+function getTrackDestination(seriesData, scheduleKeys, trackKey) {
+    const stage = findTrackStage(seriesData, trackKey);
+    if (stage) return seriesDestination(stage.series.id);
+    return scheduleKeys.includes(trackKey) ? DAILY_DESTINATION : UNUSED_DESTINATION;
+}
+
+// Saves a track's shape, name and medal times. It never changes where the track
+// is used: a new track starts as not used, and a rename keeps its place.
 export function buildTrackRepositoryUpdate({
     catalogSource,
     seriesSource,
@@ -212,14 +208,10 @@ export function buildTrackRepositoryUpdate({
     trackKey,
     originalTrackKey = null,
     trackName,
-    destination = 'daily',
-    laps = null,
-    requiredMedals = null,
     medalRow = null,
 }) {
     assertTrackKey(trackKey);
     const seriesData = parseCampaignSeriesSource(seriesSource);
-    const parsedDestination = assertDestination(destination, seriesData);
     if (originalTrackKey !== null) {
         assertTrackKey(originalTrackKey, 'Original track key');
     }
@@ -266,13 +258,13 @@ export function buildTrackRepositoryUpdate({
     }
 
     namesByKey[trackKey] = normalizedName;
-    applyScheduleDestination(nextScheduleKeys, trackKey, parsedDestination);
+    const destination = originalExists
+        ? getTrackDestination(seriesData, scheduleKeys, originalTrackKey)
+        : UNUSED_DESTINATION;
     const seriesUpdate = applyTrackSeriesUpdate(seriesData, {
         trackKey,
         originalTrackKey: originalExists ? originalTrackKey : null,
         destination,
-        laps,
-        requiredMedals,
     });
     const seriesStage = seriesUpdate.series
         ? { series: seriesUpdate.series, stageIndex: seriesUpdate.stageIndex }
@@ -331,9 +323,6 @@ export function applyTrackRepositoryUpdate({
     trackKey,
     originalTrackKey = null,
     trackName,
-    destination = 'daily',
-    laps = null,
-    requiredMedals = null,
     medalRow = null,
     track,
 }) {
@@ -351,9 +340,6 @@ export function applyTrackRepositoryUpdate({
         trackKey,
         originalTrackKey,
         trackName,
-        destination,
-        laps,
-        requiredMedals,
         medalRow,
     });
     const definitionFilename = getTrackModuleFilename(trackKey);
@@ -430,6 +416,66 @@ export function applySeriesStageMove({ rootDir, seriesId, trackKey, direction })
     return { seriesId, trackKeys: series.stages.map((stage) => stage.trackKey) };
 }
 
+// Sets where a saved track is used: the Daily schedule, a Campaign series, or neither.
+export function buildTrackAssignment({
+    catalogSource,
+    seriesSource,
+    medalsSource,
+    trackKey,
+    destination,
+    laps = null,
+    requiredMedals = null,
+}) {
+    assertTrackKey(trackKey);
+    const seriesData = parseCampaignSeriesSource(seriesSource);
+    const parsedDestination = assertDestination(destination, seriesData);
+    const { namesByKey, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    if (!Object.prototype.hasOwnProperty.call(namesByKey, trackKey)) {
+        throw new Error(`Track ${trackKey} is not saved yet. Save it in the Mapmaker first.`);
+    }
+    const nextScheduleKeys = [...scheduleKeys];
+    applyScheduleDestination(nextScheduleKeys, trackKey, parsedDestination);
+    const seriesUpdate = applyTrackSeriesUpdate(seriesData, {
+        trackKey,
+        destination,
+        laps,
+        requiredMedals,
+    });
+    if (seriesUpdate.series && getMedalRowError(parseMedalTimesSource(medalsSource)[trackKey])) {
+        throw new Error(`A Campaign stage needs all four medal times. Set them for ${trackKey} in the Mapmaker.`);
+    }
+    return {
+        destination,
+        scheduleIndex: nextScheduleKeys.indexOf(trackKey),
+        seriesId: seriesUpdate.series?.id ?? null,
+        stageIndex: seriesUpdate.stageIndex,
+        catalogSource: catalogSource.replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys)),
+        seriesSource: serializeCampaignSeries(seriesUpdate.data),
+    };
+}
+
+export function applyTrackAssignment({ rootDir, ...options }) {
+    const resolvedRoot = resolve(rootDir);
+    const catalogPath = join(resolvedRoot, 'game/track/catalog.js');
+    const seriesPath = join(resolvedRoot, SERIES_FILE);
+    const update = buildTrackAssignment({
+        catalogSource: readFileSync(catalogPath, 'utf8'),
+        seriesSource: readFileSync(seriesPath, 'utf8'),
+        medalsSource: readFileSync(join(resolvedRoot, MEDALS_FILE), 'utf8'),
+        ...options,
+    });
+    writeFilesWithRollback([
+        { path: catalogPath, source: update.catalogSource },
+        { path: seriesPath, source: update.seriesSource },
+    ]);
+    return {
+        destination: update.destination,
+        scheduleIndex: update.scheduleIndex,
+        seriesId: update.seriesId,
+        stageIndex: update.stageIndex,
+    };
+}
+
 export function buildTrackRepositoryRemoval({
     catalogSource,
     trackKey,
@@ -451,7 +497,7 @@ export function buildTrackRepositoryRemoval({
     const stage = findTrackStage(parseCampaignSeriesSource(seriesSource), trackKey);
     if (stage) {
         throw new Error(
-            `Cannot remove ${trackKey} because ${stage.series.name} uses it. Set Use For to Daily Challenge first.`,
+            `Cannot remove ${trackKey} because ${stage.series.name} uses it. Take it out of the series in the Campaign Planner first.`,
         );
     }
     if (publishedHistorySource.includes(`'${trackKey}'`)) {

@@ -10,8 +10,10 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+    applyTrackAssignment,
     applyTrackRepositoryUpdate,
     applyTrackRepositoryRemoval,
+    buildTrackAssignment,
     buildTrackRepositoryRemoval,
     buildTrackRepositoryUpdate,
     parseTrackCatalogSource,
@@ -64,12 +66,22 @@ const FORMULA_MINI_DRAFT_SOURCE = seriesSource([], [], [{ trackKey: 'numberZero'
 
 const SERIES_SOURCE = seriesSource();
 const MEDALS_SOURCE = `${JSON.stringify({ numberZero: MEDAL_ROW, circuit: MEDAL_ROW }, null, 2)}\n`;
+const ALL_MEDALS_SOURCE = JSON.stringify({ numberZero: MEDAL_ROW, circuit: MEDAL_ROW, sunlitTemple: MEDAL_ROW });
 
 function buildUpdate(options) {
     return buildTrackRepositoryUpdate({
         catalogSource: CATALOG_SOURCE,
         seriesSource: SERIES_SOURCE,
         medalsSource: MEDALS_SOURCE,
+        ...options,
+    });
+}
+
+function buildAssign(options) {
+    return buildTrackAssignment({
+        catalogSource: CATALOG_SOURCE,
+        seriesSource: SERIES_SOURCE,
+        medalsSource: ALL_MEDALS_SOURCE,
         ...options,
     });
 }
@@ -129,22 +141,18 @@ describe('Mapmaker track repository integration', () => {
         expect(parsed.namesByKey.numberZero).toBe('Number Zero');
     });
 
-    it('appends a new Daily track as the final catalog and schedule entry', () => {
+    it('adds a new track to the catalog as not used', () => {
         const update = buildUpdate({
             trackKey: 'newHarborRun',
             trackName: 'New Harbor Run',
-            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
         expect(update.action).toBe('created');
-        expect(update.destination).toBe('daily');
-        expect(update.scheduleIndex).toBe(2);
-        expect(parsed.scheduleKeys).toEqual([
-            'circuit',
-            'sunlitTemple',
-            'newHarborRun',
-        ]);
+        expect(update.destination).toBe('none');
+        expect(update.scheduleIndex).toBe(-1);
+        expect(update.seriesSource).toBe(SERIES_SOURCE);
+        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
         expect(parsed.catalogKeys).toEqual([
             'circuit',
             'sunlitTemple',
@@ -159,80 +167,28 @@ describe('Mapmaker track repository integration', () => {
         expect(update.tracksSource).toContain('    newHarborRun,');
     });
 
-    it('creates a series track without adding it to the Daily schedule', () => {
-        const update = buildUpdate({
-            trackKey: 'numberTen',
-            trackName: 'Number Ten',
-            destination: 'series:numbered-v1',
-            laps: 3,
-            medalRow: MEDAL_ROW,
-        });
-        const parsed = parseTrackCatalogSource(update.catalogSource);
-
-        expect(update.action).toBe('created');
-        expect(update.destination).toBe('series:numbered-v1');
-        expect(update.seriesId).toBe('numbered-v1');
-        expect(update.stageIndex).toBe(1);
-        expect(JSON.parse(update.seriesSource).series[0].stages).toEqual([
-            { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
-            { trackKey: 'numberTen', laps: 3, requiredMedals: 2 },
-        ]);
-        expect(JSON.parse(update.medalsSource).numberTen).toEqual(MEDAL_ROW);
-        expect(update.scheduleIndex).toBe(-1);
-        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
-        expect(parsed.catalogKeys).toContain('numberTen');
-        expect(parsed.namesByKey.numberTen).toBe('Number Ten');
-        expect(update.tracksSource).toContain(
-            "import numberTen from './definitions/number-ten.js';",
-        );
-    });
-
-    it('updates an existing track without changing its schedule position', () => {
+    it('updates an existing track without changing where it is used', () => {
         const update = buildUpdate({
             trackKey: 'circuit',
             originalTrackKey: 'circuit',
             trackName: 'Classic Circuit Updated',
-            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
         expect(update.action).toBe('updated');
+        expect(update.destination).toBe('daily');
         expect(update.scheduleIndex).toBe(0);
         expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple']);
         expect(parsed.catalogKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
         expect(parsed.namesByKey.circuit).toBe('Classic Circuit Updated');
-    });
 
-    it('can move a scheduled track to a series', () => {
-        const update = buildUpdate({
-            trackKey: 'sunlitTemple',
-            originalTrackKey: 'sunlitTemple',
-            trackName: 'Sunlit Temple',
-            destination: 'series:dirt-v1',
-            medalRow: MEDAL_ROW,
-        });
-        const parsed = parseTrackCatalogSource(update.catalogSource);
-
-        expect(update.action).toBe('updated');
-        expect(update.scheduleIndex).toBe(-1);
-        expect(parsed.scheduleKeys).toEqual(['circuit']);
-        expect(parsed.catalogKeys).toContain('sunlitTemple');
-    });
-
-    it('can move a track out of a series that is not live and onto the Daily schedule', () => {
-        const update = buildUpdate({
-            seriesSource: FORMULA_MINI_DRAFT_SOURCE,
+        const stageUpdate = buildUpdate({
             trackKey: 'numberZero',
             originalTrackKey: 'numberZero',
             trackName: 'Number Zero',
-            destination: 'daily',
         });
-        const parsed = parseTrackCatalogSource(update.catalogSource);
-
-        expect(update.action).toBe('updated');
-        expect(update.scheduleIndex).toBe(2);
-        expect(parsed.scheduleKeys).toEqual(['circuit', 'sunlitTemple', 'numberZero']);
-        expect(JSON.parse(update.seriesSource).series[2].stages).toEqual([]);
+        expect(stageUpdate.destination).toBe('series:numbered-v1');
+        expect(stageUpdate.seriesSource).toBe(SERIES_SOURCE);
     });
 
     it('renames a track in place and identifies the old module for removal', () => {
@@ -240,7 +196,6 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'sunriseTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunrise Temple',
-            destination: 'daily',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -260,7 +215,6 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'numberNil',
             originalTrackKey: 'numberZero',
             trackName: 'Number Nil',
-            destination: 'series:grip-v1',
         });
         const parsed = parseTrackCatalogSource(update.catalogSource);
 
@@ -272,19 +226,6 @@ describe('Mapmaker track repository integration', () => {
         expect(JSON.parse(update.seriesSource).series[2].stages[0].trackKey).toBe('numberNil');
         expect(JSON.parse(update.medalsSource)).toHaveProperty('numberNil');
         expect(JSON.parse(update.medalsSource)).not.toHaveProperty('numberZero');
-    });
-
-    it('rejects an invalid destination', () => {
-        expect(() => buildUpdate({
-            trackKey: 'newHarborRun',
-            trackName: 'New Harbor Run',
-            destination: 'challenge',
-        })).toThrow('Destination must be daily or a Campaign series.');
-        expect(() => buildUpdate({
-            trackKey: 'newHarborRun',
-            trackName: 'New Harbor Run',
-            destination: 'series:snow-v1',
-        })).toThrow('Destination must be daily or a Campaign series.');
     });
 
     it('writes all repository files and deletes the old module on rename', () => {
@@ -306,7 +247,6 @@ describe('Mapmaker track repository integration', () => {
             trackKey: 'sunriseTemple',
             originalTrackKey: 'sunlitTemple',
             trackName: 'Sunrise Temple',
-            destination: 'daily',
             track: TRACK,
         });
 
@@ -398,76 +338,132 @@ describe('Mapmaker track repository integration', () => {
     });
 });
 
+describe('Campaign Planner track assignment', () => {
+    it('puts a track on the Daily schedule after the last entry', () => {
+        const update = buildAssign({ trackKey: 'numberZero', destination: 'daily', seriesSource: FORMULA_MINI_DRAFT_SOURCE });
+        expect(update.scheduleIndex).toBe(2);
+        expect(parseTrackCatalogSource(update.catalogSource).scheduleKeys)
+            .toEqual(['circuit', 'sunlitTemple', 'numberZero']);
+        expect(JSON.parse(update.seriesSource).series[2].stages).toEqual([]);
+    });
+
+    it('moves a Daily track to a series and off the schedule', () => {
+        const update = buildAssign({ trackKey: 'sunlitTemple', destination: 'series:numbered-v1', laps: 3 });
+        expect(update.seriesId).toBe('numbered-v1');
+        expect(update.stageIndex).toBe(1);
+        expect(update.scheduleIndex).toBe(-1);
+        expect(parseTrackCatalogSource(update.catalogSource).scheduleKeys).toEqual(['circuit']);
+        expect(JSON.parse(update.seriesSource).series[0].stages).toEqual([
+            { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
+            { trackKey: 'sunlitTemple', laps: 3, requiredMedals: 2 },
+        ]);
+    });
+
+    it('can mark any track as not used', () => {
+        const update = buildAssign({ trackKey: 'sunlitTemple', destination: 'none' });
+        expect(update.scheduleIndex).toBe(-1);
+        expect(parseTrackCatalogSource(update.catalogSource).scheduleKeys).toEqual(['circuit']);
+        expect(() => buildAssign({ trackKey: 'circuit', destination: 'none', catalogSource: CATALOG_SOURCE
+            .replace("    'sunlitTemple',\n", '') })).toThrow('at least one key');
+    });
+
+    it('rejects an unsaved track and an invalid destination', () => {
+        expect(() => buildAssign({ trackKey: 'newHarborRun', destination: 'daily' }))
+            .toThrow('Save it in the Mapmaker first');
+        expect(() => buildAssign({ trackKey: 'circuit', destination: 'challenge' }))
+            .toThrow('Destination must be daily, not used, or a Campaign series.');
+        expect(() => buildAssign({ trackKey: 'circuit', destination: 'series:snow-v1' }))
+            .toThrow('Destination must be daily, not used, or a Campaign series.');
+    });
+
+    it('writes the catalog and series files', () => {
+        const root = mkdtempSync(join(tmpdir(), 'dailygp-planner-'));
+        temporaryRoots.push(root);
+        mkdirSync(join(root, 'game/track'), { recursive: true });
+        mkdirSync(join(root, 'game/campaign'), { recursive: true });
+        mkdirSync(join(root, 'game/medals'), { recursive: true });
+        writeFileSync(join(root, 'game/track/catalog.js'), CATALOG_SOURCE);
+        writeFileSync(join(root, 'game/campaign/series.json'), SERIES_SOURCE);
+        writeFileSync(join(root, 'game/medals/medal-times.json'), ALL_MEDALS_SOURCE);
+
+        const result = applyTrackAssignment({ rootDir: root, trackKey: 'sunlitTemple', destination: 'series:dirt-v1' });
+
+        expect(result).toMatchObject({ seriesId: 'dirt-v1', stageIndex: 0, scheduleIndex: -1 });
+        expect(parseTrackCatalogSource(readFileSync(join(root, 'game/track/catalog.js'), 'utf8')).scheduleKeys)
+            .toEqual(['circuit']);
+        expect(JSON.parse(readFileSync(join(root, 'game/campaign/series.json'), 'utf8')).series[1].stages)
+            .toEqual([{ trackKey: 'sunlitTemple', laps: 1, requiredMedals: 0 }]);
+    });
+});
+
 describe('Mapmaker Campaign series rules', () => {
     const liveSeries = seriesSource(
         [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }],
         tenStages(),
     );
+    const liveMedals = JSON.stringify({ numberZero: MEDAL_ROW, sunlitTemple: MEDAL_ROW, circuit: MEDAL_ROW });
 
     function buildLive(options) {
-        return buildUpdate({
-            seriesSource: liveSeries,
-            medalsSource: JSON.stringify({ numberZero: MEDAL_ROW, sunlitTemple: MEDAL_ROW }),
-            ...options,
-        });
+        return buildUpdate({ seriesSource: liveSeries, medalsSource: liveMedals, ...options });
     }
 
-    it('adds a new track after the last stage of a live series', () => {
-        const update = buildLive({
-            trackKey: 'newHarborRun',
-            trackName: 'New Harbor Run',
+    function assignLive(options) {
+        return buildAssign({ seriesSource: liveSeries, medalsSource: liveMedals, ...options });
+    }
+
+    it('adds a track after the last stage of a live series', () => {
+        const update = assignLive({
+            trackKey: 'circuit',
             destination: 'series:dirt-v1',
             laps: 2,
             requiredMedals: 21,
-            medalRow: MEDAL_ROW,
         });
         const dirt = JSON.parse(update.seriesSource).series[1];
         expect(update.stageIndex).toBe(10);
-        expect(dirt.stages.at(-1)).toEqual({ trackKey: 'newHarborRun', laps: 2, requiredMedals: 21 });
+        expect(dirt.stages.at(-1)).toEqual({ trackKey: 'circuit', laps: 2, requiredMedals: 21 });
         expect(dirt.stages.slice(0, 10)).toEqual(tenStages());
     });
 
     it('keeps the stages of a live series fixed', () => {
-        const base = { trackKey: 'sunlitTemple', originalTrackKey: 'sunlitTemple', trackName: 'Sunlit Temple' };
-        expect(() => buildLive({ ...base, destination: 'daily' })).toThrow('Dirt is live');
-        expect(() => buildLive({ ...base, destination: 'series:numbered-v1', medalRow: MEDAL_ROW }))
+        const base = { trackKey: 'sunlitTemple' };
+        expect(() => assignLive({ ...base, destination: 'daily' })).toThrow('Dirt is live');
+        expect(() => assignLive({ ...base, destination: 'none' })).toThrow('Dirt is live');
+        expect(() => assignLive({ ...base, destination: 'series:numbered-v1' })).toThrow('Dirt is live');
+        expect(() => assignLive({ ...base, destination: 'series:dirt-v1', laps: 3 })).toThrow('Dirt is live');
+        expect(() => assignLive({ ...base, destination: 'series:dirt-v1', requiredMedals: 1 }))
             .toThrow('Dirt is live');
-        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', laps: 3 })).toThrow('Dirt is live');
-        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', requiredMedals: 1 }))
-            .toThrow('Dirt is live');
-        expect(() => buildLive({ ...base, destination: 'series:dirt-v1', laps: 1, requiredMedals: 0 }))
+        expect(() => assignLive({ ...base, destination: 'series:dirt-v1', laps: 1, requiredMedals: 0 }))
             .not.toThrow();
-        expect(() => buildLive({
-            ...base,
-            trackKey: 'sunsetTemple',
-            destination: 'series:dirt-v1',
-        })).toThrow('Dirt is live');
-        expect(() => buildLive({
-            ...base,
-            destination: 'series:dirt-v1',
-            medalRow: { ...MEDAL_ROW, author: 9.4 },
-        })).toThrow('medal times of sunlitTemple are fixed');
+
+        const save = { trackKey: 'sunlitTemple', originalTrackKey: 'sunlitTemple', trackName: 'Sunlit Temple' };
+        expect(() => buildLive({ ...save, trackKey: 'sunsetTemple' })).toThrow('Dirt is live');
+        expect(() => buildLive({ ...save, medalRow: { ...MEDAL_ROW, author: 9.4 } }))
+            .toThrow('medal times of sunlitTemple are fixed');
+        expect(() => buildLive(save)).not.toThrow();
     });
 
     it('needs all four medal times in order for a series stage', () => {
-        const base = { trackKey: 'newHarborRun', trackName: 'New Harbor Run', destination: 'series:dirt-v1' };
-        expect(() => buildUpdate(base)).toThrow('needs all four medal times');
-        expect(() => buildUpdate({ ...base, medalRow: { ...MEDAL_ROW, gold: 9.4 } }))
-            .toThrow('Medal times must go up');
-        expect(() => buildUpdate({ ...base, medalRow: MEDAL_ROW })).not.toThrow();
+        expect(() => buildAssign({ trackKey: 'sunlitTemple', destination: 'series:dirt-v1', medalsSource: MEDALS_SOURCE }))
+            .toThrow('needs all four medal times');
+        expect(() => buildUpdate({
+            trackKey: 'numberZero',
+            originalTrackKey: 'numberZero',
+            trackName: 'Number Zero',
+            medalsSource: '{}',
+        })).toThrow('needs all four medal times');
+        expect(() => buildUpdate({
+            trackKey: 'newHarborRun',
+            trackName: 'New Harbor Run',
+            medalRow: { ...MEDAL_ROW, gold: 9.4 },
+        })).toThrow('Medal times must go up');
     });
 
     it('checks the medal target against its position', () => {
-        const base = {
-            trackKey: 'newHarborRun',
-            trackName: 'New Harbor Run',
-            destination: 'series:numbered-v1',
-            medalRow: MEDAL_ROW,
-        };
-        expect(() => buildUpdate({ ...base, requiredMedals: 0 })).toThrow('more than 0');
-        expect(() => buildUpdate({ ...base, requiredMedals: 4 })).toThrow('3 at most');
-        expect(() => buildUpdate({ ...base, requiredMedals: 3 })).not.toThrow();
-        expect(() => buildUpdate({ ...base, laps: 4 })).toThrow('Laps must be');
+        const base = { trackKey: 'sunlitTemple', destination: 'series:numbered-v1' };
+        expect(() => buildAssign({ ...base, requiredMedals: 0 })).toThrow('more than 0');
+        expect(() => buildAssign({ ...base, requiredMedals: 4 })).toThrow('3 at most');
+        expect(() => buildAssign({ ...base, requiredMedals: 3 })).not.toThrow();
+        expect(() => buildAssign({ ...base, laps: 4 })).toThrow('Laps must be');
     });
 
     it('moves a stage in a series that is not live, and keeps each medal target in place', async () => {

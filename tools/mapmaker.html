@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.29">
+    <link rel="stylesheet" href="mapmaker.css?v=2.30">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
         <a class="maker-link" href="../pages/game.html">&larr; Game</a>
         <h1>Mapmaker</h1>
+        <a class="maker-link" href="campaign-planner.html">Campaign Planner</a>
         <div class="maker-header-actions">
             <span id="dirty-badge" class="pill">Saved</span>
             <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
@@ -31,29 +32,6 @@
                     <span>Name</span>
                     <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
                 </label>
-                <label class="field">
-                    <span>Use for</span>
-                    <select id="track-destination-select"></select>
-                </label>
-                <div id="series-stage-fields" class="series-stage-fields" hidden>
-                <p id="series-stage-label" class="panel-note"></p>
-                <div class="button-row">
-                    <label class="field">
-                        <span>Laps</span>
-                        <select id="series-laps-select">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Medal Target</span>
-                        <input id="series-target-input" type="number" min="0" step="1">
-                    </label>
-                </div>
-                <p id="series-stage-hint" class="field-hint" hidden></p>
-                <ol id="series-stage-list" class="series-stage-list"></ol>
-            </div>
             </details>
 
             <details class="maker-panel" open>
@@ -173,6 +151,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.28"></script>
+    <script type="module" src="mapmaker.js?v=2.29"></script>
 </body>
 </html>

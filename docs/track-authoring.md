@@ -19,7 +19,8 @@ every consumer load the large geometry registry.
   including Campaign tracks that are not in the Daily schedule.
 - `game/campaign/series.json`
   Owns the Campaign series and their stages: the track, the laps and the medal
-  target of each stage. The Mapmaker writes it. See **Campaign Series**.
+  target of each stage. The Campaign Planner writes it; a Mapmaker rename
+  updates the track key of its stage. See **Campaign Series**.
   Rendering, collision, previews, and replay validation use this registry.
 - `game/track/geometry.js`
   Owns the shared point and line-intersection helpers.
@@ -144,26 +145,28 @@ automatically in the same tab.
    `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
    **Save & Integrate**. It writes the definition module and updates
    `TRACK_CATALOG`, the static definition imports, and the compatibility
-   registry. Choose **Use For** before saving:
-   - **Daily Challenge** also appends or keeps the track in
-     `TRACK_SCHEDULE_KEYS`.
-   - **Campaign · <series>** keeps the track out of the Daily schedule and
-     makes it a stage of that series. See **Campaign Series**.
-   - **Not used** appears only for a track that is already out of Daily and
-     out of every series.
-3. New Daily Challenge tracks are appended as the final
-   `TRACK_SCHEDULE_KEYS` entry. Existing Daily tracks keep their position.
-   When extending an existing branch, keep the existing catalog and schedule
-   prefixes in their original order, then append new catalog and Daily entries.
-   Renames replace the old key at its existing position after confirmation
-   and remove the old definition file. Series saves never add the track to the
-   Daily schedule.
-4. Set the medal times in **Medal Times** (see below). **Save & Integrate**
+   registry. It never changes where a track is used: a new track starts as
+   **Not used** (off the Daily schedule and in no series), and an existing
+   track keeps its Daily position or Campaign stage. Renames replace the old
+   key at its existing position after confirmation and remove the old
+   definition file.
+3. Set the medal times in **Medal Times** (see below). **Save & Integrate**
    writes them to `game/medals/medal-times.json`.
    New Daily GP publication selects 1–2 laps when Author time is under 10s,
    and one lap at or above 10s. Missing or invalid Author times conservatively
    publish as one lap. Campaign lap counts are set for each stage and may be
    1, 2, or 3.
+4. Open `http://127.0.0.1:5173/tools/campaign-planner.html` (the
+   **Campaign Planner** link in the Mapmaker header), choose the track, set
+   **Use For**, and choose **Save**:
+   - **Daily Challenge** appends the track as the final `TRACK_SCHEDULE_KEYS`
+     entry. Existing Daily tracks keep their position.
+   - **Campaign · <series>** takes the track off the Daily schedule and makes
+     it a stage of that series. See **Campaign Series**.
+   - **Not used** takes the track off the Daily schedule and out of its
+     series.
+   When extending an existing branch, keep the existing catalog and schedule
+   prefixes in their original order, then append new catalog and Daily entries.
 5. Add or adjust `game/track/presentation.js` only when the track needs a
    non-default preview or race presentation.
 6. Update the intentional full-registry fingerprint in
@@ -201,11 +204,14 @@ its own stages. `game/campaign/series.json` holds them, and
 - Campaign opens a series screen that lists every series in `series.json`.
   A series that has not reached its stage count shows there as **Coming soon**.
 
-In the Mapmaker, choose **Use For** → **Campaign · <series>**. The panel under
-it shows the stage number, **Laps** and **Medal Target**. For a series that is
-not live, the stage list has **Up** and **Down** buttons; they write
-`series.json` at once. The panel warns when the track's ground is not the
-series ground.
+In the Campaign Planner (`tools/campaign-planner.html`), choose the track and
+**Use For** → **Campaign · <series>**. The panel under it shows the stage
+number, **Laps** and **Medal Target**, and warns when the track's ground is not
+the series ground or the track has no medal times yet. **Save** writes
+`series.json` and the Daily schedule. The right side lists every series with
+its stages, then the Not used and Daily Challenge tracks; click a name to
+choose it. For a series that is not live, each stage has **Up** and **Down**
+buttons; they write `series.json` at once.
 
 ## Medal Times
 
@@ -308,8 +314,9 @@ Rules:
   than 41.7 seconds for each lap, and a slow ground makes laps longer.
   `tests/track-grounds.test.js` checks this for every ground track.
 
-The repository-writing endpoint exists only in the dedicated local Mapmaker
-Vite configuration and accepts requests only from localhost. It is not part of
+The repository-writing endpoints used by the Mapmaker and the Campaign Planner
+exist only in the dedicated local Mapmaker Vite configuration and accept
+requests only from localhost. It is not part of
 the Devvit playtest or production build.
 
 ## Removing A Track
@@ -326,8 +333,8 @@ The local Mapmaker cannot query hosted Redis or Reddit to determine whether a
 track appeared in a published Daily race or Head-to-Head post. Removing such a
 track from the catalog makes those existing records unusable. Check hosted
 history and posts before permanently removing an integrated track. To stop
-future Daily scheduling while retaining old races, select a Campaign series
-and use **Save & Integrate** instead.
+future Daily scheduling while retaining old races, set the track to
+**Not used** or a Campaign series in the Campaign Planner instead.
 
 The removal confirmation is an in-page dialog, so it works in browsers that
 do not support native JavaScript confirmation prompts. Dependency checks read

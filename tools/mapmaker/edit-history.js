@@ -121,13 +121,11 @@ function normalizeRecovery(recovery) {
     for (const draft of recovery.drafts) {
         if (!draft || !validKey(draft.trackKey) || keys.has(draft.trackKey)
             || (draft.originalTrackKey !== null && !validKey(draft.originalTrackKey))
-            || !['daily', 'campaign'].includes(draft.destination)
             || !validTrack(draft.track) || !validPoints(draft.draftLoop)) return null;
         keys.add(draft.trackKey);
         drafts.push({
             trackKey: draft.trackKey,
             originalTrackKey: draft.originalTrackKey,
-            destination: draft.destination,
             track: copySnapshot(draft.track),
             draftLoop: copySnapshot(draft.draftLoop),
         });

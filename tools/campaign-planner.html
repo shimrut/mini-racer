@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer Campaign Planner</title>
+    <link rel="stylesheet" href="mapmaker.css?v=2.30">
+    <link rel="stylesheet" href="campaign-planner.css?v=1.0">
+</head>
+<body class="mapmaker-body">
+    <header class="maker-header">
+        <a class="maker-link" href="mapmaker.html">&larr; Mapmaker</a>
+        <h1>Campaign Planner</h1>
+    </header>
+
+    <main class="maker-layout">
+        <aside class="maker-sidebar">
+            <details class="maker-panel" open>
+                <summary><h2>Track</h2></summary>
+                <select id="track-select" aria-label="Track"></select>
+                <label class="field">
+                    <span>Use for</span>
+                    <select id="track-destination-select"></select>
+                </label>
+                <div id="series-stage-fields" class="series-stage-fields" hidden>
+                    <p id="series-stage-label" class="panel-note"></p>
+                    <div class="button-row">
+                        <label class="field">
+                            <span>Laps</span>
+                            <select id="series-laps-select">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Medal Target</span>
+                            <input id="series-target-input" type="number" min="0" step="1">
+                        </label>
+                    </div>
+                </div>
+                <p id="series-stage-hint" class="field-hint" hidden></p>
+                <button id="save-use-btn" type="button" class="primary-btn" disabled>Save</button>
+            </details>
+        </aside>
+
+        <section class="maker-stage">
+            <div class="stage-head">
+                <p id="status-text" class="stage-status">Choose a track, then where it is used.</p>
+            </div>
+            <div id="planner-overview" class="planner-overview"></div>
+        </section>
+    </main>
+
+    <script type="module" src="campaign-planner.js?v=1.1"></script>
+</body>
+</html>

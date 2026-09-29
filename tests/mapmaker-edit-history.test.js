@@ -24,7 +24,6 @@ const recovery = () => ({
     drafts: [{
         trackKey: 'draftCircuit',
         originalTrackKey: null,
-        destination: 'campaign',
         track: track(),
         draftLoop: [point(2, 3), point(4, 6)],
     }],
@@ -94,7 +93,6 @@ describe('Mapmaker draft recovery', () => {
         draft.drafts.push({
             trackKey: 'otherDraft',
             originalTrackKey: 'oldTrack',
-            destination: 'daily',
             track: track(),
             draftLoop: [],
         });

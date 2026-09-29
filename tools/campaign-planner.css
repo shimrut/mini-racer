@@ -1,0 +1,77 @@
+/* Campaign Planner: builds on mapmaker.css */
+
+.maker-panel > .primary-btn {
+    width: 100%;
+}
+
+.series-stage-fields {
+    margin-top: 0.6rem;
+}
+
+.series-stage-fields .button-row {
+    margin-top: 0.5rem;
+}
+
+#series-stage-hint {
+    color: var(--maker-gold);
+}
+
+.planner-overview {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    align-content: start;
+    gap: 1.25rem;
+    padding: 1rem;
+}
+
+.planner-group h2 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.planner-group .field-hint {
+    margin-top: 0.4rem;
+}
+
+.series-stage-list {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.82rem;
+}
+
+.series-stage-list li {
+    display: grid;
+    grid-template-columns: 2.4rem minmax(0, 16rem) minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--maker-muted);
+}
+
+.series-stage-list button {
+    padding: 0.15rem 0.5rem;
+}
+
+.planner-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+
+.planner-track-btn {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-align: left;
+}
+
+.planner-track-btn[data-current="true"] {
+    border-color: var(--maker-accent);
+    color: #fff;
+    font-weight: 700;
+}
