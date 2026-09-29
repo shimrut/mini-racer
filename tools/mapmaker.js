@@ -287,7 +287,6 @@ class MapmakerApp {
         this.ctx = this.canvas.getContext('2d');
         this.trackSelect = document.getElementById('editor-track-select');
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
-        this.stageTitle = document.getElementById('stage-title');
         this.canvasHint = document.getElementById('canvas-hint');
         this.trackKeyInput = document.getElementById('track-key-input');
         this.trackNameInput = document.getElementById('track-name-input');
@@ -621,11 +620,12 @@ class MapmakerApp {
         this.flowCount.textContent = `${report.passed} of ${total} rules`;
         this.flowCount.className = `pill${report.passed === total ? ' pill-ok' : ''}`;
         this.flowSummary.textContent = report.passed === total
-            ? `The road meets all flow rules. Approx. lap ${report.lapSeconds.toFixed(1)} s on the fast line.`
-            : `Blue markers show where the flow breaks. These are hints, not errors. Approx. lap ${report.lapSeconds.toFixed(1)} s on the fast line.`;
+            ? `Meets all flow rules. Approx. lap ${report.lapSeconds.toFixed(1)} s.`
+            : `Blue markers show where the flow breaks (hints, not errors). Approx. lap ${report.lapSeconds.toFixed(1)} s.`;
         report.rules.forEach((rule, index) => {
+            if (rule.pass) return;
             const item = document.createElement('li');
-            item.dataset.flow = rule.pass ? 'pass' : 'miss';
+            item.dataset.flow = 'miss';
             const text = `F${index + 1}. ${rule.message}`;
             if (rule.hotspot) {
                 const button = document.createElement('button');
@@ -1024,7 +1024,6 @@ class MapmakerApp {
     }
 
     updateStageText() {
-        this.stageTitle.textContent = this.track.name;
         this.toolButtons.forEach((button) => {
             button.dataset.active = String(button.dataset.tool === this.state.tool);
         });

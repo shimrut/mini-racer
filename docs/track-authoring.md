@@ -73,7 +73,7 @@ center axis when moved. Moving or reversing the start on a newly built road
 updates its automatic checkpoint order while its walls and checkpoints remain
 unedited; manual checkpoint edits keep their authored positions.
 
-The **Track Checks** panel checks the smoothed race walls, road clearance,
+The **Checks** panel checks the smoothed race walls, road clearance,
 start position, gate coverage, and checkpoint order. It marks problem locations
 on the map and shows approximate lap length plus the narrowest wall gap.
 New structural errors block export and **Save & Integrate**;
@@ -89,7 +89,12 @@ not save the track. Open `tools/runner.html` for the same check on a saved track
 
 ### Flow checks
 
-The **Flow** part of Track Checks measures how the road drives. It uses the
+The Mapmaker sidebar has four collapsible sections: **Track** (pick, name, key,
+destination), **Shape** (corners, ground, smoothing, Insert Point, Reverse
+Wall), **Medal times** (closed by default) and **Checks**. Flow lists only the
+rules a track misses; the count in its badge shows how many pass.
+
+The **Flow** part of Checks measures how the road drives. It uses the
 fastest smooth line through the lane and the car's real steering limits. It
 checks five rules:
 

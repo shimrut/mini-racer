@@ -4,112 +4,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.26">
+    <link rel="stylesheet" href="mapmaker.css?v=2.28">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
-        <h1>Mini Racer Mapmaker</h1>
+        <a class="maker-link" href="../pages/game.html">&larr; Game</a>
+        <h1>Mapmaker</h1>
         <div class="maker-header-actions">
-            <a class="maker-link" href="../pages/game.html">Back to Game</a>
-            <span id="dirty-badge" class="pill pill-warn">Saved</span>
+            <span id="dirty-badge" class="pill">Saved</span>
             <button id="copy-backup-btn" type="button" class="ghost-btn">Copy backup</button>
             <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
-            <button id="save-track-btn" type="button">Save &amp; Integrate</button>
+            <button id="save-track-btn" type="button" class="primary-btn">Save &amp; Integrate</button>
         </div>
     </header>
 
     <main class="maker-layout">
         <aside class="maker-sidebar">
-            <section class="maker-panel">
-                <div class="panel-head">
-                    <h2>Track</h2>
-                </div>
-
-                <label class="field">
-                    <span>Current Track</span>
-                    <select id="editor-track-select"></select>
-                </label>
-
+            <details class="maker-panel" open>
+                <summary><h2>Track</h2></summary>
+                <select id="editor-track-select" aria-label="Current track"></select>
                 <div class="button-row button-row-3">
                     <button id="new-track-btn" type="button">New</button>
                     <button id="duplicate-track-btn" type="button" class="ghost-btn">Clone</button>
                     <button id="remove-track-btn" type="button" class="danger-btn">Remove</button>
                 </div>
-
+                <div class="button-row">
+                    <label class="field">
+                        <span>Name</span>
+                        <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>Key</span>
+                        <input id="track-key-input" type="text" spellcheck="false" autocomplete="off">
+                    </label>
+                </div>
                 <label class="field">
-                    <span>Track Key</span>
-                    <input id="track-key-input" type="text" spellcheck="false" autocomplete="off">
-                </label>
-
-                <label class="field">
-                    <span>Display Name</span>
-                    <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
-                </label>
-
-                <label class="field">
-                    <span>Use For</span>
+                    <span>Use for</span>
                     <select id="track-destination-select"></select>
                 </label>
-
                 <div id="series-stage-fields" class="series-stage-fields" hidden>
-                    <p id="series-stage-label" class="panel-note"></p>
-                    <div class="button-row">
-                        <label class="field">
-                            <span>Laps</span>
-                            <select id="series-laps-select">
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            <span>Medal Target</span>
-                            <input id="series-target-input" type="number" min="0" step="1">
-                        </label>
-                    </div>
-                    <p id="series-stage-hint" class="field-hint" hidden></p>
-                    <ol id="series-stage-list" class="series-stage-list"></ol>
+                <p id="series-stage-label" class="panel-note"></p>
+                <div class="button-row">
+                    <label class="field">
+                        <span>Laps</span>
+                        <select id="series-laps-select">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Medal Target</span>
+                        <input id="series-target-input" type="number" min="0" step="1">
+                    </label>
                 </div>
+                <p id="series-stage-hint" class="field-hint" hidden></p>
+                <ol id="series-stage-list" class="series-stage-list"></ol>
+            </div>
+            </details>
 
-                <label class="field">
-                    <span>Wall Corners</span>
-                    <select id="corner-radius-select">
-                        <option value="0">Sharp</option>
-                        <option value="1.5">A bit rounded</option>
-                        <option value="3" selected>Rounded</option>
-                        <option value="5">Soft</option>
-                    </select>
-                </label>
-
-                <label class="field">
-                    <span>Ground</span>
-                    <select id="ground-select"></select>
-                </label>
-            </section>
-
-            <section class="maker-panel">
-                <div class="panel-head">
-                    <h2>Edit Tools</h2>
+            <details class="maker-panel" open>
+                <summary><h2>Shape</h2></summary>
+                <div class="button-row">
+                    <label class="field">
+                        <span>Wall corners</span>
+                        <select id="corner-radius-select">
+                            <option value="0">Sharp</option>
+                            <option value="1.5">A bit rounded</option>
+                            <option value="3" selected>Rounded</option>
+                            <option value="5">Soft</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Ground</span>
+                        <select id="ground-select"></select>
+                    </label>
                 </div>
-
                 <label class="field">
-                    <span>Line Smoothing</span>
+                    <span>Line smoothing</span>
                     <input id="line-smoothing-input" type="number" min="0" max="1" step="0.05">
                 </label>
-
-                <p id="draw-metrics-label" class="panel-note">Road width 3.85u.</p>
-
+                <p id="draw-metrics-label" class="field-hint">Road width 3.85u.</p>
                 <div class="button-row">
-                    <button id="insert-point-btn" type="button">Insert Point</button>
+                    <button id="insert-point-btn" type="button" class="ghost-btn">Insert Point</button>
                     <button id="reverse-polygon-btn" type="button" class="ghost-btn">Reverse Wall</button>
                 </div>
-            </section>
+            </details>
 
-            <section class="maker-panel" aria-labelledby="medal-times-title">
-                <div class="panel-head">
-                    <h2 id="medal-times-title">Medal Times</h2>
+            <details class="maker-panel">
+                <summary>
+                    <h2>Medal times</h2>
                     <span id="medal-times-state" class="pill">Not set</span>
-                </div>
+                </summary>
                 <div id="draft-laps-list" class="draft-laps-list"></div>
                 <div class="medal-time-grid">
                     <label class="field">
@@ -130,55 +116,46 @@
                     </label>
                 </div>
                 <p id="medal-times-hint" class="field-hint" hidden></p>
-            </section>
+            </details>
 
-            <section class="maker-panel" aria-labelledby="quality-title">
-                <div class="panel-head">
-                    <h2 id="quality-title">Track Checks</h2>
+            <details class="maker-panel" open>
+                <summary>
+                    <h2 id="quality-title">Checks</h2>
                     <span id="quality-count" class="pill">Draw a track</span>
-                </div>
-                <p id="quality-summary" class="panel-note">Draw a closed road to check its walls, start, and lap gates.</p>
+                </summary>
+                <p id="quality-summary" class="field-hint">Draw a closed road to check its walls, start, and lap gates.</p>
                 <ul id="quality-issues" class="quality-issues"></ul>
                 <div class="panel-head flow-head">
                     <h3 id="flow-title">Flow</h3>
                     <span id="flow-count" class="pill">Draw a track</span>
                 </div>
-                <p id="flow-summary" class="panel-note">Draw a closed road to check how it flows.</p>
+                <p id="flow-summary" class="field-hint">Draw a closed road to check how it flows.</p>
                 <ul id="flow-rules" class="quality-issues flow-rules" aria-labelledby="flow-title"></ul>
                 <div class="panel-head flow-head">
                     <h3 id="bot-check-title">Bots</h3>
                     <span id="bot-check-count" class="pill">Not run</span>
                 </div>
-                <p id="bot-check-summary" class="panel-note" hidden></p>
-                <button id="run-bots-btn" type="button">Run bots</button>
+                <p id="bot-check-summary" class="field-hint" hidden></p>
+                <button id="run-bots-btn" type="button" class="ghost-btn">Run bots</button>
                 <ul id="bot-check-issues" class="quality-issues"></ul>
-            </section>
+            </details>
 
-            <section id="checkpoint-panel" class="maker-panel" hidden>
-                <div class="panel-head">
+            <details id="checkpoint-panel" class="maker-panel" open hidden>
+                <summary>
                     <h2>Checkpoints</h2>
                     <span id="checkpoint-count" class="pill">0 total</span>
-                </div>
-
-                <label class="field">
-                    <span>Current Checkpoint</span>
-                    <select id="checkpoint-select"></select>
-                </label>
-
+                </summary>
+                <select id="checkpoint-select" aria-label="Current checkpoint"></select>
                 <div class="button-row">
                     <button id="add-checkpoint-btn" type="button">Add</button>
                     <button id="remove-checkpoint-btn" type="button" class="danger-btn">Remove</button>
                 </div>
-            </section>
-
+            </details>
         </aside>
 
         <section class="maker-stage">
             <div class="stage-head">
-                <div>
-                    <p id="stage-title" class="stage-title">Classic Circuit</p>
-                    <p id="status-text" class="stage-subtitle">Ready.</p>
-                </div>
+                <p id="status-text" class="stage-status">Ready.</p>
                 <div class="stage-toolbar">
                     <div class="stage-edit-actions">
                         <button id="undo-edit-btn" type="button" class="ghost-btn" disabled>Undo</button>
@@ -253,6 +230,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.25"></script>
+    <script type="module" src="mapmaker.js?v=2.27"></script>
 </body>
 </html>

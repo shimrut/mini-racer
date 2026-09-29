@@ -1,3 +1,5 @@
+- Mapmaker got a calmer layout: a slim header, flat collapsible sidebar sections (Track, Shape, Medal times, Checks), and a canvas that fills the rest of the window. Flow lists only the rules a road misses. The track name is no longer repeated above the canvas.
+
 - Mapmaker is simpler: the Status panel, Selected X/Y boxes, Delete Point button, and "Line Brush Size" note are gone. Status messages show under the track name, and the Saved/Unsaved badge and Copy backup sit in the header. Delete still removes the selected point.
 
 - Players no longer get the game's source maps, which held the full, readable game code. The build keeps them on the developer's computer in `dist/client-sourcemaps`.
