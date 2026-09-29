@@ -1,3 +1,5 @@
+- Reloading or leaving the Mapmaker while it asks "Restore unsaved maps?" no longer deletes those maps. The question comes back next time. Discard still deletes them.
+
 - Drive Draft moves smoothly. It drew the car only at each physics step, so on about half the frames the car and camera stood still or jumped two steps, and on a 120 Hz screen every other frame stood still. It now draws the car between steps, as the race does.
 
 - The Mapmaker and Drive Draft are online at **miniracer.club/mapmaker**, locked by a passcode, and work on a phone or tablet: tap to draw, drag the map to move it, pinch to zoom, and the buttons at the top undo, redo, add a point and delete a point. Save keeps the map in a private cloud list, even when it is not finished. At home, the local Mapmaker lists those **Cloud maps** in its track picker; saving one there adds it to the game and deletes the cloud copy.

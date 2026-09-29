@@ -440,6 +440,8 @@ class MapmakerApp {
     flushDraftRecovery() {
         if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
         this.recoveryTimer = null;
+        // Until Restore or Discard is chosen, the stored maps are not in the editor yet.
+        if (this.restoreDraftsDialog.open) return;
         if (this.state.draftLoop.length) {
             this.draftLoopsByKey.set(this.state.selectedTrackKey, cloneTracks(this.state.draftLoop));
         } else {
