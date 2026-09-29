@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=3.3">
+    <link rel="stylesheet" href="mapmaker.css?v=3.6">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -13,16 +13,16 @@
             <span id="track-picker-name"></span>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
         </button>
-        <button id="new-track-btn" type="button" class="ghost-btn">New track</button>
+        <button id="new-track-btn" type="button">New track</button>
         <div id="tool-buttons" class="segmented" role="group" aria-label="Tool">
             <button type="button" data-tool="draw">Draw</button>
             <button type="button" data-tool="edit">Edit</button>
         </div>
         <div class="maker-header-actions">
             <a class="maker-link local-only" href="campaign-planner.html">Campaign Planner</a>
-            <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
+            <button id="drive-draft-btn" type="button">Drive Draft</button>
             <button id="save-track-btn" type="button" class="primary-btn">Save</button>
-            <button id="panel-toggle-btn" type="button" class="ghost-btn icon-btn" aria-controls="maker-panel" aria-label="Show or hide the panel" title="Show or hide the panel">
+            <button id="panel-toggle-btn" type="button" class="icon-btn" aria-controls="maker-panel" aria-label="Show or hide the panel" title="Show or hide the panel">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13"/></svg>
             </button>
         </div>
@@ -56,7 +56,7 @@
                 <ul id="quality-issues" class="quality-issues"></ul>
                 <details id="flow-tips" class="flow-tips" hidden>
                     <summary>Flow tips <span id="flow-count" class="pill"></span></summary>
-                    <p class="field-hint">Hints on how the road drives. They never block Save.</p>
+                    <p class="field-hint">Suggestions only. They don't block Save.</p>
                     <ul id="flow-rules" class="quality-issues flow-rules"></ul>
                 </details>
             </section>
@@ -82,7 +82,7 @@
                     <button id="add-checkpoint-btn" type="button">Add</button>
                     <button id="delete-checkpoint-btn" type="button">Delete</button>
                 </div>
-                <p class="field-hint">Add puts one halfway along the longest stretch without a gate. To delete one, select it on the map.</p>
+                <p class="field-hint">Select one on the map to delete it.</p>
             </section>
 
             <section class="panel-section">
@@ -130,8 +130,8 @@
             <h2 id="remove-track-dialog-title">Remove track?</h2>
             <p id="remove-track-dialog-message"></p>
             <div class="maker-dialog-actions">
-                <button type="submit" value="cancel" class="ghost-btn">Cancel</button>
-                <button type="submit" value="remove" class="danger-btn">Remove Track</button>
+                <button type="submit" value="cancel">Cancel</button>
+                <button type="submit" value="remove" class="danger-btn">Remove</button>
             </div>
         </form>
     </dialog>
@@ -141,12 +141,12 @@
             <h2 id="restore-drafts-dialog-title">Restore unsaved maps?</h2>
             <p id="restore-drafts-dialog-message"></p>
             <div class="maker-dialog-actions">
-                <button type="submit" value="discard" class="ghost-btn">Discard Drafts</button>
-                <button type="submit" value="restore">Restore Drafts</button>
+                <button type="submit" value="discard">Discard</button>
+                <button type="submit" value="restore" class="primary-btn">Restore</button>
             </div>
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=3.7"></script>
+    <script type="module" src="mapmaker.js?v=3.9"></script>
 </body>
 </html>

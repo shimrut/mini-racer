@@ -482,7 +482,7 @@ class MapmakerApp {
             this.restoreDraftRecovery(recovery);
             return;
         }
-        this.restoreDraftsDialogMessage.textContent = `${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'} found in this browser. Restore them to the editor?`;
+        this.restoreDraftsDialogMessage.textContent = `${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'} found.`;
         this.restoreDraftsDialog.returnValue = '';
         this.restoreDraftsDialog.showModal();
         this.restoreDraftsDialog.addEventListener('close', () => {
@@ -574,7 +574,7 @@ class MapmakerApp {
         this.addCloudMap(map);
         this.trackPickerDialog.close();
         this.loadTrack(trackKey);
-        this.setStatus(`Opened ${map.track.name} from your cloud maps. Save adds it to the game and deletes the cloud copy.`);
+        this.setStatus(`Opened ${map.track.name} from cloud maps. Save adds it to the game.`);
     }
 
     // After a local save or removal, the cloud copy is not needed.
@@ -1107,7 +1107,6 @@ class MapmakerApp {
         const addLapButton = (lap, label, kind) => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'ghost-btn';
             button.dataset.lap = String(lap);
             button.dataset.kind = kind;
             button.textContent = label;
@@ -1121,7 +1120,7 @@ class MapmakerApp {
         if (!laps.length) {
             const note = document.createElement('p');
             note.className = 'field-hint';
-            note.textContent = 'No Drive Draft laps on this layout yet.';
+            note.textContent = 'No Drive Draft laps yet.';
             this.draftLapsList.appendChild(note);
         }
 
@@ -1130,12 +1129,12 @@ class MapmakerApp {
         const bronze = Number(row?.bronze);
         const notes = [];
         if (fixed) {
-            notes.push('This track is a stage of a live series, so its medal times are fixed.');
+            notes.push('Fixed: the track is in a live series.');
         } else if (row && error) {
             notes.push(error);
         }
         if (Number.isFinite(bronze) && bronze >= BRONZE_WARNING_SEC) {
-            notes.push(`Keep a bronze lap under ${BRONZE_WARNING_SEC} s, because the server refuses very long laps.`);
+            notes.push(`Keep bronze under ${BRONZE_WARNING_SEC} s. Longer laps are refused.`);
         }
         this.medalTimesHint.hidden = notes.length === 0;
         this.medalTimesHint.textContent = notes.join(' ');
@@ -1285,7 +1284,7 @@ class MapmakerApp {
         const key = trackKeyFromName(name);
         this.state.tracks[key] = createBlankTrack(name);
         this.loadTrack(key);
-        this.markDirty(`Created ${name}. Name it, then draw the road.`);
+        this.markDirty(`Created ${name}.`);
         this.setPanelHidden(false);
         this.trackNameInput.focus();
         this.trackNameInput.select();
@@ -1315,8 +1314,8 @@ class MapmakerApp {
                 : `Discard unsaved track ${trackName}?`;
         } else {
             warning = originalKey
-                ? `Permanently remove ${trackName} (${originalKey}) from the game? This deletes its definition, catalog entry, Daily schedule entry, and medal times. Published Daily races and Head-to-Head posts using it may stop working. Unsaved edits will also be lost.${cloudText}`
-                : `Discard unsaved track ${trackName} (${selectedKey})?${cloudText}`;
+                ? `Remove ${trackName} from the game for good? Published Daily races and Head-to-Head posts that use it may stop working.${cloudText}`
+                : `Discard unsaved track ${trackName}?${cloudText}`;
         }
         try {
             if (!await this.confirmTrackRemoval(warning)) return;
@@ -1371,7 +1370,7 @@ class MapmakerApp {
                 this.setStatus(cloudKey ? `Deleted ${trackName} from your cloud maps.` : `Discarded unsaved track ${trackName}.`);
             } else {
                 this.setStatus((originalKey
-                    ? `Removed ${trackName} (${originalKey}) from the repository. Review track-specific references and registry integrity tests before shipping.`
+                    ? `Removed ${trackName}.`
                     : `Discarded unsaved track ${trackName}.`) + cloudResult);
             }
             this.scheduleDraftRecovery();
@@ -1522,30 +1521,30 @@ class MapmakerApp {
         if (this.state.tool === 'draw') {
             const pointCount = this.state.draftLoop.length;
             if (pointCount === 0) {
-                return `${click} to start drawing the road.`;
+                return `${click} to start the road.`;
             }
             if (pointCount < 3) {
-                return `${click} to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
+                return `${click} to add ${3 - pointCount} more point${pointCount === 2 ? '' : 's'}.`;
             }
             if (this.state.draftCloseHover) {
-                return 'This is the closed road. Click the first point to build it.';
+                return `${click} to close the road.`;
             }
-            return `${click} to add another point in whole car lengths. The road stays open until you ${click.toLowerCase()} the first point.`;
+            return `${click} to add a point. ${click} the first point to close the road.`;
         }
         if (!this.hasTrackGeometry()) {
-            return 'This track has no walls yet. Switch to Draw and close the loop first.';
+            return 'No road yet. Use Draw.';
         }
         const kind = this.state.selectedHandle?.kind;
         if (kind === 'startPos') {
-            return 'Drag the start car. It stays centered on the start line and always faces perpendicular to it.';
+            return 'Drag to move the start.';
         }
         if (kind === 'startLine' || kind === 'checkpoint') {
-            return 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
+            return 'Drag to slide it along the road.';
         }
         if (this.touchInput) {
-            return 'Tap to select, then drag. Drag the map to move it and pinch to zoom.';
+            return 'Tap to select, drag to move. Pinch to zoom.';
         }
-        return 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point or checkpoint. Cmd+Z undoes.';
+        return 'Click to select, drag to move. Shift+click a wall adds a point. Delete removes. Cmd+Z undoes.';
     }
 
     updateCanvasHint() {
@@ -2471,13 +2470,13 @@ class MapmakerApp {
     addCheckpoint() {
         const placed = this.hasTrackGeometry() ? placeCheckpointInLongestGap(this.track) : null;
         if (!placed) {
-            this.setStatus('No room for a checkpoint. Fix the finish line and checkpoint problems under Checks, or move a checkpoint.', true);
+            this.setStatus('No room for a checkpoint. Fix the problems under Checks first.', true);
             return;
         }
         this.keepCheckpointsAsEdited();
         this.track.checkpoints.splice(placed.index, 0, placed.checkpoint);
         this.setTool('edit', { kind: 'checkpoint', checkpointIndex: placed.index });
-        this.markDirty(`Added checkpoint ${placed.index + 1}. Drag it to move it.`);
+        this.markDirty(`Added CP ${placed.index + 1}.`);
     }
 
     deleteCheckpoint() {
@@ -2489,7 +2488,7 @@ class MapmakerApp {
         this.keepCheckpointsAsEdited();
         this.track.checkpoints.splice(handle.checkpointIndex, 1);
         this.state.selectedHandle = null;
-        this.markDirty(`Deleted checkpoint ${handle.checkpointIndex + 1}.`);
+        this.markDirty(`Deleted CP ${handle.checkpointIndex + 1}.`);
     }
 
     syncCheckpointPanel() {
@@ -2983,7 +2982,7 @@ class MapmakerApp {
             this.skipBeforeUnload = true;
             window.location.assign('mapmaker-playtest.html');
         } catch (error) {
-            this.setStatus('Draft Drive could not open in this browser.', true);
+            this.setStatus('Drive Draft could not open in this browser.', true);
             console.error(error);
         }
     }
@@ -3005,7 +3004,7 @@ class MapmakerApp {
                 replaceKey: this.cloudKeyByKey.get(trackKey) ?? null,
             });
             this.cloudKeyByKey.set(trackKey, trackKey);
-            this.markSaved(`Saved ${this.track.name} to your cloud maps. Open it from the track list in the Mapmaker at home to add it to the game.`);
+            this.markSaved(`Saved ${this.track.name} to cloud maps. Add it to the game from the Mapmaker at home.`);
         } catch (error) {
             console.error(error);
             this.setStatus(error.message, true);
@@ -3032,7 +3031,7 @@ class MapmakerApp {
             originalTrackKey
             && originalTrackKey !== trackKey
             && !window.confirm(
-                `Rename ${originalTrackKey} to ${trackKey}? This will delete the old definition file and replace its catalog, schedule, import, and registry entries.`,
+                `Rename ${originalTrackKey} to ${trackKey}? The old track file is replaced.`,
             )
         ) {
             return;
@@ -3052,7 +3051,7 @@ class MapmakerApp {
 
         this.busy = true;
         this.syncActionButtons();
-        this.setStatus(`Saving and integrating ${this.track.name}...`);
+        this.setStatus(`Saving ${this.track.name}...`);
         try {
             const response = await fetch('/__mapmaker/save-track', {
                 method: 'POST',
@@ -3079,15 +3078,10 @@ class MapmakerApp {
             this.medalRowByKey.delete(trackKey);
             this.state.originalTrackKeyByKey.set(trackKey, trackKey);
             const useText = result.action === 'created'
-                ? ' It is not used yet. Choose Daily Challenge or a Campaign series in the Campaign Planner.'
-                : '';
-            const renameText = result.removedFilename
-                ? ` Removed ${result.removedFilename}.`
+                ? ' Assign it in the Campaign Planner.'
                 : '';
             const cloudText = await this.deleteCloudCopy(trackKey);
-            this.markSaved(
-                `Saved and integrated ${result.filename}.${useText}${renameText}${cloudText}`,
-            );
+            this.markSaved(`Saved ${this.track.name}.${useText}${cloudText}`);
         } catch (error) {
             console.error(error);
             this.setStatus(

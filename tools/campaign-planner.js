@@ -306,7 +306,7 @@ class CampaignPlannerApp {
     }
 
     createMoveButton(trackKey) {
-        const button = el('button', 'ghost-btn planner-small-btn', 'Move to…');
+        const button = el('button', 'planner-small-btn', 'Move to…');
         button.type = 'button';
         button.dataset.moveTrack = trackKey;
         return button;
@@ -367,7 +367,7 @@ class CampaignPlannerApp {
     createStageActions(index, count, trackKey) {
         const actions = el('div', 'planner-stage-actions');
         for (const [direction, label, title] of [[-1, '↑', 'Move up'], [1, '↓', 'Move down']]) {
-            const button = el('button', 'ghost-btn planner-icon-btn', label);
+            const button = el('button', 'icon-btn', label);
             button.type = 'button';
             button.title = title;
             button.setAttribute('aria-label', title);

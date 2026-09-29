@@ -323,7 +323,7 @@ export function validateTrackQuality(track) {
     const finishHit = checkGate('Finish line', 'finish', track.startLine, outer, inner, issues);
     const checkpoints = Array.isArray(track.checkpoints) ? track.checkpoints : [];
     if (checkpoints.length < MIN_CHECKPOINTS) {
-        issues.push(issue('checkpoints-too-few', 'error', 'Too few checkpoints', `This track has ${checkpoints.length}. Every track needs at least ${MIN_CHECKPOINTS}. Press Add under Checkpoints.`));
+        issues.push(issue('checkpoints-too-few', 'error', 'Too few checkpoints', `Add ${MIN_CHECKPOINTS - checkpoints.length} more.`));
     }
     const checkpointHits = checkpoints.map((checkpoint, index) => (
         checkGate(`Checkpoint ${index + 1}`, `checkpoint-${index + 1}`, checkpoint, outer, inner, issues)

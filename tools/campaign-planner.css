@@ -135,11 +135,6 @@
     font-size: 0.75rem;
 }
 
-.planner-small-btn {
-    padding: 0.25rem 0.6rem;
-    font-size: 0.8rem;
-}
-
 [data-highlight="true"] {
     outline: 2px solid var(--maker-gold);
     outline-offset: 2px;
@@ -228,10 +223,6 @@
 .planner-stage:hover .planner-stage-actions,
 .planner-stage:focus-within .planner-stage-actions {
     opacity: 1;
-}
-
-.planner-icon-btn {
-    padding: 0.25rem 0.55rem;
 }
 
 /* Track cards (base styles in mapmaker.css) */

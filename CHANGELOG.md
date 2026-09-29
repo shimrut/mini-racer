@@ -1,3 +1,5 @@
+- Mapmaker and Campaign Planner buttons all share one shape, size and color: grey with a thin border, red for Save, Restore and Add track, and a red outline for Remove. Header links look like buttons too, and on a touch screen every button is a bit bigger. Map hints, panel notes, dialogs and messages are shorter.
+
 - Every track needs at least 3 checkpoints. With fewer, Mapmaker's Checks show "Too few checkpoints" and Save is blocked until you add more. Online Save still keeps unfinished maps.
 
 - Mapmaker shows each checkpoint's number (CP 1, CP 2, …) on the map again, so the lap order is visible.
