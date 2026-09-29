@@ -210,6 +210,7 @@ describe('track runtime integrity', () => {
             'wildCrest',
             'dirtValley',
             'warpedLoop',
+            'oldMountain',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -255,6 +256,7 @@ describe('track runtime integrity', () => {
         // Broken Antler got simpler corners, and Winding Road got rounder corners
         // and moved gates. The same day, every definition dropped the unused
         // drawWidth and lineSmoothing fields, so these hashes all moved.
+        // Old Mountain is the August Mountain Peak layout, appended after that.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -271,7 +273,7 @@ describe('track runtime integrity', () => {
             '4c4654b67fc05b67be1ec7998ad78ff575efb0614bd6c89621c0377f75efdd31',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '150d591f413bd0d7b010504d6b1c70d2f76068fd3c45104e0734d2b11b236bb8',
+            'ecec07a9bca647a28a4991b98c9429ec1f3f43acf75e7ac60e4a39770e7826f7',
         );
     });
 

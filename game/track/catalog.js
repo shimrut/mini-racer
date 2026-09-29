@@ -155,6 +155,7 @@ export const TRACK_CATALOG = {
     wildCrest: { name: "Wild Crest" },
     dirtValley: { name: "Dirt Valley" },
     warpedLoop: { name: "Warped Loop" },
+    oldMountain: { name: "Old Mountain" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

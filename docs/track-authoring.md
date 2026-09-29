@@ -234,8 +234,9 @@ so maps can be made on a laptop, tablet or phone.
    fingerprint as a subset assertion so adding a track cannot hide changes to
    existing track geometry. The current approved fingerprint includes the
    intentional Mistfall Circuit outer-boundary shape committed in `c4da688`,
-   the reshaped Double Trouble, Monkey Wrench, and Shark Bite, and the
-   appended Daily tracks through Anvil Circuit.
+   the reshaped Double Trouble, Monkey Wrench, and Shark Bite, the
+   appended Daily tracks through Anvil Circuit, and Old Mountain (the August
+   Mountain Peak layout, kept off the Daily schedule).
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 ## Campaign Series

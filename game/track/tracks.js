@@ -154,6 +154,7 @@ import dirtSnake from './definitions/dirt-snake.js';
 import wildCrest from './definitions/wild-crest.js';
 import dirtValley from './definitions/dirt-valley.js';
 import warpedLoop from './definitions/warped-loop.js';
+import oldMountain from './definitions/old-mountain.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -313,6 +314,7 @@ const TRACK_GEOMETRY = {
     wildCrest,
     dirtValley,
     warpedLoop,
+    oldMountain,
 };
 
 // Compatibility registry for existing gameplay and server consumers.
