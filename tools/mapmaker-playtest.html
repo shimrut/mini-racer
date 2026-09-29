@@ -20,7 +20,8 @@
     </header>
 
     <main class="drive-layout">
-        <section class="stage" aria-label="Draft track drive">
+        <div class="stage-slot">
+        <section class="stage" data-frame="desktop" aria-label="Draft track drive">
             <canvas id="drive-canvas" aria-label="Draft track and car"></canvas>
             <!-- The race HUD, as in pages/game.html. -->
             <div class="hud-bar">
@@ -52,6 +53,7 @@
             </div>
             <div class="stage-note" id="stage-note" role="status">Loading draft…</div>
         </section>
+        </div>
 
         <aside class="drive-panel">
             <div class="panel-heading">
@@ -72,6 +74,10 @@
                 <div class="metric"><span>Left-right changes</span><strong id="flow-switch">—</strong></div>
             </section>
             <p class="drive-feedback" id="drive-feedback">Steer through the checkpoints, then cross the finish line.</p>
+            <div class="frame-toggle" role="group" aria-label="Race screen">
+                <button id="frame-desktop" type="button" aria-pressed="true">Desktop</button>
+                <button id="frame-mobile" type="button" aria-pressed="false">Mobile</button>
+            </div>
             <div class="controls">
                 <button id="pause-button" type="button">Pause</button>
                 <button id="reset-button" type="button">Reset run</button>
@@ -81,7 +87,7 @@
                 <button id="steer-left" type="button" aria-label="Steer left">←</button>
                 <button id="steer-right" type="button" aria-label="Steer right">→</button>
             </div>
-            <p class="help">Steer: ← / → or A / D. The car accelerates automatically, as in the race. Space pauses, R resets, M changes view.</p>
+            <p class="help">Desktop is the wide race. Mobile is the tall phone race. Steer: ← / → or A / D. The car accelerates automatically, as in the race. Space pauses, R resets, M changes view.</p>
             <p class="help">This drive uses the current browser draft. It does not save or integrate a track.</p>
             <p class="help">Drive Draft keeps your 10 best laps on this layout. In Mapmaker, Medal Times lets you pick one of them, or their average, as the author time. A change to the layout starts a new list.</p>
         </aside>

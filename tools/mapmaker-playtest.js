@@ -13,8 +13,6 @@ import {
     getCameraZoom,
     getDesiredLookAhead,
     getLookAheadLerpFactor,
-    isMobileCameraMode,
-    NARROW_VIEWPORT_MAX_WIDTH,
 } from '../game/race/race-camera.js';
 import { RaceHud } from '../game/race/ui-hud.js';
 import { CarSpriteLoader, getDrawnCar } from '../game/car/sprite.js';
@@ -49,6 +47,9 @@ const ui = {
     note: document.getElementById('stage-note'),
     pause: document.getElementById('pause-button'),
     view: document.getElementById('view-button'),
+    stage: document.querySelector('.stage'),
+    frameDesktop: document.getElementById('frame-desktop'),
+    frameMobile: document.getElementById('frame-mobile'),
     flow: document.getElementById('flow-drive'),
     flowSlowest: document.getElementById('flow-slowest'),
     flowGap: document.getElementById('flow-gap'),
@@ -66,6 +67,7 @@ let trackPresentation = null;
 let state = null;
 let paused = false;
 let overview = false;
+let raceFrame = 'desktop';
 let wallContacts = 0;
 let contactSpots = [];
 let lapTime = null;
@@ -83,8 +85,6 @@ let draftLapsKey = null;
 const car = { image: null, drawn: null, drawWidth: 64, drawHeight: 32 };
 const lookAhead = { x: 0, y: 0 };
 const desiredLookAhead = { x: 0, y: 0 };
-const coarsePointer = typeof window.matchMedia === 'function'
-    && window.matchMedia('(pointer: coarse)').matches;
 const heldKeys = new Set();
 const heldButtons = { left: false, right: false };
 
@@ -209,6 +209,14 @@ function toggleView() {
     overview = !overview;
     ui.view.textContent = overview ? 'Follow car' : 'Show whole track';
     render();
+}
+
+function setRaceFrame(frame) {
+    raceFrame = frame;
+    ui.stage.dataset.frame = frame === 'mobile' ? 'portrait' : 'desktop';
+    ui.frameDesktop.setAttribute('aria-pressed', String(frame === 'desktop'));
+    ui.frameMobile.setAttribute('aria-pressed', String(frame === 'mobile'));
+    requestAnimationFrame(() => render());
 }
 
 function tick() {
@@ -400,11 +408,8 @@ function render(dt = 0) {
         (width - 56) / Math.max(1, bounds.maxX - bounds.minX),
         (height - 56) / Math.max(1, bounds.maxY - bounds.minY),
     );
-    // Follow view: the race camera, with its zoom and its look-ahead.
-    const mobileCameraMode = isMobileCameraMode({
-        coarsePointer,
-        narrowViewport: window.innerWidth <= NARROW_VIEWPORT_MAX_WIDTH,
-    });
+    // Follow view: the race camera for the chosen screen, not the browser window.
+    const mobileCameraMode = raceFrame === 'mobile';
     getDesiredLookAhead(desiredLookAhead, state.velocity, state.cachedSpeed, width, height, mobileCameraMode);
     const lerpFactor = getLookAheadLerpFactor(dt, mobileCameraMode);
     lookAhead.x += (desiredLookAhead.x - lookAhead.x) * lerpFactor;
@@ -518,6 +523,7 @@ function renderGameToText() {
         savedLapsSec: draftLaps,
         flow: flowSummary,
         view: overview ? 'whole-track' : 'follow-car',
+        screen: raceFrame,
         feedback,
     });
 }
@@ -543,6 +549,8 @@ window.addEventListener('blur', () => {
 });
 ui.pause.addEventListener('click', togglePause);
 ui.view.addEventListener('click', toggleView);
+ui.frameDesktop.addEventListener('click', () => setRaceFrame('desktop'));
+ui.frameMobile.addEventListener('click', () => setRaceFrame('mobile'));
 document.getElementById('reset-button').addEventListener('click', resetRun);
 for (const direction of ['left', 'right']) {
     const button = document.getElementById(`steer-${direction}`);
