@@ -22,7 +22,7 @@ import {
 } from './mapmaker/edit-history.js';
 import { snapLineBuildPoint } from './mapmaker/line-build.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
-import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
+import { buildRibbonWallsFromCenterline, fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
 import {
     DEFAULT_DRAW_WIDTH,
     isValidTrackKey,
@@ -193,7 +193,7 @@ function normalizeTrackLayout(layout, padding = 4) {
     return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
 }
 
-function buildRoadWallsFromLoop(rawPoints, trackWidth) {
+function buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius) {
     const filtered = dedupeStrokePoints(rawPoints, 0.35);
     if (filtered.length < 3) {
         return null;
@@ -205,11 +205,15 @@ function buildRoadWallsFromLoop(rawPoints, trackWidth) {
         return null;
     }
 
-    return buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
+    const walls = buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
+    return walls && {
+        ...walls,
+        ...fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, trackWidth),
+    };
 }
 
 function buildTrackFromLoop(rawPoints, trackWidth, cornerRadius) {
-    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth);
+    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius);
     if (!walls) {
         return null;
     }
@@ -782,6 +786,18 @@ class MapmakerApp {
     setCornerRadius(value, options = {}) {
         const nextRadius = this.nearestCornerRadiusPreset(value);
         this.track.cornerRadius = nextRadius;
+        if (this.hasTrackGeometry()) {
+            const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+            const guideMatchesWalls = guide?.wallSignature === JSON.stringify([this.track.outer, this.track.inner]);
+            const walls = fitCurvesToCorners(this.track.outer, this.track.inner, nextRadius, DEFAULT_DRAW_WIDTH);
+            const handle = this.state.selectedHandle;
+            if (handle?.kind === 'polygon' && walls[handle.path].length !== this.track[handle.path].length) {
+                this.state.selectedHandle = null;
+            }
+            this.track.outer = walls.outer;
+            this.track.inner = walls.inner;
+            if (guideMatchesWalls) guide.wallSignature = JSON.stringify([walls.outer, walls.inner]);
+        }
         this.syncCornerRadiusControl();
         if (options.markDirty !== false) {
             const preset = CORNER_RADIUS_PRESETS.find((entry) => entry.value === nextRadius);
@@ -2828,7 +2844,7 @@ class MapmakerApp {
             && cached.cornerRadius === cornerRadius;
         let generated = cached?.generated;
         if (!cacheMatches) {
-            const walls = buildRoadWallsFromLoop(points, width);
+            const walls = buildRoadWallsFromLoop(points, width, cornerRadius);
             generated = walls ? buildTrackGeometry({
                 outer: walls.outer,
                 inner: walls.inner,

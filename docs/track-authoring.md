@@ -62,6 +62,14 @@ Existing saved tracks are unchanged until you redraw them with Draw.
 Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
 Changing Wall Corners updates the Mapmaker race preview immediately.
+The race rounds a single-point corner by the setting, but a curve made of
+many points hardly changes. So on each Draw-style corner (a single point on
+one wall, a curve on the other), Mapmaker rebuilds the curve to stay one road
+width from the rounded corner: rounder settings give a wider curve with more
+points, and Sharp gives back the tight curve Draw builds. Switching settings
+back and forth returns the same walls. Curves that do not follow that pattern
+(shaped by hand) are left alone. Draw builds its walls for the current
+setting (`fitCurvesToCorners` in `tools/mapmaker/ribbon-walls.js`).
 
 Draw places its start line and checkpoints against the final road after
 tight bends are widened and corners are filleted. It spaces three to five

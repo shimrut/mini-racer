@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { smoothPoly } from '../game/track/runtime.js';
 import {
     buildRibbonWallsFromCenterline,
     filletCenterline,
+    fitCurvesToCorners,
     inflateTightBends,
 } from '../tools/mapmaker/ribbon-walls.js';
 
@@ -99,5 +101,82 @@ describe('buildRibbonWallsFromCenterline', () => {
         const nearestTight = Math.min(...tight.map((sample) => distance(sample.point, origin)));
         const nearestOpen = Math.min(...open.map((sample) => distance(sample.point, origin)));
         expect(nearestOpen).toBeGreaterThan(nearestTight);
+    });
+});
+
+const ROAD_WIDTH = 3.85;
+const L_SHAPE = [
+    { x: 0, y: 0 },
+    { x: 24.6, y: 0 },
+    { x: 24.6, y: 12.3 },
+    { x: 12.3, y: 12.3 },
+    { x: 12.3, y: 24.6 },
+    { x: 0, y: 24.6 },
+];
+
+function distanceToLoop(point, loop) {
+    return Math.min(...loop.map((start, index) => {
+        const end = loop[(index + 1) % loop.length];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const lengthSq = dx * dx + dy * dy;
+        if (lengthSq === 0) {
+            return distance(point, start);
+        }
+        const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq));
+        return distance(point, { x: start.x + dx * t, y: start.y + dy * t });
+    }));
+}
+
+function widestRaceRoad(walls, cornerRadius) {
+    const outer = smoothPoly(walls.outer, cornerRadius);
+    const inner = smoothPoly(walls.inner, cornerRadius);
+    return Math.max(
+        ...outer.map((point) => distanceToLoop(point, inner)),
+        ...inner.map((point) => distanceToLoop(point, outer)),
+    );
+}
+
+describe('fitCurvesToCorners', () => {
+    const drawn = buildRibbonWallsFromCenterline(L_SHAPE, ROAD_WIDTH / 2);
+
+    it('keeps the race road one width wide through rounded corners', () => {
+        expect(widestRaceRoad(drawn, 5)).toBeGreaterThan(ROAD_WIDTH * 1.3);
+        for (const cornerRadius of [0, 1.5, 3, 5]) {
+            const fitted = fitCurvesToCorners(drawn.outer, drawn.inner, cornerRadius, ROAD_WIDTH);
+            expect(widestRaceRoad(fitted, cornerRadius)).toBeLessThan(ROAD_WIDTH * 1.02);
+        }
+    });
+
+    it('uses more curve points for rounder corners', () => {
+        const counts = [0, 1.5, 3, 5].map((cornerRadius) => {
+            const fitted = fitCurvesToCorners(drawn.outer, drawn.inner, cornerRadius, ROAD_WIDTH);
+            return fitted.outer.length + fitted.inner.length;
+        });
+        expect(counts[0]).toBe(drawn.outer.length + drawn.inner.length);
+        expect(counts[1]).toBeGreaterThan(counts[0]);
+        expect(counts[3]).toBeGreaterThan(counts[1]);
+    });
+
+    it('returns to the same walls when a setting is chosen again', () => {
+        const sharp = fitCurvesToCorners(drawn.outer, drawn.inner, 0, ROAD_WIDTH);
+        let walls = drawn;
+        for (const cornerRadius of [5, 1.5, 3, 0]) {
+            walls = fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, ROAD_WIDTH);
+        }
+        for (const path of ['outer', 'inner']) {
+            expect(walls[path]).toHaveLength(drawn[path].length);
+            walls[path].forEach((point, index) => {
+                expect(distance(point, drawn[path][index])).toBeLessThan(1e-9);
+                expect(distance(point, sharp[path][index])).toBeLessThan(1e-9);
+            });
+        }
+    });
+
+    it('leaves hand-shaped curves alone', () => {
+        const outer = drawn.outer.map((point) => ({ x: point.x + 0.3, y: point.y + 0.2 }));
+        const fitted = fitCurvesToCorners(outer, drawn.inner, 5, ROAD_WIDTH);
+        expect(fitted.outer).toEqual(outer);
+        expect(fitted.inner).toEqual(drawn.inner);
     });
 });

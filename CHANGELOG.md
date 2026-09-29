@@ -1,3 +1,5 @@
+- Mapmaker Wall Corners now reshape both walls of a corner. Before, only corners made of a single point got rounder; the curve on the other wall, made of many points, stayed the same, so the road got wider in corners. Now that curve is rebuilt to stay one road width away: rounder settings give it a wider curve with more points, and Sharp gives back the tight curve. Switching back and forth returns the same walls, and Draw builds its walls for the chosen setting. Curves shaped by hand are left alone. Saved tracks change only when you pick a setting and save.
+
 - Mapmaker and Campaign Planner buttons all share one shape, size and color: grey with a thin border, red for Save, Restore and Add track, and a red outline for Remove. Header links look like buttons too, and on a touch screen every button is a bit bigger. Map hints, panel notes, dialogs and messages are shorter.
 
 - Every track needs at least 3 checkpoints. With fewer, Mapmaker's Checks show "Too few checkpoints" and Save is blocked until you add more. Online Save still keeps unfinished maps.
