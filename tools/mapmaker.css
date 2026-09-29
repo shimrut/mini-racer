@@ -371,6 +371,7 @@ summary:focus-visible,
     display: grid;
     align-content: start;
     gap: 0.3rem;
+    min-height: auto;
     padding: 0.6rem;
     border: 1px solid var(--maker-border);
     border-radius: 10px;
