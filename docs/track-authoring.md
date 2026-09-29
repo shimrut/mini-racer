@@ -101,6 +101,7 @@ the last action show for a few seconds in the hint at the bottom of the map.
 In Edit, click an item to select it, drag to move it, Shift+click a wall to add
 a point, and Delete to remove the selected wall point or checkpoint.
 
+Each checkpoint is labelled on the map with its lap order (CP 1, CP 2, …).
 **Checkpoints** shows how many the track has. **Add** puts a new one in the
 middle of the longest stretch without a gate, keeps the lap order, and selects
 it so it can be dragged. **Delete** removes the selected checkpoint (the Delete

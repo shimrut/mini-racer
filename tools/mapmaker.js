@@ -2888,6 +2888,19 @@ class MapmakerApp {
         this.drawGhostCar(this.track.startPos, this.track.startAngle || 0, viewport);
     }
 
+    drawCheckpointLabels(selectedCheckpoint, viewport) {
+        this.ctx.save();
+        this.ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.track.checkpoints.forEach((checkpoint, index) => {
+            const screen = this.worldToScreen(midpoint(checkpoint.p1, checkpoint.p2), viewport);
+            this.ctx.fillStyle = index === selectedCheckpoint ? '#dcfce7' : '#86efac';
+            this.ctx.fillText(`CP ${index + 1}`, screen.x, screen.y - 10);
+        });
+        this.ctx.restore();
+    }
+
     draw() {
         this.syncCheckpointPanel();
         const ratio = window.devicePixelRatio || 1;
@@ -2936,6 +2949,7 @@ class MapmakerApp {
                     active ? 4 : 2
                 );
             });
+            this.drawCheckpointLabels(selectedCheckpoint, viewport);
         }
 
         this.drawFlowMarkers(viewport);

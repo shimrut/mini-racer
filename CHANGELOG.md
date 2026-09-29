@@ -1,3 +1,5 @@
+- Mapmaker shows each checkpoint's number (CP 1, CP 2, …) on the map again, so the lap order is visible.
+
 - Mapmaker can add and delete checkpoints again. The panel has a **Checkpoints** section with the count and **Add** and **Delete** buttons. Add puts a new checkpoint in the middle of the longest stretch without one, in lap order, selected so you can drag it. Delete (or the Delete key) removes the selected checkpoint. It works the same on a phone.
 
 - Reloading or leaving the Mapmaker while it asks "Restore unsaved maps?" no longer deletes those maps. The question comes back next time. Discard still deletes them.
