@@ -23,6 +23,7 @@ import {
     loadDraftRecovery,
     saveDraftRecovery,
 } from './mapmaker/edit-history.js';
+import { snapLineBuildPoint } from './mapmaker/line-build.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
@@ -1833,11 +1834,11 @@ class MapmakerApp {
                 return;
             }
             if (pointCount < 3) {
-                this.canvasHint.textContent = `Click to keep drawing. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
+                this.canvasHint.textContent = `Click to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
             } else if (this.state.draftCloseHover) {
                 this.canvasHint.textContent = 'This is the closed road. Click the first point to build it.';
             } else {
-                this.canvasHint.textContent = 'Click to add another point. The road stays open until you click the first point.';
+                this.canvasHint.textContent = 'Click to add another point in whole car lengths. The road stays open until you click the first point.';
             }
             return;
         }
@@ -2419,7 +2420,8 @@ class MapmakerApp {
         }
 
         if (this.state.tool === 'draw') {
-            this.state.draftCursor = worldPoint;
+            const lastPoint = this.state.draftLoop[this.state.draftLoop.length - 1] ?? null;
+            this.state.draftCursor = snapLineBuildPoint(lastPoint, worldPoint);
             this.state.draftCloseHover = Boolean(this.getDraftCloseHandle(canvasPoint, viewport));
             this.updateCanvasHint();
             this.draw();
@@ -2497,7 +2499,12 @@ class MapmakerApp {
             return;
         }
         const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
-        this.addDraftLoopPoint(worldPoint);
+        const lastPoint = this.state.draftLoop[this.state.draftLoop.length - 1] ?? null;
+        const snapped = snapLineBuildPoint(lastPoint, worldPoint);
+        if (!snapped) {
+            return;
+        }
+        this.addDraftLoopPoint(snapped);
     }
 
     onPointerUp() {

@@ -39,11 +39,15 @@ collision size (`0.55u` wide × `1.23u` long).
 Brush size is fixed at **7 car-widths** (`3.85u`). That is the
 usual racing lane width for Line Build.
 
-Line Build keeps the full-width road **open** while placing points. The pointer
-extends the road, and bends are rounded in the draft preview. It never draws
-an implied closing edge. Hover over the first point to see the exact road that
-clicking it will build; the close target is kept small so a nearby click can
-still add a point. The draft view has no length labels or centerline so the
+Line Build keeps the full-width road **open** while placing points. The first
+click lands where you click. After that, each new point lands a whole number
+of car lengths (`1.23u`) from the last point, in the direction of the pointer.
+A click closer than half a car length does not add a point. The preview ends
+on that snapped point, and bends are rounded in the draft preview. It never
+draws an implied closing edge. Hover over the first point to see the exact
+road that clicking it will build; the close target is kept small so a nearby
+click can still add a point. The stretch that closes the loop is not forced
+to a car length. The draft view has no length labels or centerline so the
 road footprint stays clear. The editor keeps the same camera scale and
 position after closing; **Reframe** fits the finished track whenever needed.
 
