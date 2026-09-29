@@ -337,10 +337,6 @@ summary:focus-visible,
     border-bottom: 1px solid var(--maker-border);
 }
 
-.track-picker-head button {
-    flex: 0 0 auto;
-}
-
 #track-picker-list {
     flex: 1;
     min-height: 0;

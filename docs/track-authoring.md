@@ -89,7 +89,7 @@ open `tools/runner.html`.
 ### Layout and Flow tips
 
 The map fills the window. The top bar has the track name (click it to open
-another track or start a **New track**), **Draw** and **Edit**, then
+another track), **New track**, **Draw** and **Edit**, then
 **Campaign Planner**, **Drive Draft**, **Save** and the panel button. **Save**
 reads **Saved** when the open track has no unsaved changes. The panel on the
 right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and

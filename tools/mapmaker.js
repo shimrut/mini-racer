@@ -1277,7 +1277,6 @@ class MapmakerApp {
         }
         const key = trackKeyFromName(name);
         this.state.tracks[key] = createBlankTrack(name);
-        this.trackPickerDialog.close();
         this.loadTrack(key);
         this.markDirty(`Created ${name}. Name it, then draw the road.`);
         this.setPanelHidden(false);

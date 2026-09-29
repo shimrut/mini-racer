@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=3.2">
+    <link rel="stylesheet" href="mapmaker.css?v=3.3">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -13,6 +13,7 @@
             <span id="track-picker-name"></span>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
         </button>
+        <button id="new-track-btn" type="button" class="ghost-btn">New track</button>
         <div id="tool-buttons" class="segmented" role="group" aria-label="Tool">
             <button type="button" data-tool="draw">Draw</button>
             <button type="button" data-tool="edit">Edit</button>
@@ -108,7 +109,6 @@
     <dialog id="track-picker-dialog" class="maker-dialog track-picker-dialog" closedby="any" aria-label="Tracks">
         <div class="track-picker-head">
             <input id="track-search" type="search" placeholder="Find a track" aria-label="Find a track" autocomplete="off">
-            <button id="new-track-btn" type="button" class="primary-btn">New track</button>
         </div>
         <div id="track-picker-list" class="track-cards"></div>
     </dialog>
@@ -135,6 +135,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=3.1"></script>
+    <script type="module" src="mapmaker.js?v=3.2"></script>
 </body>
 </html>
