@@ -1,18 +1,23 @@
 @import url('../styles/fonts.css');
 
 :root {
-    --maker-bg: #0b1020;
-    --maker-panel: #111827;
-    --maker-field: #0b1220;
-    --maker-border: rgba(148, 163, 184, 0.16);
-    --maker-text: #e2e8f0;
-    --maker-muted: #94a3b8;
+    --maker-bg: #0a0d14;
+    --maker-canvas: #05070c;
+    --maker-panel: #10141d;
+    --maker-raised: #1a202c;
+    --maker-field: #0c1018;
+    --maker-border: rgba(148, 163, 184, 0.12);
+    --maker-border-strong: rgba(148, 163, 184, 0.28);
+    --maker-text: #e6e9ef;
+    --maker-muted: #8b93a3;
     --maker-accent: #f43f5e;
     --maker-blue: #38bdf8;
     --maker-green: #22c55e;
     --maker-gold: #fbbf24;
+    --maker-danger-text: #fda4af;
     --maker-radius: 8px;
     --maker-header-height: 3.25rem;
+    --maker-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 * {
@@ -26,8 +31,9 @@ body.mapmaker-body {
     flex-direction: column;
     background: var(--maker-bg);
     color: var(--maker-text);
-    font-family: "Segoe UI", system-ui, sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     font-size: 0.9rem;
+    -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -42,8 +48,8 @@ select {
     flex: 0 0 var(--maker-header-height);
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0 1rem;
+    gap: 0.75rem;
+    padding: 0 0.75rem 0 1rem;
     border-bottom: 1px solid var(--maker-border);
     background: var(--maker-panel);
 }
@@ -51,7 +57,7 @@ select {
 .maker-header h1 {
     margin: 0;
     font-size: 1rem;
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .maker-header-actions {
@@ -61,11 +67,16 @@ select {
     margin-left: auto;
 }
 
+.maker-header-actions .maker-link {
+    margin-right: 0.5rem;
+}
+
 /* Controls */
 
 .maker-link {
     color: var(--maker-muted);
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .maker-link:hover {
@@ -73,17 +84,19 @@ select {
 }
 
 button {
-    border: 1px solid var(--maker-border);
+    border: 1px solid transparent;
     border-radius: var(--maker-radius);
-    background: #1e293b;
+    background: var(--maker-raised);
     color: var(--maker-text);
-    padding: 0.5rem 0.85rem;
+    padding: 0.45rem 0.85rem;
     font-weight: 600;
+    line-height: 1.2;
     cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 button:hover:not(:disabled) {
-    border-color: rgba(148, 163, 184, 0.45);
+    border-color: var(--maker-border-strong);
 }
 
 button:disabled {
@@ -95,15 +108,51 @@ button:disabled {
     background: transparent;
 }
 
+.ghost-btn:hover:not(:disabled) {
+    background: var(--maker-raised);
+}
+
 .primary-btn {
     background: var(--maker-accent);
-    border-color: transparent;
     color: #fff;
+}
+
+.primary-btn:hover:not(:disabled) {
+    border-color: transparent;
+    background: #e11d48;
+}
+
+.primary-btn:disabled {
+    opacity: 1;
+    background: transparent;
+    color: var(--maker-muted);
 }
 
 .danger-btn {
     background: transparent;
-    color: #fda4af;
+    color: var(--maker-danger-text);
+}
+
+.danger-btn:hover:not(:disabled) {
+    border-color: rgba(244, 63, 94, 0.4);
+    background: rgba(244, 63, 94, 0.08);
+}
+
+.icon-btn {
+    display: inline-grid;
+    place-items: center;
+    padding: 0.4rem;
+}
+
+.icon-btn svg,
+.track-picker-btn svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 input,
@@ -113,18 +162,42 @@ select {
     border-radius: var(--maker-radius);
     background: var(--maker-field);
     color: var(--maker-text);
-    padding: 0.5rem 0.65rem;
+    padding: 0.45rem 0.6rem;
     outline: none;
 }
 
-input[readonly] {
+input:hover,
+select:hover {
+    border-color: var(--maker-border-strong);
+}
+
+input:focus,
+select:focus {
+    border-color: var(--maker-blue);
+}
+
+input[type="number"] {
+    appearance: textfield;
+    font-family: var(--maker-mono);
+    font-size: 0.82rem;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+input:disabled {
     color: var(--maker-muted);
+    cursor: not-allowed;
 }
 
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+.segmented input:focus-visible + span {
     outline: 2px solid var(--maker-blue);
     outline-offset: 1px;
 }
@@ -133,11 +206,11 @@ summary:focus-visible {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.75rem;
+    padding: 0.12rem 0.55rem;
+    font-size: 0.72rem;
     font-weight: 700;
-    background: rgba(56, 189, 248, 0.12);
-    color: var(--maker-blue);
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--maker-muted);
 }
 
 .pill-warn {
@@ -147,7 +220,7 @@ summary:focus-visible {
 
 .pill-danger {
     background: rgba(244, 63, 94, 0.16);
-    color: #fda4af;
+    color: var(--maker-danger-text);
 }
 
 .pill-ok {
@@ -155,89 +228,297 @@ summary:focus-visible {
     color: var(--maker-green);
 }
 
-/* Layout */
+/* Segmented controls: Draw/Edit buttons, and radio groups in the panel */
 
-.maker-layout {
+.segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--maker-border);
+    border-radius: 10px;
+    background: var(--maker-field);
+}
+
+.segmented button,
+.segmented label span {
+    display: block;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--maker-muted);
+    padding: 0.35rem 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+}
+
+.segmented button:hover:not(:disabled),
+.segmented label:hover span {
+    color: var(--maker-text);
+}
+
+.segmented button[data-active="true"],
+.segmented input:checked + span {
+    background: var(--maker-raised);
+    color: var(--maker-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--maker-border-strong);
+}
+
+.segmented label {
+    position: relative;
+}
+
+.segmented input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.segmented-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segmented-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmented-grid label span {
+    padding: 0.35rem 0.3rem;
+    font-size: 0.82rem;
+}
+
+/* Track picker */
+
+.track-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    max-width: 18rem;
+    background: transparent;
+    padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.track-picker-btn:hover:not(:disabled) {
+    background: var(--maker-raised);
+}
+
+.track-picker-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-picker-btn svg {
+    flex: 0 0 auto;
+    color: var(--maker-muted);
+}
+
+.maker-dialog.track-picker-dialog {
+    width: min(64rem, calc(100vw - 2rem));
+    height: min(48rem, calc(100vh - 4rem));
+    padding: 0;
+}
+
+.maker-dialog.track-picker-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.track-picker-head {
+    display: flex;
+    gap: 0.6rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--maker-border);
+}
+
+.track-picker-head button {
+    flex: 0 0 auto;
+}
+
+#track-picker-list {
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+/* Track cards: the Mapmaker track picker and the Campaign Planner lists */
+
+.track-cards {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    align-content: start;
+    gap: 0.75rem;
+}
+
+.track-card {
+    display: grid;
+    align-content: start;
+    gap: 0.3rem;
+    padding: 0.6rem;
+    border: 1px solid var(--maker-border);
+    border-radius: 10px;
+    background: var(--maker-panel);
+    color: var(--maker-text);
+    font-weight: 600;
+    text-align: left;
+}
+
+button.track-card:hover:not(:disabled) {
+    border-color: var(--maker-border-strong);
+    background: var(--maker-raised);
+}
+
+.track-card[aria-current="true"] {
+    border-color: var(--maker-accent);
+    box-shadow: inset 0 0 0 1px var(--maker-accent);
+}
+
+.track-card strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-card-preview {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+}
+
+.track-card-meta {
+    color: var(--maker-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Editor layout: the map fills the window, the panel sits on the right */
+
+.maker-editor {
+    flex: 1;
+    min-height: 0;
+    display: flex;
 }
 
 .maker-sidebar {
     overflow-y: auto;
     overscroll-behavior: contain;
-    border-right: 1px solid var(--maker-border);
     background: var(--maker-panel);
+    scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+    scrollbar-width: thin;
+}
+
+.maker-panel-side {
+    flex: 0 0 300px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--maker-border);
+}
+
+.maker-panel-side[hidden] {
+    display: none;
 }
 
 .maker-stage {
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    flex: 1;
     min-width: 0;
+    overflow: hidden;
+    background: var(--maker-canvas);
 }
 
-/* Sidebar panels: flat sections separated by hairlines */
+#map-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
 
-.maker-panel {
-    padding: 0 1rem;
+#map-canvas[data-pan="true"] {
+    cursor: grab;
+}
+
+.canvas-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 1rem;
+    max-width: min(46rem, calc(100% - 2rem));
+    margin: 0;
+    padding: 0.5rem 0.95rem;
+    border: 1px solid var(--maker-border);
+    border-radius: 999px;
+    background: rgba(10, 13, 20, 0.8);
+    backdrop-filter: blur(8px);
+    color: var(--maker-muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    text-align: center;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.canvas-hint[data-kind="status"] {
+    color: var(--maker-text);
+    border-color: var(--maker-border-strong);
+}
+
+.canvas-hint[data-kind="error"] {
+    color: var(--maker-danger-text);
+    border-color: rgba(244, 63, 94, 0.45);
+}
+
+/* Panel sections */
+
+.panel-section {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem;
     border-bottom: 1px solid var(--maker-border);
 }
 
-.maker-panel > summary {
+.panel-section h2 {
+    margin: 0;
+    color: var(--maker-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.panel-footer {
+    margin-top: auto;
+    border-bottom: 0;
+}
+
+.panel-footer .danger-btn {
+    justify-self: start;
+}
+
+.panel-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.85rem 0 0.25rem;
-    cursor: pointer;
-    list-style: none;
-}
-
-.maker-panel > summary::-webkit-details-marker {
-    display: none;
-}
-
-.maker-panel > summary::before {
-    content: '▸';
-    color: var(--maker-muted);
-    margin-right: -0.25rem;
-}
-
-.maker-panel[open] > summary::before {
-    content: '▾';
-}
-
-.maker-panel > summary h2 {
-    margin: 0 auto 0 0;
-    font-size: 0.9rem;
-    font-weight: 700;
-}
-
-.maker-panel[open] {
-    padding-bottom: 1rem;
-}
-
-.maker-panel > select,
-.maker-panel > .button-row,
-.maker-panel > .field,
-.maker-panel > .field-hint,
-.maker-panel > button {
-    margin-top: 0.6rem;
 }
 
 .field {
     display: grid;
-    gap: 0.3rem;
+    gap: 0.35rem;
 }
 
-.field span {
+.field > span {
     color: var(--maker-muted);
     font-size: 0.78rem;
 }
 
-.field-hint,
-.panel-note {
+.field-hint {
     margin: 0;
     color: var(--maker-muted);
     font-size: 0.8rem;
@@ -250,28 +531,24 @@ summary:focus-visible {
     gap: 0.5rem;
 }
 
-.button-row.button-row-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.button-row button {
-    padding-left: 0.4rem;
-    padding-right: 0.4rem;
-}
-
 /* Checks */
 
 .quality-issues {
     display: grid;
     gap: 0.35rem;
-    margin: 0.5rem 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
 }
 
+.quality-issues:empty {
+    display: none;
+}
+
 .quality-issues li {
     border-left: 3px solid var(--maker-gold);
-    padding: 0.3rem 0.5rem;
+    border-radius: 0 6px 6px 0;
+    padding: 0.35rem 0.55rem;
     font-size: 0.82rem;
     line-height: 1.4;
     background: rgba(251, 191, 36, 0.07);
@@ -280,11 +557,6 @@ summary:focus-visible {
 .quality-issues li[data-severity="error"] {
     border-color: var(--maker-accent);
     background: rgba(244, 63, 94, 0.09);
-}
-
-.quality-issues li[data-severity="info"] {
-    border-color: var(--maker-green);
-    background: rgba(34, 197, 94, 0.06);
 }
 
 .flow-rules li[data-flow="miss"] {
@@ -304,26 +576,43 @@ summary:focus-visible {
     line-height: inherit;
 }
 
-.panel-head {
+.flow-tips {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.flow-tips summary {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    color: var(--maker-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
 }
 
-.flow-head {
-    margin-top: 0.9rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--maker-border);
+.flow-tips summary::-webkit-details-marker {
+    display: none;
 }
 
-.flow-head h3 {
-    margin: 0;
-    font-size: 0.85rem;
-    font-weight: 700;
+.flow-tips summary::before {
+    content: '▸';
 }
 
-.flow-head + * {
+.flow-tips[open] summary::before {
+    content: '▾';
+}
+
+.flow-tips summary:hover {
+    color: var(--maker-text);
+}
+
+.flow-tips .field-hint {
+    margin-top: 0.5rem;
+}
+
+.flow-tips .flow-rules {
     margin-top: 0.5rem;
 }
 
@@ -336,120 +625,72 @@ summary:focus-visible {
 .draft-laps-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.6rem;
+    gap: 0.35rem;
 }
 
 .draft-laps-list button {
-    padding: 0.3rem 0.55rem;
-    font-variant-numeric: tabular-nums;
+    padding: 0.25rem 0.5rem;
+    border-color: var(--maker-border);
+    font-family: var(--maker-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .draft-laps-list button[data-kind="average"] {
     border-color: var(--maker-gold);
+    color: var(--maker-gold);
 }
 
 .medal-time-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.6rem;
-}
-
-/* Stage */
-
-.stage-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--maker-border);
-}
-
-.stage-status {
-    margin: 0;
-    color: var(--maker-muted);
-    min-width: 0;
-}
-
-.stage-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.stage-edit-actions {
-    display: flex;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.4rem;
 }
 
-.tool-grid {
+.medal-time-grid input {
+    padding: 0.4rem 0.3rem;
+    text-align: center;
+}
+
+.medal-time-grid .field > span {
     display: flex;
-    gap: 0.35rem;
+    align-items: center;
+    gap: 0.3rem;
 }
 
-.tool-grid button[data-active="true"] {
-    background: var(--maker-accent);
-    border-color: transparent;
-    color: #fff;
+.medal-time-grid .field > span::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--medal-color);
 }
 
-.canvas-shell {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    background: #020617;
-}
-
-#map-canvas {
-    position: absolute;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-    cursor: crosshair;
-}
-
-#map-canvas[data-pan="true"] {
-    cursor: grab;
-}
-
-.canvas-overlay {
-    position: absolute;
-    left: 0.75rem;
-    bottom: 0.75rem;
-    padding: 0.45rem 0.7rem;
-    border-radius: var(--maker-radius);
-    background: rgba(2, 6, 23, 0.72);
-    color: var(--maker-muted);
-    font-size: 0.82rem;
-    pointer-events: none;
-}
-
-.canvas-overlay p {
-    margin: 0;
-}
+.medal-time-grid [data-tier="author"] { --medal-color: #34d399; }
+.medal-time-grid [data-tier="gold"] { --medal-color: #fbbf24; }
+.medal-time-grid [data-tier="silver"] { --medal-color: #cbd5e1; }
+.medal-time-grid [data-tier="bronze"] { --medal-color: #d97706; }
 
 /* Dialogs */
 
 .maker-dialog {
     width: min(28rem, calc(100vw - 2rem));
     border: 1px solid var(--maker-border);
-    border-radius: 12px;
+    border-radius: 14px;
     padding: 1.25rem;
     background: var(--maker-panel);
     color: var(--maker-text);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 
 .maker-dialog::backdrop {
-    background: rgba(2, 6, 23, 0.75);
+    background: rgba(2, 6, 23, 0.7);
+    backdrop-filter: blur(3px);
 }
 
 .maker-dialog h2 {
     margin: 0;
+    font-size: 1.1rem;
 }
 
 .maker-dialog p {
@@ -463,7 +704,7 @@ summary:focus-visible {
     gap: 0.5rem;
 }
 
-/* Narrow screens: stack the sidebar under the canvas */
+/* Narrow screens: the panel goes under the map */
 
 @media (max-width: 900px) {
     body.mapmaker-body {
@@ -473,28 +714,20 @@ summary:focus-visible {
 
     .maker-header {
         flex-wrap: wrap;
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 0.75rem;
     }
 
-    .maker-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .maker-sidebar {
-        order: 2;
-        border-right: 0;
+    .maker-editor {
+        flex-direction: column;
     }
 
     .maker-stage {
-        min-height: 70vh;
+        min-height: 65vh;
     }
 
-    .stage-head {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .tool-grid {
-        flex-wrap: wrap;
+    .maker-panel-side {
+        flex-basis: auto;
+        border-left: 0;
+        border-top: 1px solid var(--maker-border);
     }
 }

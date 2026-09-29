@@ -13,7 +13,6 @@ import {
 } from './mapmaker/lane-gate.js';
 import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
 import { validateTrackQuality } from './mapmaker/track-quality.js';
-import { runTrackBotCheck } from './runner.js';
 import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/track-flow.js';
 import {
     clearDraftRecovery,
@@ -26,7 +25,6 @@ import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
     DEFAULT_DRAW_WIDTH,
-    formatTrackNumber as formatNumber,
     isValidTrackKey,
     trackKeyFromName
 } from './mapmaker/track-source.js';
@@ -46,7 +44,12 @@ import {
     readDraftLaps,
     suggestMedalTimes,
 } from './mapmaker/medal-times.js';
+import { TrackPreviews } from './mapmaker/track-preview.js';
 
+const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
+const STATUS_MS = 3500;
+const STATUS_ERROR_MS = 8000;
+const STATUS_MS_PER_CHAR = 60;
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
 const DEFAULT_LINE_SMOOTHING = 0.35;
 const DEFAULT_CORNER_RADIUS = 3;
@@ -258,7 +261,13 @@ class MapmakerApp {
     constructor() {
         this.canvas = document.getElementById('map-canvas');
         this.ctx = this.canvas.getContext('2d');
-        this.trackSelect = document.getElementById('editor-track-select');
+        this.trackPickerBtn = document.getElementById('track-picker-btn');
+        this.trackPickerName = document.getElementById('track-picker-name');
+        this.trackPickerDialog = document.getElementById('track-picker-dialog');
+        this.trackSearch = document.getElementById('track-search');
+        this.trackPickerList = document.getElementById('track-picker-list');
+        this.panel = document.getElementById('maker-panel');
+        this.panelToggleBtn = document.getElementById('panel-toggle-btn');
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
         this.canvasHint = document.getElementById('canvas-hint');
         this.trackNameInput = document.getElementById('track-name-input');
@@ -269,32 +278,21 @@ class MapmakerApp {
             tier,
             document.getElementById(`medal-${tier}-input`),
         ]));
-        this.cornerRadiusSelect = document.getElementById('corner-radius-select');
-        this.groundSelect = document.getElementById('ground-select');
-        this.statusText = document.getElementById('status-text');
-        this.dirtyBadge = document.getElementById('dirty-badge');
+        this.cornerRadiusOptions = document.getElementById('corner-radius-options');
+        this.groundOptions = document.getElementById('ground-options');
         this.saveTrackBtn = document.getElementById('save-track-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
-        this.duplicateTrackBtn = document.getElementById('duplicate-track-btn');
         this.removeTrackBtn = document.getElementById('remove-track-btn');
         this.removeTrackDialog = document.getElementById('remove-track-dialog');
         this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
-        this.reframeBtn = document.getElementById('reframe-btn');
-        this.undoEditBtn = document.getElementById('undo-edit-btn');
-        this.redoEditBtn = document.getElementById('redo-edit-btn');
         this.driveDraftBtn = document.getElementById('drive-draft-btn');
         this.restoreDraftsDialog = document.getElementById('restore-drafts-dialog');
         this.restoreDraftsDialogMessage = document.getElementById('restore-drafts-dialog-message');
         this.qualityCount = document.getElementById('quality-count');
-        this.qualitySummary = document.getElementById('quality-summary');
         this.qualityIssues = document.getElementById('quality-issues');
+        this.flowTips = document.getElementById('flow-tips');
         this.flowCount = document.getElementById('flow-count');
-        this.flowSummary = document.getElementById('flow-summary');
         this.flowRules = document.getElementById('flow-rules');
-        this.runBotsBtn = document.getElementById('run-bots-btn');
-        this.botCheckCount = document.getElementById('bot-check-count');
-        this.botCheckSummary = document.getElementById('bot-check-summary');
-        this.botCheckIssues = document.getElementById('bot-check-issues');
 
         const initialTrackKey = Object.keys(TRACKS)[0];
         this.state = {
@@ -309,7 +307,6 @@ class MapmakerApp {
             originalTrackKeyByKey: new Map(
                 Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey]),
             ),
-            status: 'Ready.',
             isSpaceDown: false,
             skipDrawClick: false,
             draftLoop: [],
@@ -343,9 +340,22 @@ class MapmakerApp {
         this.flowSignature = null;
         this.baselineQualityCodesByKey = new Map();
         this.baselineGeometryByKey = new Map();
+        this.trackPreviews = new TrackPreviews((trackKey) => this.state.tracks[trackKey]);
+        this.hintText = '';
+        this.statusMessage = null;
+        this.statusIsError = false;
+        this.statusTimer = null;
+        this.busy = false;
 
+        this.buildOptionGroup(this.cornerRadiusOptions, 'corner-radius', CORNER_RADIUS_PRESETS);
+        this.buildOptionGroup(this.groundOptions, 'ground', TRACK_GROUND_KEYS.map((key) => ({
+            value: key,
+            label: TRACK_GROUNDS[key].label,
+        })));
+        let panelHidden = false;
+        try { panelHidden = getBrowserStorage('localStorage')?.getItem(PANEL_HIDDEN_KEY) === '1'; } catch {}
+        this.setPanelHidden(panelHidden);
         this.bindEvents();
-        this.populateTrackSelect();
         this.loadTrack(initialTrackKey);
         this.resizeCanvas();
 
@@ -365,12 +375,6 @@ class MapmakerApp {
         return this.editHistories.get(key);
     }
 
-    syncHistoryButtons() {
-        const history = this.getEditHistory();
-        this.undoEditBtn.disabled = !history.canUndo && this.state.draftLoop.length === 0;
-        this.redoEditBtn.disabled = !history.canRedo;
-    }
-
     beginHistoryEdit() {
         if (this.activeHistoryEditKey) return;
         this.activeHistoryEditKey = this.state.selectedTrackKey;
@@ -382,14 +386,12 @@ class MapmakerApp {
         if (!key) return;
         this.activeHistoryEditKey = null;
         if (this.state.tracks[key]) this.getEditHistory(key).commitEdit(this.state.tracks[key]);
-        this.syncHistoryButtons();
     }
 
     restoreEdit(track, message) {
         this.state.tracks[this.state.selectedTrackKey] = track;
         this.loadTrack(this.state.selectedTrackKey);
         this.markDirty(message, true, { recordHistory: false });
-        this.syncHistoryButtons();
     }
 
     undoEdit() {
@@ -478,7 +480,6 @@ class MapmakerApp {
             this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
             this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
         }
-        this.populateTrackSelect();
         this.loadTrack(recovery.selectedTrackKey || recovery.drafts[0].trackKey);
         this.setStatus(`Restored ${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'}.`);
     }
@@ -498,17 +499,24 @@ class MapmakerApp {
         this.qualityTrackKey = key;
         const errors = report.issues.filter((issue) => issue.severity === 'error');
         const warnings = report.issues.filter((issue) => issue.severity === 'warning');
-        this.qualityCount.textContent = `${errors.length} errors · ${warnings.length} warnings`;
-        this.qualityCount.className = `pill${errors.length ? ' pill-danger' : warnings.length ? ' pill-warn' : ' pill-ok'}`;
-        const approximateLapLength = (
-            closedLoopLength(this.track.outer) + closedLoopLength(this.track.inner)
-        ) / 2;
-        this.qualitySummary.textContent = !this.hasTrackGeometry()
-            ? 'Draw a closed road to check its walls, start, and lap gates.'
-            : `${report.issues.length ? 'Review the marked locations.' : 'No structural issues found.'} Approx. lap ${formatNumber(approximateLapLength)}u · narrowest wall gap ${formatNumber(report.minClearance ?? 0)}u.`;
+        const hasGeometry = this.hasTrackGeometry();
+        let label = 'OK';
+        let tone = ' pill-ok';
+        if (!hasGeometry) {
+            label = 'Draw a track';
+            tone = '';
+        } else if (errors.length) {
+            label = `${errors.length} error${errors.length === 1 ? '' : 's'}`;
+            tone = ' pill-danger';
+        } else if (warnings.length) {
+            label = `${warnings.length} warning${warnings.length === 1 ? '' : 's'}`;
+            tone = ' pill-warn';
+        }
+        this.qualityCount.textContent = label;
+        this.qualityCount.className = `pill${tone}`;
         this.qualityIssues.replaceChildren();
         let markerNumber = 0;
-        for (const issue of report.issues.slice(0, 12)) {
+        for (const issue of hasGeometry ? report.issues.slice(0, 12) : []) {
             const item = document.createElement('li');
             item.dataset.severity = issue.severity;
             if (issue.hotspot) {
@@ -524,7 +532,6 @@ class MapmakerApp {
             this.qualityIssues.appendChild(item);
         }
         this.scheduleFlowCheck();
-        if (this.botReport) this.renderBotReport();
         this.draw();
         return report;
     }
@@ -538,39 +545,25 @@ class MapmakerApp {
         if (this.flowTimer) clearTimeout(this.flowTimer);
         this.flowTimer = null;
         const key = this.state.selectedTrackKey;
-        let blockedReason = null;
-        if (!this.hasTrackGeometry()) {
-            blockedReason = 'Draw a closed road to check how it flows.';
-        } else if (this.qualityReport?.hasErrors) {
-            blockedReason = 'Fix the errors above to check how the road flows.';
-        }
-        const signature = blockedReason ? null : geometrySignature(this.track);
-        if (!blockedReason && key === this.flowTrackKey && signature === this.flowSignature) {
-            return this.flowReport;
-        }
-        this.flowReport = blockedReason ? null : analyzeTrackFlow(this.track);
-        this.flowTrackKey = key;
-        this.flowSignature = signature;
-        this.renderFlowReport(blockedReason ?? 'This road cannot be measured for flow.');
-        this.draw();
-        return this.flowReport;
-    }
-
-    renderFlowReport(unavailableReason) {
-        this.flowRules.replaceChildren();
-        const report = this.flowReport;
-        if (!report) {
-            this.flowCount.textContent = 'Not checked';
-            this.flowCount.className = 'pill';
-            this.flowSummary.textContent = unavailableReason;
+        const blocked = !this.hasTrackGeometry() || Boolean(this.qualityReport?.hasErrors);
+        const signature = blocked ? null : geometrySignature(this.track);
+        if (!blocked && key === this.flowTrackKey && signature === this.flowSignature) {
             return;
         }
-        const total = report.rules.length;
-        this.flowCount.textContent = `${report.passed} of ${total} rules`;
-        this.flowCount.className = `pill${report.passed === total ? ' pill-ok' : ''}`;
-        this.flowSummary.textContent = report.passed === total
-            ? `Meets all flow rules. Approx. lap ${report.lapSeconds.toFixed(1)} s.`
-            : `Blue markers show where the flow breaks (hints, not errors). Approx. lap ${report.lapSeconds.toFixed(1)} s.`;
+        this.flowReport = blocked ? null : analyzeTrackFlow(this.track);
+        this.flowTrackKey = key;
+        this.flowSignature = signature;
+        this.renderFlowReport();
+        this.draw();
+    }
+
+    renderFlowReport() {
+        this.flowRules.replaceChildren();
+        const report = this.flowReport;
+        const misses = report ? report.rules.filter((rule) => !rule.pass).length : 0;
+        this.flowTips.hidden = misses === 0;
+        this.flowCount.textContent = String(misses);
+        if (!report) return;
         report.rules.forEach((rule, index) => {
             if (rule.pass) return;
             const item = document.createElement('li');
@@ -620,7 +613,7 @@ class MapmakerApp {
     }
 
     drawFlowMarkers(viewport) {
-        if (!this.flowReport || this.flowTrackKey !== this.state.selectedTrackKey) return;
+        if (!this.flowTips.open || !this.flowReport || this.flowTrackKey !== this.state.selectedTrackKey) return;
         // Hide markers while an edit waits for its flow check, so none point at a moved wall.
         if (geometrySignature(this.track) !== this.flowSignature) return;
         this.flowReport.rules.forEach((rule, index) => {
@@ -656,11 +649,27 @@ class MapmakerApp {
         ), DEFAULT_CORNER_RADIUS);
     }
 
+    buildOptionGroup(container, name, options) {
+        container.replaceChildren(...options.map(({ value, label }) => {
+            const option = document.createElement('label');
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = name;
+            input.value = String(value);
+            const text = document.createElement('span');
+            text.textContent = label;
+            option.append(input, text);
+            return option;
+        }));
+    }
+
+    checkOption(container, value) {
+        const input = container.querySelector(`input[value="${value}"]`);
+        if (input) input.checked = true;
+    }
+
     syncCornerRadiusControl() {
-        if (!this.cornerRadiusSelect) {
-            return;
-        }
-        this.cornerRadiusSelect.value = String(this.nearestCornerRadiusPreset());
+        this.checkOption(this.cornerRadiusOptions, this.nearestCornerRadiusPreset());
     }
 
     setCornerRadius(value, options = {}) {
@@ -677,18 +686,7 @@ class MapmakerApp {
     }
 
     syncGroundControl() {
-        if (!this.groundSelect) {
-            return;
-        }
-        if (this.groundSelect.options.length === 0) {
-            TRACK_GROUND_KEYS.forEach((key) => {
-                const option = document.createElement('option');
-                option.value = key;
-                option.textContent = TRACK_GROUNDS[key].label;
-                this.groundSelect.appendChild(option);
-            });
-        }
-        this.groundSelect.value = getTrackGround(this.track).key;
+        this.checkOption(this.groundOptions, getTrackGround(this.track).key);
     }
 
     setGround(key) {
@@ -748,9 +746,29 @@ class MapmakerApp {
     }
 
     bindEvents() {
-        this.trackSelect.addEventListener('change', (event) => {
-            this.loadTrack(event.target.value);
+        this.trackPickerBtn.addEventListener('click', () => this.openTrackPicker());
+        this.trackSearch.addEventListener('input', () => this.renderTrackPicker());
+        this.trackSearch.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            const first = this.trackPickerList.querySelector('[data-track-key]');
+            if (first) this.pickTrack(first.dataset.trackKey);
         });
+        this.trackPickerList.addEventListener('click', (event) => {
+            const card = event.target.closest?.('[data-track-key]');
+            if (card) this.pickTrack(card.dataset.trackKey);
+        });
+        if (!('closedBy' in HTMLDialogElement.prototype)) {
+            this.trackPickerDialog.addEventListener('click', (event) => {
+                if (event.target !== this.trackPickerDialog) return;
+                const rect = this.trackPickerDialog.getBoundingClientRect();
+                const inside = rect.top <= event.clientY && event.clientY <= rect.bottom
+                    && rect.left <= event.clientX && event.clientX <= rect.right;
+                if (!inside) this.trackPickerDialog.close();
+            });
+        }
+        this.panelToggleBtn.addEventListener('click', () => this.setPanelHidden(!this.panel.hidden));
+        this.flowTips.addEventListener('toggle', () => this.draw());
 
         this.toolButtons.forEach((button) => {
             button.addEventListener('click', () => this.setTool(button.dataset.tool));
@@ -760,7 +778,7 @@ class MapmakerApp {
             const typed = this.trackNameInput.value;
             this.track.name = typed.trim() || 'Untitled Track';
             const derived = this.applyDerivedTrackKey(typed);
-            this.syncTrackSelectText();
+            this.syncTrackPickerButton();
             this.updateStageText();
             this.markDirty('Updated track name.', derived);
         });
@@ -777,22 +795,17 @@ class MapmakerApp {
             this.setAuthorTime(lapToAuthorTime(Number(button.dataset.lap)));
         });
 
-        this.cornerRadiusSelect.addEventListener('change', () => {
-            this.setCornerRadius(Number(this.cornerRadiusSelect.value));
+        this.cornerRadiusOptions.addEventListener('change', (event) => {
+            this.setCornerRadius(Number(event.target.value));
         });
 
-        this.groundSelect?.addEventListener('change', () => {
-            this.setGround(this.groundSelect.value);
+        this.groundOptions.addEventListener('change', (event) => {
+            this.setGround(event.target.value);
         });
 
         this.newTrackBtn.addEventListener('click', () => this.createTrack());
-        this.duplicateTrackBtn.addEventListener('click', () => this.duplicateTrack());
         this.removeTrackBtn.addEventListener('click', () => this.removeTrack());
-        this.reframeBtn.addEventListener('click', () => this.resetView());
-        this.undoEditBtn.addEventListener('click', () => this.undoEdit());
-        this.redoEditBtn.addEventListener('click', () => this.redoEdit());
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
-        this.runBotsBtn.addEventListener('click', () => this.runBots());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
 
         this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -842,8 +855,45 @@ class MapmakerApp {
         this.state.view.panX = 0;
         this.state.view.panY = 0;
         this.state.view.frozenBounds = null;
-        this.setStatus('View reframed.');
-        this.draw();
+    }
+
+    setPanelHidden(hidden) {
+        this.panel.hidden = hidden;
+        this.panelToggleBtn.setAttribute('aria-expanded', String(!hidden));
+        try { getBrowserStorage('localStorage')?.setItem(PANEL_HIDDEN_KEY, hidden ? '1' : '0'); } catch {}
+    }
+
+    openTrackPicker() {
+        this.trackSearch.value = '';
+        this.renderTrackPicker();
+        this.trackPickerDialog.showModal();
+    }
+
+    renderTrackPicker() {
+        this.trackPreviews.reset();
+        const query = this.trackSearch.value.trim().toLowerCase();
+        const keys = Object.keys(this.state.tracks).reverse()
+            .filter((key) => !query || this.state.tracks[key].name.toLowerCase().includes(query));
+        if (!keys.length) {
+            const empty = document.createElement('p');
+            empty.className = 'field-hint';
+            empty.textContent = 'No track has that name. Use New track to start one.';
+            this.trackPickerList.replaceChildren(empty);
+            return;
+        }
+        this.trackPickerList.replaceChildren(...keys.map((key) => {
+            const track = this.state.tracks[key];
+            const meta = getTrackGround(track).label + (this.state.dirtyTrackKeys.has(key) ? ' · Unsaved' : '');
+            const card = this.trackPreviews.createCard('button', key, track.name, meta);
+            card.type = 'button';
+            if (key === this.state.selectedTrackKey) card.setAttribute('aria-current', 'true');
+            return card;
+        }));
+    }
+
+    pickTrack(trackKey) {
+        this.trackPickerDialog.close();
+        this.loadTrack(trackKey);
     }
 
     setTool(tool, selectedHandle) {
@@ -866,22 +916,8 @@ class MapmakerApp {
         this.updateCanvasHint();
     }
 
-    populateTrackSelect() {
-        const previous = this.state.selectedTrackKey;
-        this.trackSelect.innerHTML = '';
-        Object.entries(this.state.tracks).forEach(([key, track]) => {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = this.getTrackOptionText(key, track);
-            this.trackSelect.appendChild(option);
-        });
-        this.trackSelect.value = previous;
-    }
-
-    getTrackOptionText(key, track) {
-        return this.state.dirtyTrackKeys.has(key)
-            ? `${track.name} • Unsaved`
-            : track.name;
+    syncTrackPickerButton() {
+        this.trackPickerName.textContent = this.track.name;
     }
 
     // The saved stage of a track: { series, stageIndex }, or null.
@@ -981,13 +1017,6 @@ class MapmakerApp {
         this.markDirty('Changed the medal times.');
     }
 
-    syncTrackSelectText() {
-        const option = this.trackSelect.querySelector(`option[value="${this.state.selectedTrackKey}"]`);
-        if (option) {
-            option.textContent = this.getTrackOptionText(this.state.selectedTrackKey, this.track);
-        }
-    }
-
     loadTrack(trackKey) {
         if (!this.state.tracks[trackKey]) {
             return;
@@ -1002,9 +1031,7 @@ class MapmakerApp {
             this.baselineGeometryByKey.set(trackKey, geometrySignature(TRACKS[originalTrackKey]));
         }
         if (this.state.selectedTrackKey !== trackKey) {
-            this.botReport = null;
-            this.botReportSignature = '';
-            this.renderBotReport();
+            this.resetView();
             if (this.state.draftLoop.length) {
                 this.draftLoopsByKey.set(this.state.selectedTrackKey, cloneTracks(this.state.draftLoop));
             } else {
@@ -1013,7 +1040,7 @@ class MapmakerApp {
         }
         this.commitHistoryEdit();
         this.state.selectedTrackKey = trackKey;
-        this.trackSelect.value = trackKey;
+        this.syncTrackPickerButton();
         this.trackNameInput.value = this.track.name;
         this.syncMedalTimesPanel();
         this.syncCornerRadiusControl();
@@ -1031,8 +1058,7 @@ class MapmakerApp {
             this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
         }
         this.updateStageText();
-        this.syncDirtyBadge();
-        this.syncHistoryButtons();
+        this.syncSaveButton();
         this.draw();
         this.scheduleQualityCheck();
         if (this.state.dirtyTrackKeys.size || this.draftLoopsByKey.size) {
@@ -1078,8 +1104,6 @@ class MapmakerApp {
         this.state.dirtyTrackKeys.delete(currentKey);
         this.state.dirtyTrackKeys.add(nextKey);
         this.state.selectedTrackKey = nextKey;
-        this.populateTrackSelect();
-        this.trackSelect.value = nextKey;
         this.state.dirtyTrackKeys.add(nextKey);
         return true;
     }
@@ -1101,46 +1125,18 @@ class MapmakerApp {
     }
 
     createTrack() {
-        const typed = window.prompt('Track display name', 'New Circuit');
-        if (typed == null) return;
-        const name = typed.trim();
-        if (!name) return;
+        let name = 'New Track';
+        for (let number = 2; this.state.tracks[trackKeyFromName(name)]; number += 1) {
+            name = `New Track ${number}`;
+        }
         const key = trackKeyFromName(name);
-        if (!isValidTrackKey(key)) {
-            this.setStatus('That name cannot be a track key.', true);
-            return;
-        }
-        if (this.state.tracks[key]) {
-            this.setStatus('That name is already used by another track.', true);
-            return;
-        }
         this.state.tracks[key] = createBlankTrack(name);
-        this.populateTrackSelect();
+        this.trackPickerDialog.close();
         this.loadTrack(key);
-        this.markDirty(`Created blank track ${name}.`);
-    }
-
-    duplicateTrack() {
-        const sourceKey = this.state.selectedTrackKey;
-        const copy = cloneTracks(this.track);
-        const typed = window.prompt('Clone display name', `${copy.name} Copy`);
-        if (typed == null) return;
-        const name = typed.trim();
-        if (!name) return;
-        const key = trackKeyFromName(name);
-        if (!isValidTrackKey(key)) {
-            this.setStatus('That name cannot be a track key.', true);
-            return;
-        }
-        if (this.state.tracks[key]) {
-            this.setStatus('That name is already used by another track.', true);
-            return;
-        }
-        copy.name = name;
-        this.state.tracks[key] = copy;
-        this.populateTrackSelect();
-        this.loadTrack(key);
-        this.markDirty(`Cloned ${sourceKey} into ${key}.`);
+        this.markDirty(`Created ${name}. Name it, then draw the road.`);
+        this.setPanelHidden(false);
+        this.trackNameInput.focus();
+        this.trackNameInput.select();
     }
 
     confirmTrackRemoval(message) {
@@ -1169,7 +1165,8 @@ class MapmakerApp {
         }
 
         this.removeTrackBtn.disabled = true;
-        this.saveTrackBtn.disabled = true;
+        this.busy = true;
+        this.syncSaveButton();
         try {
             if (originalKey) {
                 const response = await fetch('/__mapmaker/remove-track', {
@@ -1196,7 +1193,7 @@ class MapmakerApp {
             this.state.originalTrackKeyByKey.delete(selectedKey);
             this.state.dirtyTrackKeys.delete(selectedKey);
             this.state.selectedTrackKey = nextKey;
-            this.populateTrackSelect();
+            this.resetView();
             this.loadTrack(nextKey);
             this.setStatus(originalKey
                 ? `Removed ${trackName} (${originalKey}) from the repository. Review track-specific references and registry integrity tests before shipping.`
@@ -1207,7 +1204,8 @@ class MapmakerApp {
             this.setStatus(error.message, true);
         } finally {
             this.removeTrackBtn.disabled = false;
-            this.saveTrackBtn.disabled = false;
+            this.busy = false;
+            this.syncSaveButton();
         }
     }
 
@@ -1343,39 +1341,41 @@ class MapmakerApp {
         return this.track.outer.length >= 3 && this.track.inner.length >= 3;
     }
 
-    updateCanvasHint() {
-        if (!this.canvasHint) {
-            return;
-        }
+    getCanvasHint() {
         if (this.state.tool === 'draw') {
             const pointCount = this.state.draftLoop.length;
             if (pointCount === 0) {
-                this.canvasHint.textContent = 'Click to start drawing the road.';
-                return;
+                return 'Click to start drawing the road.';
             }
             if (pointCount < 3) {
-                this.canvasHint.textContent = `Click to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
-            } else if (this.state.draftCloseHover) {
-                this.canvasHint.textContent = 'This is the closed road. Click the first point to build it.';
-            } else {
-                this.canvasHint.textContent = 'Click to add another point in whole car lengths. The road stays open until you click the first point.';
+                return `Click to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
             }
-            return;
+            if (this.state.draftCloseHover) {
+                return 'This is the closed road. Click the first point to build it.';
+            }
+            return 'Click to add another point in whole car lengths. The road stays open until you click the first point.';
         }
         if (!this.hasTrackGeometry()) {
-            this.canvasHint.textContent = 'This track has no walls yet. Switch to Draw and close the loop first.';
-            return;
+            return 'This track has no walls yet. Switch to Draw and close the loop first.';
         }
         const kind = this.state.selectedHandle?.kind;
         if (kind === 'startPos') {
-            this.canvasHint.textContent = 'Drag the start car. It stays centered on the start line and always faces perpendicular to it.';
-            return;
+            return 'Drag the start car. It stays centered on the start line and always faces perpendicular to it.';
         }
         if (kind === 'startLine' || kind === 'checkpoint') {
-            this.canvasHint.textContent = 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
-            return;
+            return 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
         }
-        this.canvasHint.textContent = 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point.';
+        return 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point. Cmd+Z undoes.';
+    }
+
+    updateCanvasHint() {
+        this.hintText = this.getCanvasHint();
+        this.renderCanvasHint();
+    }
+
+    renderCanvasHint() {
+        this.canvasHint.textContent = this.statusMessage ?? this.hintText;
+        this.canvasHint.dataset.kind = this.statusMessage === null ? 'hint' : this.statusIsError ? 'error' : 'status';
     }
 
     validateTrack(track) {
@@ -1717,7 +1717,6 @@ class MapmakerApp {
         this.state.draftLoop = [...this.state.draftLoop, clonePoint(point)];
         this.state.draftCursor = clonePoint(point);
         this.state.draftCloseHover = false;
-        this.syncHistoryButtons();
         this.scheduleDraftRecovery();
         this.updateCanvasHint();
         this.draw();
@@ -1732,7 +1731,6 @@ class MapmakerApp {
             ? clonePoint(this.state.draftLoop[this.state.draftLoop.length - 1])
             : null;
         this.state.draftCloseHover = false;
-        this.syncHistoryButtons();
         this.scheduleDraftRecovery();
         this.setStatus(this.state.draftLoop.length ? 'Removed last draft point.' : 'Cleared draft loop.');
         this.updateCanvasHint();
@@ -1743,7 +1741,6 @@ class MapmakerApp {
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
-        this.syncHistoryButtons();
         this.scheduleDraftRecovery();
         this.setStatus('Cleared draft loop.');
         this.updateCanvasHint();
@@ -1791,6 +1788,7 @@ class MapmakerApp {
     }
 
     onPointerDown(event) {
+        document.activeElement?.blur?.();
         const viewport = this.getViewport();
         const canvasPoint = this.getCanvasPoint(event);
 
@@ -2187,20 +2185,23 @@ class MapmakerApp {
     }
 
     setStatus(message, isError = false) {
-        this.state.status = message;
-        this.statusText.textContent = message;
-        this.statusText.style.color = isError ? '#fda4af' : '';
+        this.statusMessage = message;
+        this.statusIsError = isError;
+        clearTimeout(this.statusTimer);
+        this.statusTimer = setTimeout(() => {
+            this.statusMessage = null;
+            this.renderCanvasHint();
+        }, Math.max(isError ? STATUS_ERROR_MS : STATUS_MS, message.length * STATUS_MS_PER_CHAR));
+        this.renderCanvasHint();
     }
 
     markDirty(message, updateStatus = true, options = {}) {
         if (options.recordHistory !== false && this.activeHistoryEditKey !== this.state.selectedTrackKey) {
             const history = this.getEditHistory();
             history.recordEdit(history.current(), this.track);
-            this.syncHistoryButtons();
         }
         this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
-        this.syncTrackSelectText();
-        this.syncDirtyBadge();
+        this.syncSaveButton();
         if (updateStatus) {
             this.setStatus(message);
         }
@@ -2209,10 +2210,10 @@ class MapmakerApp {
         this.draw();
     }
 
-    syncDirtyBadge() {
+    syncSaveButton() {
         const isDirty = this.state.dirtyTrackKeys.has(this.state.selectedTrackKey);
-        this.dirtyBadge.textContent = isDirty ? 'Unsaved' : 'Saved';
-        this.dirtyBadge.classList.toggle('pill-warn', isDirty);
+        this.saveTrackBtn.textContent = isDirty ? 'Save' : 'Saved';
+        this.saveTrackBtn.disabled = this.busy || !isDirty;
     }
 
     markSaved(message) {
@@ -2223,8 +2224,7 @@ class MapmakerApp {
         ));
         this.baselineGeometryByKey.set(this.state.selectedTrackKey, geometrySignature(this.track));
         this.state.dirtyTrackKeys.delete(this.state.selectedTrackKey);
-        this.syncTrackSelectText();
-        this.syncDirtyBadge();
+        this.syncSaveButton();
         this.setStatus(message);
         this.syncMedalTimesPanel();
         this.scheduleDraftRecovery();
@@ -2569,25 +2569,6 @@ class MapmakerApp {
         this.drawGhostCar(this.track.startPos, this.track.startAngle || 0, viewport);
     }
 
-    drawCheckpointLabels(viewport) {
-        this.ctx.save();
-        this.ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        const selectedCheckpoint = this.state.selectedHandle?.kind === 'checkpoint'
-            ? this.state.selectedHandle.checkpointIndex
-            : -1;
-        this.track.checkpoints.forEach((checkpoint, index) => {
-            const center = midpoint(checkpoint.p1, checkpoint.p2);
-            const screen = this.worldToScreen(center, viewport);
-            this.ctx.fillStyle = index === selectedCheckpoint
-                ? '#dcfce7'
-                : '#86efac';
-            this.ctx.fillText(`CP ${index + 1}`, screen.x, screen.y - 8);
-        });
-        this.ctx.restore();
-    }
-
     draw() {
         const ratio = window.devicePixelRatio || 1;
         const viewport = this.getViewport();
@@ -2631,11 +2612,10 @@ class MapmakerApp {
                     checkpoint.p1,
                     checkpoint.p2,
                     viewport,
-                    active ? '#4ade80' : 'rgba(74, 222, 128, 0.7)',
-                    active ? 4 : 3
+                    active ? '#4ade80' : 'rgba(74, 222, 128, 0.45)',
+                    active ? 4 : 2
                 );
             });
-            this.drawCheckpointLabels(viewport);
         }
 
         this.drawFlowMarkers(viewport);
@@ -2651,79 +2631,6 @@ class MapmakerApp {
             return aPriority - bPriority;
         });
         handles.forEach((handle) => this.drawHandle(handle, viewport));
-    }
-
-    renderBotReport() {
-        const report = this.botReport;
-        this.botCheckIssues.replaceChildren();
-        if (!report) {
-            this.botCheckCount.textContent = 'Not run';
-            this.botCheckCount.className = 'pill';
-            this.botCheckSummary.hidden = true;
-            this.botCheckSummary.textContent = '';
-            return;
-        }
-        const issueCount = report.issues.filter((issue) => issue.severity !== 'info').length;
-        this.botCheckCount.textContent = issueCount
-            ? `${issueCount} issue${issueCount === 1 ? '' : 's'}`
-            : 'Clean';
-        this.botCheckCount.className = `pill${
-            report.issues.some((issue) => issue.severity === 'error')
-                ? ' pill-danger'
-                : issueCount
-                    ? ' pill-warn'
-                    : ' pill-ok'
-        }`;
-        const finishers = report.simulation ? report.simulation.aggregate.finishers : 0;
-        const crashes = report.simulation ? report.simulation.aggregate.crashes : 0;
-        const crashLabel = crashes === 1 ? '1 crash' : `${crashes} crashes`;
-        let summary = report.simulation
-            ? `${finishers} of ${report.settings.botCount} finished. ${crashLabel}.`
-            : 'Bots did not run. The drawing has a problem that blocks them.';
-        if (geometrySignature(this.track) !== this.botReportSignature) {
-            summary = `The drawing changed since this check. ${summary}`;
-        }
-        this.botCheckSummary.hidden = false;
-        this.botCheckSummary.textContent = summary;
-        for (const issue of report.issues) {
-            const item = document.createElement('li');
-            item.dataset.severity = issue.severity;
-            item.textContent = `${issue.title}. ${issue.detail}`;
-            this.botCheckIssues.appendChild(item);
-        }
-    }
-
-    async runBots() {
-        if (!this.hasTrackGeometry()) {
-            this.setStatus('Draw a closed road before running bots.', true);
-            return;
-        }
-        const trackKey = this.state.selectedTrackKey;
-        const snapshot = cloneTracks(this.track);
-        const signature = geometrySignature(snapshot);
-        this.runBotsBtn.disabled = true;
-        this.botCheckSummary.hidden = false;
-        this.botCheckSummary.textContent = `Running bots on ${snapshot.name}...`;
-        this.setStatus(`Running bots on ${snapshot.name}...`);
-        await new Promise((resolve) => {
-            setTimeout(resolve, 0);
-        });
-        try {
-            const report = runTrackBotCheck(snapshot);
-            if (trackKey !== this.state.selectedTrackKey) return;
-            this.botReport = report;
-            this.botReportSignature = signature;
-            this.renderBotReport();
-            const finishers = report.simulation ? report.simulation.aggregate.finishers : 0;
-            this.setStatus(report.simulation
-                ? `Bot check finished. ${finishers} of ${report.settings.botCount} finished.`
-                : 'Bot check finished. The drawing blocked the bots.');
-        } catch (error) {
-            console.error(error);
-            this.setStatus('Bot check failed.', true);
-        } finally {
-            this.runBotsBtn.disabled = false;
-        }
     }
 
     driveDraft() {
@@ -2778,7 +2685,8 @@ class MapmakerApp {
             return;
         }
 
-        this.saveTrackBtn.disabled = true;
+        this.busy = true;
+        this.syncSaveButton();
         this.setStatus(`Saving and integrating ${this.track.name}...`);
         try {
             const response = await fetch('/__mapmaker/save-track', {
@@ -2821,7 +2729,8 @@ class MapmakerApp {
                 true,
             );
         } finally {
-            this.saveTrackBtn.disabled = false;
+            this.busy = false;
+            this.syncSaveButton();
         }
     }
 }

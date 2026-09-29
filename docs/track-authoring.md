@@ -49,7 +49,7 @@ road that clicking it will build; the close target is kept small so a nearby
 click can still add a point. The stretch that closes the loop is not forced
 to a car length. The draft view has no length labels or centerline so the
 road footprint stays clear. The editor keeps the same camera scale and
-position after closing; **Reframe** fits the finished track whenever needed.
+position after closing. Opening a track fits it to the window.
 
 Draw fillets each sharp bend on the drawn centerline by half the lane
 width, then offsets both walls by that same half-width. Bends tighter than
@@ -73,30 +73,36 @@ center axis when moved. Moving or reversing the start on a newly built road
 updates its automatic checkpoint order while its walls and checkpoints remain
 unedited; manual checkpoint edits keep their authored positions.
 
-The **Checks** panel checks the smoothed race walls, road clearance,
-start position, gate coverage, and checkpoint order. It marks problem locations
-on the map and shows approximate lap length plus the narrowest wall gap.
-New structural errors block export and **Save & Integrate**;
+**Checks** tests the smoothed race walls, road clearance,
+start position, gate coverage, and checkpoint order. It shows a green **OK**
+when nothing is wrong; otherwise it lists each problem and marks it on the map.
+New structural errors block export and **Save**;
 warnings invite a driving check. Existing integrated tracks with a known
 baseline issue can still be renamed or have metadata saved while their race
 geometry is unchanged. Geometry edits must resolve any remaining hard error.
 Use **Drive Draft** to test the current unsaved track with the real race
 simulation before integration. The draft drive runs only in the browser and
 does not publish or save a definition. It reports checkpoint progress, lap
-completion, and wall contacts. **Run bots** checks that same drawing with the
-Runner Lab bots and lists who finished, the crashes, and the issues. It does
-not save the track. Open `tools/runner.html` for the same check on a saved track.
+completion, and wall contacts. To run the Runner Lab bots on a saved track,
+open `tools/runner.html`.
 
-### Flow checks
+### Layout and Flow tips
 
-The Mapmaker sidebar has four collapsible sections: **Track** (pick, name,
-destination), **Shape** (corners, ground), **Medal times** (closed by default)
-and **Checks**. The canvas bar has **Draw** and **Edit**. In Edit, click an item
-to select it, drag to move it, Shift+click a wall to add a point, and Delete to
-remove the selected wall point. Flow lists only the rules a track misses; the
-count in its badge shows how many pass.
+The map fills the window. The top bar has the track name (click it to open
+another track or start a **New track**), **Draw** and **Edit**, then
+**Campaign Planner**, **Drive Draft**, **Save** and the panel button. **Save**
+reads **Saved** when the open track has no unsaved changes. The panel on the
+right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and
+ground) and **Medal times**, with **Remove track** at the bottom. The track
+picker is searchable, shows a preview of every track, and lists the newest
+first. Press Enter in its search box to open the first match. Messages about
+the last action show for a few seconds in the hint at the bottom of the map.
+In Edit, click an item to select it, drag to move it, Shift+click a wall to add
+a point, and Delete to remove the selected wall point.
 
-The **Flow** part of Checks measures how the road drives. It uses the
+**Flow tips** under Checks measures how the road drives. It appears only when
+a track misses a rule, closed by default, and shows how many rules it misses.
+Its blue **F** markers show on the map only while it is open. It uses the
 fastest smooth line through the lane and the car's real steering limits. It
 checks five rules:
 
@@ -110,7 +116,7 @@ Of the 124 Daily tracks on 2026-09-24, exactly six pass all five rules:
 Double Crest, Anvil Circuit, Shark Bite, Oven Mitt, Whistle Ridge and Safari
 Circuit. These are the tracks that play as flowy. A blue **F** marker shows
 where each missed rule breaks the flow. Flow results are hints. They never
-block export or **Save & Integrate**. The check runs only when the track has no
+block export or **Save**. The check runs only when the track has no
 structural errors.
 
 While Draw is open, each straight longer than 14 units is marked with
@@ -130,8 +136,8 @@ Drive Draft keeps your
 10 best laps for each layout in the browser. A change to a wall, gate, start
 point, corner or ground starts a new list.
 
-**Undo** and **Redo** cover wall, gate, start, name, and corner edits; a pointer
-drag is one undo step. While Draw is open, Undo removes the last sketch
+Undo (Cmd+Z) and Redo (Shift+Cmd+Z) cover wall, gate, start, name, and corner
+edits; a pointer drag is one undo step. While Draw is open, Undo removes the last sketch
 point. The browser keeps unsaved maps and open sketches locally and offers to
 restore them after a reload. Returning from **Drive Draft** restores the map
 automatically in the same tab.
@@ -140,17 +146,18 @@ automatically in the same tab.
 
 1. Build and validate the layout in `tools/mapmaker.html`.
    The track key follows the display name: "Spade Kingdom" becomes `spadeKingdom`.
-   **New** and **Clone** ask for the name only. The key follows that name.
+   **New track** starts a blank track called New Track and selects its name,
+   so you can type the real name right away. The key follows that name.
 2. Run `npm run mapmaker`, open
    `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
-   **Save & Integrate**. It writes the definition module and updates
+   **Save**. It writes the definition module and updates
    `TRACK_CATALOG`, the static definition imports, and the compatibility
    registry. It never changes where a track is used: a new track starts as
    **Not used** (off the Daily schedule and in no series), and an existing
    track keeps its Daily position or Campaign stage. Renames replace the old
    key at its existing position after confirmation and remove the old
    definition file.
-3. Set the medal times in **Medal Times** (see below). **Save & Integrate**
+3. Set the medal times in **Medal times** (see below). **Save**
    writes them to `game/medals/medal-times.json`.
    New Daily GP publication selects 1–2 laps when Author time is under 10s,
    and one lap at or above 10s. Missing or invalid Author times conservatively
@@ -222,8 +229,8 @@ matching tracks; click a track to open the list it is in.
 
 ## Medal Times
 
-The **Medal Times** panel sets the four medal times of one lap: author, gold,
-silver and bronze.
+The **Medal times** section of the panel sets the four medal times of one lap:
+author, gold, silver and bronze.
 
 - The panel lists your 10 best **Drive Draft** laps on the current layout, and
   their average. Click one to use it as the author time. It is rounded up to
@@ -238,8 +245,8 @@ silver and bronze.
 
 ## Choosing A Ground
 
-Each track has one ground for the full lap. Choose it with **Ground** in the
-Mapmaker track settings. The choices come from `TRACK_GROUNDS` in
+Each track has one ground for the full lap. Choose it with **Ground** under
+**Shape** in the Mapmaker panel. The choices come from `TRACK_GROUNDS` in
 `game/track/grounds.js`.
 
 - **Street** is the default. The Mapmaker does not write a `ground` field for

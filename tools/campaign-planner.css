@@ -12,6 +12,19 @@
     color: #fda4af;
 }
 
+/* Layout */
+
+.maker-layout {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.planner-sidebar {
+    border-right: 1px solid var(--maker-border);
+}
+
 /* Lists */
 
 .planner-search {
@@ -221,36 +234,9 @@
     padding: 0.25rem 0.55rem;
 }
 
-/* Track cards */
+/* Track cards (base styles in mapmaker.css) */
 
-.planner-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 0.75rem;
-}
-
-.planner-card {
-    display: grid;
-    align-content: start;
-    gap: 0.3rem;
-    padding: 0.6rem;
-    border: 1px solid var(--maker-border);
-    border-radius: var(--maker-radius);
-    background: var(--maker-panel);
-}
-
-.planner-card-preview {
-    display: block;
-    width: 100%;
-    aspect-ratio: 16 / 10;
-}
-
-.planner-card-meta {
-    color: var(--maker-muted);
-    font-size: 0.75rem;
-}
-
-.planner-card .planner-small-btn {
+.track-card .planner-small-btn {
     justify-self: start;
     margin-top: 0.2rem;
 }
@@ -331,9 +317,13 @@
 }
 
 @media (max-width: 900px) {
-    .maker-sidebar.planner-sidebar {
-        order: 0;
+    .maker-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .planner-sidebar {
         max-height: 40vh;
+        border-right: 0;
         border-bottom: 1px solid var(--maker-border);
     }
 

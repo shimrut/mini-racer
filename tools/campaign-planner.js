@@ -1,8 +1,6 @@
 import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACK_GROUNDS, getTrackGround } from '../game/track/grounds.js';
 import { isLiveGround } from '../game/track/live-grounds.js';
-import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
-import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { TRACKS } from '../game/track/tracks.js';
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
 import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
@@ -20,6 +18,7 @@ import {
     UNUSED_DESTINATION,
 } from './mapmaker/campaign-series.js';
 import { getMedalRowError } from './mapmaker/medal-times.js';
+import { TrackPreviews } from './mapmaker/track-preview.js';
 
 // A save rewrites files this page imports, so the dev server may reload the page
 // right after it. The last status is kept briefly so it shows again after that reload.
@@ -107,13 +106,7 @@ class CampaignPlannerApp {
         this.scheduleKeys = [...TRACK_SCHEDULE_KEYS];
         this.query = '';
         this.picker = null;
-        this.previewObserver = new IntersectionObserver((entries) => {
-            for (const entry of entries) {
-                if (!entry.isIntersecting) continue;
-                this.previewObserver.unobserve(entry.target);
-                this.drawPreview(entry.target);
-            }
-        }, { rootMargin: '200px' });
+        this.previews = new TrackPreviews((trackKey) => TRACKS[trackKey]);
 
         const hashList = decodeURIComponent(window.location.hash.slice(1));
         this.selectedList = parseTrackDestination(hashList, this.seriesData)
@@ -308,37 +301,8 @@ class CampaignPlannerApp {
             : hints[list];
         this.listMeta.textContent = `${this.getListMeta(list)}. ${hint}`;
         this.addTrackBtn.hidden = !series;
-        this.previewObserver.disconnect();
+        this.previews.reset();
         this.listBody.replaceChildren(series ? this.renderStages(series) : this.renderCards(list));
-    }
-
-    createPreview(trackKey, className) {
-        const canvas = el('canvas', className);
-        canvas.dataset.previewTrack = trackKey;
-        this.previewObserver.observe(canvas);
-        return canvas;
-    }
-
-    drawPreview(canvas) {
-        const trackKey = canvas.dataset.previewTrack;
-        const track = TRACKS[trackKey];
-        if (!track) return;
-        const scale = Math.min(2, Math.max(1, Math.round(window.devicePixelRatio || 1)));
-        canvas.width = Math.round(canvas.clientWidth * scale);
-        canvas.height = Math.round(canvas.clientHeight * scale);
-        renderTrackPreviewCanvas(canvas, {
-            trackGeometry: { outer: track.outer, inner: track.inner },
-            cornerRadius: track.cornerRadius,
-            presentation: resolveTrackPresentation(trackKey, {
-                surface: TRACK_PRESENTATION_SURFACES.TRACK_PICKER,
-                ground: track.ground,
-            }),
-            startLine: track.startLine,
-            startPos: track.startPos,
-            startAngle: track.startAngle,
-            transparentBackground: true,
-            previewRenderMode: 'schematic',
-        });
     }
 
     createMoveButton(trackKey) {
@@ -361,7 +325,7 @@ class CampaignPlannerApp {
             if (warnings.length) info.append(el('span', 'planner-warn', warnings.join(' ')));
             item.append(
                 el('span', 'planner-stage-number', stageNumber(index)),
-                this.createPreview(stage.trackKey, 'planner-stage-preview'),
+                this.previews.create(stage.trackKey, 'planner-stage-preview'),
                 info,
             );
             if (live) {
@@ -422,17 +386,16 @@ class CampaignPlannerApp {
                 ? 'Every track is in use. New tracks from the Mapmaker land here.'
                 : 'No tracks here.');
         }
-        const grid = el('div', 'planner-cards');
+        const grid = el('div', 'track-cards');
         trackKeys.forEach((trackKey, index) => {
-            const card = el('div', 'planner-card');
-            card.dataset.trackKey = trackKey;
             const ground = groundLabel(getTrackGroundKey(trackKey));
-            const warnings = this.getTrackWarnings(trackKey, null);
-            card.append(
-                this.createPreview(trackKey, 'planner-card-preview'),
-                el('strong', '', getTrackName(trackKey)),
-                el('span', 'planner-card-meta', list === DAILY_DESTINATION ? `#${index + 1} · ${ground}` : ground),
+            const card = this.previews.createCard(
+                'div',
+                trackKey,
+                getTrackName(trackKey),
+                list === DAILY_DESTINATION ? `#${index + 1} · ${ground}` : ground,
             );
+            const warnings = this.getTrackWarnings(trackKey, null);
             if (warnings.length) card.append(el('span', 'planner-warn', warnings.join(' ')));
             card.append(this.createMoveButton(trackKey));
             grid.appendChild(card);
@@ -504,7 +467,7 @@ class CampaignPlannerApp {
             for (const key of trackKeys) {
                 const warnings = this.getTrackWarnings(key, series);
                 const button = this.createPickerButton(getTrackName(key), this.getListName(this.getTrackDestination(key)), warnings.join(' '));
-                button.prepend(this.createPreview(key, 'planner-pick-preview'));
+                button.prepend(this.previews.create(key, 'planner-pick-preview'));
                 button.dataset.pickTrack = key;
                 button.disabled = this.isStageFixed(key);
                 if (button.disabled) button.title = 'It is a stage of a live campaign, so it cannot move.';

@@ -4,130 +4,108 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=2.30">
+    <link rel="stylesheet" href="mapmaker.css?v=3.1">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
         <a class="maker-link" href="../pages/game.html">&larr; Game</a>
-        <h1>Mapmaker</h1>
-        <a class="maker-link" href="campaign-planner.html">Campaign Planner</a>
+        <button id="track-picker-btn" type="button" class="track-picker-btn" aria-haspopup="dialog" title="Open another track">
+            <span id="track-picker-name"></span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
+        </button>
+        <div id="tool-buttons" class="segmented" role="group" aria-label="Tool">
+            <button type="button" data-tool="draw">Draw</button>
+            <button type="button" data-tool="edit">Edit</button>
+        </div>
         <div class="maker-header-actions">
-            <span id="dirty-badge" class="pill">Saved</span>
+            <a class="maker-link" href="campaign-planner.html">Campaign Planner</a>
             <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
-            <button id="save-track-btn" type="button" class="primary-btn">Save &amp; Integrate</button>
+            <button id="save-track-btn" type="button" class="primary-btn">Save</button>
+            <button id="panel-toggle-btn" type="button" class="ghost-btn icon-btn" aria-controls="maker-panel" aria-label="Show or hide the panel" title="Show or hide the panel">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13"/></svg>
+            </button>
         </div>
     </header>
 
-    <main class="maker-layout">
-        <aside class="maker-sidebar">
-            <details class="maker-panel" open>
-                <summary><h2>Track</h2></summary>
-                <select id="editor-track-select" aria-label="Current track"></select>
-                <div class="button-row button-row-3">
-                    <button id="new-track-btn" type="button">New</button>
-                    <button id="duplicate-track-btn" type="button" class="ghost-btn">Clone</button>
-                    <button id="remove-track-btn" type="button" class="danger-btn">Remove</button>
-                </div>
+    <main class="maker-editor">
+        <section class="maker-stage">
+            <canvas id="map-canvas"></canvas>
+            <p id="canvas-hint" class="canvas-hint" role="status"></p>
+        </section>
+
+        <aside id="maker-panel" class="maker-sidebar maker-panel-side">
+            <section class="panel-section">
                 <label class="field">
                     <span>Name</span>
                     <input id="track-name-input" type="text" spellcheck="false" autocomplete="off">
                 </label>
-            </details>
+            </section>
 
-            <details class="maker-panel" open>
-                <summary><h2>Shape</h2></summary>
-                <div class="button-row">
-                    <label class="field">
-                        <span>Wall corners</span>
-                        <select id="corner-radius-select">
-                            <option value="0">Sharp</option>
-                            <option value="1.5">A bit rounded</option>
-                            <option value="3" selected>Rounded</option>
-                            <option value="5">Soft</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Ground</span>
-                        <select id="ground-select"></select>
-                    </label>
+            <section class="panel-section">
+                <div class="panel-head">
+                    <h2>Checks</h2>
+                    <span id="quality-count" class="pill"></span>
                 </div>
-            </details>
+                <ul id="quality-issues" class="quality-issues"></ul>
+                <details id="flow-tips" class="flow-tips" hidden>
+                    <summary>Flow tips <span id="flow-count" class="pill"></span></summary>
+                    <p class="field-hint">Hints on how the road drives. They never block Save.</p>
+                    <ul id="flow-rules" class="quality-issues flow-rules"></ul>
+                </details>
+            </section>
 
-            <details class="maker-panel">
-                <summary>
+            <section class="panel-section">
+                <h2>Shape</h2>
+                <div class="field">
+                    <span id="corner-label">Wall corners</span>
+                    <div id="corner-radius-options" class="segmented segmented-grid" role="radiogroup" aria-labelledby="corner-label"></div>
+                </div>
+                <div class="field">
+                    <span id="ground-label">Ground</span>
+                    <div id="ground-options" class="segmented segmented-grid segmented-grid-3" role="radiogroup" aria-labelledby="ground-label"></div>
+                </div>
+            </section>
+
+            <section class="panel-section">
+                <div class="panel-head">
                     <h2>Medal times</h2>
                     <span id="medal-times-state" class="pill">Not set</span>
-                </summary>
+                </div>
                 <div id="draft-laps-list" class="draft-laps-list"></div>
                 <div class="medal-time-grid">
-                    <label class="field">
+                    <label class="field" data-tier="author">
                         <span>Author</span>
                         <input id="medal-author-input" type="number" min="0" step="0.01">
                     </label>
-                    <label class="field">
+                    <label class="field" data-tier="gold">
                         <span>Gold</span>
                         <input id="medal-gold-input" type="number" min="0" step="0.01">
                     </label>
-                    <label class="field">
+                    <label class="field" data-tier="silver">
                         <span>Silver</span>
                         <input id="medal-silver-input" type="number" min="0" step="0.01">
                     </label>
-                    <label class="field">
+                    <label class="field" data-tier="bronze">
                         <span>Bronze</span>
                         <input id="medal-bronze-input" type="number" min="0" step="0.01">
                     </label>
                 </div>
                 <p id="medal-times-hint" class="field-hint" hidden></p>
-            </details>
+            </section>
 
-            <details class="maker-panel" open>
-                <summary>
-                    <h2 id="quality-title">Checks</h2>
-                    <span id="quality-count" class="pill">Draw a track</span>
-                </summary>
-                <p id="quality-summary" class="field-hint">Draw a closed road to check its walls, start, and lap gates.</p>
-                <ul id="quality-issues" class="quality-issues"></ul>
-                <div class="panel-head flow-head">
-                    <h3 id="flow-title">Flow</h3>
-                    <span id="flow-count" class="pill">Draw a track</span>
-                </div>
-                <p id="flow-summary" class="field-hint">Draw a closed road to check how it flows.</p>
-                <ul id="flow-rules" class="quality-issues flow-rules" aria-labelledby="flow-title"></ul>
-                <div class="panel-head flow-head">
-                    <h3 id="bot-check-title">Bots</h3>
-                    <span id="bot-check-count" class="pill">Not run</span>
-                </div>
-                <p id="bot-check-summary" class="field-hint" hidden></p>
-                <button id="run-bots-btn" type="button" class="ghost-btn">Run bots</button>
-                <ul id="bot-check-issues" class="quality-issues"></ul>
-            </details>
-
+            <section class="panel-section panel-footer">
+                <button id="remove-track-btn" type="button" class="danger-btn">Remove track</button>
+            </section>
         </aside>
-
-        <section class="maker-stage">
-            <div class="stage-head">
-                <p id="status-text" class="stage-status">Ready.</p>
-                <div class="stage-toolbar">
-                    <div class="stage-edit-actions">
-                        <button id="undo-edit-btn" type="button" class="ghost-btn" disabled>Undo</button>
-                        <button id="redo-edit-btn" type="button" class="ghost-btn" disabled>Redo</button>
-                        <button id="reframe-btn" type="button" class="ghost-btn">Reframe</button>
-                    </div>
-                <div id="tool-buttons" class="tool-grid">
-                    <button type="button" data-tool="draw">Draw</button>
-                    <button type="button" data-tool="edit">Edit</button>
-                </div>
-                </div>
-            </div>
-
-            <div class="canvas-shell">
-                <canvas id="map-canvas"></canvas>
-                <div class="canvas-overlay">
-                    <p id="canvas-hint">Click the track to select, then drag to edit or use the sidebar for precise values.</p>
-                </div>
-            </div>
-        </section>
     </main>
+
+    <dialog id="track-picker-dialog" class="maker-dialog track-picker-dialog" closedby="any" aria-label="Tracks">
+        <div class="track-picker-head">
+            <input id="track-search" type="search" placeholder="Find a track" aria-label="Find a track" autocomplete="off">
+            <button id="new-track-btn" type="button" class="primary-btn">New track</button>
+        </div>
+        <div id="track-picker-list" class="track-cards"></div>
+    </dialog>
 
     <dialog id="remove-track-dialog" class="maker-dialog" aria-labelledby="remove-track-dialog-title">
         <form method="dialog">
@@ -151,6 +129,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=2.29"></script>
+    <script type="module" src="mapmaker.js?v=3.0"></script>
 </body>
 </html>

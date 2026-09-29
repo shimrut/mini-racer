@@ -724,16 +724,14 @@ These are the places where a "small" change can create regressions outside the v
 These are useful, but they are not on the critical player path:
 
 - `tools/mapmaker.*`
-  Track/content support tooling. Local **Save & Integrate** writes the selected
-  definition and updates the catalog and compatibility registry. Authors choose
-  whether the track is for **Daily Challenge** (also updates
-  `TRACK_SCHEDULE_KEYS`) or **Campaign only** (catalog/registry only). Start
+  Track/content support tooling. Local **Save** writes the selected
+  definition and updates the catalog and compatibility registry. It never
+  changes where a track is used; `tools/campaign-planner.*` assigns tracks to
+  the Daily schedule or a Campaign series. Start
   line and checkpoint edits snap perpendicular across outer/inner walls.
   The track key follows the display name (`Spade Kingdom` becomes `spadeKingdom`).
 - `tools/runner.*`
-  Bot checks for a track. The Mapmaker **Run bots** button uses the same check
-  on the drawing on screen. Runner Lab still opens saved tracks at
-  `tools/runner.html`.
+  Bot checks for a saved track, at `tools/runner.html`.
 - `pages/preview.html`, `pages/daily.html`, `pages/preview.js`, `pages/preview.css`
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable
