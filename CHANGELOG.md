@@ -1,3 +1,5 @@
+- Mapmaker can add and delete checkpoints again. The panel has a **Checkpoints** section with the count and **Add** and **Delete** buttons. Add puts a new checkpoint in the middle of the longest stretch without one, in lap order, selected so you can drag it. Delete (or the Delete key) removes the selected checkpoint. It works the same on a phone.
+
 - Reloading or leaving the Mapmaker while it asks "Restore unsaved maps?" no longer deletes those maps. The question comes back next time. Discard still deletes them.
 
 - Drive Draft moves smoothly. It drew the car only at each physics step, so on about half the frames the car and camera stood still or jumped two steps, and on a 120 Hz screen every other frame stood still. It now draws the car between steps, as the race does.

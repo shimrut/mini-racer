@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { validateTrackQuality } from '../tools/mapmaker/track-quality.js';
+import { placeCheckpointInLongestGap, validateTrackQuality } from '../tools/mapmaker/track-quality.js';
 import analogAudio from '../game/track/definitions/analog-audio.js';
+import classicCircuit from '../game/track/definitions/circuit.js';
 import { buildRibbonWallsFromCenterline } from '../tools/mapmaker/ribbon-walls.js';
 import { buildPerpendicularLaneGate } from '../tools/mapmaker/lane-gate.js';
 import { snapStartPose } from '../tools/mapmaker/start-pose.js';
@@ -37,6 +38,33 @@ describe('Mapmaker track quality', () => {
         expect(result.hasErrors).toBe(false);
         expect(result.issues).toEqual([]);
         expect(result.minClearance).toBeCloseTo(5);
+    });
+
+    it('places a new checkpoint across the middle of the longest stretch without a gate, in lap order', () => {
+        const track = loop();
+        track.checkpoints.splice(1, 1);
+        const placed = placeCheckpointInLongestGap(track);
+        expect(placed.index).toBe(1);
+        const middle = { x: (placed.checkpoint.p1.x + placed.checkpoint.p2.x) / 2, y: (placed.checkpoint.p1.y + placed.checkpoint.p2.y) / 2 };
+        expect(middle.x).toBeCloseTo(10);
+        expect(middle.y).toBeCloseTo(17.5);
+        track.checkpoints.splice(placed.index, 0, placed.checkpoint);
+        expect(validateTrackQuality(track).issues).toEqual([]);
+    });
+
+    it('keeps each added checkpoint on the road and in order, even next to a sharp corner', () => {
+        const track = structuredClone(classicCircuit);
+        for (let added = 0; added < 4; added += 1) {
+            const placed = placeCheckpointInLongestGap(track);
+            track.checkpoints.splice(placed.index, 0, placed.checkpoint);
+            expect(validateTrackQuality(track).hasErrors).toBe(false);
+        }
+    });
+
+    it('places no checkpoint when the checkpoints are out of order', () => {
+        const track = loop();
+        track.checkpoints.reverse();
+        expect(placeCheckpointInLongestGap(track)).toBeNull();
     });
 
     it('accepts a generated Line Build loop with snapped gates and start pose', () => {

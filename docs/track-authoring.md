@@ -93,12 +93,19 @@ another track), **New track**, **Draw** and **Edit**, then
 **Campaign Planner**, **Drive Draft**, **Save** and the panel button. **Save**
 reads **Saved** when the open track has no unsaved changes. The panel on the
 right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and
-ground) and **Medal times**, with **Remove track** at the bottom. The track
+ground), **Checkpoints** and **Medal times**, with **Remove track** at the
+bottom. The track
 picker is searchable, shows a preview of every track, and lists the newest
 first. Press Enter in its search box to open the first match. Messages about
 the last action show for a few seconds in the hint at the bottom of the map.
 In Edit, click an item to select it, drag to move it, Shift+click a wall to add
-a point, and Delete to remove the selected wall point.
+a point, and Delete to remove the selected wall point or checkpoint.
+
+**Checkpoints** shows how many the track has. **Add** puts a new one in the
+middle of the longest stretch without a gate, keeps the lap order, and selects
+it so it can be dragged. **Delete** removes the selected checkpoint (the Delete
+key does the same). After a manual add or delete, Draw no longer re-places the
+checkpoints when the start moves.
 
 **Flow tips** under Checks measures how the road drives. It appears only when
 a track misses a rule, closed by default, and shows how many rules it misses.

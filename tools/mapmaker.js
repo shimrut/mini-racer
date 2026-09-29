@@ -12,7 +12,7 @@ import {
     buildPerpendicularLaneGate,
 } from './mapmaker/lane-gate.js';
 import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
-import { validateTrackQuality } from './mapmaker/track-quality.js';
+import { placeCheckpointInLongestGap, validateTrackQuality } from './mapmaker/track-quality.js';
 import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/track-flow.js';
 import {
     clearDraftRecovery,
@@ -291,6 +291,9 @@ class MapmakerApp {
         this.saveTrackBtn = document.getElementById('save-track-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.removeTrackBtn = document.getElementById('remove-track-btn');
+        this.checkpointCount = document.getElementById('checkpoint-count');
+        this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
+        this.deleteCheckpointBtn = document.getElementById('delete-checkpoint-btn');
         this.removeTrackDialog = document.getElementById('remove-track-dialog');
         this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
         this.driveDraftBtn = document.getElementById('drive-draft-btn');
@@ -909,6 +912,8 @@ class MapmakerApp {
 
         this.newTrackBtn.addEventListener('click', () => this.createTrack());
         this.removeTrackBtn.addEventListener('click', () => this.removeTrack());
+        this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
+        this.deleteCheckpointBtn.addEventListener('click', () => this.deleteCheckpoint());
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
 
@@ -1540,7 +1545,7 @@ class MapmakerApp {
         if (this.touchInput) {
             return 'Tap to select, then drag. Drag the map to move it and pinch to zoom.';
         }
-        return 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point. Cmd+Z undoes.';
+        return 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point or checkpoint. Cmd+Z undoes.';
     }
 
     updateCanvasHint() {
@@ -2433,8 +2438,12 @@ class MapmakerApp {
 
     deleteSelectedPoint() {
         const handle = this.state.selectedHandle;
+        if (handle?.kind === 'checkpoint') {
+            this.deleteCheckpoint();
+            return;
+        }
         if (!handle || handle.kind !== 'polygon') {
-            this.setStatus('Select an outer or inner wall point first.', true);
+            this.setStatus('Select a wall point or a checkpoint first.', true);
             return;
         }
 
@@ -2451,6 +2460,43 @@ class MapmakerApp {
             index: Math.max(0, handle.index - 1)
         };
         this.markDirty(`Deleted ${handle.path} point.`);
+    }
+
+    // A checkpoint added or deleted by hand stops Draw from placing them again.
+    keepCheckpointsAsEdited() {
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        if (guide) guide.manualGates = true;
+    }
+
+    addCheckpoint() {
+        const placed = this.hasTrackGeometry() ? placeCheckpointInLongestGap(this.track) : null;
+        if (!placed) {
+            this.setStatus('No room for a checkpoint. Fix the finish line and checkpoint problems under Checks, or move a checkpoint.', true);
+            return;
+        }
+        this.keepCheckpointsAsEdited();
+        this.track.checkpoints.splice(placed.index, 0, placed.checkpoint);
+        this.setTool('edit', { kind: 'checkpoint', checkpointIndex: placed.index });
+        this.markDirty(`Added checkpoint ${placed.index + 1}. Drag it to move it.`);
+    }
+
+    deleteCheckpoint() {
+        const handle = this.state.selectedHandle;
+        if (handle?.kind !== 'checkpoint') {
+            this.setStatus('Select a checkpoint on the map first.', true);
+            return;
+        }
+        this.keepCheckpointsAsEdited();
+        this.track.checkpoints.splice(handle.checkpointIndex, 1);
+        this.state.selectedHandle = null;
+        this.markDirty(`Deleted checkpoint ${handle.checkpointIndex + 1}.`);
+    }
+
+    syncCheckpointPanel() {
+        const count = String(this.track.checkpoints.length);
+        if (this.checkpointCount.textContent !== count) this.checkpointCount.textContent = count;
+        this.addCheckpointBtn.disabled = !this.hasTrackGeometry();
+        this.deleteCheckpointBtn.disabled = this.state.selectedHandle?.kind !== 'checkpoint';
     }
 
     setStatus(message, isError = false) {
@@ -2843,6 +2889,7 @@ class MapmakerApp {
     }
 
     draw() {
+        this.syncCheckpointPanel();
         const ratio = window.devicePixelRatio || 1;
         const viewport = this.getViewport();
         this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);

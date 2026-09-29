@@ -1,7 +1,7 @@
 import { CONFIG } from '../../game/config.js';
 import { buildTrackGeometry } from '../../game/track/runtime.js';
 import { distance, isFinitePoint, midpoint, subtract } from '../geometry.js';
-import { closestPointOnPolygon } from './lane-gate.js';
+import { buildPerpendicularLaneGate, closestPointOnPolygon } from './lane-gate.js';
 
 const EPSILON = 1e-7;
 const SEAM_TOLERANCE = 0.2;
@@ -173,6 +173,88 @@ function perimeterProgress(polygon, hit) {
     return progress + distance(segmentStart, segmentEnd) * Math.max(0, Math.min(1, hit.wallFraction));
 }
 
+function pointAtPerimeterProgress(polygon, progress) {
+    let remaining = progress;
+    for (let index = 0; index < polygon.length; index += 1) {
+        const a = polygon[index];
+        const b = polygon[(index + 1) % polygon.length];
+        const length = distance(a, b);
+        if (remaining <= length) {
+            const t = length > EPSILON ? remaining / length : 0;
+            return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        }
+        remaining -= length;
+    }
+    return { ...polygon[0] };
+}
+
+// Measures the lap along the outer wall from the finish, in the driving
+// direction. An alignment under 0.25 means the start heading points across the
+// road, so the direction is unknown.
+function measureLap(outer, finishHit, startAngle) {
+    const outerLength = outer.reduce((sum, point, index) => sum + distance(point, outer[(index + 1) % outer.length]), 0);
+    const a = outer[finishHit.segmentIndex];
+    const b = outer[(finishHit.segmentIndex + 1) % outer.length];
+    const heading = { x: Math.cos(startAngle), y: Math.sin(startAngle) };
+    const tangent = { x: (b.x - a.x) / distance(a, b), y: (b.y - a.y) / distance(a, b) };
+    const alignment = heading.x * tangent.x + heading.y * tangent.y;
+    const direction = Math.sign(alignment);
+    const finishProgress = perimeterProgress(outer, finishHit);
+    const wrap = (value) => ((value % outerLength) + outerLength) % outerLength;
+    return {
+        alignment,
+        outerLength,
+        fromFinish: (hit) => wrap(direction * (perimeterProgress(outer, hit) - finishProgress)),
+        pointAt: (fromFinish) => pointAtPerimeterProgress(outer, wrap(finishProgress + direction * fromFinish)),
+    };
+}
+
+// Tried in turn until a gate crosses the road cleanly: the middle of the stretch first.
+const NEW_CHECKPOINT_SPOTS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8];
+
+/**
+ * Places a new checkpoint in the longest stretch of the lap without a gate:
+ * finish to the first checkpoint, one checkpoint to the next, or the last
+ * checkpoint to the finish. Returns its list position and the gate. Null when a
+ * gate misses the road, the start heading points across the road, the
+ * checkpoints are out of order, or no clean gate fits in that stretch.
+ */
+export function placeCheckpointInLongestGap(track) {
+    if (!Number.isFinite(track?.startAngle)) return null;
+    const geometry = buildTrackGeometry(track);
+    const outer = withoutDuplicateCorners(geometry.outer);
+    const inner = withoutDuplicateCorners(geometry.inner);
+    const ignored = [];
+    const finishHit = checkGate('Finish line', 'finish', track.startLine, outer, inner, ignored);
+    const checkpointHits = (track.checkpoints ?? []).map((checkpoint) => (
+        checkGate('Checkpoint', 'checkpoint', checkpoint, outer, inner, ignored)
+    ));
+    if (!finishHit || !checkpointHits.every(Boolean)) return null;
+    const lap = measureLap(outer, finishHit, track.startAngle);
+    if (Math.abs(lap.alignment) < 0.25) return null;
+    const stops = [0, ...checkpointHits.map(lap.fromFinish), lap.outerLength];
+    let best = null;
+    for (let index = 0; index < stops.length - 1; index += 1) {
+        const length = stops[index + 1] - stops[index];
+        if (length <= 0) return null;
+        if (!best || length > best.end - best.start) best = { index, start: stops[index], end: stops[index + 1] };
+    }
+    for (const spot of NEW_CHECKPOINT_SPOTS) {
+        const onOuter = lap.pointAt(best.start + (best.end - best.start) * spot);
+        const seed = midpoint(onOuter, closestPointOnPolygon(onOuter, inner).closest);
+        const checkpoint = buildPerpendicularLaneGate(seed, track.outer, track.inner);
+        if (!checkpoint) continue;
+        const gateIssues = [];
+        const hit = checkGate('Checkpoint', 'checkpoint', checkpoint, outer, inner, gateIssues);
+        if (!hit || gateIssues.length) continue;
+        const fromFinish = lap.fromFinish(hit);
+        if (fromFinish > best.start + 0.25 && fromFinish < best.end - 0.25) {
+            return { index: best.index, checkpoint };
+        }
+    }
+    return null;
+}
+
 /**
  * Validate a Mapmaker draft against the race collision walls and lap gates.
  * Errors make a track unplayable; warnings flag risky but potentially intentional layouts.
@@ -249,22 +331,13 @@ export function validateTrackQuality(track) {
     if (!Number.isFinite(track.startAngle)) {
         issues.push(issue('heading-invalid', 'error', 'Start heading is missing', 'Set the direction the car should drive.'));
     } else if (finishHit && checkpointHits.every(Boolean) && checkpoints.length) {
-        const outerLength = outer.reduce((sum, point, index) => sum + distance(point, outer[(index + 1) % outer.length]), 0);
-        const a = outer[finishHit.segmentIndex];
-        const b = outer[(finishHit.segmentIndex + 1) % outer.length];
-        const heading = { x: Math.cos(track.startAngle), y: Math.sin(track.startAngle) };
-        const tangent = { x: (b.x - a.x) / distance(a, b), y: (b.y - a.y) / distance(a, b) };
-        const alignment = heading.x * tangent.x + heading.y * tangent.y;
-        if (Math.abs(alignment) < 0.25) {
+        const lap = measureLap(outer, finishHit, track.startAngle);
+        if (Math.abs(lap.alignment) < 0.25) {
             issues.push(issue('heading-across-road', 'warning', 'Start heading points across the road', 'Turn the car to face along the road.', track.startPos));
         } else {
-            const direction = Math.sign(alignment);
-            const finishProgress = perimeterProgress(outer, finishHit);
             let previous = 0;
-            checkpointHits.forEach((hit, index) => {
-                const progress = perimeterProgress(outer, hit);
-                const fromStart = ((direction * (progress - finishProgress)) % outerLength + outerLength) % outerLength;
-                if (fromStart < 0.25 || fromStart > outerLength - 0.25) {
+            checkpointHits.map(lap.fromFinish).forEach((fromStart, index) => {
+                if (fromStart < 0.25 || fromStart > lap.outerLength - 0.25) {
                     issues.push(issue(`checkpoint-${index + 1}-near-finish`, 'error', `Checkpoint ${index + 1} overlaps the finish`, 'Move it farther along the lap.', midpoint(checkpoints[index].p1, checkpoints[index].p2)));
                 } else if (fromStart < previous + 0.25) {
                     issues.push(issue(`checkpoint-${index + 1}-order`, 'error', `Checkpoint ${index + 1} is out of order`, 'Place checkpoints in the order the car reaches them from the start heading.', midpoint(checkpoints[index].p1, checkpoints[index].p2)));
