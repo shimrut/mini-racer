@@ -157,12 +157,12 @@ automatically in the same tab.
    publish as one lap. Campaign lap counts are set for each stage and may be
    1, 2, or 3.
 4. Open `http://127.0.0.1:5173/tools/campaign-planner.html` (the
-   **Campaign Planner** link in the Mapmaker header), choose the track, set
-   **Use For**, and choose **Save**:
+   **Campaign Planner** link in the Mapmaker header). Open **Not used** (or
+   search the track by name) and choose **Move to…** on the track:
    - **Daily Challenge** appends the track as the final `TRACK_SCHEDULE_KEYS`
      entry. Existing Daily tracks keep their position.
-   - **Campaign · <series>** takes the track off the Daily schedule and makes
-     it a stage of that series. See **Campaign Series**.
+   - A Campaign series takes the track off the Daily schedule and makes it a
+     stage of that series. See **Campaign Series**.
    - **Not used** takes the track off the Daily schedule and out of its
      series.
    When extending an existing branch, keep the existing catalog and schedule
@@ -204,14 +204,21 @@ its own stages. `game/campaign/series.json` holds them, and
 - Campaign opens a series screen that lists every series in `series.json`.
   A series that has not reached its stage count shows there as **Coming soon**.
 
-In the Campaign Planner (`tools/campaign-planner.html`), choose the track and
-**Use For** → **Campaign · <series>**. The panel under it shows the stage
-number, **Laps** and **Medal Target**, and warns when the track's ground is not
-the series ground or the track has no medal times yet. **Save** writes
-`series.json` and the Daily schedule. The right side lists every series with
-its stages, then the Not used and Daily Challenge tracks; click a name to
-choose it. For a series that is not live, each stage has **Up** and **Down**
-buttons; they write `series.json` at once.
+The Campaign Planner (`tools/campaign-planner.html`) shows one list at a time.
+The left side has a search box, **Not used** and **Daily Challenge** at the
+top, and every series below them. Typing filters the series and also lists
+matching tracks; click a track to open the list it is in.
+
+- **Not used** and **Daily Challenge** show track previews. **Move to…** opens
+  a searchable list of places.
+- A series shows one row per stage. When the series is not live, each row has
+  **Laps**, **Medal Target**, **Up**, **Down** and **Move to…**. **Add track**
+  picks a Not used track, or any track by search.
+- Moving a track into a series, or off the Daily schedule, asks for
+  confirmation first. The confirm step sets **Laps** and **Medal Target** and
+  warns when the track's ground is not the series ground. A track without all
+  four medal times cannot become a stage.
+- Every change writes `series.json` and the Daily schedule at once.
 
 ## Medal Times
 

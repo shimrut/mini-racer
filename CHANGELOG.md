@@ -1,4 +1,4 @@
-- Mapmaker only makes tracks now. Where a track is used (Daily Challenge, a Campaign series, or Not used) moved to a new **Campaign Planner** page, linked from the Mapmaker header. It sets laps, medal targets and stage order, and lists every series, the Not used tracks and the Daily schedule. A new track saves as Not used until you assign it there.
+- Mapmaker only makes tracks now. Where a track is used (Daily Challenge, a Campaign series, or Not used) moved to a new **Campaign Planner** page, linked from the Mapmaker header. It shows one list at a time: search on the left, Not used and Daily Challenge pinned at the top, then every series. Tracks show previews, **Move to…** sends a track anywhere, **Add track** fills a series, and laps and medal targets are edited in place. Changes save at once. A new track saves as Not used until you assign it there.
 
 - Drive Draft is the race view. The side panel is gone. Time, best lap and speed stay on the race HUD. The bar shows the next gate, wall contacts, Desktop, Mobile, Pause, Reset and Whole track.
 

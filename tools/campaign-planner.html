@@ -5,53 +5,68 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Campaign Planner</title>
     <link rel="stylesheet" href="mapmaker.css?v=2.30">
-    <link rel="stylesheet" href="campaign-planner.css?v=1.0">
+    <link rel="stylesheet" href="campaign-planner.css?v=2.0">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
         <a class="maker-link" href="mapmaker.html">&larr; Mapmaker</a>
         <h1>Campaign Planner</h1>
+        <p id="status-text" class="planner-status"></p>
     </header>
 
     <main class="maker-layout">
-        <aside class="maker-sidebar">
-            <details class="maker-panel" open>
-                <summary><h2>Track</h2></summary>
-                <select id="track-select" aria-label="Track"></select>
-                <label class="field">
-                    <span>Use for</span>
-                    <select id="track-destination-select"></select>
-                </label>
-                <div id="series-stage-fields" class="series-stage-fields" hidden>
-                    <p id="series-stage-label" class="panel-note"></p>
-                    <div class="button-row">
-                        <label class="field">
-                            <span>Laps</span>
-                            <select id="series-laps-select">
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                            </select>
-                        </label>
-                        <label class="field">
-                            <span>Medal Target</span>
-                            <input id="series-target-input" type="number" min="0" step="1">
-                        </label>
-                    </div>
-                </div>
-                <p id="series-stage-hint" class="field-hint" hidden></p>
-                <button id="save-use-btn" type="button" class="primary-btn" disabled>Save</button>
-            </details>
+        <aside class="maker-sidebar planner-sidebar">
+            <div class="planner-search">
+                <input id="list-search" type="search" placeholder="Find a campaign or track" aria-label="Find a campaign or track" autocomplete="off">
+            </div>
+            <nav id="list-nav" class="planner-nav" aria-label="Lists"></nav>
         </aside>
 
-        <section class="maker-stage">
-            <div class="stage-head">
-                <p id="status-text" class="stage-status">Choose a track, then where it is used.</p>
+        <section class="planner-main">
+            <div class="planner-main-head">
+                <div>
+                    <h2 id="list-title"></h2>
+                    <p id="list-meta" class="field-hint"></p>
+                </div>
+                <button id="add-track-btn" type="button" class="primary-btn" hidden>Add track</button>
             </div>
-            <div id="planner-overview" class="planner-overview"></div>
+            <div id="list-body" class="planner-main-body"></div>
         </section>
     </main>
 
-    <script type="module" src="campaign-planner.js?v=1.1"></script>
+    <dialog id="picker-dialog" class="maker-dialog planner-dialog" aria-labelledby="picker-title">
+        <form method="dialog">
+            <h2 id="picker-title"></h2>
+            <div id="picker-choose">
+                <input id="picker-search" type="search" placeholder="Search" aria-label="Search" autocomplete="off">
+                <div id="picker-list" class="planner-picker-list"></div>
+            </div>
+            <div id="picker-confirm" hidden>
+                <p id="picker-summary"></p>
+                <div id="picker-stage-fields" class="button-row">
+                    <label class="field">
+                        <span>Laps</span>
+                        <select id="picker-laps">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Medal Target</span>
+                        <input id="picker-target" type="number" min="0" step="1">
+                    </label>
+                </div>
+                <ul id="picker-notes" class="planner-notes"></ul>
+            </div>
+            <div class="maker-dialog-actions">
+                <button type="submit" value="cancel" class="ghost-btn">Cancel</button>
+                <button id="picker-back-btn" type="button" class="ghost-btn" hidden>Back</button>
+                <button id="picker-confirm-btn" type="button" class="primary-btn" hidden>Confirm</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script type="module" src="campaign-planner.js?v=2.0"></script>
 </body>
 </html>
