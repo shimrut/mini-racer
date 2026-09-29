@@ -67,15 +67,6 @@ import {
 
 const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
-const TOOL_LABELS = {
-    draw: 'line build',
-    outer: 'outer wall',
-    inner: 'inner wall',
-    startLine: 'finish line',
-    startPos: 'start position',
-    checkpoints: 'checkpoints'
-};
-
 const EDITOR_TOOLS = ['outer', 'inner', 'startLine', 'startPos', 'checkpoints'];
 
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
@@ -297,7 +288,6 @@ class MapmakerApp {
         this.trackSelect = document.getElementById('editor-track-select');
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
         this.stageTitle = document.getElementById('stage-title');
-        this.stageSubtitle = document.getElementById('stage-subtitle');
         this.canvasHint = document.getElementById('canvas-hint');
         this.trackKeyInput = document.getElementById('track-key-input');
         this.trackNameInput = document.getElementById('track-name-input');
@@ -319,9 +309,6 @@ class MapmakerApp {
         this.groundSelect = document.getElementById('ground-select');
         this.lineSmoothingInput = document.getElementById('line-smoothing-input');
         this.drawMetricsLabel = document.getElementById('draw-metrics-label');
-        this.selectedXInput = document.getElementById('selected-x-input');
-        this.selectedYInput = document.getElementById('selected-y-input');
-        this.selectionLabel = document.getElementById('selection-label');
         this.checkpointSelect = document.getElementById('checkpoint-select');
         this.checkpointCount = document.getElementById('checkpoint-count');
         this.checkpointPanel = document.getElementById('checkpoint-panel');
@@ -335,7 +322,6 @@ class MapmakerApp {
         this.removeTrackDialog = document.getElementById('remove-track-dialog');
         this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
         this.insertPointBtn = document.getElementById('insert-point-btn');
-        this.deletePointBtn = document.getElementById('delete-point-btn');
         this.reversePolygonBtn = document.getElementById('reverse-polygon-btn');
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.removeCheckpointBtn = document.getElementById('remove-checkpoint-btn');
@@ -932,42 +918,6 @@ class MapmakerApp {
             this.lineSmoothingInput.value = formatNumber(this.getLineSmoothing());
         });
 
-        const updateSelectedCoordinate = () => {
-            const gate = this.getSelectedLaneGateRef();
-            if (gate) {
-                return;
-            }
-            const handle = this.state.selectedHandle;
-            const nextX = Number(this.selectedXInput.value);
-            const nextY = Number(this.selectedYInput.value);
-            if (
-                handle?.kind === 'startPos'
-                && Number.isFinite(nextX)
-                && Number.isFinite(nextY)
-            ) {
-                this.snapStartPoseToLine({
-                    seedPoint: { x: nextX, y: nextY },
-                    status: 'Updated start car (snapped perpendicular to start line).',
-                });
-                return;
-            }
-            const point = this.getSelectedPointRef();
-            if (!point) {
-                return;
-            }
-            if (Number.isFinite(nextX)) {
-                point.x = nextX;
-            }
-            if (Number.isFinite(nextY)) {
-                point.y = nextY;
-            }
-            this.markDirty('Updated point coordinates.');
-            this.syncSelectedInputs();
-        };
-
-        this.selectedXInput.addEventListener('change', updateSelectedCoordinate);
-        this.selectedYInput.addEventListener('change', updateSelectedCoordinate);
-
         this.checkpointSelect.addEventListener('change', () => {
             this.state.checkpointIndex = Number(this.checkpointSelect.value) || 0;
             if (this.state.tool === 'checkpoints') {
@@ -976,7 +926,6 @@ class MapmakerApp {
                     checkpointIndex: this.state.checkpointIndex,
                 };
             }
-            this.syncSelectedInputs();
             this.updateStageText();
             this.draw();
         });
@@ -985,7 +934,6 @@ class MapmakerApp {
         this.duplicateTrackBtn.addEventListener('click', () => this.duplicateTrack());
         this.removeTrackBtn.addEventListener('click', () => this.removeTrack());
         this.insertPointBtn.addEventListener('click', () => this.insertPointAfterSelection());
-        this.deletePointBtn.addEventListener('click', () => this.deleteSelectedPoint());
         this.reversePolygonBtn.addEventListener('click', () => this.reverseActivePolygon());
         this.copyBackupBtn.addEventListener('click', () => this.copyBackup());
         this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
@@ -1071,14 +1019,12 @@ class MapmakerApp {
             this.state.checkpointIndex = this.state.selectedHandle.checkpointIndex;
             this.checkpointSelect.value = String(this.state.checkpointIndex);
         }
-        this.syncSelectedInputs();
         this.updateStageText();
         this.draw();
     }
 
     updateStageText() {
         this.stageTitle.textContent = this.track.name;
-        this.stageSubtitle.textContent = `Editing ${TOOL_LABELS[this.state.tool]}`;
         this.toolButtons.forEach((button) => {
             button.dataset.active = String(button.dataset.tool === this.state.tool);
         });
@@ -1422,7 +1368,6 @@ class MapmakerApp {
         }
         this.state.checkpointIndex = 0;
         this.refreshCheckpointSelect();
-        this.syncSelectedInputs();
         this.updateStageText();
         this.updateDrawMetricsLabel();
         this.syncDirtyBadge();
@@ -1730,7 +1675,6 @@ class MapmakerApp {
                 markDirty: false,
             });
         }
-        this.syncSelectedInputs();
         if (options.markDirty !== false) {
             const label = this.state.selectedHandle?.kind === 'checkpoint'
                 ? 'Snapped checkpoint across the lane.'
@@ -1755,7 +1699,6 @@ class MapmakerApp {
         this.track.startPos.y = snapped.startPos.y;
         this.track.startAngle = snapped.startAngle;
         this.reflowAutoCheckpoints();
-        this.syncSelectedInputs();
         if (options.markDirty !== false) {
             this.markDirty(
                 options.status ?? 'Snapped start car perpendicular to the start line.',
@@ -1786,37 +1729,6 @@ class MapmakerApp {
         if (!generated) return;
         this.track.checkpoints = generated.checkpoints;
         this.refreshCheckpointSelect();
-    }
-
-    syncSelectedInputs() {
-        const gate = this.getSelectedLaneGateRef();
-        const point = this.getSelectedPointRef();
-        const handle = this.state.selectedHandle;
-        const hasPoint = Boolean(point) && !gate;
-        this.selectedXInput.disabled = !hasPoint;
-        this.selectedYInput.disabled = !hasPoint;
-        if (hasPoint) {
-            this.selectedXInput.value = formatNumber(point.x);
-            this.selectedYInput.value = formatNumber(point.y);
-        } else {
-            this.selectedXInput.value = '';
-            this.selectedYInput.value = '';
-        }
-
-        if (!handle) {
-            this.selectionLabel.textContent = 'No point selected.';
-            return;
-        }
-
-        if (handle.kind === 'polygon') {
-            this.selectionLabel.textContent = `${handle.path} point ${handle.index + 1}`;
-        } else if (handle.kind === 'startLine') {
-            this.selectionLabel.textContent = 'start line (drag line to move)';
-        } else if (handle.kind === 'startPos') {
-            this.selectionLabel.textContent = 'start position';
-        } else if (handle.kind === 'checkpoint') {
-            this.selectionLabel.textContent = `checkpoint ${handle.checkpointIndex + 1} (drag line to move)`;
-        }
     }
 
     hasTrackGeometry() {
@@ -2403,7 +2315,6 @@ class MapmakerApp {
         }
 
         this.state.selectedHandle = null;
-        this.syncSelectedInputs();
         this.draw();
     }
 
@@ -2452,7 +2363,6 @@ class MapmakerApp {
             if (point) {
                 point.x = worldPoint.x;
                 point.y = worldPoint.y;
-                this.syncSelectedInputs();
                 this.markDirty('Moved point.', false);
                 this.draw();
             }
@@ -2635,7 +2545,6 @@ class MapmakerApp {
             }
             point.x = nextX;
             point.y = nextY;
-            this.syncSelectedInputs();
             this.markDirty('Nudged selected point.');
         }
     }
@@ -2667,7 +2576,6 @@ class MapmakerApp {
             path,
             index: bestIndex + 1
         };
-        this.syncSelectedInputs();
         this.markDirty(`Inserted ${path} point.`);
     }
 
@@ -2713,7 +2621,6 @@ class MapmakerApp {
             path: this.state.tool,
             index: handle.index + 1
         };
-        this.syncSelectedInputs();
         this.markDirty(`Inserted ${this.state.tool} point.`);
     }
 
@@ -2736,7 +2643,6 @@ class MapmakerApp {
             path: handle.path,
             index: Math.max(0, handle.index - 1)
         };
-        this.syncSelectedInputs();
         this.markDirty(`Deleted ${handle.path} point.`);
     }
 
@@ -2747,7 +2653,6 @@ class MapmakerApp {
         }
         this.track[this.state.tool].reverse();
         this.state.selectedHandle = { kind: 'polygon', path: this.state.tool, index: 0 };
-        this.syncSelectedInputs();
         this.markDirty(`Reversed ${this.state.tool} wall order.`);
     }
 
@@ -2798,7 +2703,6 @@ class MapmakerApp {
                 checkpointIndex: this.state.checkpointIndex,
             }
             : null;
-        this.syncSelectedInputs();
         this.markDirty('Removed checkpoint.');
     }
 

@@ -1,3 +1,5 @@
+- Mapmaker is simpler: the Status panel, Selected X/Y boxes, Delete Point button, and "Line Brush Size" note are gone. Status messages show under the track name, and the Saved/Unsaved badge and Copy backup sit in the header. Delete still removes the selected point.
+
 - Players no longer get the game's source maps, which held the full, readable game code. The build keeps them on the developer's computer in `dist/client-sourcemaps`.
 
 - **Warped Loop** joins the Daily rotation.
