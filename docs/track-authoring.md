@@ -36,10 +36,9 @@ easy to see.
 Mapmaker draws a ghost car at the finished start position using the real race
 collision size (`0.55u` wide × `1.23u` long).
 
-Brush size is fixed at **7 car-widths** (`3.85u`). That is the
-usual racing lane width for Line Build.
+The road is always **7 car-widths** (`3.85u`).
 
-Line Build keeps the full-width road **open** while placing points. The first
+**Draw** keeps the full-width road **open** while placing points. The first
 click lands where you click. After that, each new point lands a whole number
 of car lengths (`1.23u`) from the last point, in the direction of the pointer.
 A click closer than half a car length does not add a point. The preview ends
@@ -51,19 +50,19 @@ to a car length. The draft view has no length labels or centerline so the
 road footprint stays clear. The editor keeps the same camera scale and
 position after closing; **Reframe** fits the finished track whenever needed.
 
-Line Build fillets each sharp bend on the drawn centerline by half the lane
+Draw fillets each sharp bend on the drawn centerline by half the lane
 width, then offsets both walls by that same half-width. Bends tighter than
 half the lane are widened first so the inside wall cannot cross itself.
 That keeps the road the same width through corners. It does not rewrite
 the sketch: a square stays a square.
 
-Existing saved tracks are unchanged until you redraw them with Line Build.
+Existing saved tracks are unchanged until you redraw them with Draw.
 
 Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
 Changing Wall Corners updates the Mapmaker race preview immediately.
 
-Line Build places its start line and checkpoints against the final road after
+Draw places its start line and checkpoints against the final road after
 tight bends are widened and corners are filleted. It spaces three to five
 checkpoints by road length, in driving order. Start line and checkpoint edits
 snap across the lane, stay perpendicular to the nearer track wall, and extend
@@ -89,10 +88,12 @@ not save the track. Open `tools/runner.html` for the same check on a saved track
 
 ### Flow checks
 
-The Mapmaker sidebar has four collapsible sections: **Track** (pick, name, key,
-destination), **Shape** (corners, ground, smoothing, Insert Point, Reverse
-Wall), **Medal times** (closed by default) and **Checks**. Flow lists only the
-rules a track misses; the count in its badge shows how many pass.
+The Mapmaker sidebar has four collapsible sections: **Track** (pick, name,
+destination), **Shape** (corners, ground), **Medal times** (closed by default)
+and **Checks**. The canvas bar has **Draw** and **Edit**. In Edit, click an item
+to select it, drag to move it, Shift+click a wall to add a point, and Delete to
+remove the selected wall point. Flow lists only the rules a track misses; the
+count in its badge shows how many pass.
 
 The **Flow** part of Checks measures how the road drives. It uses the
 fastest smooth line through the lane and the car's real steering limits. It
@@ -111,7 +112,7 @@ where each missed rule breaks the flow. Flow results are hints. They never
 block export or **Save & Integrate**. The check runs only when the track has no
 structural errors.
 
-While you draw in Line Build, each straight longer than 14 units is marked with
+While Draw is open, each straight longer than 14 units is marked with
 its length. A straight of that length takes about 1 s at top speed. A bend
 counts only when the fast line must turn tighter than a 15-unit radius.
 
@@ -131,7 +132,7 @@ laps for each layout in the browser. A change to a wall, gate, start point,
 corner or ground starts a new list.
 
 **Undo** and **Redo** cover wall, gate, start, name, and corner edits; a pointer
-drag is one undo step. While Line Build is open, Undo removes the last sketch
+drag is one undo step. While Draw is open, Undo removes the last sketch
 point. The browser keeps unsaved maps and open sketches locally and offers to
 restore them after a reload. Returning from **Drive Draft** restores the map
 automatically in the same tab.
@@ -140,7 +141,7 @@ automatically in the same tab.
 
 1. Build and validate the layout in `tools/mapmaker.html`.
    The track key follows the display name: "Spade Kingdom" becomes `spadeKingdom`.
-   **New** and **Clone** ask for the name only. The key box can still be edited.
+   **New** and **Clone** ask for the name only. The key follows that name.
 2. Run `npm run mapmaker`, open
    `http://127.0.0.1:5173/tools/mapmaker.html`, and choose
    **Save & Integrate**. It writes the definition module and updates
@@ -311,8 +312,7 @@ Rules:
 
 The repository-writing endpoint exists only in the dedicated local Mapmaker
 Vite configuration and accepts requests only from localhost. It is not part of
-the Devvit playtest or production build. **Copy backup** copies the track file
-and the catalog lines. If the clipboard is unavailable, it downloads the file.
+the Devvit playtest or production build.
 
 ## Removing A Track
 

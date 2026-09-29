@@ -1,13 +1,8 @@
 import { CONFIG } from '../../game/config.js';
-import { clamp } from '../geometry.js';
 import { getStoredTrackGroundKey } from '../../game/track/grounds.js';
 
-const MIN_DRAW_WIDTH = 1.5;
-const MAX_DRAW_WIDTH = 20;
 export const LINE_BUILD_CAR_UNITS = 7;
 export const DEFAULT_DRAW_WIDTH = LINE_BUILD_CAR_UNITS * CONFIG.carRadius * 2;
-const MIN_LINE_SMOOTHING = 0;
-const MAX_LINE_SMOOTHING = 1;
 const TRACK_KEY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const RESERVED_TRACK_KEYS = new Set([
     'await',
@@ -122,22 +117,6 @@ export function generateTrackGeometrySource(track, indent = '') {
     if (track.cornerRadius !== undefined) {
         lines.push(`${indent}    cornerRadius: ${formatTrackNumber(track.cornerRadius)},`);
     }
-    if (track.drawWidth !== undefined) {
-        const drawWidth = clamp(
-            Number(track.drawWidth) || DEFAULT_DRAW_WIDTH,
-            MIN_DRAW_WIDTH,
-            MAX_DRAW_WIDTH
-        );
-        lines.push(`${indent}    drawWidth: ${formatTrackNumber(drawWidth)},`);
-    }
-    if (track.lineSmoothing !== undefined) {
-        const lineSmoothing = clamp(
-            Number(track.lineSmoothing) || 0,
-            MIN_LINE_SMOOTHING,
-            MAX_LINE_SMOOTHING
-        );
-        lines.push(`${indent}    lineSmoothing: ${formatTrackNumber(lineSmoothing)},`);
-    }
     const groundKey = getStoredTrackGroundKey(track);
     if (groundKey !== null) {
         lines.push(`${indent}    ground: '${groundKey}',`);
@@ -171,20 +150,5 @@ export function generateTrackModuleSource(track) {
         '',
         `export default ${generateTrackGeometrySource(track)};`,
         ''
-    ].join('\n');
-}
-
-export function generateTrackIntegrationSnippet(trackKey, trackName) {
-    const filename = getTrackModuleFilename(trackKey);
-    const importName = `${trackKey}Geometry`;
-    return [
-        '// TRACK_CATALOG metadata',
-        `${trackKey}: { name: ${JSON.stringify(trackName)} },`,
-        '',
-        '// tracks.js static import',
-        `import ${importName} from './definitions/${filename}';`,
-        '',
-        '// tracks.js geometry registry',
-        `${trackKey}: ${importName},`
     ].join('\n');
 }

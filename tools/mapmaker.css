@@ -432,40 +432,6 @@ summary:focus-visible {
     color: #fff;
 }
 
-.tool-icon-btn,
-.tool-swatch-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.7rem;
-}
-
-.tool-icon-btn svg {
-    width: 1rem;
-    height: 1rem;
-    flex: 0 0 auto;
-}
-
-.tool-icon-label {
-    font-size: 0.8rem;
-    white-space: nowrap;
-}
-
-.legend-swatch {
-    display: inline-block;
-    width: 0.7rem;
-    height: 0.7rem;
-    border-radius: 999px;
-}
-
-.legend-outer {
-    background: var(--maker-accent);
-}
-
-.legend-inner {
-    background: var(--maker-blue);
-}
-
 .canvas-shell {
     position: relative;
     flex: 1;

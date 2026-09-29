@@ -29,9 +29,6 @@ import { buildRibbonWallsFromCenterline } from './mapmaker/ribbon-walls.js';
 import {
     DEFAULT_DRAW_WIDTH,
     formatTrackNumber as formatNumber,
-    generateTrackIntegrationSnippet,
-    generateTrackModuleSource,
-    getTrackModuleFilename,
     isValidTrackKey,
     trackKeyFromName
 } from './mapmaker/track-source.js';
@@ -67,12 +64,7 @@ import {
 
 const SCHEDULED_TRACK_KEYS = new Set(TRACK_SCHEDULE_KEYS);
 
-const EDITOR_TOOLS = ['outer', 'inner', 'startLine', 'startPos', 'checkpoints'];
-
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
-const FIXED_DRAW_WIDTH = DEFAULT_DRAW_WIDTH;
-const MIN_LINE_SMOOTHING = 0;
-const MAX_LINE_SMOOTHING = 1;
 const DEFAULT_LINE_SMOOTHING = 0.35;
 const DEFAULT_CORNER_RADIUS = 3;
 const CORNER_RADIUS_PRESETS = [
@@ -129,8 +121,8 @@ function dedupeStrokePoints(points, minimumDistance) {
     return filtered;
 }
 
-function smoothLoopPoints(points, strength) {
-    const smoothing = clamp(strength, MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING);
+function smoothLoopPoints(points) {
+    const smoothing = DEFAULT_LINE_SMOOTHING;
     if (points.length < 3 || smoothing <= 0) {
         return points.map(clonePoint);
     }
@@ -147,8 +139,8 @@ function smoothLoopPoints(points, strength) {
     });
 }
 
-function smoothOpenPoints(points, strength) {
-    const smoothing = clamp(strength, MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING);
+function smoothOpenPoints(points) {
+    const smoothing = DEFAULT_LINE_SMOOTHING;
     if (points.length < 3 || smoothing <= 0) return points.map(clonePoint);
     const neighborWeight = smoothing * 0.2;
     const pointWeight = 1 - neighborWeight * 2;
@@ -208,13 +200,13 @@ function normalizeTrackLayout(layout, padding = 4) {
     return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
 }
 
-function buildRoadWallsFromLoop(rawPoints, trackWidth, lineSmoothing) {
+function buildRoadWallsFromLoop(rawPoints, trackWidth) {
     const filtered = dedupeStrokePoints(rawPoints, 0.35);
     if (filtered.length < 3) {
         return null;
     }
 
-    const centerline = smoothLoopPoints(filtered, lineSmoothing);
+    const centerline = smoothLoopPoints(filtered);
     const loopLength = closedLoopLength(centerline);
     if (loopLength < trackWidth * 5) {
         return null;
@@ -223,8 +215,8 @@ function buildRoadWallsFromLoop(rawPoints, trackWidth, lineSmoothing) {
     return buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
 }
 
-function buildTrackFromLoop(rawPoints, trackWidth, lineSmoothing, cornerRadius) {
-    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth, lineSmoothing);
+function buildTrackFromLoop(rawPoints, trackWidth, cornerRadius) {
+    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth);
     if (!walls) {
         return null;
     }
@@ -267,8 +259,6 @@ function createBlankTrack(name = 'New Track') {
     return {
         name,
         cornerRadius: DEFAULT_CORNER_RADIUS,
-        drawWidth: FIXED_DRAW_WIDTH,
-        lineSmoothing: DEFAULT_LINE_SMOOTHING,
         outer: [],
         inner: [],
         startLine: {
@@ -288,7 +278,6 @@ class MapmakerApp {
         this.trackSelect = document.getElementById('editor-track-select');
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
         this.canvasHint = document.getElementById('canvas-hint');
-        this.trackKeyInput = document.getElementById('track-key-input');
         this.trackNameInput = document.getElementById('track-name-input');
         this.trackDestinationSelect = document.getElementById('track-destination-select');
         this.seriesStageFields = document.getElementById('series-stage-fields');
@@ -306,24 +295,14 @@ class MapmakerApp {
         ]));
         this.cornerRadiusSelect = document.getElementById('corner-radius-select');
         this.groundSelect = document.getElementById('ground-select');
-        this.lineSmoothingInput = document.getElementById('line-smoothing-input');
-        this.drawMetricsLabel = document.getElementById('draw-metrics-label');
-        this.checkpointSelect = document.getElementById('checkpoint-select');
-        this.checkpointCount = document.getElementById('checkpoint-count');
-        this.checkpointPanel = document.getElementById('checkpoint-panel');
         this.statusText = document.getElementById('status-text');
         this.dirtyBadge = document.getElementById('dirty-badge');
         this.saveTrackBtn = document.getElementById('save-track-btn');
-        this.copyBackupBtn = document.getElementById('copy-backup-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.duplicateTrackBtn = document.getElementById('duplicate-track-btn');
         this.removeTrackBtn = document.getElementById('remove-track-btn');
         this.removeTrackDialog = document.getElementById('remove-track-dialog');
         this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
-        this.insertPointBtn = document.getElementById('insert-point-btn');
-        this.reversePolygonBtn = document.getElementById('reverse-polygon-btn');
-        this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
-        this.removeCheckpointBtn = document.getElementById('remove-checkpoint-btn');
         this.reframeBtn = document.getElementById('reframe-btn');
         this.undoEditBtn = document.getElementById('undo-edit-btn');
         this.redoEditBtn = document.getElementById('redo-edit-btn');
@@ -345,11 +324,10 @@ class MapmakerApp {
         this.state = {
             tracks: cloneTracks(TRACKS),
             selectedTrackKey: initialTrackKey,
-            tool: 'outer',
+            tool: 'edit',
             selectedHandle: null,
             hoverHandle: null,
             hoverSegment: null,
-            checkpointIndex: 0,
             drag: null,
             dirtyTrackKeys: new Set(),
             originalTrackKeyByKey: new Map(
@@ -694,17 +672,6 @@ class MapmakerApp {
         });
     }
 
-    getDrawWidth() {
-        this.track.drawWidth = FIXED_DRAW_WIDTH;
-        return FIXED_DRAW_WIDTH;
-    }
-
-    getLineSmoothing() {
-        return Number.isFinite(Number(this.track.lineSmoothing))
-            ? clamp(Number(this.track.lineSmoothing), MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING)
-            : DEFAULT_LINE_SMOOTHING;
-    }
-
     getCornerRadius() {
         return Number.isFinite(Number(this.track.cornerRadius))
             ? Math.max(0, Number(this.track.cornerRadius))
@@ -763,35 +730,12 @@ class MapmakerApp {
         this.markDirty(`Set ground to ${getTrackGround(this.track).label}.`);
     }
 
-    syncDrawWidthControls() {
-        this.track.drawWidth = FIXED_DRAW_WIDTH;
-        this.updateDrawMetricsLabel();
-    }
-
-    syncLineSmoothingControl() {
-        if (this.lineSmoothingInput) {
-            this.lineSmoothingInput.value = formatNumber(this.getLineSmoothing());
-        }
-    }
-
-    updateDrawMetricsLabel() {
-        if (this.drawMetricsLabel) {
-            const straights = this.getDraftStraights(this.state.draftLoop, false);
-            const longest = straights.reduce((best, run) => Math.max(best, run.length), 0);
-            const straightNote = straights.length
-                ? ` Longest straight ${Math.round(longest)}u (flow guide: ${FLOW_DRAW_GUIDE.maxStraight}u or less).`
-                : '';
-            this.drawMetricsLabel.textContent = `Road width ${formatNumber(this.getDrawWidth())}u.${straightNote}`;
-        }
-    }
-
     getDraftStraights(points, closed) {
         if (points.length < 2) return [];
-        const smoothing = this.getLineSmoothing();
         const path = closed
-            ? smoothLoopPoints(dedupeStrokePoints(points, 0.35), smoothing)
-            : smoothOpenPoints(points, smoothing);
-        return measureStraights(path, { closed, halfWidth: this.getDrawWidth() / 2 })
+            ? smoothLoopPoints(dedupeStrokePoints(points, 0.35))
+            : smoothOpenPoints(points);
+        return measureStraights(path, { closed, halfWidth: DEFAULT_DRAW_WIDTH / 2 })
             .map((run) => ({ ...run, path }));
     }
 
@@ -850,13 +794,6 @@ class MapmakerApp {
             this.markDirty('Updated track name.', derived);
         });
 
-        this.trackKeyInput.addEventListener('change', () => {
-            this.renameTrackKey(this.trackKeyInput.value.trim());
-        });
-        this.trackKeyInput.addEventListener('blur', () => {
-            this.trackKeyInput.value = this.state.selectedTrackKey;
-        });
-
         this.trackDestinationSelect.addEventListener('change', () => {
             const destination = this.getSelectedDestination();
             this.destinationByKey.set(this.state.selectedTrackKey, destination);
@@ -900,44 +837,9 @@ class MapmakerApp {
             this.setGround(this.groundSelect.value);
         });
 
-        this.lineSmoothingInput.addEventListener('input', () => {
-            const rawValue = this.lineSmoothingInput.value.trim();
-            if (!rawValue) {
-                return;
-            }
-            const value = Number(rawValue);
-            this.track.lineSmoothing = Number.isFinite(value)
-                ? clamp(value, MIN_LINE_SMOOTHING, MAX_LINE_SMOOTHING)
-                : DEFAULT_LINE_SMOOTHING;
-            this.lineSmoothingInput.value = formatNumber(this.getLineSmoothing());
-            this.updateDrawMetricsLabel();
-            this.updateCanvasHint();
-            this.markDirty('Updated line-build smoothing.', false);
-        });
-        this.lineSmoothingInput.addEventListener('blur', () => {
-            this.lineSmoothingInput.value = formatNumber(this.getLineSmoothing());
-        });
-
-        this.checkpointSelect.addEventListener('change', () => {
-            this.state.checkpointIndex = Number(this.checkpointSelect.value) || 0;
-            if (this.state.tool === 'checkpoints') {
-                this.state.selectedHandle = {
-                    kind: 'checkpoint',
-                    checkpointIndex: this.state.checkpointIndex,
-                };
-            }
-            this.updateStageText();
-            this.draw();
-        });
-
         this.newTrackBtn.addEventListener('click', () => this.createTrack());
         this.duplicateTrackBtn.addEventListener('click', () => this.duplicateTrack());
         this.removeTrackBtn.addEventListener('click', () => this.removeTrack());
-        this.insertPointBtn.addEventListener('click', () => this.insertPointAfterSelection());
-        this.reversePolygonBtn.addEventListener('click', () => this.reverseActivePolygon());
-        this.copyBackupBtn.addEventListener('click', () => this.copyBackup());
-        this.addCheckpointBtn.addEventListener('click', () => this.addCheckpoint());
-        this.removeCheckpointBtn.addEventListener('click', () => this.removeCheckpoint());
         this.reframeBtn.addEventListener('click', () => this.resetView());
         this.undoEditBtn.addEventListener('click', () => this.undoEdit());
         this.redoEditBtn.addEventListener('click', () => this.redoEdit());
@@ -997,27 +899,13 @@ class MapmakerApp {
     }
 
     setTool(tool, selectedHandle) {
-        this.state.tool = tool;
-        const hasExplicitSelection = arguments.length > 1;
-        if (tool === 'draw') {
+        this.state.tool = tool === 'draw' ? 'draw' : 'edit';
+        if (this.state.tool === 'draw') {
             this.state.selectedHandle = null;
-        } else if (hasExplicitSelection) {
+        } else if (arguments.length > 1) {
             this.state.selectedHandle = selectedHandle ? { ...selectedHandle } : null;
-        } else if (tool === 'checkpoints' && this.track.checkpoints.length > 0) {
-            this.state.selectedHandle = {
-                kind: 'checkpoint',
-                checkpointIndex: this.state.checkpointIndex,
-            };
-        } else if (tool === 'startLine') {
-            this.state.selectedHandle = { kind: 'startLine' };
-        } else if (tool === 'startPos') {
-            this.state.selectedHandle = { kind: 'startPos' };
-        } else {
-            this.state.selectedHandle = { kind: 'polygon', path: tool, index: 0 };
-        }
-        if (tool === 'checkpoints' && this.state.selectedHandle?.kind === 'checkpoint') {
-            this.state.checkpointIndex = this.state.selectedHandle.checkpointIndex;
-            this.checkpointSelect.value = String(this.state.checkpointIndex);
+        } else if (!this.state.selectedHandle && this.hasTrackGeometry()) {
+            this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
         }
         this.updateStageText();
         this.draw();
@@ -1027,7 +915,6 @@ class MapmakerApp {
         this.toolButtons.forEach((button) => {
             button.dataset.active = String(button.dataset.tool === this.state.tool);
         });
-        this.checkpointPanel.hidden = this.state.tool !== 'checkpoints';
         this.updateCanvasHint();
     }
 
@@ -1339,36 +1226,24 @@ class MapmakerApp {
         this.commitHistoryEdit();
         this.state.selectedTrackKey = trackKey;
         this.trackSelect.value = trackKey;
-        this.trackKeyInput.value = trackKey;
         this.trackNameInput.value = this.track.name;
         this.syncDestinationControl(trackKey);
         this.syncMedalTimesPanel();
         this.syncCornerRadiusControl();
         this.syncGroundControl();
-        this.syncLineSmoothingControl();
-        this.syncDrawWidthControls();
         this.state.draftLoop = cloneTracks(this.draftLoopsByKey.get(trackKey) ?? []);
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
         this.state.skipDrawClick = false;
         this.state.view.frozenBounds = null;
-        this.state.selectedHandle = { kind: 'polygon', path: this.state.tool === 'inner' ? 'inner' : 'outer', index: 0 };
         if (!this.hasTrackGeometry()) {
             this.state.tool = 'draw';
             this.state.selectedHandle = null;
-        } else if (this.state.tool === 'startLine') {
-            this.state.selectedHandle = { kind: 'startLine' };
-        } else if (this.state.tool === 'startPos') {
-            this.state.selectedHandle = { kind: 'startPos' };
-        } else if (this.state.tool === 'checkpoints') {
-            this.state.selectedHandle = this.track.checkpoints.length
-                ? { kind: 'checkpoint', checkpointIndex: 0 }
-                : null;
+        } else {
+            this.state.tool = 'edit';
+            this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
         }
-        this.state.checkpointIndex = 0;
-        this.refreshCheckpointSelect();
         this.updateStageText();
-        this.updateDrawMetricsLabel();
         this.syncDirtyBadge();
         this.syncHistoryButtons();
         this.draw();
@@ -1378,44 +1253,10 @@ class MapmakerApp {
         }
     }
 
-    refreshCheckpointSelect() {
-        this.checkpointSelect.innerHTML = '';
-        const checkpoints = this.track.checkpoints;
-        checkpoints.forEach((_, index) => {
-            const option = document.createElement('option');
-            option.value = String(index);
-            option.textContent = `Checkpoint ${index + 1}`;
-            this.checkpointSelect.appendChild(option);
-        });
-        this.checkpointCount.textContent = `${checkpoints.length} total`;
-        if (checkpoints.length === 0) {
-            const option = document.createElement('option');
-            option.value = '0';
-            option.textContent = 'No checkpoints';
-            this.checkpointSelect.appendChild(option);
-            this.checkpointSelect.disabled = true;
-        } else {
-            this.checkpointSelect.disabled = false;
-            this.state.checkpointIndex = Math.max(0, Math.min(this.state.checkpointIndex, checkpoints.length - 1));
-            this.checkpointSelect.value = String(this.state.checkpointIndex);
-        }
-    }
-
-    renameTrackKey(nextKey, options = {}) {
+    renameTrackKey(nextKey) {
         const currentKey = this.state.selectedTrackKey;
-        if (!nextKey || nextKey === currentKey) {
-            this.trackKeyInput.value = currentKey;
-            return;
-        }
-        if (!isValidTrackKey(nextKey)) {
-            this.trackKeyInput.value = currentKey;
-            this.setStatus('Track key must be a valid non-reserved JavaScript identifier.', true);
-            return;
-        }
-        if (this.state.tracks[nextKey]) {
-            this.trackKeyInput.value = currentKey;
-            this.setStatus('That track key already exists.', true);
-            return;
+        if (!nextKey || nextKey === currentKey || !isValidTrackKey(nextKey) || this.state.tracks[nextKey]) {
+            return false;
         }
 
         const entries = Object.entries(this.state.tracks);
@@ -1457,34 +1298,24 @@ class MapmakerApp {
         this.state.selectedTrackKey = nextKey;
         this.populateTrackSelect();
         this.trackSelect.value = nextKey;
-        this.trackKeyInput.value = nextKey;
-        if (options.silent) {
-            this.state.dirtyTrackKeys.add(nextKey);
-            return true;
-        }
-        this.markDirty(
-            `Renamed track key to ${nextKey}. Save & Integrate will replace the old definition and integration entries.`
-        );
+        this.state.dirtyTrackKeys.add(nextKey);
         return true;
     }
 
     applyDerivedTrackKey(name) {
         const nextKey = trackKeyFromName(name);
         if (!nextKey || nextKey === this.state.selectedTrackKey) {
-            this.trackKeyInput.value = this.state.selectedTrackKey;
             return true;
         }
         if (!isValidTrackKey(nextKey)) {
-            this.trackKeyInput.value = this.state.selectedTrackKey;
             this.setStatus('That name cannot be a track key.', true);
             return false;
         }
         if (this.state.tracks[nextKey]) {
-            this.trackKeyInput.value = this.state.selectedTrackKey;
             this.setStatus('That name is already used by another track.', true);
             return false;
         }
-        return this.renameTrackKey(nextKey, { silent: true });
+        return this.renameTrackKey(nextKey);
     }
 
     createTrack() {
@@ -1722,12 +1553,11 @@ class MapmakerApp {
             guide.centerline,
             this.track.outer,
             this.track.inner,
-            this.getDrawWidth(),
+            DEFAULT_DRAW_WIDTH,
             { startDistance: nearest.distance, direction, cornerRadius: this.getCornerRadius() },
         );
         if (!generated) return;
         this.track.checkpoints = generated.checkpoints;
-        this.refreshCheckpointSelect();
     }
 
     hasTrackGeometry() {
@@ -1754,18 +1584,19 @@ class MapmakerApp {
             return;
         }
         if (!this.hasTrackGeometry()) {
-            this.canvasHint.textContent = 'This track has no walls yet. Switch to Line Build and close the loop first.';
+            this.canvasHint.textContent = 'This track has no walls yet. Switch to Draw and close the loop first.';
             return;
         }
-        if (this.state.tool === 'startPos') {
+        const kind = this.state.selectedHandle?.kind;
+        if (kind === 'startPos') {
             this.canvasHint.textContent = 'Drag the start car. It stays centered on the start line and always faces perpendicular to it.';
             return;
         }
-        if (this.state.tool === 'startLine' || this.state.tool === 'checkpoints') {
+        if (kind === 'startLine' || kind === 'checkpoint') {
             this.canvasHint.textContent = 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
             return;
         }
-        this.canvasHint.textContent = 'Click the track to select, then drag to edit or use the sidebar for precise values.';
+        this.canvasHint.textContent = 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point.';
     }
 
     validateTrack(track) {
@@ -1921,57 +1752,28 @@ class MapmakerApp {
         this.draw();
     }
 
-    getToolForHandle(handle) {
-        if (!handle) {
-            return null;
-        }
-        if (handle.kind === 'polygon') {
-            return handle.path;
-        }
-        if (handle.kind === 'checkpoint') {
-            return 'checkpoints';
-        }
-        if (handle.kind === 'startLine') {
-            return 'startLine';
-        }
-        if (handle.kind === 'startPos') {
-            return 'startPos';
-        }
-        return null;
-    }
-
-    getHandlesForTool(tool) {
-        if (tool === 'outer' || tool === 'inner') {
-            return this.track[tool].map((point, index) => ({
-                kind: 'polygon',
-                path: tool,
-                index,
-                point
-            }));
-        }
+    getAllHandles() {
         if (!this.hasTrackGeometry()) {
             return [];
         }
-        if (tool === 'startLine') {
-            return [
-                { kind: 'startLine', endpoint: 'p1', point: this.track.startLine.p1 },
-                { kind: 'startLine', endpoint: 'p2', point: this.track.startLine.p2 },
-            ];
-        }
-        if (tool === 'startPos') {
-            return [{ kind: 'startPos', point: this.track.startPos }];
-        }
-        if (tool === 'checkpoints') {
-            return this.track.checkpoints.flatMap((checkpoint, checkpointIndex) => ([
+        const handles = ['outer', 'inner'].flatMap((path) => this.track[path].map((point, index) => ({
+            kind: 'polygon',
+            path,
+            index,
+            point,
+        })));
+        handles.push(
+            { kind: 'startLine', endpoint: 'p1', point: this.track.startLine.p1 },
+            { kind: 'startLine', endpoint: 'p2', point: this.track.startLine.p2 },
+            { kind: 'startPos', point: this.track.startPos },
+        );
+        this.track.checkpoints.forEach((checkpoint, checkpointIndex) => {
+            handles.push(
                 { kind: 'checkpoint', checkpointIndex, endpoint: 'p1', point: checkpoint.p1 },
                 { kind: 'checkpoint', checkpointIndex, endpoint: 'p2', point: checkpoint.p2 },
-            ]));
-        }
-        return [];
-    }
-
-    getAllHandles() {
-        return EDITOR_TOOLS.flatMap((tool) => this.getHandlesForTool(tool));
+            );
+        });
+        return handles;
     }
 
     getSelectableSegments() {
@@ -2045,9 +1847,7 @@ class MapmakerApp {
                 return;
             }
 
-            const selectionPriority = this.handleMatches(this.state.selectedHandle, handle) ? 2 : 0;
-            const toolPriority = this.getToolForHandle(handle) === this.state.tool ? 1 : 0;
-            const priority = selectionPriority + toolPriority;
+            const priority = this.handleMatches(this.state.selectedHandle, handle) ? 2 : 0;
 
             if (
                 !best
@@ -2083,14 +1883,10 @@ class MapmakerApp {
     }
 
     selectHandle(handle) {
-        const tool = this.getToolForHandle(handle);
-        if (!tool) {
+        if (!handle) {
             return;
         }
-        if (handle.kind === 'checkpoint') {
-            this.state.checkpointIndex = handle.checkpointIndex;
-        }
-        this.setTool(tool, handle);
+        this.setTool('edit', handle);
     }
 
     selectSegment(segment, canvasPoint, viewport) {
@@ -2144,7 +1940,6 @@ class MapmakerApp {
         this.state.draftCloseHover = false;
         this.syncHistoryButtons();
         this.scheduleDraftRecovery();
-        this.updateDrawMetricsLabel();
         this.updateCanvasHint();
         this.draw();
     }
@@ -2161,7 +1956,6 @@ class MapmakerApp {
         this.syncHistoryButtons();
         this.scheduleDraftRecovery();
         this.setStatus(this.state.draftLoop.length ? 'Removed last draft point.' : 'Cleared draft loop.');
-        this.updateDrawMetricsLabel();
         this.updateCanvasHint();
         this.draw();
     }
@@ -2173,16 +1967,13 @@ class MapmakerApp {
         this.syncHistoryButtons();
         this.scheduleDraftRecovery();
         this.setStatus('Cleared draft loop.');
-        this.updateDrawMetricsLabel();
         this.updateCanvasHint();
         this.draw();
     }
 
     commitDraftLoop(points) {
-        const width = this.getDrawWidth();
-        const lineSmoothing = this.getLineSmoothing();
         const cornerRadius = this.getCornerRadius();
-        const generated = buildTrackFromLoop(points, width, lineSmoothing, cornerRadius);
+        const generated = buildTrackFromLoop(points, DEFAULT_DRAW_WIDTH, cornerRadius);
         if (!generated) {
             this.setStatus('Draft loop is not usable yet. Add cleaner spacing and close it again.', true);
             this.draw();
@@ -2203,22 +1994,19 @@ class MapmakerApp {
         this.track.startAngle = generated.startAngle;
         this.track.checkpoints = generated.checkpoints;
         this.track.cornerRadius = generated.cornerRadius;
-        this.track.lineSmoothing = lineSmoothing;
+        delete this.track.lineSmoothing;
+        delete this.track.drawWidth;
         this.autoRoadGuideByKey.set(this.state.selectedTrackKey, {
             centerline: generated.centerline,
             wallSignature: JSON.stringify([generated.outer, generated.inner]),
             manualGates: false,
         });
         this.syncCornerRadiusControl();
-        this.syncLineSmoothingControl();
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
         this.draftLoopsByKey.delete(this.state.selectedTrackKey);
-        this.state.checkpointIndex = 0;
-        this.refreshCheckpointSelect();
-        this.updateDrawMetricsLabel();
-        this.setTool('outer', { kind: 'polygon', path: 'outer', index: 0 });
+        this.setTool('edit', { kind: 'polygon', path: 'outer', index: 0 });
         this.markDirty('Built walls from closed line loop.');
         return true;
     }
@@ -2296,16 +2084,16 @@ class MapmakerApp {
             return;
         }
 
-        if ((this.state.tool === 'outer' || this.state.tool === 'inner') && event.shiftKey) {
+        const selected = this.state.selectedHandle;
+        if (event.shiftKey && selected?.kind === 'polygon') {
             const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
             this.insertPointNear(worldPoint);
             return;
         }
 
-        if (this.state.tool === 'startPos') {
+        if (selected?.kind === 'startPos') {
             this.beginHistoryEdit();
             const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
-            this.state.selectedHandle = { kind: 'startPos' };
             this.snapStartPoseToLine({
                 seedPoint: worldPoint,
                 status: 'Moved start car (snapped perpendicular to start line).',
@@ -2549,8 +2337,10 @@ class MapmakerApp {
     }
 
     insertPointNear(worldPoint) {
-        const path = this.state.tool;
-        const polygon = this.track[path];
+        const path = this.state.selectedHandle?.kind === 'polygon'
+            ? this.state.selectedHandle.path
+            : null;
+        const polygon = path ? this.track[path] : null;
         if (!polygon || polygon.length < 2) {
             return;
         }
@@ -2595,34 +2385,6 @@ class MapmakerApp {
         this.markDirty(`Inserted ${path} point.`);
     }
 
-    insertPointAfterSelection() {
-        if (this.state.tool !== 'outer' && this.state.tool !== 'inner') {
-            this.setStatus('Point insertion is only available for wall polygons.', true);
-            return;
-        }
-
-        const handle = this.state.selectedHandle;
-        const polygon = this.track[this.state.tool];
-        if (!handle || handle.kind !== 'polygon') {
-            const center = this.getTrackBounds();
-            this.insertPointNear({
-                x: (center.minX + center.maxX) / 2,
-                y: (center.minY + center.maxY) / 2
-            });
-            return;
-        }
-
-        const current = polygon[handle.index];
-        const next = polygon[(handle.index + 1) % polygon.length];
-        polygon.splice(handle.index + 1, 0, midpoint(current, next));
-        this.state.selectedHandle = {
-            kind: 'polygon',
-            path: this.state.tool,
-            index: handle.index + 1
-        };
-        this.markDirty(`Inserted ${this.state.tool} point.`);
-    }
-
     deleteSelectedPoint() {
         const handle = this.state.selectedHandle;
         if (!handle || handle.kind !== 'polygon') {
@@ -2643,66 +2405,6 @@ class MapmakerApp {
             index: Math.max(0, handle.index - 1)
         };
         this.markDirty(`Deleted ${handle.path} point.`);
-    }
-
-    reverseActivePolygon() {
-        if (this.state.tool !== 'outer' && this.state.tool !== 'inner') {
-            this.setStatus('Reverse is only available for outer and inner walls.', true);
-            return;
-        }
-        this.track[this.state.tool].reverse();
-        this.state.selectedHandle = { kind: 'polygon', path: this.state.tool, index: 0 };
-        this.markDirty(`Reversed ${this.state.tool} wall order.`);
-    }
-
-    addCheckpoint() {
-        if (!this.hasTrackGeometry()) {
-            this.setStatus('Build outer and inner walls before adding a checkpoint.', true);
-            return;
-        }
-        const bounds = this.getTrackBounds();
-        const seed = {
-            x: (bounds.minX + bounds.maxX) / 2,
-            y: (bounds.minY + bounds.maxY) / 2,
-        };
-        const snapped = buildPerpendicularLaneGate(seed, this.track.outer, this.track.inner);
-        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
-        if (guide) guide.manualGates = true;
-        const checkpoint = snapped || {
-            p1: { x: seed.x - 2, y: seed.y },
-            p2: { x: seed.x + 2, y: seed.y },
-        };
-        this.track.checkpoints.push({
-            p1: { x: checkpoint.p1.x, y: checkpoint.p1.y },
-            p2: { x: checkpoint.p2.x, y: checkpoint.p2.y },
-        });
-        this.state.checkpointIndex = this.track.checkpoints.length - 1;
-        this.state.selectedHandle = {
-            kind: 'checkpoint',
-            checkpointIndex: this.state.checkpointIndex,
-        };
-        this.refreshCheckpointSelect();
-        this.setTool('checkpoints');
-        this.markDirty('Added checkpoint (snapped perpendicular to walls).');
-    }
-
-    removeCheckpoint() {
-        if (!this.track.checkpoints.length) {
-            this.setStatus('There are no checkpoints to remove.', true);
-            return;
-        }
-        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
-        if (guide) guide.manualGates = true;
-        this.track.checkpoints.splice(this.state.checkpointIndex, 1);
-        this.state.checkpointIndex = Math.max(0, this.state.checkpointIndex - 1);
-        this.refreshCheckpointSelect();
-        this.state.selectedHandle = this.track.checkpoints.length
-            ? {
-                kind: 'checkpoint',
-                checkpointIndex: this.state.checkpointIndex,
-            }
-            : null;
-        this.markDirty('Removed checkpoint.');
     }
 
     setStatus(message, isError = false) {
@@ -2899,8 +2601,7 @@ class MapmakerApp {
         const screen = this.worldToScreen(point, viewport);
         const isSelected = this.handleMatches(this.state.selectedHandle, handle);
         const isHovered = this.handleMatches(this.state.hoverHandle, handle);
-        const isActiveTool = this.getToolForHandle(handle) === this.state.tool;
-        const radius = isSelected ? 8 : isHovered ? 7 : isActiveTool ? 6 : 4.5;
+        const radius = isSelected ? 8 : isHovered ? 7 : 4.5;
         let fill = '#f8fafc';
         if (handle.kind === 'polygon') {
             fill = handle.path === 'outer' ? '#f43f5e' : '#38bdf8';
@@ -2913,7 +2614,7 @@ class MapmakerApp {
         }
 
         this.ctx.save();
-        this.ctx.globalAlpha = isSelected || isHovered || isActiveTool ? 1 : 0.45;
+        this.ctx.globalAlpha = isSelected || isHovered ? 1 : 0.45;
         this.ctx.beginPath();
         this.ctx.fillStyle = fill;
         this.ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.5)';
@@ -2953,10 +2654,10 @@ class MapmakerApp {
             this.ctx.lineJoin = 'round';
             this.ctx.lineCap = 'round';
             this.ctx.strokeStyle = '#fbbf24';
-            this.ctx.lineWidth = this.getDrawWidth() * viewport.scale + 4;
+            this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale + 4;
             this.ctx.stroke(openPath);
             this.ctx.strokeStyle = '#475569';
-            this.ctx.lineWidth = this.getDrawWidth() * viewport.scale;
+            this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale;
             this.ctx.stroke(openPath);
         }
         this.drawLongStraights(roadPreview ? points : previewPoints, Boolean(roadPreview), viewport);
@@ -2991,7 +2692,7 @@ class MapmakerApp {
     }
 
     buildOpenRoadPath(points, viewport) {
-        const smoothed = smoothOpenPoints(points, this.getLineSmoothing());
+        const smoothed = smoothOpenPoints(points);
         const path = new Path2D();
         const first = this.worldToScreen(smoothed[0], viewport);
         path.moveTo(first.x, first.y);
@@ -3005,7 +2706,7 @@ class MapmakerApp {
             const tanHalf = Math.tan(turn / 2);
             const maxTrim = Math.min(distance(prev, curr), distance(curr, next)) * 0.45;
             const radius = tanHalf > 1e-6
-                ? Math.min(this.getDrawWidth() / 2, maxTrim / tanHalf)
+                ? Math.min(DEFAULT_DRAW_WIDTH / 2, maxTrim / tanHalf)
                 : 0;
             const corner = this.worldToScreen(curr, viewport);
             if (!Number.isFinite(radius) || radius < 0.001) {
@@ -3023,17 +2724,15 @@ class MapmakerApp {
     }
 
     getDraftRoadPreview(points) {
-        const width = this.getDrawWidth();
-        const smoothing = this.getLineSmoothing();
+        const width = DEFAULT_DRAW_WIDTH;
         const cornerRadius = this.getCornerRadius();
         const cached = this.draftRoadPreview;
         const cacheMatches = cached?.points === points
             && cached.width === width
-            && cached.smoothing === smoothing
             && cached.cornerRadius === cornerRadius;
         let generated = cached?.generated;
         if (!cacheMatches) {
-            const walls = buildRoadWallsFromLoop(points, width, smoothing);
+            const walls = buildRoadWallsFromLoop(points, width);
             generated = walls ? buildTrackGeometry({
                 outer: walls.outer,
                 inner: walls.inner,
@@ -3041,7 +2740,7 @@ class MapmakerApp {
             }) : null;
         }
         this.draftRoadPreview = {
-            points, width, smoothing, cornerRadius, generated,
+            points, width, cornerRadius, generated,
         };
         return generated;
     }
@@ -3097,10 +2796,13 @@ class MapmakerApp {
         this.ctx.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'bottom';
+        const selectedCheckpoint = this.state.selectedHandle?.kind === 'checkpoint'
+            ? this.state.selectedHandle.checkpointIndex
+            : -1;
         this.track.checkpoints.forEach((checkpoint, index) => {
             const center = midpoint(checkpoint.p1, checkpoint.p2);
             const screen = this.worldToScreen(center, viewport);
-            this.ctx.fillStyle = index === this.state.checkpointIndex && this.state.tool === 'checkpoints'
+            this.ctx.fillStyle = index === selectedCheckpoint
                 ? '#dcfce7'
                 : '#86efac';
             this.ctx.fillText(`CP ${index + 1}`, screen.x, screen.y - 8);
@@ -3142,8 +2844,11 @@ class MapmakerApp {
             );
             this.drawStartPosition(viewport);
 
+            const selectedCheckpoint = this.state.selectedHandle?.kind === 'checkpoint'
+                ? this.state.selectedHandle.checkpointIndex
+                : -1;
             this.track.checkpoints.forEach((checkpoint, index) => {
-                const active = this.state.tool === 'checkpoints' && index === this.state.checkpointIndex;
+                const active = index === selectedCheckpoint;
                 this.drawLineSegment(
                     checkpoint.p1,
                     checkpoint.p2,
@@ -3161,45 +2866,13 @@ class MapmakerApp {
         this.drawDraftLoop(viewport);
 
         const handles = this.getAllHandles().sort((a, b) => {
-            const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 4
-                + Number(this.handleMatches(this.state.hoverHandle, a)) * 2
-                + Number(this.getToolForHandle(a) === this.state.tool);
-            const bPriority = Number(this.handleMatches(this.state.selectedHandle, b)) * 4
-                + Number(this.handleMatches(this.state.hoverHandle, b)) * 2
-                + Number(this.getToolForHandle(b) === this.state.tool);
+            const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 2
+                + Number(this.handleMatches(this.state.hoverHandle, a));
+            const bPriority = Number(this.handleMatches(this.state.selectedHandle, b)) * 2
+                + Number(this.handleMatches(this.state.hoverHandle, b));
             return aPriority - bPriority;
         });
         handles.forEach((handle) => this.drawHandle(handle, viewport));
-    }
-
-    async copyBackup() {
-        const invalidTrack = this.validateTrack(this.track);
-        if (invalidTrack) {
-            this.setStatus(`Finish ${this.track.name} before copying a backup: ${invalidTrack}.`, true);
-            return;
-        }
-
-        const filename = getTrackModuleFilename(this.state.selectedTrackKey);
-        const moduleSource = generateTrackModuleSource(this.track);
-        const text = `${moduleSource}\n${generateTrackIntegrationSnippet(this.state.selectedTrackKey, this.track.name)}`;
-        try {
-            if (navigator.clipboard?.writeText) {
-                await navigator.clipboard.writeText(text);
-                this.setStatus(`Copied ${filename} and the catalog lines.`);
-                return;
-            }
-        } catch (error) {
-            console.error(error);
-        }
-
-        const blob = new Blob([moduleSource], { type: 'text/javascript;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        this.setStatus(`Downloaded ${filename}.`);
     }
 
     renderBotReport() {
@@ -3418,7 +3091,7 @@ class MapmakerApp {
         } catch (error) {
             console.error(error);
             this.setStatus(
-                `${error.message} Run Mapmaker through the local Vite server, or use Copy backup.`,
+                `${error.message} Run Mapmaker through the local Vite server.`,
                 true,
             );
         } finally {

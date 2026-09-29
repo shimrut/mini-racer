@@ -11,8 +11,6 @@ const gate = (x) => ({ p1: point(x, 0), p2: point(x, 4) });
 const track = () => ({
     name: 'Draft Circuit',
     cornerRadius: 3,
-    drawWidth: 3.85,
-    lineSmoothing: 0.35,
     outer: [point(0, 0), point(10, 0), point(10, 10)],
     inner: [point(2, 2), point(8, 2), point(8, 8)],
     startLine: gate(1),

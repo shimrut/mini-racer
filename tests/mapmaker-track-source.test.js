@@ -4,7 +4,6 @@ import {
     DEFAULT_DRAW_WIDTH,
     LINE_BUILD_CAR_UNITS,
     formatTrackNumber,
-    generateTrackIntegrationSnippet,
     generateTrackModuleSource,
     getTrackModuleFilename,
     isValidTrackKey,
@@ -14,8 +13,6 @@ import {
 const TRACK = {
     name: 'Test Circuit',
     cornerRadius: 3.1254,
-    drawWidth: 5,
-    lineSmoothing: 0.35,
     outer: [
         { x: 1, y: 2 },
         { x: 10.25, y: 2 },
@@ -84,26 +81,20 @@ describe('Mapmaker track source serializer', () => {
         expect(source).not.toContain('TRACK_KEY');
     });
 
-    it('falls back to the 7-car Line Build width when drawWidth is invalid', () => {
-        const source = generateTrackModuleSource({
+    it('never writes draw width or line smoothing', () => {
+        const withLegacyFields = generateTrackModuleSource({
             ...TRACK,
-            drawWidth: 0
+            drawWidth: 5,
+            lineSmoothing: 0.35,
         });
-
-        expect(source).toContain('drawWidth: 3.85,');
-    });
-
-    it('omits optional drawing properties when a new track does not define them', () => {
-        const source = generateTrackModuleSource({
+        const withoutCorner = generateTrackModuleSource({
             ...TRACK,
             cornerRadius: undefined,
-            drawWidth: undefined,
-            lineSmoothing: undefined
         });
 
-        expect(source).not.toContain('cornerRadius:');
-        expect(source).not.toContain('drawWidth:');
-        expect(source).not.toContain('lineSmoothing:');
+        expect(withLegacyFields).not.toContain('drawWidth:');
+        expect(withLegacyFields).not.toContain('lineSmoothing:');
+        expect(withoutCorner).not.toContain('cornerRadius:');
     });
 
     it('writes a non-tarmac ground and omits tarmac', () => {
@@ -113,22 +104,5 @@ describe('Mapmaker track source serializer', () => {
         expect(generateTrackModuleSource(TRACK)).not.toContain('ground:');
         expect(generateTrackModuleSource({ ...TRACK, ground: 'tarmac' })).not.toContain('ground:');
         expect(generateTrackModuleSource({ ...TRACK, ground: "x', evil: '" })).not.toContain('ground:');
-    });
-
-    it('emits the three integration lines needed by catalog and tracks registry', () => {
-        const snippet = generateTrackIntegrationSnippet('sunlitTemple', 'Sunlit Temple');
-
-        expect(snippet).toContain('sunlitTemple: { name: "Sunlit Temple" },');
-        expect(snippet).toContain("import sunlitTempleGeometry from './definitions/sunlit-temple.js';");
-        expect(snippet).toContain('sunlitTemple: sunlitTempleGeometry,');
-    });
-
-    it('uses the renamed key consistently in filenames and integration snippets', () => {
-        const snippet = generateTrackIntegrationSnippet('newHarborRun', 'New Harbor Run');
-
-        expect(getTrackModuleFilename('newHarborRun')).toBe('new-harbor-run.js');
-        expect(snippet).toContain('newHarborRun: { name: "New Harbor Run" },');
-        expect(snippet).toContain("import newHarborRunGeometry from './definitions/new-harbor-run.js';");
-        expect(snippet).toContain('newHarborRun: newHarborRunGeometry,');
     });
 });

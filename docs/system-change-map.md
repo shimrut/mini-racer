@@ -729,10 +729,7 @@ These are useful, but they are not on the critical player path:
   whether the track is for **Daily Challenge** (also updates
   `TRACK_SCHEDULE_KEYS`) or **Campaign only** (catalog/registry only). Start
   line and checkpoint edits snap perpendicular across outer/inner walls.
-  **Copy backup** copies the track file and the catalog lines when Save cannot
-  reach the local server, as described in `docs/track-authoring.md`. The track
-  key follows the display name (`Spade Kingdom` becomes `spadeKingdom`) and can
-  still be edited.
+  The track key follows the display name (`Spade Kingdom` becomes `spadeKingdom`).
 - `tools/runner.*`
   Bot checks for a track. The Mapmaker **Run bots** button uses the same check
   on the drawing on screen. Runner Lab still opens saved tracks at

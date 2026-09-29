@@ -105,7 +105,7 @@ function validTrack(track) {
         && Array.isArray(track.checkpoints)
         && track.checkpoints.length <= MAX_CHECKPOINTS
         && track.checkpoints.every(validGate)
-        && ['cornerRadius', 'drawWidth', 'lineSmoothing'].every(
+        && ['cornerRadius'].every(
             (key) => track[key] === undefined || Number.isFinite(track[key]),
         )
         && (track.ground === undefined || isTrackGroundKey(track.ground));

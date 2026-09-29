@@ -235,7 +235,7 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !intentionallyReviewedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(unchangedTrackRegistry)).toBe(
-            'a3c5cc6c6e84afd239e1eb05a325da97d9a6499ff0085b27d5e5b44a95f6a462',
+            '9a40e6ebe61cf1ad0814cb2ae8b05c1a61491386dfd0c6a27fd3a240f252701b',
         );
 
         const existingTrackRegistry = Object.fromEntries(
@@ -244,7 +244,7 @@ describe('track runtime integrity', () => {
                 .map((trackKey) => [trackKey, TRACKS[trackKey]]),
         );
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
-            '2835aa8e12848f18df32725370f93af486477be964617a0fb1f4ecb5fe63db16',
+            'd5f930078b4bd671d6d50aa8a61cc1c08c74d0acdc14ade07d1f6fcd581d0576',
         );
         // Mountain Peak, Shark Fin, Twisted Clover, Hook Loop, Crooked Arrow and
         // Winding Road were reshaped on purpose on 2026-09-25. The next three hashes
@@ -253,7 +253,8 @@ describe('track runtime integrity', () => {
         // Hook Loop, Shark Fin, Twin Wings and Winding Road were reshaped again later
         // on 2026-09-27, before they were ever a live Daily day. On 2026-09-29,
         // Broken Antler got simpler corners, and Winding Road got rounder corners
-        // and moved gates.
+        // and moved gates. The same day, every definition dropped the unused
+        // drawWidth and lineSmoothing fields, so these hashes all moved.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -261,16 +262,16 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            '368aca96ddb34f68ebbab9b5a42a5b41d6d5c4d5cfb2078fb7ca74cd925e1b77',
+            '9ec0d85ececf610060e786f1914ca01c46b280ea1430795b531727a6c82f95c7',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            '5684b44b47f153c9192b64e94c904e8a002617c2f4f244dd076b2757a00fa5c9',
+            '4c4654b67fc05b67be1ec7998ad78ff575efb0614bd6c89621c0377f75efdd31',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '4d3d87b95ec1d0eefb4e9c9b8a93b754295a50ebab26e64ea81dc4803017cc32',
+            '150d591f413bd0d7b010504d6b1c70d2f76068fd3c45104e0734d2b11b236bb8',
         );
     });
 

@@ -2,7 +2,6 @@ import { Point } from '../geometry.js';
 
 export default {
     cornerRadius: 1.8,
-    drawWidth: 5,
     outer: [
         Point(5, 18),
         Point(10, 10),
