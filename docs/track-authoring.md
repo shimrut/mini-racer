@@ -121,15 +121,13 @@ your slowest speed, your longest time without steering, your steering beat and
 your left-right changes. The numbers describe your own lap, so a wall hit
 shows as a slow point.
 
-**Drive Draft** looks like a lap in the game. **Desktop** fills the wide
-view with the desktop race camera. **Mobile** uses a tall phone screen and
-the phone race camera, so a layout can be tried in both without resizing the
-window. It uses the race camera (`game/race/race-camera.js`): the same zoom
-and look-ahead as the race. It draws the default car
-of the track's ground and the race HUD (time, best lap and speed bar).
-**Show whole track** still shows the full map. Drive Draft keeps your 10 best
-laps for each layout in the browser. A change to a wall, gate, start point,
-corner or ground starts a new list.
+**Drive Draft** is the race view. Time, best lap and speed are the race HUD.
+The bar shows the next gate and wall contacts, plus **Desktop**, **Mobile**,
+Pause, Reset and Whole track. **Desktop** fills the wide view with the desktop
+race camera. **Mobile** uses a tall phone screen and the phone race camera.
+Drive Draft keeps your
+10 best laps for each layout in the browser. A change to a wall, gate, start
+point, corner or ground starts a new list.
 
 **Undo** and **Redo** cover wall, gate, start, name, and corner edits; a pointer
 drag is one undo step. While Draw is open, Undo removes the last sketch

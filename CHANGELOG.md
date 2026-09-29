@@ -1,3 +1,5 @@
+- Drive Draft is the race view. The side panel is gone. Time, best lap and speed stay on the race HUD. The bar shows the next gate, wall contacts, Desktop, Mobile, Pause, Reset and Whole track.
+
 - Mapmaker keeps only the buttons that do a separate job. Draw and Edit replace the six tools. The key, line smoothing, Insert Point, Reverse Wall, Copy backup, and the checkpoint list are gone. Shift+click a wall to add a point. Saved tracks no longer store the unused road width and smoothing numbers.
 
 - Mapmaker got a calmer layout: a slim header, flat collapsible sidebar sections (Track, Shape, Medal times, Checks), and a canvas that fills the rest of the window. Flow lists only the rules a road misses. The track name is no longer repeated above the canvas.

@@ -8,90 +8,69 @@
     <link rel="stylesheet" href="../styles/foundation.css">
     <link rel="stylesheet" href="../styles/race-hud-and-medals.css">
     <link rel="stylesheet" href="../styles/race-controls-and-feedback.css">
-    <link rel="stylesheet" href="mapmaker-playtest.css">
+    <link rel="stylesheet" href="mapmaker-playtest.css?v=6">
 </head>
-<body>
+<body class="drive-body">
     <header class="drive-header">
-        <div>
-            <p class="eyebrow">Mapmaker · unsaved draft</p>
-            <h1 id="track-title">Draft Drive</h1>
-        </div>
-        <a class="button quiet" href="mapmaker.html">← Back to Mapmaker</a>
-    </header>
-
-    <main class="drive-layout">
-        <div class="stage-slot">
-        <section class="stage" data-frame="desktop" aria-label="Draft track drive">
-            <canvas id="drive-canvas" aria-label="Draft track and car"></canvas>
-            <!-- The race HUD, as in pages/game.html. -->
-            <div class="hud-bar">
-                <div class="hud-left-cluster"></div>
-                <div class="hud-right-cluster">
-                    <div class="hud-lap-cluster">
-                        <button id="hud-stats-btn" class="hud-stats" type="button" aria-label="Race time" disabled>
-                            <div class="hud-stat">
-                                <span id="hud-timer-pause-icon" class="hud-pause-icon" hidden></span>
-                                <span id="time-val" class="hud-value">0.000</span>
-                            </div>
-                            <div class="hud-stat" id="best-time-display" style="display: none;">
-                                <span id="best-time-val" class="hud-value">--</span>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="mobile-hud-bar">
-                <div id="speedometer" class="speedometer" aria-live="off" aria-label="Current speed">
-                    <div class="speedometer-content">
-                        <div id="speed-bar" class="speedometer-bar"></div>
-                        <div class="speedometer-text">
-                            <span id="speed-val" class="speedometer-value">0</span>
-                            <span class="speedometer-label">KPH</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="stage-note" id="stage-note" role="status">Loading draft…</div>
-        </section>
-        </div>
-
-        <aside class="drive-panel">
-            <div class="panel-heading">
-                <span class="eyebrow">Live drive</span>
-                <strong id="drive-state">Ready</strong>
-            </div>
-            <div class="metric"><span>Time</span><strong id="time-value">0.00 s</strong></div>
-            <div class="metric"><span>Next gate</span><strong id="gate-value">—</strong></div>
-            <div class="metric"><span>Speed</span><strong id="speed-value">0 km/h</strong></div>
-            <div class="metric"><span>Wall contacts</span><strong id="contact-value">0</strong></div>
-            <div class="metric"><span>Lap</span><strong id="lap-value">Not finished</strong></div>
-            <div class="metric"><span>Best laps saved</span><strong id="saved-laps-value">0 / 10</strong></div>
-            <section class="flow-drive" id="flow-drive" aria-labelledby="flow-drive-title" hidden>
-                <p class="eyebrow" id="flow-drive-title">Flow on this lap</p>
-                <div class="metric"><span>Slowest speed</span><strong id="flow-slowest">—</strong></div>
-                <div class="metric"><span>Longest without steering</span><strong id="flow-gap">—</strong></div>
-                <div class="metric"><span>Steering beat</span><strong id="flow-beat">—</strong></div>
-                <div class="metric"><span>Left-right changes</span><strong id="flow-switch">—</strong></div>
-            </section>
-            <p class="drive-feedback" id="drive-feedback">Steer through the checkpoints, then cross the finish line.</p>
+        <a class="drive-back" href="mapmaker.html">&larr; Mapmaker</a>
+        <h1 id="track-title">Draft</h1>
+        <p id="drive-feedback" class="drive-status">Loading draft…</p>
+        <div class="drive-actions">
             <div class="frame-toggle" role="group" aria-label="Race screen">
                 <button id="frame-desktop" type="button" aria-pressed="true">Desktop</button>
                 <button id="frame-mobile" type="button" aria-pressed="false">Mobile</button>
             </div>
-            <div class="controls">
-                <button id="pause-button" type="button">Pause</button>
-                <button id="reset-button" type="button">Reset run</button>
-                <button id="view-button" type="button">Show whole track</button>
-            </div>
-            <div class="steer-buttons" aria-label="Steering controls">
-                <button id="steer-left" type="button" aria-label="Steer left">←</button>
-                <button id="steer-right" type="button" aria-label="Steer right">→</button>
-            </div>
-            <p class="help">Desktop is the wide race. Mobile is the tall phone race. Steer: ← / → or A / D. The car accelerates automatically, as in the race. Space pauses, R resets, M changes view.</p>
-            <p class="help">This drive uses the current browser draft. It does not save or integrate a track.</p>
-            <p class="help">Drive Draft keeps your 10 best laps on this layout. In Mapmaker, Medal Times lets you pick one of them, or their average, as the author time. A change to the layout starts a new list.</p>
-        </aside>
+            <button id="pause-button" type="button">Pause</button>
+            <button id="reset-button" type="button">Reset</button>
+            <button id="view-button" type="button">Whole track</button>
+        </div>
+    </header>
+
+    <main class="drive-stage">
+        <div class="stage-slot">
+            <section class="stage" data-frame="desktop" aria-label="Draft track drive">
+                <canvas id="drive-canvas" aria-label="Draft track and car"></canvas>
+                <div class="hud-bar">
+                    <div class="hud-left-cluster"></div>
+                    <div class="hud-right-cluster">
+                        <div class="hud-lap-cluster">
+                            <button id="hud-stats-btn" class="hud-stats" type="button" aria-label="Race time" disabled>
+                                <div class="hud-stat">
+                                    <span id="hud-timer-pause-icon" class="hud-pause-icon" hidden></span>
+                                    <span id="time-val" class="hud-value">0.000</span>
+                                </div>
+                                <div class="hud-stat" id="best-time-display" style="display: none;">
+                                    <span id="best-time-val" class="hud-value">--</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mobile-hud-bar">
+                    <div id="speedometer" class="speedometer" aria-live="off" aria-label="Current speed">
+                        <div class="speedometer-content">
+                            <div id="speed-bar" class="speedometer-bar"></div>
+                            <div class="speedometer-text">
+                                <span id="speed-val" class="speedometer-value">0</span>
+                                <span class="speedometer-label">KPH</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p id="stage-note" class="stage-note" role="status" hidden></p>
+                <section id="flow-drive" class="flow-strip" aria-label="Flow on this lap" hidden>
+                    <span id="flow-slowest"></span>
+                    <span id="flow-gap"></span>
+                    <span id="flow-beat"></span>
+                    <span id="flow-switch"></span>
+                </section>
+                <div class="steer-buttons" aria-label="Steering controls">
+                    <button id="steer-left" type="button" aria-label="Steer left">←</button>
+                    <button id="steer-right" type="button" aria-label="Steer right">→</button>
+                </div>
+            </section>
+        </div>
     </main>
-    <script type="module" src="mapmaker-playtest.js"></script>
+    <script type="module" src="mapmaker-playtest.js?v=3"></script>
 </body>
 </html>

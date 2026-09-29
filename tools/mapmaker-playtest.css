@@ -1,59 +1,199 @@
-@import url('../styles/fonts.css');
-
 :root {
-    color-scheme: dark;
-    font-family: "Segoe UI", system-ui, sans-serif;
-    color: #e2e8f0;
-    background: #060c1a;
+    --drive-bg: #0b1020;
+    --drive-panel: #111827;
+    --drive-border: rgba(148, 163, 184, 0.16);
+    --drive-text: #e2e8f0;
+    --drive-muted: #94a3b8;
+    --drive-accent: #f43f5e;
+    --drive-blue: #38bdf8;
 }
 
 * { box-sizing: border-box; }
-/* foundation.css locks the game page. Keep that lock so the drive stays on screen. */
+
 html, body { height: 100%; max-height: 100vh; max-height: 100dvh; }
-body { display: flex; flex-direction: column; margin: 0; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; user-select: auto; -webkit-user-select: auto; background: #060c1a; color: #e2e8f0; font-family: "Segoe UI", system-ui, sans-serif; }
-button, a.button { font: inherit; }
-.drive-header { display: flex; flex: none; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.2rem 1.6rem; border-bottom: 1px solid #26344d; background: #0b1425; }
-.eyebrow { margin: 0 0 .35rem; color: #38bdf8; font-size: .72rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
-h1 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); letter-spacing: -.04em; }
-.button, button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #34465f; border-radius: 999px; padding: .65rem .95rem; background: #1e3047; color: #f8fafc; text-decoration: none; font-weight: 700; cursor: pointer; }
-.button:hover, button:hover { border-color: #38bdf8; }
-.button:disabled, button:disabled { opacity: .5; cursor: default; }
-.button:focus-visible, button:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
-.quiet { background: #101d30; }
-.drive-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 1rem; flex: 1 1 auto; min-height: 0; padding: 1rem; max-width: 1680px; width: 100%; margin: 0 auto; overflow: hidden; }
-.stage-slot { container-type: size; display: grid; place-items: center; min-width: 0; min-height: 0; height: 100%; }
-.stage { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; border: 1px solid #34465f; border-radius: 18px; background: #0f172a; }
-/* A phone screen: 9 by 19.5, the shape the mobile race camera is built for. */
-.stage[data-frame="portrait"] { width: min(100cqw, calc(100cqh * 9 / 19.5)); height: min(100cqh, calc(100cqw * 19.5 / 9)); }
+
+body.drive-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--drive-bg);
+    color: var(--drive-text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 0.9rem;
+    user-select: auto;
+    -webkit-user-select: auto;
+}
+
+.drive-header {
+    flex: 0 0 3.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--drive-border);
+    background: var(--drive-panel);
+}
+
+.drive-header h1 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.drive-back {
+    color: var(--drive-muted);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.drive-back:hover { color: var(--drive-text); }
+
+.drive-status {
+    margin: 0;
+    min-width: 0;
+    color: var(--drive-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.drive-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.drive-header button {
+    border: 1px solid var(--drive-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--drive-text);
+    padding: 0.4rem 0.7rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.drive-header button:hover:not(:disabled) { border-color: rgba(148, 163, 184, 0.45); }
+.drive-header button:disabled { opacity: 0.4; cursor: not-allowed; }
+.drive-header button:focus-visible,
+.steer-buttons button:focus-visible,
+.drive-back:focus-visible { outline: 2px solid var(--drive-blue); outline-offset: 1px; }
+
+.frame-toggle { display: flex; gap: 0.35rem; }
+.frame-toggle button[aria-pressed="true"] {
+    background: var(--drive-accent);
+    border-color: transparent;
+    color: #fff;
+}
+
+.drive-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+
+.stage-slot {
+    container-type: size;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    place-items: center;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: #020617;
+}
+
+.stage[data-frame="portrait"] {
+    width: min(100cqw, calc(100cqh * 9 / 19.5));
+    height: min(100cqh, calc(100cqw * 19.5 / 9));
+    border-inline: 1px solid var(--drive-border);
+}
+
 #drive-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-.stage-note { position: absolute; inset: auto 1rem 1rem; width: fit-content; max-width: calc(100% - 2rem); padding: .55rem .8rem; border-radius: .6rem; background: #07101fdd; color: #e2e8f0; font-size: .85rem; }
-.stage-note[hidden] { display: none; }
-/* The race HUD sits on the drive view, as it sits on the race view in the game. */
+
 .stage .hud-bar { position: absolute; top: 12px; }
 .stage[data-frame="desktop"] .hud-bar { left: 50%; right: auto; width: min(560px, calc(100% - 2rem)); transform: translateX(-50%); }
 .stage[data-frame="portrait"] .hud-bar { left: .5rem; right: .5rem; width: auto; transform: none; gap: .35rem; }
 .stage .mobile-hud-bar { position: absolute; }
 .stage[data-frame="desktop"] .mobile-hud-bar { width: min(560px, calc(100% - 2rem)); }
 .stage[data-frame="portrait"] .mobile-hud-bar { left: 0; right: 0; width: auto; margin-inline: 0; padding-inline: .75rem; justify-content: space-between; }
-.drive-panel { align-self: stretch; min-height: 0; overflow: auto; padding: 1rem; border: 1px solid #34465f; border-radius: 18px; background: #101b2e; }
-.panel-heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; }
-.panel-heading strong { color: #fbbf24; }
-.metric { display: flex; justify-content: space-between; gap: .8rem; padding: .72rem 0; border-top: 1px solid #26344d; }
-.metric span { color: #94a3b8; }
-.metric strong { text-align: right; }
-.flow-drive { margin: .9rem 0 .4rem; }
-.flow-drive[hidden] { display: none; }
-.flow-drive .metric strong[data-flow="miss"] { color: #38bdf8; }
-.drive-feedback { min-height: 3.2em; padding: .8rem; border-radius: .6rem; background: #17283d; line-height: 1.5; }
-.frame-toggle { display: flex; gap: .45rem; margin-bottom: .7rem; }
-.frame-toggle button { flex: 1; }
-.frame-toggle button[aria-pressed="true"] { border-color: #38bdf8; background: #143044; }
-.controls { display: flex; flex-wrap: wrap; gap: .45rem; }
-.steer-buttons { display: flex; gap: .6rem; margin-top: 1rem; }
-.steer-buttons button { flex: 1; min-height: 3.2rem; font-size: 1.35rem; touch-action: none; }
-.help { color: #a9bad1; font-size: .83rem; line-height: 1.5; }
 
-@media (max-width: 850px) {
-    .drive-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 42%); }
-    .drive-header { padding: .85rem 1rem; }
+.stage-note {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 4.5rem;
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.72);
+    color: var(--drive-text);
+}
+
+.stage-note[hidden] { display: none; }
+
+.flow-strip {
+    position: absolute;
+    top: 4.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.75rem;
+    max-width: calc(100% - 1.5rem);
+    padding: 0.35rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(2, 6, 23, 0.72);
+    color: var(--drive-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.flow-strip[hidden] { display: none; }
+.flow-strip [data-flow="miss"] { color: var(--drive-blue); }
+
+.steer-buttons {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.steer-buttons button {
+    width: 3.2rem;
+    height: 3.2rem;
+    border: 1px solid var(--drive-border);
+    border-radius: 8px;
+    background: rgba(17, 24, 39, 0.8);
+    color: var(--drive-text);
+    font: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.steer-buttons button:hover { border-color: rgba(148, 163, 184, 0.45); }
+
+.stage[data-frame="portrait"] .steer-buttons { bottom: 5rem; }
+
+@media (max-width: 800px) {
+    .drive-header { flex-wrap: wrap; height: auto; padding: 0.5rem 1rem; }
+    .drive-actions { margin-left: 0; flex-wrap: wrap; }
 }

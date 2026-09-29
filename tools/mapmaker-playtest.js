@@ -22,9 +22,8 @@ import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 import { isFinitePoint } from './geometry.js';
-import { FLOW_LIMITS, summarizeDriveFlow } from './mapmaker/track-flow.js';
+import { summarizeDriveFlow } from './mapmaker/track-flow.js';
 import {
-    DRAFT_LAP_LIMIT,
     draftLapsStorageKey,
     readDraftLaps,
     recordDraftLap,
@@ -36,13 +35,6 @@ const canvas = document.getElementById('drive-canvas');
 const context = canvas.getContext('2d', { alpha: false });
 const ui = {
     title: document.getElementById('track-title'),
-    state: document.getElementById('drive-state'),
-    time: document.getElementById('time-value'),
-    gate: document.getElementById('gate-value'),
-    speed: document.getElementById('speed-value'),
-    contacts: document.getElementById('contact-value'),
-    lap: document.getElementById('lap-value'),
-    savedLaps: document.getElementById('saved-laps-value'),
     feedback: document.getElementById('drive-feedback'),
     note: document.getElementById('stage-note'),
     pause: document.getElementById('pause-button'),
@@ -157,7 +149,6 @@ function getStorage() {
 }
 
 function syncBestLap() {
-    ui.savedLaps.textContent = `${draftLaps.length} / ${DRAFT_LAP_LIMIT}`;
     hud?.setHudBestMetric(draftLaps.length
         ? { value: draftLaps[0].toFixed(3), visible: true }
         : { visible: false });
@@ -193,7 +184,7 @@ function resetRun() {
     lapTime = null;
     flowSamples = [];
     flowSummary = null;
-    feedback = 'Steer through the checkpoints, then cross the finish line.';
+    feedback = '';
     ui.pause.textContent = 'Pause';
     render();
 }
@@ -207,7 +198,7 @@ function togglePause() {
 
 function toggleView() {
     overview = !overview;
-    ui.view.textContent = overview ? 'Follow car' : 'Show whole track';
+    ui.view.textContent = overview ? 'Follow car' : 'Whole track';
     render();
 }
 
@@ -465,15 +456,13 @@ function render(dt = 0) {
     // After the finish, the HUD keeps the lap time, as in the race.
     if (state.status === 'playing') hud?.syncHud({ time: state.currentTime, speed: state.cachedSpeed });
 
-    ui.state.textContent = state.status === 'won' ? 'Lap complete' : paused ? 'Paused' : 'Driving';
-    ui.time.textContent = `${state.currentTime.toFixed(2)} s`;
-    ui.gate.textContent = state.status === 'won' ? 'Complete' : state.nextCheckpointIndex < draft.track.checkpoints.length
-        ? `${state.nextCheckpointIndex + 1} / ${draft.track.checkpoints.length}`
-        : 'Finish line';
-    ui.speed.textContent = `${Math.round(state.cachedSpeed * KPH_PER_WORLD_UNIT)} km/h`;
-    ui.contacts.textContent = String(wallContacts);
-    ui.lap.textContent = lapTime === null ? 'Not finished' : `${lapTime.toFixed(2)} s`;
-    ui.feedback.textContent = feedback;
+    const gateLabel = state.status === 'won'
+        ? 'Complete'
+        : state.nextCheckpointIndex < draft.track.checkpoints.length
+            ? `Gate ${state.nextCheckpointIndex + 1} of ${draft.track.checkpoints.length}`
+            : 'Finish line';
+    const wallLabel = `${wallContacts} wall${wallContacts === 1 ? '' : 's'}`;
+    ui.feedback.textContent = feedback || (paused ? `Paused · ${gateLabel}` : `${gateLabel} · ${wallLabel}`);
     renderFlowSummary();
     ui.pause.disabled = state.status === 'won';
     ui.note.hidden = true;
@@ -489,16 +478,16 @@ function renderFlowSummary() {
     if (!flowSummary) return;
     const percent = (share) => `${Math.round(share * 100)}%`;
     showFlowValue(ui.flowSlowest,
-        `${percent(flowSummary.slowestShare)} of top · aim ${percent(FLOW_LIMITS.minCornerSpeedShare)}+`,
+        `${percent(flowSummary.slowestShare)} speed`,
         flowSummary.pass.corner);
     showFlowValue(ui.flowGap,
-        `${flowSummary.steerFreeSec.toFixed(1)} s · aim under ${FLOW_LIMITS.maxSteerFreeSec} s`,
+        `${flowSummary.steerFreeSec.toFixed(1)} s clear`,
         flowSummary.pass.steerGap);
     showFlowValue(ui.flowBeat,
-        `every ${(1 / Math.max(flowSummary.inputsPerSec, 0.01)).toFixed(1)} s · aim ${(1 / FLOW_LIMITS.minInputsPerSec).toFixed(1)} s or less`,
+        `beat ${(1 / Math.max(flowSummary.inputsPerSec, 0.01)).toFixed(1)} s`,
         flowSummary.pass.beat);
     showFlowValue(ui.flowSwitch,
-        `${percent(flowSummary.switchShare)} · aim ${percent(FLOW_LIMITS.minSwitchShare)}+`,
+        `${percent(flowSummary.switchShare)} sides`,
         flowSummary.pass.leftRight);
 }
 
@@ -585,7 +574,6 @@ try {
     loadCar();
 } catch (error) {
     loadError = error instanceof Error ? error.message : 'Could not load this draft.';
-    ui.state.textContent = 'Unavailable';
     ui.feedback.textContent = loadError;
     ui.note.textContent = loadError;
     ui.note.hidden = false;
