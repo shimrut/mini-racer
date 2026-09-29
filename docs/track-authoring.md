@@ -142,6 +142,42 @@ point. The browser keeps unsaved maps and open sketches locally and offers to
 restore them after a reload. Returning from **Drive Draft** restores the map
 automatically in the same tab.
 
+## Online Mapmaker
+
+The Mapmaker and **Drive Draft** also run at `https://miniracer.club/mapmaker`,
+so maps can be made on a laptop, tablet or phone.
+
+- **Passcode.** The page asks for a passcode and then stays open for 30 days
+  in that browser. Five wrong codes from one address lock it for 15 minutes.
+  The passcode is the Cloudflare secret `MAPMAKER_PASSCODE`. Set or change it
+  with:
+  `npx -y wrangler@latest pages secret put MAPMAKER_PASSCODE --project-name miniracer`
+- **Cloud maps.** Online, **Save** keeps the open map in a private cloud list
+  (Cloudflare KV `MAPMAKER_KV`). It saves unfinished maps too and runs no
+  checks. It never changes the game. The track picker lists the game's tracks
+  and your cloud maps; a cloud map shows **Cloud**. **Remove track** deletes a
+  cloud map. If the map was an edit of a game track, the game's own version
+  comes back.
+- **At home.** Add the passcode to `.env.local` in the repo root and restart
+  `npm run mapmaker`:
+
+  ```sh
+  MAPMAKER_PASSCODE=your-passcode
+  ```
+
+  The track picker then shows **Cloud maps** at the top. Opening one loads it
+  as an unsaved map. **Save** adds it to the game as usual and deletes its
+  cloud copy. **Remove track** on a cloud map deletes its cloud copy too.
+- **Touch.** Tap to draw or select, drag the map to move it and pinch to zoom.
+  The buttons at the top of the map undo and redo, and in Edit add a point
+  after the selected one or delete the selected point. On a narrow screen the
+  panel opens as a sheet over the bottom of the map.
+- **Publish.** `npm run deploy:site` builds the site (`tools/build-site.js`,
+  into `site/dist`) and uploads it to the Cloudflare Pages project
+  `miniracer`. The site holds the promo page (`LP/`) and the Mapmaker, because
+  each upload replaces the whole site. The passcode check and the cloud map
+  API are Pages Functions in `site/`.
+
 ## Adding A Track
 
 1. Build and validate the layout in `tools/mapmaker.html`.
@@ -331,7 +367,9 @@ Rules:
 The repository-writing endpoints used by the Mapmaker and the Campaign Planner
 exist only in the dedicated local Mapmaker Vite configuration and accept
 requests only from localhost. It is not part of
-the Devvit playtest or production build.
+the Devvit playtest or production build. The online Mapmaker has none of
+them; the local Mapmaker only lists and deletes cloud maps, through the local
+server, with the passcode from `.env.local`.
 
 ## Removing A Track
 

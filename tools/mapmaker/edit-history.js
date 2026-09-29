@@ -111,6 +111,14 @@ function validTrack(track) {
         && (track.ground === undefined || isTrackGroundKey(track.ground));
 }
 
+// A draft: { trackKey, originalTrackKey, track, draftLoop }. The browser
+// recovery and the online cloud maps both store drafts.
+export function isValidDraft(draft) {
+    return Boolean(draft) && validKey(draft.trackKey)
+        && (draft.originalTrackKey === null || validKey(draft.originalTrackKey))
+        && validTrack(draft.track) && validPoints(draft.draftLoop);
+}
+
 function normalizeRecovery(recovery) {
     if (!recovery || typeof recovery !== 'object' || !Array.isArray(recovery.drafts)
         || recovery.drafts.length > MAX_DRAFTS) return null;
@@ -119,9 +127,7 @@ function normalizeRecovery(recovery) {
     const keys = new Set();
     const drafts = [];
     for (const draft of recovery.drafts) {
-        if (!draft || !validKey(draft.trackKey) || keys.has(draft.trackKey)
-            || (draft.originalTrackKey !== null && !validKey(draft.originalTrackKey))
-            || !validTrack(draft.track) || !validPoints(draft.draftLoop)) return null;
+        if (!isValidDraft(draft) || keys.has(draft.trackKey)) return null;
         keys.add(draft.trackKey);
         drafts.push({
             trackKey: draft.trackKey,

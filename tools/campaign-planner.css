@@ -317,6 +317,11 @@
 }
 
 @media (max-width: 900px) {
+    body.mapmaker-body {
+        height: auto;
+        min-height: 100vh;
+    }
+
     .maker-layout {
         grid-template-columns: 1fr;
     }

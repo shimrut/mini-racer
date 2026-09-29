@@ -4,6 +4,16 @@ Standalone page with the same lobby look as the game (Outfit type, racing red ti
 
 Canonical host: **https://miniracer.club/**. That origin is hard-coded in the canonical tags, Open Graph URLs, JSON-LD, `sitemap.xml`, `robots.txt` and `llms.txt` — change it in those files if the domain ever moves.
 
+## Publish
+
+miniracer.club is the Cloudflare Pages project `miniracer`. Every upload replaces the whole site, so this page and the online Mapmaker (`/mapmaker`) are published together from the repo root:
+
+```sh
+npm run deploy:site
+```
+
+`npm run build:site` builds the site into `site/dist` without publishing it. See `docs/track-authoring.md`, **Online Mapmaker**.
+
 ## Files
 
 | File | What it is |

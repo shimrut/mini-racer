@@ -14,6 +14,8 @@
     "launch": "npm run test && devvit publish",
     "login": "devvit login",
     "mapmaker": "vite --config vite.mapmaker.config.js --host 127.0.0.1",
+    "build:site": "node tools/build-site.js",
+    "deploy:site": "npm run build:site && npx -y wrangler@latest pages deploy --cwd site --project-name miniracer --branch main",
     "predev": "npm run --silent kill:watchers && npm run generate:car-assets && npm run generate:share-images",
     "pretest": "npm run typecheck && npm run generate:car-assets && npm run generate:share-images",
     "test": "vitest run",

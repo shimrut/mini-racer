@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=3.1">
+    <link rel="stylesheet" href="mapmaker.css?v=3.2">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
-        <a class="maker-link" href="../pages/game.html">&larr; Game</a>
+        <a class="maker-link local-only" href="../pages/game.html">&larr; Game</a>
         <button id="track-picker-btn" type="button" class="track-picker-btn" aria-haspopup="dialog" title="Open another track">
             <span id="track-picker-name"></span>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 8l4 4 4-4"/></svg>
@@ -18,7 +18,7 @@
             <button type="button" data-tool="edit">Edit</button>
         </div>
         <div class="maker-header-actions">
-            <a class="maker-link" href="campaign-planner.html">Campaign Planner</a>
+            <a class="maker-link local-only" href="campaign-planner.html">Campaign Planner</a>
             <button id="drive-draft-btn" type="button" class="ghost-btn">Drive Draft</button>
             <button id="save-track-btn" type="button" class="primary-btn">Save</button>
             <button id="panel-toggle-btn" type="button" class="ghost-btn icon-btn" aria-controls="maker-panel" aria-label="Show or hide the panel" title="Show or hide the panel">
@@ -30,6 +30,12 @@
     <main class="maker-editor">
         <section class="maker-stage">
             <canvas id="map-canvas"></canvas>
+            <div id="touch-tools" class="touch-tools" role="toolbar" aria-label="Edit">
+                <button type="button" data-action="undo">Undo</button>
+                <button type="button" data-action="redo">Redo</button>
+                <button type="button" data-action="add-point">Add point</button>
+                <button type="button" data-action="delete-point">Delete point</button>
+            </div>
             <p id="canvas-hint" class="canvas-hint" role="status"></p>
         </section>
 
@@ -129,6 +135,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=3.0"></script>
+    <script type="module" src="mapmaker.js?v=3.1"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ tools/*
 !tools/generate-player-car-assets.js
 !tools/generate-share-images.js
 !tools/generate-lp-assets.js
+!tools/build-site.js
 !tools/analyze-unused-css.js
 !tools/vitest-global-setup.js
 !tools/debug-module-stubs.js
@@ -47,6 +48,8 @@ progress.md
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
 
 # Test & mutation tooling
 stryker.log

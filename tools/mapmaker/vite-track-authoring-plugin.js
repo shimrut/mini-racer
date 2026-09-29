@@ -6,12 +6,14 @@ import {
 } from './track-repository.js';
 import { isValidTrackKey } from './track-source.js';
 import { parseTrackDestination } from './campaign-series.js';
+import { PASSCODE_HEADER } from '../../site/lib/gate.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
 const REMOVE_ENDPOINT = '/__mapmaker/remove-track';
 const MOVE_STAGE_ENDPOINT = '/__mapmaker/move-stage';
 const ASSIGN_ENDPOINT = '/__mapmaker/assign-track';
-const ENDPOINTS = new Set([ENDPOINT, REMOVE_ENDPOINT, MOVE_STAGE_ENDPOINT, ASSIGN_ENDPOINT]);
+const CLOUD_ENDPOINT = '/__mapmaker/cloud-maps';
+const ENDPOINTS = new Set([ENDPOINT, REMOVE_ENDPOINT, MOVE_STAGE_ENDPOINT, ASSIGN_ENDPOINT, CLOUD_ENDPOINT]);
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
 
 function isLocalHost(host = '') {
@@ -120,7 +122,29 @@ function normalizeSavePayload(payload) {
     };
 }
 
-export function mapmakerTrackAuthoringPlugin() {
+// Lists or deletes the maps saved in the online Mapmaker. Returns [status, body].
+async function forwardCloudRequest(cloud, payload) {
+    if (!cloud.passcode) {
+        return [501, { error: 'Add MAPMAKER_PASSCODE to .env.local and restart npm run mapmaker to see your cloud maps.' }];
+    }
+    const method = payload?.method;
+    const key = typeof payload?.key === 'string' ? payload.key : '';
+    const validRequest = (method === 'GET' && !key) || (method === 'DELETE' && isValidTrackKey(key));
+    if (!validRequest) return [400, { error: 'Cloud maps request is invalid.' }];
+    let response;
+    try {
+        response = await fetch(`${cloud.url}/api/maps${key ? `/${key}` : ''}`, {
+            method,
+            headers: { [PASSCODE_HEADER]: cloud.passcode },
+        });
+    } catch {
+        return [502, { error: `Cannot reach ${cloud.url}.` }];
+    }
+    return [response.status, await response.json().catch(() => ({ error: `${cloud.url} answered ${response.status}.` }))];
+}
+
+// cloud: { url, passcode } of the online Mapmaker, for the Cloud maps list.
+export function mapmakerTrackAuthoringPlugin(cloud = { url: '', passcode: '' }) {
     return {
         name: 'mini-racer-mapmaker-track-authoring',
         apply: 'serve',
@@ -143,6 +167,10 @@ export function mapmakerTrackAuthoringPlugin() {
                 }
 
                 try {
+                    if (pathname === CLOUD_ENDPOINT) {
+                        writeJson(response, ...await forwardCloudRequest(cloud, await readJsonBody(request)));
+                        return;
+                    }
                     if (pathname === REMOVE_ENDPOINT) {
                         const payload = await readJsonBody(request);
                         const trackKey = typeof payload?.trackKey === 'string'

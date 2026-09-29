@@ -45,11 +45,18 @@ import {
     suggestMedalTimes,
 } from './mapmaker/medal-times.js';
 import { TrackPreviews } from './mapmaker/track-preview.js';
+import { MAPMAKER_ONLINE, deleteCloudMap, listCloudMaps, saveCloudMap } from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
+const PLAYTEST_DRAFT_KEY = 'mapmaker:playtest-draft:v1';
 const STATUS_MS = 3500;
 const STATUS_ERROR_MS = 8000;
 const STATUS_MS_PER_CHAR = 60;
+// Picker cards for cloud maps in the local Mapmaker use this key prefix, which
+// no track key can have.
+const CLOUD_CARD_PREFIX = 'cloud:';
+// A finger that moves less than this many pixels is a tap, not a pan.
+const TOUCH_TAP_SLOP = 8;
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
 const DEFAULT_LINE_SMOOTHING = 0.35;
 const DEFAULT_CORNER_RADIUS = 3;
@@ -270,6 +277,7 @@ class MapmakerApp {
         this.panelToggleBtn = document.getElementById('panel-toggle-btn');
         this.toolButtons = Array.from(document.querySelectorAll('#tool-buttons [data-tool]'));
         this.canvasHint = document.getElementById('canvas-hint');
+        this.touchTools = document.getElementById('touch-tools');
         this.trackNameInput = document.getElementById('track-name-input');
         this.medalTimesState = document.getElementById('medal-times-state');
         this.draftLapsList = document.getElementById('draft-laps-list');
@@ -340,21 +348,36 @@ class MapmakerApp {
         this.flowSignature = null;
         this.baselineQualityCodesByKey = new Map();
         this.baselineGeometryByKey = new Map();
-        this.trackPreviews = new TrackPreviews((trackKey) => this.state.tracks[trackKey]);
+        this.trackPreviews = new TrackPreviews((key) => (key.startsWith(CLOUD_CARD_PREFIX)
+            ? this.cloudMaps.find((map) => CLOUD_CARD_PREFIX + map.trackKey === key)?.track
+            : this.state.tracks[key]));
         this.hintText = '';
         this.statusMessage = null;
         this.statusIsError = false;
         this.statusTimer = null;
         this.busy = false;
+        // Track key -> the key of its saved cloud map.
+        this.cloudKeyByKey = new Map();
+        // The local Mapmaker lists the cloud maps in the track picker.
+        this.cloudMaps = [];
+        this.cloudMapsError = '';
+        this.touchInput = window.matchMedia('(pointer: coarse)').matches;
+        this.touchPoints = new Map();
+        this.pinch = null;
 
+        if (MAPMAKER_ONLINE) {
+            document.querySelectorAll('.local-only').forEach((element) => { element.hidden = true; });
+        }
         this.buildOptionGroup(this.cornerRadiusOptions, 'corner-radius', CORNER_RADIUS_PRESETS);
         this.buildOptionGroup(this.groundOptions, 'ground', TRACK_GROUND_KEYS.map((key) => ({
             value: key,
             label: TRACK_GROUNDS[key].label,
         })));
-        let panelHidden = false;
-        try { panelHidden = getBrowserStorage('localStorage')?.getItem(PANEL_HIDDEN_KEY) === '1'; } catch {}
-        this.setPanelHidden(panelHidden);
+        let storedPanelHidden = null;
+        try { storedPanelHidden = getBrowserStorage('localStorage')?.getItem(PANEL_HIDDEN_KEY); } catch {}
+        this.setPanelHidden(storedPanelHidden === null
+            ? window.matchMedia('(max-width: 900px)').matches
+            : storedPanelHidden === '1');
         this.bindEvents();
         this.loadTrack(initialTrackKey);
         this.resizeCanvas();
@@ -362,6 +385,7 @@ class MapmakerApp {
         const resizeObserver = new ResizeObserver(() => this.resizeCanvas());
         resizeObserver.observe(this.canvas.parentElement);
         this.offerDraftRecovery();
+        if (MAPMAKER_ONLINE) this.loadCloudMapsOnline();
     }
 
     get track() {
@@ -465,23 +489,101 @@ class MapmakerApp {
         }, { once: true });
     }
 
-    restoreDraftRecovery(recovery) {
-        for (const draft of recovery.drafts) {
-            if (draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
-                delete this.state.tracks[draft.originalTrackKey];
-                this.state.originalTrackKeyByKey.delete(draft.originalTrackKey);
-                this.editHistories.delete(draft.originalTrackKey);
-            }
-            this.state.tracks[draft.trackKey] = draft.track;
-            this.state.dirtyTrackKeys.add(draft.trackKey);
-            if (draft.originalTrackKey) {
-                this.state.originalTrackKeyByKey.set(draft.trackKey, draft.originalTrackKey);
-            }
-            this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
-            this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
+    // Puts a draft in the editor as an unsaved track. A renamed draft replaces
+    // the saved track it came from.
+    addDraft(draft) {
+        if (draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
+            delete this.state.tracks[draft.originalTrackKey];
+            this.state.originalTrackKeyByKey.delete(draft.originalTrackKey);
+            this.editHistories.delete(draft.originalTrackKey);
         }
+        this.state.tracks[draft.trackKey] = draft.track;
+        this.state.dirtyTrackKeys.add(draft.trackKey);
+        if (draft.originalTrackKey) {
+            this.state.originalTrackKeyByKey.set(draft.trackKey, draft.originalTrackKey);
+        }
+        if (draft.draftLoop.length) this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
+        this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
+    }
+
+    restoreDraftRecovery(recovery) {
+        recovery.drafts.forEach((draft) => this.addDraft(draft));
         this.loadTrack(recovery.selectedTrackKey || recovery.drafts[0].trackKey);
         this.setStatus(`Restored ${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'}.`);
+    }
+
+    // A cloud map is a draft of a new track, or of a track that was in the
+    // game when the map was saved.
+    addCloudMap(map) {
+        this.addDraft({ ...map, originalTrackKey: TRACKS[map.originalTrackKey] ? map.originalTrackKey : null });
+        if (map.medalRow) this.medalRowByKey.set(map.trackKey, map.medalRow);
+        this.cloudKeyByKey.set(map.trackKey, map.trackKey);
+    }
+
+    // Online, the cloud maps are the saved tracks, so they open clean. A map
+    // with unsaved changes in this browser keeps them.
+    async loadCloudMapsOnline() {
+        let maps;
+        try {
+            maps = await listCloudMaps();
+        } catch (error) {
+            this.setStatus(`Cannot load your cloud maps: ${error.message}`, true);
+            return;
+        }
+        for (const map of [...maps].reverse()) {
+            if (this.state.dirtyTrackKeys.has(map.trackKey)) {
+                this.cloudKeyByKey.set(map.trackKey, map.trackKey);
+                continue;
+            }
+            this.addCloudMap(map);
+            this.state.dirtyTrackKeys.delete(map.trackKey);
+        }
+        // Open the track just driven in Drive Draft, else the newest cloud map.
+        let drivenKey = null;
+        try {
+            drivenKey = JSON.parse(getBrowserStorage('sessionStorage')?.getItem(PLAYTEST_DRAFT_KEY) ?? 'null')?.trackKey ?? null;
+        } catch {}
+        const openKey = this.state.dirtyTrackKeys.size
+            ? this.state.selectedTrackKey
+            : [drivenKey, maps[0]?.trackKey, this.state.selectedTrackKey].find((key) => key && this.state.tracks[key]);
+        this.loadTrack(this.state.tracks[openKey] ? openKey : Object.keys(this.state.tracks)[0]);
+        if (this.trackPickerDialog.open) this.renderTrackPicker();
+    }
+
+    async refreshCloudMapsLocal() {
+        try {
+            this.cloudMaps = await listCloudMaps();
+            this.cloudMapsError = '';
+        } catch (error) {
+            this.cloudMaps = [];
+            this.cloudMapsError = error.message;
+        }
+        if (this.trackPickerDialog.open) this.renderTrackPicker();
+    }
+
+    // The local Mapmaker opens a cloud map as an unsaved draft. Saving it adds
+    // it to the game and deletes the cloud copy.
+    openCloudMap(trackKey) {
+        const map = this.cloudMaps.find((entry) => entry.trackKey === trackKey);
+        if (!map) return;
+        this.addCloudMap(map);
+        this.trackPickerDialog.close();
+        this.loadTrack(trackKey);
+        this.setStatus(`Opened ${map.track.name} from your cloud maps. Save adds it to the game and deletes the cloud copy.`);
+    }
+
+    // After a local save or removal, the cloud copy is not needed.
+    async deleteCloudCopy(trackKey) {
+        const cloudKey = this.cloudKeyByKey.get(trackKey);
+        if (!cloudKey) return '';
+        this.cloudKeyByKey.delete(trackKey);
+        this.cloudMaps = this.cloudMaps.filter((map) => map.trackKey !== cloudKey);
+        try {
+            await deleteCloudMap(cloudKey);
+            return ' Deleted its cloud copy.';
+        } catch (error) {
+            return ` Its cloud copy was not deleted: ${error.message}`;
+        }
     }
 
     scheduleQualityCheck() {
@@ -752,11 +854,11 @@ class MapmakerApp {
             if (event.key !== 'Enter') return;
             event.preventDefault();
             const first = this.trackPickerList.querySelector('[data-track-key]');
-            if (first) this.pickTrack(first.dataset.trackKey);
+            if (first) this.pickCard(first.dataset.trackKey);
         });
         this.trackPickerList.addEventListener('click', (event) => {
             const card = event.target.closest?.('[data-track-key]');
-            if (card) this.pickTrack(card.dataset.trackKey);
+            if (card) this.pickCard(card.dataset.trackKey);
         });
         if (!('closedBy' in HTMLDialogElement.prototype)) {
             this.trackPickerDialog.addEventListener('click', (event) => {
@@ -808,11 +910,23 @@ class MapmakerApp {
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
 
+        this.touchTools.addEventListener('click', (event) => {
+            const action = event.target.closest?.('button[data-action]')?.dataset.action;
+            if (action === 'undo') this.undoEdit();
+            else if (action === 'redo') this.redoEdit();
+            else if (action === 'add-point') this.insertPointAfterSelected();
+            else if (action === 'delete-point') this.deleteSelectedPoint();
+        });
+
         this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
         this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
         this.canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
-        this.canvas.addEventListener('pointerup', () => this.onPointerUp());
-        this.canvas.addEventListener('pointerleave', () => this.onPointerUp());
+        this.canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
+        this.canvas.addEventListener('pointercancel', (event) => this.onPointerUp(event));
+        // A lifted finger leaves the canvas before its tap click arrives.
+        this.canvas.addEventListener('pointerleave', (event) => {
+            if (event.pointerType !== 'touch') this.onPointerUp(event);
+        });
         this.canvas.addEventListener('click', (event) => this.onCanvasClick(event));
         this.canvas.addEventListener('wheel', (event) => this.onWheel(event), { passive: false });
 
@@ -867,33 +981,61 @@ class MapmakerApp {
         this.trackSearch.value = '';
         this.renderTrackPicker();
         this.trackPickerDialog.showModal();
+        if (!MAPMAKER_ONLINE) this.refreshCloudMapsLocal();
     }
 
     renderTrackPicker() {
         this.trackPreviews.reset();
         const query = this.trackSearch.value.trim().toLowerCase();
-        const keys = Object.keys(this.state.tracks).reverse()
-            .filter((key) => !query || this.state.tracks[key].name.toLowerCase().includes(query));
-        if (!keys.length) {
-            const empty = document.createElement('p');
-            empty.className = 'field-hint';
-            empty.textContent = 'No track has that name. Use New track to start one.';
-            this.trackPickerList.replaceChildren(empty);
-            return;
-        }
-        this.trackPickerList.replaceChildren(...keys.map((key) => {
-            const track = this.state.tracks[key];
-            const meta = getTrackGround(track).label + (this.state.dirtyTrackKeys.has(key) ? ' · Unsaved' : '');
+        const matches = (track) => !query || track.name.toLowerCase().includes(query);
+        const createCard = (key, track, meta) => {
             const card = this.trackPreviews.createCard('button', key, track.name, meta);
             card.type = 'button';
+            return card;
+        };
+        const createText = (tag, className, text) => {
+            const element = document.createElement(tag);
+            element.className = className;
+            element.textContent = text;
+            return element;
+        };
+
+        const cloudItems = [];
+        const cloudMaps = this.cloudMaps.filter((map) => matches(map.track));
+        if (cloudMaps.length || (this.cloudMapsError && !query)) {
+            cloudItems.push(createText('h3', 'track-cards-heading', 'Cloud maps'));
+            if (this.cloudMapsError) cloudItems.push(createText('p', 'field-hint', this.cloudMapsError));
+            cloudItems.push(...cloudMaps.map((map) => createCard(
+                CLOUD_CARD_PREFIX + map.trackKey,
+                map.track,
+                `Saved ${new Date(map.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+            )));
+            cloudItems.push(createText('h3', 'track-cards-heading', 'Tracks'));
+        }
+
+        const keys = Object.keys(this.state.tracks).reverse().filter((key) => matches(this.state.tracks[key]));
+        const trackItems = keys.map((key) => {
+            const track = this.state.tracks[key];
+            const meta = [
+                getTrackGround(track).label,
+                this.cloudKeyByKey.has(key) ? 'Cloud' : '',
+                this.state.dirtyTrackKeys.has(key) ? 'Unsaved' : '',
+            ].filter(Boolean).join(' · ');
+            const card = createCard(key, track, meta);
             if (key === this.state.selectedTrackKey) card.setAttribute('aria-current', 'true');
             return card;
-        }));
+        });
+        if (!keys.length) trackItems.push(createText('p', 'field-hint', 'No track has that name. Use New track to start one.'));
+        this.trackPickerList.replaceChildren(...cloudItems, ...trackItems);
     }
 
-    pickTrack(trackKey) {
+    pickCard(cardKey) {
+        if (cardKey.startsWith(CLOUD_CARD_PREFIX)) {
+            this.openCloudMap(cardKey.slice(CLOUD_CARD_PREFIX.length));
+            return;
+        }
         this.trackPickerDialog.close();
-        this.loadTrack(trackKey);
+        this.loadTrack(cardKey);
     }
 
     setTool(tool, selectedHandle) {
@@ -913,6 +1055,7 @@ class MapmakerApp {
         this.toolButtons.forEach((button) => {
             button.dataset.active = String(button.dataset.tool === this.state.tool);
         });
+        this.touchTools.dataset.tool = this.state.tool;
         this.updateCanvasHint();
     }
 
@@ -1058,7 +1201,7 @@ class MapmakerApp {
             this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
         }
         this.updateStageText();
-        this.syncSaveButton();
+        this.syncActionButtons();
         this.draw();
         this.scheduleQualityCheck();
         if (this.state.dirtyTrackKeys.size || this.draftLoopsByKey.size) {
@@ -1096,6 +1239,9 @@ class MapmakerApp {
         const medalRow = this.medalRowByKey.get(currentKey);
         this.medalRowByKey.delete(currentKey);
         if (medalRow) this.medalRowByKey.set(nextKey, medalRow);
+        const cloudKey = this.cloudKeyByKey.get(currentKey);
+        this.cloudKeyByKey.delete(currentKey);
+        if (cloudKey) this.cloudKeyByKey.set(nextKey, cloudKey);
         const originalTrackKey = this.state.originalTrackKeyByKey.get(currentKey) ?? null;
         this.state.originalTrackKeyByKey.delete(currentKey);
         if (originalTrackKey) {
@@ -1153,10 +1299,19 @@ class MapmakerApp {
     async removeTrack() {
         const selectedKey = this.state.selectedTrackKey;
         const originalKey = this.state.originalTrackKeyByKey.get(selectedKey) ?? null;
+        const cloudKey = this.cloudKeyByKey.get(selectedKey) ?? null;
         const trackName = this.track.name;
-        const warning = originalKey
-            ? `Permanently remove ${trackName} (${originalKey}) from the game? This deletes its definition, catalog entry, Daily schedule entry, and medal times. Published Daily races and Head-to-Head posts using it may stop working. Unsaved edits will also be lost.`
-            : `Discard unsaved track ${trackName} (${selectedKey})?`;
+        const cloudText = cloudKey ? ' Its cloud copy is deleted too.' : '';
+        let warning;
+        if (MAPMAKER_ONLINE) {
+            warning = cloudKey
+                ? `Delete ${trackName} from your cloud maps?${originalKey ? ' The game keeps its own version.' : ''}`
+                : `Discard unsaved track ${trackName}?`;
+        } else {
+            warning = originalKey
+                ? `Permanently remove ${trackName} (${originalKey}) from the game? This deletes its definition, catalog entry, Daily schedule entry, and medal times. Published Daily races and Head-to-Head posts using it may stop working. Unsaved edits will also be lost.${cloudText}`
+                : `Discard unsaved track ${trackName} (${selectedKey})?${cloudText}`;
+        }
         try {
             if (!await this.confirmTrackRemoval(warning)) return;
         } catch (error) {
@@ -1166,9 +1321,11 @@ class MapmakerApp {
 
         this.removeTrackBtn.disabled = true;
         this.busy = true;
-        this.syncSaveButton();
+        this.syncActionButtons();
         try {
-            if (originalKey) {
+            if (MAPMAKER_ONLINE) {
+                if (cloudKey) await deleteCloudMap(cloudKey);
+            } else if (originalKey) {
                 const response = await fetch('/__mapmaker/remove-track', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1179,11 +1336,13 @@ class MapmakerApp {
                     throw new Error(result.error || `Removal failed with status ${response.status}.`);
                 }
             }
+            const cloudResult = MAPMAKER_ONLINE ? '' : await this.deleteCloudCopy(selectedKey);
 
             const keys = Object.keys(this.state.tracks);
             const selectedIndex = keys.indexOf(selectedKey);
-            const nextKey = keys[selectedIndex + 1] || keys[selectedIndex - 1];
+            let nextKey = keys[selectedIndex + 1] || keys[selectedIndex - 1];
             delete this.state.tracks[selectedKey];
+            this.cloudKeyByKey.delete(selectedKey);
             this.editHistories.delete(selectedKey);
             this.draftLoopsByKey.delete(selectedKey);
             this.medalRowByKey.delete(selectedKey);
@@ -1192,12 +1351,23 @@ class MapmakerApp {
             this.autoRoadGuideByKey.delete(selectedKey);
             this.state.originalTrackKeyByKey.delete(selectedKey);
             this.state.dirtyTrackKeys.delete(selectedKey);
+            // Online, a deleted cloud copy of a game track shows the game version again.
+            if (MAPMAKER_ONLINE && originalKey && TRACKS[originalKey]) {
+                this.state.tracks[originalKey] = cloneTracks(TRACKS[originalKey]);
+                this.state.originalTrackKeyByKey.set(originalKey, originalKey);
+                this.editHistories.delete(originalKey);
+                nextKey = originalKey;
+            }
             this.state.selectedTrackKey = nextKey;
             this.resetView();
             this.loadTrack(nextKey);
-            this.setStatus(originalKey
-                ? `Removed ${trackName} (${originalKey}) from the repository. Review track-specific references and registry integrity tests before shipping.`
-                : `Discarded unsaved track ${trackName}.`);
+            if (MAPMAKER_ONLINE) {
+                this.setStatus(cloudKey ? `Deleted ${trackName} from your cloud maps.` : `Discarded unsaved track ${trackName}.`);
+            } else {
+                this.setStatus((originalKey
+                    ? `Removed ${trackName} (${originalKey}) from the repository. Review track-specific references and registry integrity tests before shipping.`
+                    : `Discarded unsaved track ${trackName}.`) + cloudResult);
+            }
             this.scheduleDraftRecovery();
         } catch (error) {
             console.error(error);
@@ -1205,7 +1375,7 @@ class MapmakerApp {
         } finally {
             this.removeTrackBtn.disabled = false;
             this.busy = false;
-            this.syncSaveButton();
+            this.syncActionButtons();
         }
     }
 
@@ -1342,18 +1512,19 @@ class MapmakerApp {
     }
 
     getCanvasHint() {
+        const click = this.touchInput ? 'Tap' : 'Click';
         if (this.state.tool === 'draw') {
             const pointCount = this.state.draftLoop.length;
             if (pointCount === 0) {
-                return 'Click to start drawing the road.';
+                return `${click} to start drawing the road.`;
             }
             if (pointCount < 3) {
-                return `Click to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
+                return `${click} to keep drawing in car lengths. Place ${3 - pointCount} more point${pointCount === 2 ? '' : 's'} before you can close the loop.`;
             }
             if (this.state.draftCloseHover) {
                 return 'This is the closed road. Click the first point to build it.';
             }
-            return 'Click to add another point in whole car lengths. The road stays open until you click the first point.';
+            return `${click} to add another point in whole car lengths. The road stays open until you ${click.toLowerCase()} the first point.`;
         }
         if (!this.hasTrackGeometry()) {
             return 'This track has no walls yet. Switch to Draw and close the loop first.';
@@ -1364,6 +1535,9 @@ class MapmakerApp {
         }
         if (kind === 'startLine' || kind === 'checkpoint') {
             return 'Drag the line to slide it along the track. End dots show length only — dragging them still moves the whole gate.';
+        }
+        if (this.touchInput) {
+            return 'Tap to select, then drag. Drag the map to move it and pinch to zoom.';
         }
         return 'Click to select, then drag. Shift+click a wall to add a point. Delete removes the selected wall point. Cmd+Z undoes.';
     }
@@ -1616,9 +1790,14 @@ class MapmakerApp {
         };
     }
 
+    // Fingers are less exact than a mouse, so touch gets larger hit areas.
+    get hitScale() {
+        return this.touchInput ? 2 : 1;
+    }
+
     hitTest(canvasPoint, viewport = this.getViewport(), handles = this.getAllHandles()) {
         let best = null;
-        const hitRadius = 12;
+        const hitRadius = 12 * this.hitScale;
         handles.forEach((handle) => {
             const screen = this.worldToScreen(handle.point, viewport);
             const dist = Math.hypot(screen.x - canvasPoint.x, screen.y - canvasPoint.y);
@@ -1640,7 +1819,7 @@ class MapmakerApp {
     }
 
     hitTestSegment(canvasPoint, viewport = this.getViewport()) {
-        const hitRadius = 12;
+        const hitRadius = 12 * this.hitScale;
         let best = null;
 
         this.getSelectableSegments().forEach((segment) => {
@@ -1651,7 +1830,7 @@ class MapmakerApp {
                 segment.kind === 'startLineSegment'
                 || segment.kind === 'checkpointSegment'
             )
-                ? 14
+                ? 14 * this.hitScale
                 : hitRadius;
             if (match.distance <= radius && (!best || match.distance < best.distance)) {
                 best = { segment, distance: match.distance };
@@ -1706,7 +1885,16 @@ class MapmakerApp {
         }
         const startPoint = this.state.draftLoop[0];
         const screenPoint = this.worldToScreen(startPoint, viewport);
-        return distance(canvasPoint, screenPoint) <= 18 ? startPoint : null;
+        return distance(canvasPoint, screenPoint) <= 18 * this.hitScale ? startPoint : null;
+    }
+
+    // Online, Save keeps an unfinished road, so a drawn point is a change to save.
+    draftLoopChanged() {
+        if (MAPMAKER_ONLINE) {
+            this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
+            this.syncActionButtons();
+        }
+        this.scheduleDraftRecovery();
     }
 
     addDraftLoopPoint(point) {
@@ -1717,7 +1905,7 @@ class MapmakerApp {
         this.state.draftLoop = [...this.state.draftLoop, clonePoint(point)];
         this.state.draftCursor = clonePoint(point);
         this.state.draftCloseHover = false;
-        this.scheduleDraftRecovery();
+        this.draftLoopChanged();
         this.updateCanvasHint();
         this.draw();
     }
@@ -1731,7 +1919,7 @@ class MapmakerApp {
             ? clonePoint(this.state.draftLoop[this.state.draftLoop.length - 1])
             : null;
         this.state.draftCloseHover = false;
-        this.scheduleDraftRecovery();
+        this.draftLoopChanged();
         this.setStatus(this.state.draftLoop.length ? 'Removed last draft point.' : 'Cleared draft loop.');
         this.updateCanvasHint();
         this.draw();
@@ -1741,7 +1929,7 @@ class MapmakerApp {
         this.state.draftLoop = [];
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
-        this.scheduleDraftRecovery();
+        this.draftLoopChanged();
         this.setStatus('Cleared draft loop.');
         this.updateCanvasHint();
         this.draw();
@@ -1787,26 +1975,71 @@ class MapmakerApp {
         return true;
     }
 
+    // A mouse pan moves at once. A finger pans only once it moves past the
+    // tap slop, so a tap still draws or selects.
+    startPan(event, canvasPoint, moved) {
+        this.canvas.setPointerCapture(event.pointerId);
+        this.state.drag = {
+            type: 'pan',
+            startX: canvasPoint.x,
+            startY: canvasPoint.y,
+            panX: this.state.view.panX,
+            panY: this.state.view.panY,
+            moved,
+        };
+        if (moved) {
+            this.state.skipDrawClick = true;
+            this.canvas.dataset.pan = 'true';
+        }
+    }
+
+    // One finger works like the mouse. A second finger pinches to zoom and
+    // pan, and ends what the first finger was doing. Returns true when this
+    // finger is part of a pinch.
+    trackTouch(event) {
+        this.touchPoints.set(event.pointerId, this.getCanvasPoint(event));
+        if (this.touchPoints.size === 1) {
+            this.state.skipDrawClick = false;
+            return false;
+        }
+        if (this.touchPoints.size === 2) {
+            this.endDrag();
+            const [a, b] = [...this.touchPoints.values()];
+            this.pinch = { spread: distance(a, b), center: midpoint(a, b) };
+            this.state.skipDrawClick = true;
+        }
+        return true;
+    }
+
+    movePinch() {
+        const [a, b] = [...this.touchPoints.values()];
+        const center = midpoint(a, b);
+        const spread = distance(a, b);
+        this.state.view.panX += center.x - this.pinch.center.x;
+        this.state.view.panY += center.y - this.pinch.center.y;
+        const zoom = this.state.view.zoom * spread / Math.max(1, this.pinch.spread);
+        this.pinch = { spread, center };
+        this.setZoom(zoom, center);
+        this.draw();
+    }
+
     onPointerDown(event) {
         document.activeElement?.blur?.();
+        this.touchInput = event.pointerType === 'touch';
+        if (this.touchInput && this.trackTouch(event)) return;
         const viewport = this.getViewport();
         const canvasPoint = this.getCanvasPoint(event);
 
         if (event.button === 1 || this.state.isSpaceDown) {
-            this.canvas.setPointerCapture(event.pointerId);
-            this.state.drag = {
-                type: 'pan',
-                startX: canvasPoint.x,
-                startY: canvasPoint.y,
-                panX: this.state.view.panX,
-                panY: this.state.view.panY
-            };
-            this.state.skipDrawClick = true;
-            this.canvas.dataset.pan = 'true';
+            this.startPan(event, canvasPoint, true);
             return;
         }
 
         if (this.state.tool === 'draw') {
+            if (this.touchInput) {
+                this.startPan(event, canvasPoint, false);
+                return;
+            }
             if (event.button === 2) {
                 this.undoDraftLoopPoint();
                 return;
@@ -1879,17 +2112,32 @@ class MapmakerApp {
         }
 
         this.state.selectedHandle = null;
+        if (this.touchInput) this.startPan(event, canvasPoint, false);
         this.draw();
     }
 
     onPointerMove(event) {
+        this.touchInput = event.pointerType === 'touch';
+        if (this.touchPoints.has(event.pointerId)) {
+            this.touchPoints.set(event.pointerId, this.getCanvasPoint(event));
+            if (this.pinch) {
+                this.movePinch();
+                return;
+            }
+        }
         const viewport = this.getViewport();
         const canvasPoint = this.getCanvasPoint(event);
         const worldPoint = this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport);
 
-        if (this.state.drag?.type === 'pan') {
-            this.state.view.panX = this.state.drag.panX + (canvasPoint.x - this.state.drag.startX);
-            this.state.view.panY = this.state.drag.panY + (canvasPoint.y - this.state.drag.startY);
+        const drag = this.state.drag;
+        if (drag?.type === 'pan') {
+            const dx = canvasPoint.x - drag.startX;
+            const dy = canvasPoint.y - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < TOUCH_TAP_SLOP) return;
+            drag.moved = true;
+            this.state.skipDrawClick = true;
+            this.state.view.panX = drag.panX + dx;
+            this.state.view.panY = drag.panY + dy;
             this.draw();
             return;
         }
@@ -1981,7 +2229,15 @@ class MapmakerApp {
         this.addDraftLoopPoint(snapped);
     }
 
-    onPointerUp() {
+    onPointerUp(event) {
+        if (this.touchPoints.delete(event.pointerId) && this.pinch) {
+            if (!this.touchPoints.size) this.pinch = null;
+            return;
+        }
+        this.endDrag();
+    }
+
+    endDrag() {
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
@@ -2162,6 +2418,18 @@ class MapmakerApp {
         this.markDirty(`Inserted ${path} point.`);
     }
 
+    // The touch Add point button: a new wall point halfway to the next one.
+    insertPointAfterSelected() {
+        const handle = this.state.selectedHandle;
+        if (handle?.kind !== 'polygon') {
+            this.setStatus('Select a wall point first.', true);
+            return;
+        }
+        const polygon = this.track[handle.path];
+        const next = polygon[(handle.index + 1) % polygon.length];
+        this.insertPointOnSegment(handle.path, handle.index, midpoint(polygon[handle.index], next));
+    }
+
     deleteSelectedPoint() {
         const handle = this.state.selectedHandle;
         if (!handle || handle.kind !== 'polygon') {
@@ -2201,7 +2469,7 @@ class MapmakerApp {
             history.recordEdit(history.current(), this.track);
         }
         this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
-        this.syncSaveButton();
+        this.syncActionButtons();
         if (updateStatus) {
             this.setStatus(message);
         }
@@ -2210,10 +2478,14 @@ class MapmakerApp {
         this.draw();
     }
 
-    syncSaveButton() {
-        const isDirty = this.state.dirtyTrackKeys.has(this.state.selectedTrackKey);
+    syncActionButtons() {
+        const key = this.state.selectedTrackKey;
+        const isDirty = this.state.dirtyTrackKeys.has(key);
         this.saveTrackBtn.textContent = isDirty ? 'Save' : 'Saved';
         this.saveTrackBtn.disabled = this.busy || !isDirty;
+        // Only the local Mapmaker can remove a track from the game.
+        this.removeTrackBtn.hidden = MAPMAKER_ONLINE
+            && this.state.originalTrackKeyByKey.has(key) && !this.cloudKeyByKey.has(key);
     }
 
     markSaved(message) {
@@ -2224,7 +2496,7 @@ class MapmakerApp {
         ));
         this.baselineGeometryByKey.set(this.state.selectedTrackKey, geometrySignature(this.track));
         this.state.dirtyTrackKeys.delete(this.state.selectedTrackKey);
-        this.syncSaveButton();
+        this.syncActionButtons();
         this.setStatus(message);
         this.syncMedalTimesPanel();
         this.scheduleDraftRecovery();
@@ -2640,7 +2912,7 @@ class MapmakerApp {
             return;
         }
         try {
-            window.sessionStorage.setItem('mapmaker:playtest-draft:v1', JSON.stringify({
+            window.sessionStorage.setItem(PLAYTEST_DRAFT_KEY, JSON.stringify({
                 trackKey: this.state.selectedTrackKey,
                 track,
             }));
@@ -2654,7 +2926,38 @@ class MapmakerApp {
         }
     }
 
+    // Online, Save keeps unfinished maps too: the checks run when the local
+    // Mapmaker adds the map to the game.
+    async saveToCloud() {
+        const trackKey = this.state.selectedTrackKey;
+        this.busy = true;
+        this.syncActionButtons();
+        this.setStatus(`Saving ${this.track.name} to your cloud maps...`);
+        try {
+            await saveCloudMap({
+                trackKey,
+                originalTrackKey: this.state.originalTrackKeyByKey.get(trackKey) ?? null,
+                track: this.track,
+                draftLoop: this.state.draftLoop,
+                medalRow: this.medalRowByKey.get(trackKey) ?? null,
+                replaceKey: this.cloudKeyByKey.get(trackKey) ?? null,
+            });
+            this.cloudKeyByKey.set(trackKey, trackKey);
+            this.markSaved(`Saved ${this.track.name} to your cloud maps. Open it from the track list in the Mapmaker at home to add it to the game.`);
+        } catch (error) {
+            console.error(error);
+            this.setStatus(error.message, true);
+        } finally {
+            this.busy = false;
+            this.syncActionButtons();
+        }
+    }
+
     async saveAndIntegrateTrack() {
+        if (MAPMAKER_ONLINE) {
+            await this.saveToCloud();
+            return;
+        }
         const invalidTrack = this.validateTrack(this.track);
         if (invalidTrack) {
             this.setStatus(`Cannot save ${this.track.name}: ${invalidTrack}.`, true);
@@ -2686,7 +2989,7 @@ class MapmakerApp {
         }
 
         this.busy = true;
-        this.syncSaveButton();
+        this.syncActionButtons();
         this.setStatus(`Saving and integrating ${this.track.name}...`);
         try {
             const response = await fetch('/__mapmaker/save-track', {
@@ -2719,8 +3022,9 @@ class MapmakerApp {
             const renameText = result.removedFilename
                 ? ` Removed ${result.removedFilename}.`
                 : '';
+            const cloudText = await this.deleteCloudCopy(trackKey);
             this.markSaved(
-                `Saved and integrated ${result.filename}.${useText}${renameText}`,
+                `Saved and integrated ${result.filename}.${useText}${renameText}${cloudText}`,
             );
         } catch (error) {
             console.error(error);
@@ -2730,7 +3034,7 @@ class MapmakerApp {
             );
         } finally {
             this.busy = false;
-            this.syncSaveButton();
+            this.syncActionButtons();
         }
     }
 }

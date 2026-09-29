@@ -17,6 +17,7 @@
     "README.md",
     "assets/share/",
     "docs/",
+    "site/",
     "stryker.config.mjs",
     "tests/",
     "tools/*",

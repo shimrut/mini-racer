@@ -1,0 +1,14 @@
+// The miniracer.club Pages project: the promo page (LP/) and the online Mapmaker.
+// Build with `npm run build:site`, publish with `npm run deploy:site`.
+// The passcode is a secret: npx wrangler pages secret put MAPMAKER_PASSCODE --project-name miniracer
+{
+    "name": "miniracer",
+    "pages_build_output_dir": "./dist",
+    "compatibility_date": "2026-09-22",
+    "kv_namespaces": [
+        {
+            "binding": "MAPMAKER_KV",
+            "id": "08664777292940298112b94963a6589d"
+        }
+    ]
+}

@@ -27,6 +27,7 @@
 body.mapmaker-body {
     margin: 0;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     background: var(--maker-bg);
@@ -320,7 +321,7 @@ summary:focus-visible,
 
 .maker-dialog.track-picker-dialog {
     width: min(64rem, calc(100vw - 2rem));
-    height: min(48rem, calc(100vh - 4rem));
+    height: min(48rem, calc(100dvh - 4rem));
     padding: 0;
 }
 
@@ -354,6 +355,24 @@ summary:focus-visible,
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     align-content: start;
     gap: 0.75rem;
+}
+
+.track-cards > .track-cards-heading,
+.track-cards > .field-hint {
+    grid-column: 1 / -1;
+}
+
+.track-cards-heading {
+    margin: 0.5rem 0 0;
+    color: var(--maker-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.track-cards-heading:first-child {
+    margin-top: 0;
 }
 
 .track-card {
@@ -439,6 +458,7 @@ button.track-card:hover:not(:disabled) {
     width: 100%;
     height: 100%;
     cursor: crosshair;
+    touch-action: none;
 }
 
 #map-canvas[data-pan="true"] {
@@ -472,6 +492,38 @@ button.track-card:hover:not(:disabled) {
 .canvas-hint[data-kind="error"] {
     color: var(--maker-danger-text);
     border-color: rgba(244, 63, 94, 0.45);
+}
+
+/* Touch: buttons for what a keyboard does on a computer */
+
+.touch-tools {
+    position: absolute;
+    top: 0.75rem;
+    left: 50%;
+    display: none;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--maker-border);
+    border-radius: 12px;
+    background: rgba(10, 13, 20, 0.8);
+    backdrop-filter: blur(8px);
+    transform: translateX(-50%);
+}
+
+.touch-tools button {
+    background: transparent;
+    padding: 0.55rem 0.8rem;
+    white-space: nowrap;
+}
+
+.touch-tools[data-tool="draw"] :is([data-action="redo"], [data-action$="-point"]) {
+    display: none;
+}
+
+@media (pointer: coarse) {
+    .touch-tools {
+        display: flex;
+    }
 }
 
 /* Panel sections */
@@ -704,30 +756,43 @@ button.track-card:hover:not(:disabled) {
     gap: 0.5rem;
 }
 
-/* Narrow screens: the panel goes under the map */
+/* Narrow screens: the panel is a sheet over the bottom of the map */
 
 @media (max-width: 900px) {
-    body.mapmaker-body {
-        height: auto;
-        min-height: 100vh;
-    }
-
     .maker-header {
+        flex: 0 0 auto;
         flex-wrap: wrap;
+        gap: 0.5rem;
         padding: 0.5rem 0.75rem;
     }
 
     .maker-editor {
-        flex-direction: column;
-    }
-
-    .maker-stage {
-        min-height: 65vh;
+        position: relative;
     }
 
     .maker-panel-side {
-        flex-basis: auto;
+        position: absolute;
+        inset: auto 0 0;
+        z-index: 1;
+        max-height: 60%;
         border-left: 0;
-        border-top: 1px solid var(--maker-border);
+        border-top: 1px solid var(--maker-border-strong);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .canvas-hint {
+        top: 0.75rem;
+        bottom: auto;
+    }
+
+    .track-cards {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+}
+
+@media (max-width: 900px) and (pointer: coarse) {
+    .canvas-hint {
+        top: 4rem;
     }
 }

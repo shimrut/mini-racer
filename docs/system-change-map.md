@@ -730,6 +730,12 @@ These are useful, but they are not on the critical player path:
   the Daily schedule or a Campaign series. Start
   line and checkpoint edits snap perpendicular across outer/inner walls.
   The track key follows the display name (`Spade Kingdom` becomes `spadeKingdom`).
+- `site/`, `tools/build-site.js`, `tools/mapmaker/cloud-maps.js`
+  The miniracer.club Cloudflare Pages project: the promo page (`LP/`) and the
+  online Mapmaker at `/mapmaker`, locked by a passcode. Online **Save** stores
+  maps in the `MAPMAKER_KV` cloud list; the local Mapmaker opens them and
+  deletes the cloud copy once it saves one into the game. See
+  `docs/track-authoring.md`, **Online Mapmaker**.
 - `tools/runner.*`
   Bot checks for a saved track, at `tools/runner.html`.
 - `pages/preview.html`, `pages/daily.html`, `pages/preview.js`, `pages/preview.css`

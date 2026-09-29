@@ -28,6 +28,7 @@ import {
     readDraftLaps,
     recordDraftLap,
 } from './mapmaker/medal-times.js';
+import { MAPMAKER_ONLINE } from './mapmaker/cloud-maps.js';
 
 const DRAFT_KEY = 'mapmaker:playtest-draft:v1';
 const STEP = CONFIG.fixedDt;
@@ -48,6 +49,8 @@ const ui = {
     flowBeat: document.getElementById('flow-beat'),
     flowSwitch: document.getElementById('flow-switch'),
 };
+// Online, the Mapmaker is the index page of /mapmaker/.
+if (MAPMAKER_ONLINE) document.querySelector('.drive-back').href = './';
 
 let draft = null;
 let geometry = null;
