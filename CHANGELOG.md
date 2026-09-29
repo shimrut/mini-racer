@@ -1,3 +1,5 @@
+- Every track needs at least 3 checkpoints. With fewer, Mapmaker's Checks show "Too few checkpoints" and Save is blocked until you add more. Online Save still keeps unfinished maps.
+
 - Mapmaker shows each checkpoint's number (CP 1, CP 2, …) on the map again, so the lap order is visible.
 
 - Mapmaker can add and delete checkpoints again. The panel has a **Checkpoints** section with the count and **Add** and **Delete** buttons. Add puts a new checkpoint in the middle of the longest stretch without one, in lap order, selected so you can drag it. Delete (or the Delete key) removes the selected checkpoint. It works the same on a phone.

@@ -61,6 +61,14 @@ describe('Mapmaker track quality', () => {
         }
     });
 
+    it('blocks a track with fewer than three checkpoints', () => {
+        const track = loop();
+        track.checkpoints.pop();
+        const result = validateTrackQuality(track);
+        expect(result.hasErrors).toBe(true);
+        expect(result.issues.find((entry) => entry.code === 'checkpoints-too-few')?.severity).toBe('error');
+    });
+
     it('places no checkpoint when the checkpoints are out of order', () => {
         const track = loop();
         track.checkpoints.reverse();

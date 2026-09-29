@@ -74,7 +74,8 @@ updates its automatic checkpoint order while its walls and checkpoints remain
 unedited; manual checkpoint edits keep their authored positions.
 
 **Checks** tests the smoothed race walls, road clearance,
-start position, gate coverage, and checkpoint order. It shows a green **OK**
+start position, gate coverage, checkpoint order, and that the track has at
+least 3 checkpoints. It shows a green **OK**
 when nothing is wrong; otherwise it lists each problem and marks it on the map.
 New structural errors block export and **Save**;
 warnings invite a driving check. Existing integrated tracks with a known
@@ -431,8 +432,8 @@ The regression suite checks:
   geometry registry;
 - existing track data remains unchanged when the registry is extended;
 - the full registry fingerprint matches the intentionally reviewed track set;
-- every definition has usable boundaries, start data, checkpoints, and
-  collision geometry;
+- every definition has usable boundaries, start data, at least 3 checkpoints,
+  and collision geometry;
 - published Daily GP history refers only to catalog tracks;
 - every catalog track has medal thresholds.
 - every scheduled track has a valid Author threshold for medal calibration.

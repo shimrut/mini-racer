@@ -6,6 +6,7 @@ import { buildPerpendicularLaneGate, closestPointOnPolygon } from './lane-gate.j
 const EPSILON = 1e-7;
 const SEAM_TOLERANCE = 0.2;
 const CAR_RADIUS = CONFIG.carRadius;
+const MIN_CHECKPOINTS = 3;
 
 function cross(a, b) {
     return a.x * b.y - a.y * b.x;
@@ -321,8 +322,8 @@ export function validateTrackQuality(track) {
 
     const finishHit = checkGate('Finish line', 'finish', track.startLine, outer, inner, issues);
     const checkpoints = Array.isArray(track.checkpoints) ? track.checkpoints : [];
-    if (!checkpoints.length) {
-        issues.push(issue('checkpoints-missing', 'warning', 'No checkpoints', 'Add checkpoints to make lap direction and order meaningful.'));
+    if (checkpoints.length < MIN_CHECKPOINTS) {
+        issues.push(issue('checkpoints-too-few', 'error', 'Too few checkpoints', `This track has ${checkpoints.length}. Every track needs at least ${MIN_CHECKPOINTS}. Press Add under Checkpoints.`));
     }
     const checkpointHits = checkpoints.map((checkpoint, index) => (
         checkGate(`Checkpoint ${index + 1}`, `checkpoint-${index + 1}`, checkpoint, outer, inner, issues)

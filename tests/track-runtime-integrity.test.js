@@ -323,6 +323,7 @@ describe('track runtime integrity', () => {
             expectFinitePoint(track.startLine?.p1);
             expectFinitePoint(track.startLine?.p2);
             expect(Number.isFinite(track.startAngle), `${trackKey} needs a start angle`).toBe(true);
+            expect(track.checkpoints?.length ?? 0, `${trackKey} needs at least 3 checkpoints`).toBeGreaterThanOrEqual(3);
 
             track.outer.forEach(expectFinitePoint);
             track.inner.forEach(expectFinitePoint);
