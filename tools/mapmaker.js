@@ -3590,7 +3590,24 @@ class MapmakerApp {
     }
 
     openCreatorTestDrive() {
-        this.creatorDriveFrame.src = `map-creator-playtest.html?drive=${Date.now()}`;
+        const frame = this.creatorDriveFrame;
+        frame.addEventListener('load', () => {
+            let loaded = false;
+            try {
+                loaded = frame.contentDocument?.body?.dataset.creatorPlaytest === 'true';
+            } catch {}
+            if (loaded || frame.src === 'about:blank') return;
+            // The frame did not open Test Drive. The page opens it instead,
+            // after a save, because leaving the page drops unsaved changes.
+            this.closeCreatorTestDrive();
+            if (this.state.dirtyTrackKeys.has(this.state.selectedTrackKey)) {
+                this.setStatus('Save the track, then open Test Drive again.', true);
+                return;
+            }
+            this.skipBeforeUnload = true;
+            window.location.assign('map-creator-playtest.html');
+        }, { once: true });
+        frame.src = `map-creator-playtest.html?drive=${Date.now()}`;
         this.creatorDriveDialog.showModal();
     }
 
