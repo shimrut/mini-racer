@@ -1,4 +1,5 @@
 import { CONFIG } from "../config.js";
+import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import {
   ageSparkParticles,
   getCarRearAxleWorldPoint,
@@ -361,6 +362,9 @@ export const raceEngineMethods = {
   startSequence() {
     if (this.activeRaceMode !== 'community' && isVerificationQueueSubmissionBlocked()) return;
     if (this.status !== "ready") return;
+
+    this.runTrackKey = this.currentTrackKey;
+    this.runTrackDefinitionIdentity = getTrackDefinitionIdentity(this.currentTrack);
 
     this.beginPbGhostSizeRun?.();
     this.status = "starting";

@@ -3,6 +3,7 @@ import { getMedalRowSlots } from '../medals/medal-timing.js';
 import { openMedalTimesPopover } from '../race/ui-modal-content.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import { createLockIconSvg } from './lock-icon.js';
 import {
     resolveTrackPresentation,
@@ -166,6 +167,7 @@ export function renderTrackPreviewCanvas(canvas, card, {
         : 'default-size';
     const previewKey = [
         card.trackKey,
+        getTrackDefinitionIdentity(track),
         card.skin || 'default',
         carAssetKey,
         previewCarSizeKey,
@@ -178,11 +180,13 @@ export function renderTrackPreviewCanvas(canvas, card, {
         cacheKey: [
             cacheNamespace,
             card.trackKey,
+            getTrackDefinitionIdentity(track),
             card.skin || 'default',
             carAssetKey,
             previewCarSizeKey,
         ].join(':'),
         trackGeometry: { outer: track.outer, inner: track.inner },
+        cornerRadius: track.cornerRadius,
         presentation: resolveTrackPresentation(card.trackKey, {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
             event: card.skin
@@ -212,9 +216,9 @@ export function fitTrackPreviewCanvas(canvas, card, options = {}) {
         canvas.width = width;
         canvas.height = height;
     }
-    if (!sizeChanged && canvas.dataset?.previewKey && !options.force) return false;
+    const previousKey = canvas.dataset?.previewKey;
     renderTrackPreviewCanvas(canvas, card, { ...options, force: sizeChanged || options.force });
-    return true;
+    return sizeChanged || previousKey !== canvas.dataset?.previewKey || Boolean(options.force);
 }
 
 export function findCarouselIndex(cards = [], challengeId = null) {

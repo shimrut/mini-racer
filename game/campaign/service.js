@@ -1,5 +1,5 @@
 import { API_ROUTES } from '../scoreboard/api-client.js';
-import { registerStoredTracksFromPayload } from '../track/stored-track-service.js';
+import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
 import { registerStoredSeries } from './stored-series.js';
 import {
     CAMPAIGN_ID,
@@ -132,8 +132,13 @@ export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
         if (requestedSeriesId !== CAMPAIGN_ID) url.searchParams.set('seriesId', requestedSeriesId);
         const response = await requestJson(url.toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
-        registerStoredTracksFromPayload(response.body.storedTracks);
         if (Array.isArray(response.body.storedSeries)) registerStoredSeries(response.body.storedSeries);
+        const trackKeys = (Array.isArray(response.body.stages)
+            ? response.body.stages
+            : getCampaignSeriesStages(normalizeSeriesId(response.body.campaignId)))
+            .map((stage) => stage.trackKey);
+        registerStoredTracksFromPayload(response.body.storedTracks, { confirmedTrackKeys: trackKeys });
+        await ensureStoredTracks(trackKeys, { requireConfirmation: true });
         const ranked = response.body.ranked === true;
         const authoritative = ranked
             && response.body.campaignProgressPromotionPending !== true;

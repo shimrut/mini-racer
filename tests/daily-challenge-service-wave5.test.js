@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { clearStoredTrackChecksForTests, registerStoredTracksFromPayload } from '../game/track/stored-track-service.js';
 import {
     cacheDailyChallengePlaylist,
     getActiveDailyChallenge,
@@ -32,6 +33,12 @@ function buildChallenge(overrides = {}) {
 }
 
 describe('daily-challenge service wave5', () => {
+    // These metadata/cache tests model a session whose race layout was already confirmed.
+    beforeEach(() => {
+        clearStoredTrackChecksForTests();
+        registerStoredTracksFromPayload([], { confirmedTrackKeys: ['circuit'] });
+    });
+
     let memoryLocalStorage;
 
     beforeEach(() => {

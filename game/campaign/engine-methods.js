@@ -5,6 +5,7 @@ import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
@@ -786,6 +787,7 @@ export const campaignEngineMethods = {
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeHeadToHead = null;
+            await this.ensureRankedTrackDefinition?.(stage.trackKey);
             if (replacesCurrentRun && stage.trackKey === this.currentTrackKey) {
                 this.reset(false, {
                     preserveRaceComparisonTarget,
@@ -793,7 +795,7 @@ export const campaignEngineMethods = {
                 });
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
-            if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas) {
+            if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
@@ -1086,7 +1088,7 @@ export const campaignEngineMethods = {
         const stage = this.activeCampaignStage;
         if (!stage || !this.currentChallengeRun) return;
 
-        const invalidReason = this.getInvalidWinDataReason?.(winData) ?? null;
+        const invalidReason = getStaleRunTrackReason(this) || this.getInvalidWinDataReason?.(winData) || null;
         if (invalidReason) {
             this.handleInvalidCampaignWin(invalidReason);
             return;

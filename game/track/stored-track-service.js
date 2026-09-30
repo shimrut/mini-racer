@@ -5,7 +5,7 @@
 // minutes, when a new Daily can start.
 
 import { isBuiltInTrack } from './catalog.js';
-import { getStoredTrack, registerStoredTrack } from './stored-tracks.js';
+import { getStoredTrack, registerStoredTrack, unregisterStoredTrack } from './stored-tracks.js';
 
 const STORED_TRACKS_URL = '/api/tracks/stored';
 const TRACK_KEY_RE = /^[a-z][A-Za-z0-9]{2,39}$/;
@@ -14,18 +14,28 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_KEYS_PER_REQUEST = 50;
 
 const checkedAtByKey = new Map();
+const confirmedKeys = new Set();
 const pendingByKey = new Map();
 
 function isTrackPoint(value) {
-    return value && typeof value === 'object' && Number.isFinite(value.x) && Number.isFinite(value.y);
+    return value && typeof value === 'object' && Number.isFinite(value.x) && Number.isFinite(value.y)
+        && (value.cornerRadius === undefined || (Number.isFinite(value.cornerRadius) && value.cornerRadius >= 0));
+}
+
+function isTrackLine(value) {
+    return value && isTrackPoint(value.p1) && isTrackPoint(value.p2);
 }
 
 function toStoredEntry(raw) {
     const track = raw?.track;
     if (typeof raw?.key !== 'string' || !TRACK_KEY_RE.test(raw.key)
         || !track || typeof track !== 'object'
-        || !Array.isArray(track.outer) || !Array.isArray(track.inner)
-        || !isTrackPoint(track.startPos)) {
+        || !Array.isArray(track.outer) || track.outer.length < 3 || !track.outer.every(isTrackPoint)
+        || !Array.isArray(track.inner) || track.inner.length < 3 || !track.inner.every(isTrackPoint)
+        || !isTrackPoint(track.startPos) || !isTrackLine(track.startLine)
+        || !Number.isFinite(track.startAngle)
+        || !Array.isArray(track.checkpoints) || !track.checkpoints.every(isTrackLine)
+        || (track.cornerRadius !== undefined && (!Number.isFinite(track.cornerRadius) || track.cornerRadius < 0))) {
         return null;
     }
     const name = typeof raw.name === 'string' && raw.name ? raw.name : String(track.name || raw.key);
@@ -39,16 +49,31 @@ function toStoredEntry(raw) {
 }
 
 // Registers the stored tracks that a server answer carries.
-export function registerStoredTracksFromPayload(tracks) {
-    for (const raw of Array.isArray(tracks) ? tracks : []) {
-        const entry = toStoredEntry(raw);
+export function registerStoredTracksFromPayload(tracks, { confirmedTrackKeys = [] } = {}) {
+    const requested = [...new Set(confirmedTrackKeys.filter((key) => typeof key === 'string' && TRACK_KEY_RE.test(key)))];
+    if (requested.length && !Array.isArray(tracks)) return;
+    const entries = (Array.isArray(tracks) ? tracks : []).map(toStoredEntry);
+    if (requested.length && entries.some((entry) => !entry)) {
+        requested.forEach((key) => confirmedKeys.delete(key));
+        throw new Error('The track layout could not be confirmed. Retry before racing.');
+    }
+    if (requested.some((key) => !isBuiltInTrack(key) && !entries.some((entry) => entry?.key === key))) {
+        requested.forEach((key) => confirmedKeys.delete(key));
+        throw new Error('The track layout could not be confirmed. Retry before racing.');
+    }
+    for (const entry of entries) {
         if (entry) registerStoredTrack(entry);
+    }
+    for (const key of requested) {
+        if (isBuiltInTrack(key) && !entries.some((entry) => entry?.key === key)) unregisterStoredTrack(key);
+        confirmedKeys.add(key);
     }
 }
 
-function needsCheck(trackKey, nowMs, includeBuiltIn) {
+function needsCheck(trackKey, nowMs, includeBuiltIn, requireConfirmation) {
     if (typeof trackKey !== 'string' || !TRACK_KEY_RE.test(trackKey)) return false;
     if (!includeBuiltIn && isBuiltInTrack(trackKey)) return false;
+    if (requireConfirmation) return !confirmedKeys.has(trackKey) && !pendingByKey.has(trackKey);
     if (getStoredTrack(trackKey)?.track) return false;
     if (pendingByKey.has(trackKey)) return false;
     const checkedAt = checkedAtByKey.get(trackKey);
@@ -65,33 +90,43 @@ async function requestStoredTracks(trackKeys) {
         );
         if (!response.ok) throw new Error(`Stored tracks unavailable (${response.status}).`);
         const body = await response.json();
-        for (const raw of Array.isArray(body?.tracks) ? body.tracks : []) {
-            const entry = toStoredEntry(raw);
-            if (entry && trackKeys.includes(entry.key)) registerStoredTrack(entry);
+        if (!Array.isArray(body?.tracks)) throw new Error('The track layout could not be confirmed. Retry before racing.');
+        if (body.tracks.some((raw) => !toStoredEntry(raw))) {
+            throw new Error('The track layout could not be confirmed. Retry before racing.');
         }
+        const requestedTracks = body.tracks.filter((raw) => trackKeys.includes(raw?.key));
+        // A binding API answer can confirm a newer layout while this cosmetic
+        // request is in flight. It takes precedence over the older request.
+        registerStoredTracksFromPayload(requestedTracks.filter((raw) => !confirmedKeys.has(raw.key)));
+        trackKeys.forEach((key) => {
+            if (!confirmedKeys.has(key) && isBuiltInTrack(key)
+                && !requestedTracks.some((raw) => raw.key === key)) unregisterStoredTrack(key);
+        });
+        return trackKeys.filter((key) => isBuiltInTrack(key) || requestedTracks.some((raw) => raw.key === key));
     } finally {
         if (timeoutId !== null) clearTimeout(timeoutId);
     }
 }
 
-// Waits until the stored copies of these tracks are in the game. A failed
-// request leaves the built-in tracks in use and does not throw. A built-in
-// key is asked about only with `includeBuiltIn`, because only an unplayed
-// built-in track can have a stored copy.
-export async function ensureStoredTracks(trackKeys = [], { includeBuiltIn = false } = {}) {
-    if (typeof fetch !== 'function') return;
-    const nowMs = Date.now();
+// Cosmetic prefetch remains best effort. Race preparation uses
+// requireConfirmation, including built-in keys, and must expose Retry on a
+// failed/invalid answer. A successful empty answer confirms the app definition.
+export async function ensureStoredTracks(trackKeys = [], { includeBuiltIn = false, requireConfirmation = false } = {}) {
     const wanted = [...new Set(Array.isArray(trackKeys) ? trackKeys : [trackKeys])];
-    const missing = wanted.filter((trackKey) => needsCheck(trackKey, nowMs, includeBuiltIn));
+    if (requireConfirmation && wanted.every((key) => !key || confirmedKeys.has(key))) return;
+    if (typeof fetch !== 'function') {
+        if (requireConfirmation) throw new Error('The track layout could not be confirmed. Retry before racing.');
+        return;
+    }
+    const nowMs = Date.now();
+    const missing = wanted.filter((trackKey) => needsCheck(trackKey, nowMs, includeBuiltIn || requireConfirmation, requireConfirmation));
     const waits = wanted.flatMap((trackKey) => (pendingByKey.has(trackKey) ? [pendingByKey.get(trackKey)] : []));
     for (let index = 0; index < missing.length; index += MAX_KEYS_PER_REQUEST) {
         const batch = missing.slice(index, index + MAX_KEYS_PER_REQUEST);
         const request = requestStoredTracks(batch)
-            .then(() => {
+            .then((answeredKeys) => {
                 batch.forEach((trackKey) => checkedAtByKey.set(trackKey, Date.now()));
-            })
-            .catch((error) => {
-                console.warn('Stored tracks could not load:', error);
+                return answeredKeys;
             })
             .finally(() => {
                 batch.forEach((trackKey) => {
@@ -101,10 +136,20 @@ export async function ensureStoredTracks(trackKeys = [], { includeBuiltIn = fals
         batch.forEach((trackKey) => pendingByKey.set(trackKey, request));
         waits.push(request);
     }
-    await Promise.all(waits);
+    try {
+        const answers = await Promise.all(waits);
+        if (requireConfirmation) answers.flat().forEach((key) => confirmedKeys.add(key));
+        if (requireConfirmation && wanted.some((key) => typeof key === 'string' && TRACK_KEY_RE.test(key) && !confirmedKeys.has(key))) {
+            throw new Error('The track layout could not be confirmed. Retry before racing.');
+        }
+    } catch (error) {
+        if (requireConfirmation) throw error;
+        console.warn('Stored tracks could not load:', error);
+    }
 }
 
 export function clearStoredTrackChecksForTests() {
     checkedAtByKey.clear();
+    confirmedKeys.clear();
     pendingByKey.clear();
 }

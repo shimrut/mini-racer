@@ -211,6 +211,7 @@ function renderTrackPreview(canvas, trackKey, track, skin = 'default', carImage 
 
     renderTrackPreviewCanvas(canvas, {
         trackGeometry: { outer: track.outer, inner: track.inner },
+        cornerRadius: track.cornerRadius,
         presentation,
         startLine: track.startLine,
         startPos: track.startPos,

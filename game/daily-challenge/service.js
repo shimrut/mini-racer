@@ -727,11 +727,17 @@ export async function getActiveDailyChallenge({
         clearDailyStartOverride();
     }
 
-    if (!ignorePostData) await ensureStoredTracks([readDevvitPostData()?.challenge?.trackKey]);
+    const requireConfirmation = !shouldUseMockDailyChallenge();
+    const rawPostChallenge = ignorePostData ? null : readDevvitPostData()?.challenge;
+    if (typeof rawPostChallenge?.id === 'string' && rawPostChallenge.id.trim()
+        && !hasTrack(rawPostChallenge.trackKey)) {
+        await ensureStoredTracks([rawPostChallenge.trackKey], { requireConfirmation });
+    }
     const postChallenge = ignorePostData ? null : getPostBoundDailyChallengeFromContext();
     if (postChallenge) {
         cacheDailyChallengePlaylist([postChallenge]);
         if (allowExpiredPost || isChallengeStillUsable(postChallenge)) {
+            await ensureStoredTracks([postChallenge.trackKey], { requireConfirmation });
             return postChallenge;
         }
     }
@@ -742,8 +748,8 @@ export async function getActiveDailyChallenge({
     if (config && typeof fetch === 'function') {
         try {
             const payload = await readDailyJson(config.dailyActiveUrl, { method: 'GET' });
-            registerStoredTracksFromPayload(payload?.storedTracks);
-            await ensureStoredTracks([payload?.trackKey]);
+            registerStoredTracksFromPayload(payload?.storedTracks, { confirmedTrackKeys: [payload?.trackKey] });
+            await ensureStoredTracks([payload?.trackKey], { requireConfirmation });
             const challenge = normalizeDailyChallenge(payload);
             if (challenge) {
                 writeActiveDailyCacheStorable(challenge);
@@ -753,6 +759,7 @@ export async function getActiveDailyChallenge({
             console.warn('Failed to fetch active daily challenge from server, trying fallbacks:', error);
             if (!shouldUseMockDailyChallenge()) {
                 if (cachedChallenge) {
+                    await ensureStoredTracks([cachedChallenge.trackKey], { requireConfirmation });
                     return cachedChallenge;
                 }
                 throw error;
@@ -761,6 +768,7 @@ export async function getActiveDailyChallenge({
     }
 
     if (cachedChallenge) {
+        await ensureStoredTracks([cachedChallenge.trackKey], { requireConfirmation });
         return cachedChallenge;
     }
 
@@ -777,8 +785,11 @@ async function loadDailyChallengePlaylist() {
                 : Array.isArray(payload?.challenges)
                     ? payload.challenges
                     : [];
-            registerStoredTracksFromPayload(payload?.storedTracks);
-            await ensureStoredTracks(rawChallenges.map((challenge) => challenge?.trackKey));
+            const trackKeys = rawChallenges.map((challenge) => challenge?.trackKey);
+            registerStoredTracksFromPayload(payload?.storedTracks, {
+                confirmedTrackKeys: Array.isArray(payload?.storedTracks) ? trackKeys : [],
+            });
+            await ensureStoredTracks(trackKeys);
             const parsed = rawChallenges
                 .map((challenge) => normalizeDailyChallenge(challenge))
                 .filter(Boolean);

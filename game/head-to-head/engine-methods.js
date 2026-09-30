@@ -1,5 +1,6 @@
 import { getTrackName } from '../track/catalog.js';
 import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
+import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
 import {
     confirmHeadToHeadComment,
     getHeadToHead,
@@ -215,8 +216,8 @@ export const headToHeadEngineMethods = {
         if (challengeReady && typeof this.loadTrack === 'function') {
             try {
                 onTrackPhase?.();
-                registerStoredTracksFromPayload(response.body?.storedTracks);
-                await ensureStoredTracks([challenge.trackKey]);
+                registerStoredTracksFromPayload(response.body?.storedTracks, { confirmedTrackKeys: [challenge.trackKey] });
+                await ensureStoredTracks([challenge.trackKey], { requireConfirmation: true });
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
@@ -329,7 +330,8 @@ export const headToHeadEngineMethods = {
             this.activeRaceMode = 'challenge';
             this.clearRaceComparisonTarget?.();
             this.pbGhost.clearTrack();
-            if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas) {
+            await this.ensureRankedTrackDefinition?.(stage.trackKey);
+            if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
@@ -387,7 +389,8 @@ export const headToHeadEngineMethods = {
         void this.journeys?.endAttempt?.({ complete: true });
         const finalTime = Number(winData?.lapTime);
         const replay = this.scoreboardReplay.getPayload(challenge.lapCount);
-        const submissionBlockedReason = this.rankedSubmissionBlockedReason
+        const staleTrackReason = getStaleRunTrackReason(this);
+        const submissionBlockedReason = staleTrackReason || this.rankedSubmissionBlockedReason
             || (replay ? null : 'This run could not be verified.');
 
         const finalTimeMs = Number.isFinite(finalTime) ? Math.round(finalTime * 1000) : null;
@@ -518,6 +521,10 @@ export const headToHeadEngineMethods = {
             }
         };
 
+        if (staleTrackReason) {
+            openPendingFinish({ phase: 'error', error: staleTrackReason });
+            return;
+        }
         if (settlesLocally) {
             openPendingFinish({ phase: localDifferenceMs === 0 ? 'tie' : 'lost' });
             if (!submissionBlockedReason && beatsViewerBest) void claimSettledBest();
@@ -538,6 +545,12 @@ export const headToHeadEngineMethods = {
         void (async () => {
             let retryIndex = 0;
             while (stillOnThisFinish()) {
+                const changedTrackReason = getStaleRunTrackReason(this);
+                if (changedTrackReason) {
+                    revertOptimisticWin();
+                    openPendingFinish({ phase: 'error', error: changedTrackReason });
+                    return;
+                }
                 let confirmationFailed = false;
                 let response = { ok: false, body: { error: 'This run could not be verified.' } };
                 try {

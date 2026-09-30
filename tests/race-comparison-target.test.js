@@ -354,6 +354,7 @@ describe('leaderboard race comparison target', () => {
     }
 
     expect(engine.reset).toHaveBeenCalledWith(false, {
+      preserveDailyChallenge: false,
       preserveRaceComparisonTarget: true,
       showStartOverlay: false,
     });

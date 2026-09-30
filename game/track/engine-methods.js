@@ -12,12 +12,20 @@ import {
 import { configureCanvasViewport } from "./canvas-resolution.js";
 import {
   readCanvasDevicePixelRatio,
+  isLocalEnvironment,
 } from "./environment.js";
+import { ensureStoredTracks } from './stored-track-service.js';
 import { getPlayerProgressState } from "../player/progress-state.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 
 export const trackEngineMethods = {
+  async ensureRankedTrackDefinition(trackKey) {
+    if (this.activeRaceMode === 'community' || isLocalEnvironment()
+      || this.activeDailyChallenge?.id === 'mock-daily-challenge-local') return;
+    await ensureStoredTracks([trackKey], { requireConfirmation: true });
+  },
+
   getTrackPresentation(
     trackKey = this.currentTrackKey,
     { surface = TRACK_PRESENTATION_SURFACES.RACE } = {},
@@ -115,13 +123,14 @@ export const trackEngineMethods = {
     {
       loadPlayerProgress = true,
       preserveDailyChallengeContext = false,
+      preserveDailyChallengeOnReset = false,
       preserveRaceComparisonTarget = false,
       showStartOverlayOnReset = true,
     } = {},
   ) {
     const requestId = ++this.trackLoadRequestId;
     const nextTrack = await loadClientTrack(trackKey);
-    if (!nextTrack) return;
+    if (!nextTrack) throw new Error('The track layout could not be confirmed. Retry before racing.');
     if (requestId !== this.trackLoadRequestId) return;
     this.currentTrack = nextTrack;
     this.currentTrackKey = trackKey;
@@ -160,6 +169,7 @@ export const trackEngineMethods = {
 
     if (!loadPlayerProgress) {
       this.reset(false, {
+        preserveDailyChallenge: preserveDailyChallengeOnReset,
         preserveRaceComparisonTarget,
         showStartOverlay: showStartOverlayOnReset,
       });
@@ -187,7 +197,7 @@ export const trackEngineMethods = {
       this.hud.setBestTime(null);
     }
 
-    this.reset(false, { preserveRaceComparisonTarget });
+    this.reset(false, { preserveRaceComparisonTarget, preserveDailyChallenge: preserveDailyChallengeOnReset });
     if (
       document.activeElement &&
       typeof document.activeElement.blur === "function"

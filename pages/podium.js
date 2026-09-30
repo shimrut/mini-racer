@@ -1,5 +1,4 @@
 import { TRACKS } from '../game/track/tracks.js';
-import { isBuiltInTrack } from '../game/track/catalog.js';
 import { ensureStoredTracks } from '../game/track/stored-track-service.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { getPosterCarAssetName } from '../game/track/poster-car.js';
@@ -400,10 +399,10 @@ function resolvePodiumTrack(podium) {
 }
 
 async function loadStoredPodiumTrack(podium, fetchReplays) {
-    if (podium.trackKey || resolveTrackByName(podium.trackName)) return;
-    const trackKey = cleanText((await fetchReplays())?.trackKey);
-    if (!trackKey || isBuiltInTrack(trackKey)) return;
-    await ensureStoredTracks([trackKey]);
+    const trackKey = cleanText(podium.trackKey || resolveTrackByName(podium.trackName)?.trackKey
+        || (await fetchReplays())?.trackKey);
+    if (!trackKey) return;
+    await ensureStoredTracks([trackKey], { includeBuiltIn: true });
     if (TRACKS[trackKey]) storedPodiumTrackKey = trackKey;
 }
 
@@ -427,6 +426,7 @@ function renderPodiumTrack(podium, documentRef = typeof document !== 'undefined'
     const paint = (carImage = null) => {
         renderTrackPreviewCanvas(canvas, {
             trackGeometry: { outer: track.outer, inner: track.inner },
+            cornerRadius: track.cornerRadius,
             presentation,
             startLine: track.startLine,
             startPos: track.startPos,

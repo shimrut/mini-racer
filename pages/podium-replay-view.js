@@ -4,7 +4,6 @@ import { interpolatePbGhostPose, normalizePbGhostRecord } from '../game/ghost/pb
 import { isLocalEnvironment } from '../game/track/environment.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
-import { isBuiltInTrack } from '../game/track/catalog.js';
 import { ensureStoredTracks } from '../game/track/stored-track-service.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
@@ -492,6 +491,7 @@ export function createPodiumReplayController({
 
         renderTrackPreviewCanvas(canvas, {
             trackGeometry: { outer: track.outer, inner: track.inner },
+            cornerRadius: track.cornerRadius,
             presentation: resolveTrackPresentation(trackKey, {
                 surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
                 ground: track.ground,
@@ -552,7 +552,7 @@ export function createPodiumReplayController({
             state.visible = new Set(normalized.records.keys());
             state.trackKey = normalized.trackKey;
             state.trackName = trackName || '';
-            if (state.trackKey && !isBuiltInTrack(state.trackKey)) await ensureStoredTracks([state.trackKey]);
+            if (state.trackKey) await ensureStoredTracks([state.trackKey], { includeBuiltIn: true });
             await loadReplayCars();
             return normalized.records.size > 0;
         },

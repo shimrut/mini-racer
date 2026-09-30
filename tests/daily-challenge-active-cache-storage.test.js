@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { clearStoredTrackChecksForTests, registerStoredTracksFromPayload } from '../game/track/stored-track-service.js';
 import * as catalog from '../game/track/catalog.js';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
@@ -12,6 +13,12 @@ function futureIso(hoursFromNow = 24) {
 }
 
 describe('daily-challenge active cache storage', () => {
+    // These metadata/cache tests model a session whose race layout was already confirmed.
+    beforeEach(() => {
+        clearStoredTrackChecksForTests();
+        registerStoredTracksFromPayload([], { confirmedTrackKeys: ['circuit'] });
+    });
+
     let memoryLocalStorage;
 
     afterEach(() => {

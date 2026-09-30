@@ -15,6 +15,7 @@ import {
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { hasTrack } from '../track/catalog.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../track/presentation.js';
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
@@ -419,11 +420,12 @@ export class DailyChallengeUi {
             ground: track.ground
         });
         renderCachedTrackPreviewCanvas(canvas, {
-            cacheKey: `daily-row:${challenge.trackKey}:${challenge.skin || 'default'}`,
+            cacheKey: `daily-row:${challenge.trackKey}:${getTrackDefinitionIdentity(track)}:${challenge.skin || 'default'}`,
             trackGeometry: {
                 outer: track.outer,
                 inner: track.inner
             },
+            cornerRadius: track.cornerRadius,
             presentation,
             startLine: track.startLine,
             startPos: track.startPos,

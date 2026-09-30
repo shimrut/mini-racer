@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { clearStoredTrackChecksForTests, registerStoredTracksFromPayload } from '../game/track/stored-track-service.js';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
 
@@ -7,6 +8,12 @@ function createJsonResponse(body) {
 }
 
 describe('daily-challenge start override boundaries', () => {
+    // These metadata/cache tests model a session whose race layout was already confirmed.
+    beforeEach(() => {
+        clearStoredTrackChecksForTests();
+        registerStoredTracksFromPayload([], { confirmedTrackKeys: ['circuit'] });
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
         delete globalThis.window;

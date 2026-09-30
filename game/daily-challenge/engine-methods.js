@@ -44,6 +44,7 @@ import {
 import { getTrackCanvasAsset } from "../track/assets.js";
 import { DEFAULT_TRACK_KEY } from "../track/catalog.js";
 import { getLoadedClientTrack, loadClientTrack } from "../track/client-registry.js";
+import { getStaleRunTrackReason, hasChangedTrackDefinition, hasCurrentTrackDefinition, reloadChangedRaceTrack } from "../track/race-definition.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -455,7 +456,7 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    if (this.currentTrackKey === targetTrackKey && this.trackCanvas) {
+    if (hasCurrentTrackDefinition(this, targetTrackKey)) {
       await this.refreshTrackPresentation();
       return;
     }
@@ -739,9 +740,10 @@ export const dailyChallengeEngineMethods = {
       this.lastPlayedDailyChallenge = challenge;
       this.selectedDailyChallengeId = challenge.id;
       this.activeDailyChallenge = challenge;
+      await this.ensureRankedTrackDefinition?.(challenge.trackKey);
       if (
         challenge.trackKey
-        && (challenge.trackKey !== this.currentTrackKey || !this.trackCanvas)
+        && !hasCurrentTrackDefinition(this, challenge.trackKey)
       ) {
         await this.loadTrack(challenge.trackKey, {
           loadPlayerProgress: false,
@@ -1106,12 +1108,12 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    const invalidReason = (
+    const invalidReason = getStaleRunTrackReason(this) || ((
       typeof this.isValidatedWinData === "function"
       && this.isValidatedWinData !== dailyChallengeEngineMethods.isValidatedWinData
     )
       ? (this.isValidatedWinData(winData) ? null : "Finish could not be verified.")
-      : getInvalidDailyChallengeWinReason(this, winData);
+      : getInvalidDailyChallengeWinReason(this, winData));
     if (invalidReason) {
       this.handleInvalidDailyChallengeWin(invalidReason);
       return;
@@ -1382,6 +1384,15 @@ export const dailyChallengeEngineMethods = {
 
   restartDailyChallenge({ reason = "restart" } = {}) {
     if (!this.activeDailyChallenge) return;
+    if (hasChangedTrackDefinition(this)) {
+      return reloadChangedRaceTrack(this, { preserveRaceComparisonTarget: reason !== "improve" })
+        .then(() => this.restartDailyChallenge({ reason }))
+        .catch((error) => {
+          console.error("Could not prepare the updated Daily track:", error);
+          this.showDailyLobby?.({ selectChallengeId: this.activeDailyChallenge?.id });
+          this.lobbyUi?.setRaceStartError?.("daily", "Could not confirm this track. Retry before racing.");
+        });
+    }
 
     void this.journeys?.endAttempt?.({ complete: false });
     void this.journeys?.startAttempt?.({ mode: "daily", reason });

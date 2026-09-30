@@ -3,6 +3,7 @@ import {
     deferLobbyWorkUntilAfterPaint,
 } from '../lobby/deferred-work.js';
 import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
+import { hasChangedTrackDefinition, reloadChangedRaceTrack } from '../track/race-definition.js';
 
 export const modeRouterEngineMethods = {
     showHomeLobby() {
@@ -86,10 +87,18 @@ export const modeRouterEngineMethods = {
         }
         if (isVerificationQueueSubmissionBlocked()) return;
         if (this.activeRaceMode === 'daily') {
-            this.restartDailyChallenge({ reason: 'restart' });
-            return;
+            return this.restartDailyChallenge({ reason: 'restart' });
         }
         if (!this.currentChallengeRun) return;
+        if (hasChangedTrackDefinition(this)) {
+            return reloadChangedRaceTrack(this)
+                .then(() => this.restartActiveRace())
+                .catch((error) => {
+                    console.error('Could not prepare the updated race track:', error);
+                    this.returnToActiveLobby?.();
+                    this.lobbyUi?.setRaceStartError?.(this.activeRaceMode, 'Could not confirm this track. Retry before racing.');
+                });
+        }
         if (this.activeRaceMode === 'challenge') this.recordHeadToHeadStart?.();
         void this.journeys?.endAttempt?.({ complete: false });
         void this.journeys?.startAttempt?.({ mode: this.activeRaceMode, reason: 'restart' });

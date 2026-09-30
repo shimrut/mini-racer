@@ -5,8 +5,9 @@
 //
 // A stored entry: { key, name, ground, medalRow, track }. `track` is the shape
 // with its name. `medalRow` is { gold, silver, bronze, author } or null.
-// This file has no imports, so the catalog, the medal times and the server
-// can all use it.
+// Its identity helper is independent of the catalog and the medal times.
+
+import { getTrackDefinitionIdentity } from './definition-identity.js';
 
 const localStoredTracks = new Map();
 let storedTrackResolver = (trackKey) => localStoredTracks.get(trackKey) ?? null;
@@ -30,9 +31,18 @@ export function setStoredTrackResolver(resolver) {
 
 export function registerStoredTrack(entry) {
     if (!entry || typeof entry.key !== 'string' || !entry.key) return null;
-    const frozen = Object.freeze({ ...entry });
+    const previous = localStoredTracks.get(entry.key);
+    const track = previous?.track && entry.track && previous.track.name === entry.track.name
+        && getTrackDefinitionIdentity(previous?.track) === getTrackDefinitionIdentity(entry.track)
+        ? previous.track
+        : entry.track;
+    const frozen = Object.freeze({ ...entry, track });
     localStoredTracks.set(entry.key, frozen);
     return frozen;
+}
+
+export function unregisterStoredTrack(trackKey) {
+    localStoredTracks.delete(trackKey);
 }
 
 export function clearStoredTracksForTests() {

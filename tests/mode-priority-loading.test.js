@@ -48,10 +48,10 @@ describe('mode-priority startup', () => {
             'invokeModeMethod("challenge", "previewHeadToHead"',
         );
         expect(dailySource).toContain(
-            '&& (challenge.trackKey !== this.currentTrackKey || !this.trackCanvas)',
+            '&& !hasCurrentTrackDefinition(this, challenge.trackKey)',
         );
         expect(campaignSource).toContain(
-            'if (stage.trackKey !== this.currentTrackKey || !this.trackCanvas)',
+            'if (!hasCurrentTrackDefinition(this, stage.trackKey))',
         );
     });
 

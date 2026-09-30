@@ -28,6 +28,7 @@ import {
 } from '../game/daily-challenge/labels.js';
 import { setDailyChallengeBestTime } from '../game/daily-challenge/storage.js';
 import { createMemoryLocalStorage } from './helpers/memory-local-storage.js';
+import { clearStoredTrackChecksForTests } from '../game/track/stored-track-service.js';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const MINIMAL_REPLAY = { inputs: [] };
@@ -36,7 +37,9 @@ function createJsonResponse(body, { ok = true, status = 200 } = {}) {
     return {
         ok,
         status,
-        json: async () => body
+        json: async () => body && !Array.isArray(body)
+            ? { tracks: [], storedTracks: [], ...body }
+            : body,
     };
 }
 
@@ -44,11 +47,14 @@ describe('daily-challenge service', () => {
     let memoryLocalStorage;
 
     beforeEach(() => {
+        clearStoredTrackChecksForTests();
         memoryLocalStorage = createMemoryLocalStorage();
         globalThis.window = {
             localStorage: memoryLocalStorage
         };
-        globalThis.fetch = vi.fn();
+        globalThis.fetch = vi.fn(async (url) => url.startsWith('/api/tracks/stored?')
+            ? createJsonResponse({ tracks: [] })
+            : undefined);
     });
 
     afterEach(() => {
@@ -234,6 +240,7 @@ describe('daily-challenge service', () => {
         fetch.mockResolvedValue({
             ok: true,
             json: async () => ({
+                storedTracks: [],
                 id: VALID_UUID,
                 trackKey: 'circuit',
                 challengeDate: '2026-04-14',
@@ -312,7 +319,7 @@ describe('daily-challenge service', () => {
 
         const challenge = await getActiveDailyChallenge({ allowExpiredPost: true });
 
-        expect(fetch).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledWith('/api/tracks/stored?keys=albertGardens', expect.any(Object));
         expect(challenge.id).toBe('daily-gp-2026-06-02');
     });
 
@@ -719,6 +726,7 @@ describe('daily-challenge service', () => {
         fetch.mockResolvedValue({
             ok: true,
             json: async () => ({
+                storedTracks: [],
                 challenges: [
                     {
                         id: 'daily-gp-2026-05-24',
@@ -732,7 +740,7 @@ describe('daily-challenge service', () => {
                         objectiveParams: {},
                         skin: 'default',
                     },
-                    { id: 'bad', trackKey: 'missing' },
+                    { id: 'bad', trackKey: 'Bad Key' },
                 ],
             }),
         });
@@ -1464,7 +1472,7 @@ describe('daily-challenge service', () => {
     });
 
     it('accepts a bare array playlist payload from the server', async () => {
-        fetch.mockResolvedValue(createJsonResponse([
+        const playlistResponse = createJsonResponse([
             {
                 id: 'daily-gp-array-payload',
                 trackKey: 'circuit',
@@ -1475,7 +1483,10 @@ describe('daily-challenge service', () => {
                 objectiveParams: {},
                 skin: 'default',
             },
-        ]));
+        ]);
+        fetch.mockImplementation(async (url) => url.startsWith('/api/tracks/stored?')
+            ? createJsonResponse({ tracks: [] })
+            : playlistResponse);
 
         const playlist = await getDailyChallengePlaylist({ forceRefresh: true });
 
@@ -1799,7 +1810,7 @@ describe('daily-challenge service', () => {
         vi.resetModules();
     });
 
-    it('normalizes active-cache objective and skin fallbacks before reuse', async () => {
+    it('requires layout confirmation before reusing cached active metadata offline', async () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const endsAt = new Date(Date.now() + 3600_000).toISOString();
         memoryLocalStorage.setItem('VectorGpActiveDailyChallengeCache', JSON.stringify({
@@ -1820,13 +1831,7 @@ describe('daily-challenge service', () => {
         };
         fetch.mockRejectedValue(new Error('offline'));
 
-        const challenge = await getActiveDailyChallenge();
-
-        expect(challenge).toMatchObject({
-            id: 'cache-fallback-fields',
-            objectiveType: 'single_lap_fastest',
-            skin: 'default',
-        });
+        await expect(getActiveDailyChallenge()).rejects.toThrow('offline');
     });
 
     it('swallows errors while clearing the featured start override', async () => {

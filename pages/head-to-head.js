@@ -1,5 +1,5 @@
 import { TRACKS } from '../game/track/tracks.js';
-import { getTrackName, isBuiltInTrack } from '../game/track/catalog.js';
+import { getTrackName } from '../game/track/catalog.js';
 import { ensureStoredTracks } from '../game/track/stored-track-service.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { createPosterCarDrive, loadPosterCar } from '../game/track/poster-car.js';
@@ -183,6 +183,7 @@ function renderChallengeTrack(documentRef, trackKey, carImage = null, carTravel 
     canvas.height = height;
     renderTrackPreviewCanvas(canvas, {
         trackGeometry: { outer: track.outer, inner: track.inner },
+        cornerRadius: track.cornerRadius,
         presentation: resolveTrackPresentation(trackKey, {
             surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
             ground: track.ground,
@@ -228,7 +229,7 @@ export function bootHeadToHead(documentRef = document, root = globalThis) {
 // A track made in the Creator is not in the app, so the page loads it first.
 async function startHeadToHead() {
     const trackKey = cleanText(readHeadToHeadPostData(globalThis)?.trackKey);
-    if (trackKey && !isBuiltInTrack(trackKey)) await ensureStoredTracks([trackKey]);
+    if (trackKey) await ensureStoredTracks([trackKey], { includeBuiltIn: true });
     bootHeadToHead();
 }
 

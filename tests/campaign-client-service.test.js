@@ -69,6 +69,7 @@ describe('campaign client progress', () => {
             ok: true,
             status: 200,
             json: vi.fn().mockResolvedValue({
+                storedTracks: [],
                 ranked: true,
                 signedIn: false,
                 stages: [],
@@ -146,6 +147,7 @@ describe('campaign client progress', () => {
                 signedIn: true,
                 guestPromotionPending: true,
                 campaignProgressPromotionPending: true,
+                storedTracks: [],
                 progress: { resultsByRaceId: {} },
             }),
         });
@@ -167,6 +169,7 @@ describe('campaign client progress', () => {
                 signedIn: true,
                 guestPromotionPending: true,
                 campaignProgressPromotionPending: false,
+                storedTracks: [],
                 progress: { resultsByRaceId: {} },
             }),
         });
