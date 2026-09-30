@@ -18,7 +18,8 @@ import {
 // Tracks made in the Creator, and copies of built-in tracks that nobody has
 // raced. Each subreddit install has its own Redis, so each has its own list.
 
-export type AuthoredMedalRow = { author: number; gold: number; silver: number; bronze: number };
+// A copy of a built-in track keeps the app row, which can have no author time.
+export type AuthoredMedalRow = { author: number | null; gold: number; silver: number; bronze: number };
 export type StoredTrackOrigin = 'creator' | 'migrated';
 export type StoredTrackLockReason = 'daily' | 'series';
 
@@ -275,6 +276,9 @@ export type SaveStoredTrackOptions = {
     username: string;
     baseRevision?: unknown;
     origin?: StoredTrackOrigin;
+    // Only for an exact copy of a built-in track: the app already approved
+    // its shape and its medal times, so the checks do not run again.
+    trusted?: boolean;
     now?: Date;
 };
 
@@ -283,7 +287,7 @@ export type SaveStoredTrackOptions = {
 export async function saveStoredTrack(
     trackKeyInput: unknown,
     input: unknown,
-    { username, baseRevision = 0, origin = 'creator', now = new Date() }: SaveStoredTrackOptions,
+    { username, baseRevision = 0, origin = 'creator', trusted = false, now = new Date() }: SaveStoredTrackOptions,
 ): Promise<StoredTrackRecord> {
     const trackKey = assertTrackKey(trackKeyInput);
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -295,11 +299,17 @@ export async function saveStoredTrack(
     const draftLoop = normalizeDraftLoop(payload.draftLoop);
     let medalRow: AuthoredMedalRow | null = null;
     if (payload.medalRow !== null && payload.medalRow !== undefined) {
-        const error = getMedalRowError(payload.medalRow);
-        if (error) throw new TrackInputError(error);
-        medalRow = normalizeMedalRow(payload.medalRow) as AuthoredMedalRow;
+        if (trusted) {
+            medalRow = normalizeGameMedalRow(payload.medalRow);
+        } else {
+            const error = getMedalRowError(payload.medalRow);
+            if (error) throw new TrackInputError(error);
+            medalRow = normalizeMedalRow(payload.medalRow) as AuthoredMedalRow;
+        }
     }
-    const { checksPassed, checkError } = runTrackChecks(track, draftLoop);
+    const { checksPassed, checkError } = trusted && !draftLoop.length
+        ? { checksPassed: true, checkError: null }
+        : runTrackChecks(track, draftLoop);
 
     return withTrackWriteLock(trackKey, async () => {
         const existing = await readStoredTrack(trackKey);

@@ -330,7 +330,8 @@ const TRACK_GEOMETRY = {
     lapinLoop,
 };
 
-const BUILT_IN_TRACKS = Object.fromEntries(
+// The tracks in the app, without the stored tracks.
+export const BUILT_IN_TRACKS = Object.fromEntries(
     Object.keys(TRACK_CATALOG).map((trackKey) => [
         trackKey,
         { name: TRACK_CATALOG[trackKey].name, ...TRACK_GEOMETRY[trackKey] },

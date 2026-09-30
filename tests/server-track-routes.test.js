@@ -35,6 +35,8 @@ function deps(overrides = {}) {
         readPlacedStoredTracks: vi.fn(async (keys) => keys.map((key) => ({ key }))),
         readCreatorDailyView: vi.fn(async () => ({ latestTrackKey: 'circuit', schedule: { keys: ['circuit'] } })),
         saveDailySchedule: vi.fn(async () => ({})),
+        runTrackMigration: vi.fn(async (options) => ({ dryRun: Boolean(options.dryRun), copied: ['smallSteps'] })),
+        readMigrationReport: vi.fn(async () => null),
         ...overrides,
     };
 }
@@ -132,6 +134,16 @@ describe('track routes', () => {
         const base = await startApp(dependencies);
         expect((await fetch(`${base}/api/creator/daily`)).status).toBe(403);
         expect(dependencies.readCreatorDailyView).not.toHaveBeenCalled();
+    });
+
+    it('shows a dry run of the copy, and runs it on POST', async () => {
+        const dependencies = deps();
+        const base = await startApp(dependencies);
+        const preview = await (await fetch(`${base}/api/creator/migration`)).json();
+        expect(preview).toEqual({ report: null, preview: { dryRun: true, copied: ['smallSteps'] } });
+        const run = await (await fetch(`${base}/api/creator/migration`, { method: 'POST' })).json();
+        expect(run.report.dryRun).toBe(false);
+        expect(dependencies.runTrackMigration).toHaveBeenLastCalledWith({ username: 'RaceMod' });
     });
 
     it('gives players placed tracks without a moderator check, 50 keys at most', async () => {

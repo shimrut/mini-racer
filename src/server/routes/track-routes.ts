@@ -21,6 +21,8 @@ export type TrackRouteDependencies = {
     isTrackPlaced(trackKey: string): Promise<boolean>;
     readPlacedStoredTracks(trackKeys: string[]): Promise<unknown[]>;
     readCreatorDailyView(): Promise<{ latestTrackKey: string | null }>;
+    runTrackMigration(options: { username: string; dryRun?: boolean }): Promise<unknown>;
+    readMigrationReport(): Promise<unknown>;
     saveDailySchedule(
         keys: unknown,
         options: { username: string; baseRevision?: unknown; currentTrackKey?: string | null },
@@ -124,6 +126,28 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
                 currentTrackKey: latestTrackKey,
             });
             res.json(await dependencies.readCreatorDailyView());
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    // The last copy of unplayed tracks, and what a copy now would do.
+    app.get('/api/creator/migration', async (_req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            res.json({
+                report: await dependencies.readMigrationReport(),
+                preview: await dependencies.runTrackMigration({ username, dryRun: true }),
+            });
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.post('/api/creator/migration', async (_req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            res.json({ report: await dependencies.runTrackMigration({ username }) });
         } catch (error) {
             errorResponse(res, error);
         }

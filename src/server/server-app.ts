@@ -73,6 +73,7 @@ import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
 import { registerTrackRoutes } from './routes/track-routes.js';
 import { isTrackInDailySchedule, saveDailySchedule } from './daily/daily-schedule-store.js';
 import { readCreatorDailyView } from './daily/daily-schedule-view.js';
+import { readMigrationReport, runTrackMigration } from './tracks/track-migration.js';
 import {
     deleteStoredTrack,
     describePlacedStoredTracks,
@@ -144,6 +145,8 @@ function registerProductionRoutes(app: express.Application): void {
         readPlacedStoredTracks,
         readCreatorDailyView,
         saveDailySchedule,
+        runTrackMigration: (options) => runTrackMigration(options),
+        readMigrationReport,
     });
     registerCommunityMapRoutes(app, {
         resolveCreatorToolSubredditName,
