@@ -11,11 +11,16 @@ release is necessary for a new track or a new series.
 
 ## Scope
 
-- **Stays in the app, with no change:** the live Campaign (Numbers) and every
-  played or in-play track.
-- **Goes to Redis:** new tracks with their medal times, the Daily list,
-  unplayed built-in tracks (future Daily tracks and stages of unpublished
-  series), and new Campaign series.
+- **Goes to Redis, editable:** new tracks with their medal times, the Daily
+  list, unplayed built-in tracks (future Daily tracks and stages of
+  unpublished series), and new Campaign series.
+- **Goes to Redis, locked (2026-10-01):** the tracks of past Dailies, and the
+  live Campaign (Numbers) with its stage tracks. A played track never
+  changes, so its copy is locked when it is written. A track whose Daily
+  players can still race waits for a later copy.
+- **Stays in the app until a later release:** the app keeps every track and
+  Numbers as a fallback. A release about a month later removes the app
+  tracks (see "Removal release" below).
 - **Not visible to players:** Community maps.
 - **Skipped:** Daily post share pictures. A Daily post without a picture works.
 
@@ -26,7 +31,10 @@ release is necessary for a new track or a new series.
 3. A stored track is locked when it becomes a Daily, when its series is
    published, or when a race result exists. The server refuses edits to a
    locked track and refuses to delete it.
-4. A copy of a built-in track must have the same fingerprint as the app copy.
+4. A copy of a built-in track must match the app track exactly: the whole
+   race shape, the name and the four medal times. The ghost fingerprint is
+   not enough, because it leaves out the corner rounding. A copy that does
+   not match is not written.
 5. Only moderators can use the Creator routes. The server checks each request.
 6. Players can read a stored track only when it is placed: in the Daily
    history, today's Daily, or a published series.
@@ -85,6 +93,44 @@ Each stage is one commit, with the tests green.
 - `dailygp:campaign:series:v1:<seriesId>`: one stored series.
 - `dailygp:tracks:v1:placement-write-lock:v1`: coordinates admission,
   authoring changes, and immutable placement commits.
+- `dailygp:tracks:v1:migration-lock`: one copy runs at a time.
+- `dailygp:tracks:v1:migration-report`,
+  `dailygp:tracks:v1:copy-report:played-dailies:v1` and
+  `dailygp:tracks:v1:copy-report:live-campaign:v1`: the last run of each copy.
+
+## The three copies
+
+The Creator's Copy tab has one button per copy. Each copy shows what it
+would do now and the report of its last run. A second run copies only what
+the first run did not copy. All three wait a few minutes around midnight UTC.
+
+1. **Unplayed tracks:** the tracks nobody has raced, the Daily list and the
+   hidden series. The Creator can change these copies.
+2. **Played Dailies:** the tracks of past Dailies (the stored history and the
+   fixed table of the first days), locked with the reason `daily`. A track
+   whose Daily players can still race waits. A live Campaign stage goes with
+   the Campaign copy.
+3. **Live Campaign:** each live app series, published with all its stages,
+   and its stage tracks locked with the reason `series`. One transaction
+   writes the series and its tracks. The game still reads Numbers from the
+   app; the Creator does not list the copy for editing.
+
+Saved times, leaderboards, PB ghosts, podiums and Head to Head posts find a
+track by its key. The server already reads a stored track first. An exact
+copy therefore changes nothing for players.
+
+## Removal release (later)
+
+After the three copies, every track is in Redis, and every new Daily uses
+its Redis copy. The release that removes the app tracks needs:
+
+1. A "ready to remove" check in the Creator: every app track has a locked,
+   exact Redis copy, and each live app series has its copy. Run it on
+   r/MiniRacerGame and on every dev install just before the release.
+2. An export of each install's stored tracks to a file, and a restore.
+3. The removal: the track files and their medal times leave the app; a
+   track missing from Redis becomes an error, not a fallback; Numbers is
+   read from its Redis copy; the tests get their own track data.
 
 ## Safety fixes before first release
 
@@ -133,3 +179,5 @@ These need a real subreddit install. Do them in the test subreddit first.
    immutable version or return a retryable error. Players who open the new
    Daily together all get the same Daily. Failed layout requests block ranked
    starts until Retry confirms the correct version.
+8. The three copies run on the test subreddit, and a past Daily, its podium
+   and a Numbers stage still race and show their leaderboards and ghosts.

@@ -317,6 +317,13 @@ either must stay complete when saved; remove its editable placement first to
 save unfinished work. Daily admission requires a live ground, and Campaign
 stages must match their series ground. Published tracks remain immutable.
 
+The Copy tab moves app tracks into Redis with three buttons. **Copy
+unplayed** copies the tracks nobody has raced, the Daily list and the hidden
+series; these copies stay editable. **Copy played Dailies** copies the tracks
+of past Dailies, and **Copy live Campaign** copies each live series with its
+stage tracks. These two write locked copies, and only exact copies of the
+app tracks. A track whose Daily players can still race waits for a later run.
+
 Save records the version submitted when pressed. You may keep editing or
 select another track/series while it runs; newer edits remain unsaved. Failed
 saves retain those edits and the last acknowledged revision. Test Drive
