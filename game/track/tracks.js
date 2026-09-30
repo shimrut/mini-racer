@@ -157,6 +157,10 @@ import warpedLoop from './definitions/warped-loop.js';
 import oldMountain from './definitions/old-mountain.js';
 import budapestRun from './definitions/budapest-run.js';
 import bucharestScramble from './definitions/bucharest-scramble.js';
+import babylonRace from './definitions/babylon-race.js';
+import centralDistrict from './definitions/central-district.js';
+import smallSteps from './definitions/small-steps.js';
+import lapinLoop from './definitions/lapin-loop.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -319,6 +323,10 @@ const TRACK_GEOMETRY = {
     oldMountain,
     budapestRun,
     bucharestScramble,
+    babylonRace,
+    centralDistrict,
+    smallSteps,
+    lapinLoop,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

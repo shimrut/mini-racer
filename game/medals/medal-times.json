@@ -952,5 +952,17 @@
     "gold": 10.62,
     "silver": 10.84,
     "bronze": 11.11
+  },
+  "babylonRace": {
+    "author": 10.28,
+    "gold": 10.49,
+    "silver": 10.76,
+    "bronze": 11.09
+  },
+  "smallSteps": {
+    "author": 7.13,
+    "gold": 7.31,
+    "silver": 7.52,
+    "bronze": 7.76
   }
 }

@@ -27,7 +27,10 @@ export function smoothPoly(points, radius) {
             continue;
         }
 
-        const r = Math.min(radius, len1 / 2.5, len2 / 2.5);
+        const pointRadius = Number.isFinite(curr.cornerRadius)
+            ? Math.max(0, curr.cornerRadius)
+            : radius;
+        const r = Math.min(pointRadius, len1 / 2.5, len2 / 2.5);
         const n1 = { x: v1.x / len1, y: v1.y / len1 };
         const n2 = { x: v2.x / len2, y: v2.y / len2 };
         const start = { x: curr.x - n1.x * r, y: curr.y - n1.y * r };

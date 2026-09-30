@@ -29,13 +29,18 @@ function getPreviewGeometry(trackGeometry, cornerRadius) {
         innerCache.set(inner, radiusCache);
     }
 
-    const radiusKey = Number.isFinite(cornerRadius) ? cornerRadius : 3;
+    // The Mapmaker can change one wall point's radius while reusing its arrays.
+    const radiusKey = JSON.stringify([
+        Number.isFinite(cornerRadius) ? cornerRadius : 3,
+        outer.map((point) => point.cornerRadius ?? null),
+        inner.map((point) => point.cornerRadius ?? null),
+    ]);
     let geometry = radiusCache.get(radiusKey);
     if (!geometry) {
         geometry = buildTrackGeometry({
             outer,
             inner,
-            cornerRadius: radiusKey
+            cornerRadius: Number.isFinite(cornerRadius) ? cornerRadius : 3
         });
         radiusCache.set(radiusKey, geometry);
     }

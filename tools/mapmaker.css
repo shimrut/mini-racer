@@ -563,6 +563,10 @@ button.track-card:hover:not(:disabled) {
     display: none;
 }
 
+.touch-tools[data-tool="corner"] [data-action$="-point"] {
+    display: none;
+}
+
 @media (pointer: coarse) {
     :root {
         --maker-control-height: 2.5rem;

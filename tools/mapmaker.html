@@ -66,7 +66,12 @@
                 <h2>Shape</h2>
                 <div class="field">
                     <span id="corner-label">Wall corners</span>
+                    <div id="corner-radius-scope" class="segmented" role="group" aria-label="Apply wall corners to">
+                        <button type="button" data-scope="track">Whole track</button>
+                        <button type="button" data-scope="corner">Selected corner</button>
+                    </div>
                     <div id="corner-radius-options" class="segmented segmented-grid" role="radiogroup" aria-labelledby="corner-label"></div>
+                    <small id="corner-radius-hint" class="field-hint"></small>
                 </div>
                 <div class="field">
                     <span id="ground-label">Ground</span>

@@ -87,6 +87,15 @@ describe('Mapmaker edit history', () => {
 });
 
 describe('Mapmaker draft recovery', () => {
+    it('preserves valid local corner radii and rejects invalid ones', () => {
+        const storage = memoryStorage();
+        const draft = recovery();
+        draft.drafts[0].track.outer[0].cornerRadius = 5;
+        expect(saveDraftRecovery(storage, draft)).toBe(true);
+        expect(loadDraftRecovery(storage).drafts[0].track.outer[0].cornerRadius).toBe(5);
+        draft.drafts[0].track.outer[0].cornerRadius = -1;
+        expect(saveDraftRecovery(storage, draft)).toBe(false);
+    });
     it('round trips multiple unsaved tracks without retaining object references', () => {
         const storage = memoryStorage();
         const draft = recovery();

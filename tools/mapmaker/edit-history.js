@@ -84,7 +84,9 @@ function validKey(key) {
 
 function validPoint(point) {
     return point !== null && typeof point === 'object'
-        && Number.isFinite(point.x) && Number.isFinite(point.y);
+        && Number.isFinite(point.x) && Number.isFinite(point.y)
+        && (point.cornerRadius === undefined
+            || (Number.isFinite(point.cornerRadius) && point.cornerRadius >= 0 && point.cornerRadius <= 100));
 }
 
 function validPoints(points) {

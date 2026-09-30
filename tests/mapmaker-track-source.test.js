@@ -81,7 +81,7 @@ describe('Mapmaker track source serializer', () => {
         expect(source).not.toContain('TRACK_KEY');
     });
 
-    it('never writes draw width or line smoothing', () => {
+    it('preserves legacy editor fields when saving an older track', () => {
         const withLegacyFields = generateTrackModuleSource({
             ...TRACK,
             drawWidth: 5,
@@ -92,9 +92,17 @@ describe('Mapmaker track source serializer', () => {
             cornerRadius: undefined,
         });
 
-        expect(withLegacyFields).not.toContain('drawWidth:');
-        expect(withLegacyFields).not.toContain('lineSmoothing:');
+        expect(withLegacyFields).toContain('drawWidth: 5,');
+        expect(withLegacyFields).toContain('lineSmoothing: 0.35,');
         expect(withoutCorner).not.toContain('cornerRadius:');
+    });
+
+    it('keeps a local wall-corner radius in the saved track', () => {
+        const local = structuredClone(TRACK);
+        local.outer[1].cornerRadius = 0;
+        const source = generateTrackModuleSource(local);
+        expect(source).toContain('{ x: 10.25, y: 2, cornerRadius: 0 }');
+        expect(source).toContain('Point(1, 2)');
     });
 
     it('writes a non-tarmac ground and omits tarmac', () => {

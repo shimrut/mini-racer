@@ -523,9 +523,26 @@ function findCornerCurves(walls, roadSides, maxWidth) {
 // radius, but hardly changes a curve made of many short segments. Rebuild each
 // such curve that faces a single corner point, so it stays one road width from
 // the rounded corner at every Wall Corners setting.
+export function findCornerWallGroups(outer, inner, roadWidth) {
+    const walls = { outer, inner };
+    const roadSides = {
+        outer: signedArea(outer) > 0 ? 1 : -1,
+        inner: signedArea(inner) > 0 ? -1 : 1,
+    };
+    return findCornerCurves(walls, roadSides, roadWidth * CURVE_GAP_SLACK).map(
+        ({ wallName, index, facing, run }) => ({
+            pivot: { path: wallName, index },
+            facing: { path: facing, indices: Array.from(
+                { length: run.size },
+                (_, offset) => (run.first + offset) % walls[facing].length,
+            ) },
+        }),
+    );
+}
+
 export function fitCurvesToCorners(outer, inner, cornerRadius, roadWidth) {
     const radius = Math.max(0, Number(cornerRadius) || 0);
-    const walls = { outer: outer.map(clonePoint), inner: inner.map(clonePoint) };
+    const walls = { outer: outer.map((point) => ({ ...point })), inner: inner.map((point) => ({ ...point })) };
     // The road is inside the outer wall and outside the inner wall.
     const roadSides = {
         outer: signedArea(outer) > 0 ? 1 : -1,
@@ -561,7 +578,7 @@ export function fitCurvesToCorners(outer, inner, cornerRadius, roadWidth) {
                 corner,
                 next,
                 cornerFrame(prev, corner, next),
-                radius,
+                Number.isFinite(corner.cornerRadius) ? Math.max(0, corner.cornerRadius) : radius,
                 entry.roadWidth,
                 roadSides[entry.wallName],
             );

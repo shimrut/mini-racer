@@ -158,6 +158,10 @@ export const TRACK_CATALOG = {
     oldMountain: { name: "Old Mountain" },
     budapestRun: { name: "Budapest Run" },
     bucharestScramble: { name: "Bucharest Scramble" },
+    babylonRace: { name: "Babylon Race" },
+    centralDistrict: { name: "Central District" },
+    smallSteps: { name: "Small Steps" },
+    lapinLoop: { name: "Lapin Loop" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

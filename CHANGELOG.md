@@ -1,3 +1,7 @@
+- In Mapmaker, **Corner** moves one bend. Drag the yellow handle, or use the arrow keys. **Selected corner** keeps that bend's own roundness when the track is saved. **Whole track** still sets every corner.
+
+- **Babylon Race**, **Central District**, **Small Steps**, and **Lapin Loop** are in the game, not in the Daily rotation. Babylon Race and Small Steps have medal times.
+
 - In Mapmaker Corner, a car-wide line shows the straight shot from each bend to the next. Green stays on the road. Red is where the car would leave it.
 
 - Test Drive drives like the game. Tap the speed or press Escape to pause. On a phone, tap the left or right side of the screen to steer. The Mobile button shows only on a computer, where it previews that phone screen. Whole track and the arrow buttons are gone.

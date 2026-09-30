@@ -60,10 +60,18 @@ That keeps the road the same width through corners. It does not rewrite
 the sketch: a square stays a square.
 
 Existing saved tracks are unchanged until you redraw them with Draw.
+Saving an older track without changing its road preserves its legacy
+`drawWidth` and `lineSmoothing` fields in the definition. Those fields do not
+affect current race geometry. Tracks already used for races should keep their
+published geometry and key so existing replays and ghosts continue to match.
 
 Wall Corners controls how rounded wall corners look in race
 (Sharp, A bit rounded, Rounded, Soft). It is not the driven turn radius.
-Changing Wall Corners updates the Mapmaker race preview immediately.
+Choose **Whole track** to set every wall corner, or use the **Corner** tool to
+select a bend and choose **Selected corner**. A selected corner keeps its own
+setting when the track is saved, tested, or reloaded. Setting Whole track again
+replaces those local settings. Changing Wall Corners updates the Mapmaker race
+preview immediately.
 The race rounds a single-point corner by the setting, but a curve made of
 many points hardly changes. So on each Draw-style corner (a single point on
 one wall, a curve on the other), Mapmaker rebuilds the curve to stay one road
@@ -100,7 +108,7 @@ open `tools/runner.html`.
 ### Layout and Flow tips
 
 The map fills the window. The top bar has the track name (click it to open
-another track), **New track**, **Draw**, **Edit** and **Corner**, then
+another track), **New track**, **Draw** and **Edit**, then
 **Campaign Planner**, **Test Drive**, **Save** and the panel button. **Save**
 reads **Saved** when the open track has no unsaved changes. The panel on the
 right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and
@@ -110,8 +118,15 @@ picker is searchable and can be filtered by Daily, Campaign, Not used or
 Cloud, and by ground. It shows a preview of every track and lists the newest
 first. Press Enter in its search box to open the first match. Messages about
 the last action show for a few seconds in the hint at the bottom of the map.
-In Edit, click an item to select it, drag to move it, Shift+click a wall to add
-a point, and Delete to remove the selected wall point or checkpoint.
+In **Edit**, click an item to select it, drag to move it, Shift+click a wall to
+add a point, and Delete to remove the selected wall point or checkpoint. Use
+**Corner** for larger changes: select a bend on either wall, then drag its
+yellow center handle to move the paired wall points together. A Draw corner
+moves its sharp wall point and opposite curved run as one; hand-shaped bends
+use a soft area around both walls. The highlighted points show what will move.
+Arrow keys nudge the selected corner (Shift uses a larger step). Undo treats a
+corner drag as one edit. Check the road and gates after a large move under
+**Checks** before saving.
 
 While **Corner** is open, a line runs from the end of each bend straight to
 the start of the next, through the middle of the road. It is as wide as the

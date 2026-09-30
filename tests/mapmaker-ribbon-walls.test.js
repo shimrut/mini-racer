@@ -3,6 +3,7 @@ import { smoothPoly } from '../game/track/runtime.js';
 import {
     buildRibbonWallsFromCenterline,
     filletCenterline,
+    findCornerWallGroups,
     fitCurvesToCorners,
     inflateTightBends,
 } from '../tools/mapmaker/ribbon-walls.js';
@@ -178,5 +179,18 @@ describe('fitCurvesToCorners', () => {
         const fitted = fitCurvesToCorners(outer, drawn.inner, 5, ROAD_WIDTH);
         expect(fitted.outer).toEqual(outer);
         expect(fitted.inner).toEqual(drawn.inner);
+    });
+
+    it('refits one Draw curve to its local wall-corner radius', () => {
+        const local = {
+            outer: drawn.outer.map((point) => ({ ...point })),
+            inner: drawn.inner.map((point) => ({ ...point })),
+        };
+        const group = findCornerWallGroups(local.outer, local.inner, ROAD_WIDTH)[0];
+        local[group.pivot.path][group.pivot.index].cornerRadius = 5;
+        const fitted = fitCurvesToCorners(local.outer, local.inner, 3, ROAD_WIDTH);
+        const uniform = fitCurvesToCorners(drawn.outer, drawn.inner, 3, ROAD_WIDTH);
+        expect(fitted[group.facing.path]).not.toEqual(uniform[group.facing.path]);
+        expect(widestRaceRoad(fitted, 3)).toBeLessThan(ROAD_WIDTH * 1.02);
     });
 });

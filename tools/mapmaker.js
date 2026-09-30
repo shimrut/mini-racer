@@ -16,6 +16,7 @@ import {
     saveDraftRecovery,
 } from './mapmaker/edit-history.js';
 import { snapLineBuildPoint } from './mapmaker/line-build.js';
+import { moveCorner, selectCorner } from './mapmaker/corner-edit.js';
 import { wallContinuations } from './mapmaker/wall-continuation.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline, fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
@@ -300,6 +301,8 @@ class MapmakerApp {
             document.getElementById(`medal-${tier}-input`),
         ]));
         this.cornerRadiusOptions = document.getElementById('corner-radius-options');
+        this.cornerRadiusScope = document.getElementById('corner-radius-scope');
+        this.cornerRadiusHint = document.getElementById('corner-radius-hint');
         this.groundOptions = document.getElementById('ground-options');
         this.saveTrackBtn = document.getElementById('save-track-btn');
         this.newTrackBtn = document.getElementById('new-track-btn');
@@ -324,6 +327,8 @@ class MapmakerApp {
             selectedTrackKey: initialTrackKey,
             tool: 'edit',
             selectedHandle: null,
+            selectedCorner: null,
+            radiusScope: 'track',
             hoverHandle: null,
             hoverSegment: null,
             drag: null,
@@ -836,16 +841,47 @@ class MapmakerApp {
     }
 
     syncCornerRadiusControl() {
-        this.checkOption(this.cornerRadiusOptions, this.nearestCornerRadiusPreset());
+        const corner = this.state.selectedCorner;
+        const selectedPoint = corner?.radiusPoints[0];
+        const override = selectedPoint && this.track[selectedPoint.path][selectedPoint.index]?.cornerRadius;
+        const value = this.state.radiusScope === 'corner' && Number.isFinite(override)
+            ? override : this.getCornerRadius();
+        this.checkOption(this.cornerRadiusOptions, this.nearestCornerRadiusPreset(value));
+        for (const button of this.cornerRadiusScope.querySelectorAll('button')) {
+            const active = button.dataset.scope === this.state.radiusScope;
+            button.dataset.active = String(active);
+            button.setAttribute('aria-pressed', String(active));
+            if (button.dataset.scope === 'corner') button.disabled = !corner;
+        }
+        this.cornerRadiusHint.textContent = this.state.radiusScope === 'corner'
+            ? 'Applies to the selected bend. Other corners keep their setting.'
+            : 'Applies to every corner on this track.';
     }
 
     setCornerRadius(value, options = {}) {
         const nextRadius = this.nearestCornerRadiusPreset(value);
-        this.track.cornerRadius = nextRadius;
+        const corner = this.state.radiusScope === 'corner' ? this.state.selectedCorner : null;
+        if (this.state.radiusScope === 'corner' && !corner) return;
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        const guideMatchesWalls = guide?.wallSignature === JSON.stringify([this.track.outer, this.track.inner]);
+        const selectedPivot = this.state.selectedCorner?.radiusPoints[0];
+        const cornerPoint = selectedPivot
+            ? { ...this.track[selectedPivot.path][selectedPivot.index], path: selectedPivot.path }
+            : null;
+        if (corner) {
+            corner.radiusPoints.forEach(({ path, index }) => {
+                const point = this.track[path][index];
+                if (nextRadius === this.getCornerRadius()) delete point.cornerRadius;
+                else point.cornerRadius = nextRadius;
+            });
+        } else {
+            this.track.cornerRadius = nextRadius;
+            for (const path of ['outer', 'inner']) {
+                this.track[path].forEach((point) => { delete point.cornerRadius; });
+            }
+        }
         if (this.hasTrackGeometry()) {
-            const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
-            const guideMatchesWalls = guide?.wallSignature === JSON.stringify([this.track.outer, this.track.inner]);
-            const walls = fitCurvesToCorners(this.track.outer, this.track.inner, nextRadius, DEFAULT_DRAW_WIDTH);
+            const walls = fitCurvesToCorners(this.track.outer, this.track.inner, this.getCornerRadius(), DEFAULT_DRAW_WIDTH);
             const handle = this.state.selectedHandle;
             if (handle?.kind === 'polygon' && walls[handle.path].length !== this.track[handle.path].length) {
                 this.state.selectedHandle = null;
@@ -853,12 +889,19 @@ class MapmakerApp {
             this.track.outer = walls.outer;
             this.track.inner = walls.inner;
             if (guideMatchesWalls) guide.wallSignature = JSON.stringify([walls.outer, walls.inner]);
+            if (cornerPoint) {
+                const points = this.track[cornerPoint.path];
+                const index = points.reduce((best, point, at) => (
+                    distance(point, cornerPoint) < distance(points[best], cornerPoint) ? at : best
+                ), 0);
+                this.state.selectedCorner = selectCorner(this.track, cornerPoint.path, index, DEFAULT_DRAW_WIDTH);
+            }
         }
         this.syncCornerRadiusControl();
         if (options.markDirty !== false) {
             const preset = CORNER_RADIUS_PRESETS.find((entry) => entry.value === nextRadius);
             this.markDirty(
-                options.status ?? `Set wall corners to ${preset?.label ?? 'Rounded'}.`,
+                options.status ?? `Set ${corner ? 'selected corner' : 'whole track'} to ${preset?.label ?? 'Rounded'}.`,
                 options.updateStatus !== false,
             );
         }
@@ -976,6 +1019,12 @@ class MapmakerApp {
 
         this.cornerRadiusOptions.addEventListener('change', (event) => {
             this.setCornerRadius(Number(event.target.value));
+        });
+        this.cornerRadiusScope.addEventListener('click', (event) => {
+            const scope = event.target.closest('button[data-scope]')?.dataset.scope;
+            if (!scope || (scope === 'corner' && !this.state.selectedCorner)) return;
+            this.state.radiusScope = scope;
+            this.syncCornerRadiusControl();
         });
 
         this.groundOptions.addEventListener('change', (event) => {
@@ -1146,14 +1195,21 @@ class MapmakerApp {
     }
 
     setTool(tool, selectedHandle) {
-        this.state.tool = tool === 'draw' || tool === 'corner' ? tool : 'edit';
-        if (this.state.tool === 'draw' || this.state.tool === 'corner') {
+        this.state.tool = ['draw', 'corner'].includes(tool) ? tool : 'edit';
+        if (this.state.tool === 'draw') {
+            this.state.selectedHandle = null;
+            this.state.selectedCorner = null;
+        } else if (this.state.tool === 'corner') {
             this.state.selectedHandle = null;
         } else if (arguments.length > 1) {
             this.state.selectedHandle = selectedHandle ? { ...selectedHandle } : null;
+            this.state.selectedCorner = null;
         } else if (!this.state.selectedHandle && this.hasTrackGeometry()) {
             this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
+            this.state.selectedCorner = null;
         }
+        if (this.state.tool !== 'corner') this.state.radiusScope = 'track';
+        this.syncCornerRadiusControl();
         this.updateStageText();
         this.draw();
     }
@@ -1289,6 +1345,8 @@ class MapmakerApp {
         }
         this.commitHistoryEdit();
         this.state.selectedTrackKey = trackKey;
+        this.state.selectedCorner = null;
+        this.state.radiusScope = 'track';
         this.syncTrackPickerButton();
         this.trackNameInput.value = this.track.name;
         this.syncMedalTimesPanel();
@@ -1635,7 +1693,9 @@ class MapmakerApp {
             return 'No road yet. Use Draw.';
         }
         if (this.state.tool === 'corner') {
-            return 'The line from bend to bend is the straight shot. Green fits the car. Red leaves the road.';
+            return this.state.selectedCorner
+                ? 'Drag the selected bend to reshape both walls. Set its roundness under Shape.'
+                : 'Select a bend on either wall, then drag to reshape it. The line from bend to bend is the straight shot. Green fits the car. Red leaves the road.';
         }
         const kind = this.state.selectedHandle?.kind;
         if (kind === 'startPos') {
@@ -1955,6 +2015,15 @@ class MapmakerApp {
         this.setTool('edit', handle);
     }
 
+    selectCornerAt(path, index) {
+        this.state.selectedCorner = selectCorner(this.track, path, index, DEFAULT_DRAW_WIDTH);
+        this.state.selectedHandle = null;
+        this.state.radiusScope = 'corner';
+        this.syncCornerRadiusControl();
+        this.updateCanvasHint();
+        this.draw();
+    }
+
     selectSegment(segment, canvasPoint, viewport) {
         if (!segment) {
             return false;
@@ -2158,6 +2227,49 @@ class MapmakerApp {
             return;
         }
 
+        if (this.state.tool === 'corner') {
+            if (event.button !== 0) return;
+            this.canvas.setPointerCapture(event.pointerId);
+            const marker = this.state.selectedCorner
+                ? this.worldToScreen(this.state.selectedCorner.anchor, viewport) : null;
+            const markerHit = marker && distance(canvasPoint, marker) <= 18 * this.hitScale;
+            if (!markerHit) {
+                const handle = this.hitTest(
+                    canvasPoint, viewport, this.getAllHandles().filter((item) => item.kind === 'polygon'),
+                );
+                const segment = handle ? null : this.hitTestSegment(canvasPoint, viewport);
+                let path = handle?.path;
+                let index = handle?.index;
+                if (!path && segment?.kind === 'polygonSegment') {
+                    path = segment.path;
+                    const a = this.worldToScreen(segment.a, viewport);
+                    const b = this.worldToScreen(segment.b, viewport);
+                    index = distance(canvasPoint, a) <= distance(canvasPoint, b)
+                        ? segment.index : (segment.index + 1) % this.track[path].length;
+                }
+                if (!path) {
+                    this.state.selectedCorner = null;
+                    this.state.radiusScope = 'track';
+                    this.syncCornerRadiusControl();
+                    if (this.touchInput) this.startPan(event, canvasPoint, false);
+                    this.draw();
+                    return;
+                }
+                this.selectCornerAt(path, index);
+            }
+            this.beginHistoryEdit();
+            this.freezeViewBounds();
+            const selection = this.state.selectedCorner;
+            this.state.drag = {
+                type: 'corner',
+                selection,
+                startWorldPoint: this.screenToWorld(canvasPoint.x, canvasPoint.y, viewport),
+                startAnchor: { ...selection.anchor },
+                startPoints: selection.members.map(({ path: wall, index: at }) => ({ ...this.track[wall][at] })),
+            };
+            return;
+        }
+
         this.canvas.setPointerCapture(event.pointerId);
 
         const hit = this.hitTest(canvasPoint, viewport);
@@ -2259,6 +2371,28 @@ class MapmakerApp {
             return;
         }
 
+        if (drag?.type === 'corner') {
+            const delta = {
+                x: worldPoint.x - drag.startWorldPoint.x,
+                y: worldPoint.y - drag.startWorldPoint.y,
+            };
+            moveCorner(this.track, drag.selection, drag.startPoints, delta);
+            drag.selection.anchor = {
+                x: drag.startAnchor.x + delta.x,
+                y: drag.startAnchor.y + delta.y,
+            };
+            this.markDirty('Moved corner.', false);
+            return;
+        }
+
+        if (this.state.tool === 'corner') {
+            this.state.hoverHandle = this.hitTest(
+                canvasPoint, viewport, this.getAllHandles().filter((item) => item.kind === 'polygon'),
+            );
+            this.draw();
+            return;
+        }
+
         if (this.state.drag?.type === 'handle') {
             const handle = this.state.drag.handle;
             if (handle?.kind === 'startLine' || handle?.kind === 'checkpoint') {
@@ -2349,7 +2483,7 @@ class MapmakerApp {
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
-        if (this.state.drag?.type === 'handle' || this.state.drag?.type === 'laneGate') {
+        if (['handle', 'laneGate', 'corner'].includes(this.state.drag?.type)) {
             this.releaseViewBounds({ keepCameraSteady: true });
         }
         this.commitHistoryEdit();
@@ -2413,6 +2547,27 @@ class MapmakerApp {
             } else if (event.key === 'Escape') {
                 event.preventDefault();
                 this.clearDraftLoop();
+            }
+            return;
+        }
+
+        if (this.state.tool === 'corner') {
+            const selection = this.state.selectedCorner;
+            if (!selection) return;
+            const step = event.shiftKey ? 1 : 0.25;
+            const delta = {
+                x: event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0,
+                y: event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0,
+            };
+            if (delta.x || delta.y) {
+                event.preventDefault();
+                const startPoints = selection.members.map(({ path, index }) => ({ ...this.track[path][index] }));
+                moveCorner(this.track, selection, startPoints, delta);
+                selection.anchor = {
+                    x: selection.anchor.x + delta.x,
+                    y: selection.anchor.y + delta.y,
+                };
+                this.markDirty('Nudged corner.');
             }
             return;
         }
@@ -2803,6 +2958,55 @@ class MapmakerApp {
         this.ctx.restore();
     }
 
+    drawWallContinuations(viewport) {
+        const shots = wallContinuations(this.track.outer, this.track.inner, CAR_RADIUS * 2);
+        this.ctx.save();
+        for (const shot of shots) {
+            this.fillWorldPolygon(shot.clear, viewport, 'rgba(88, 223, 165, 0.9)');
+            this.fillWorldPolygon(shot.blocked, viewport, 'rgba(244, 63, 94, 0.9)');
+            this.drawLineSegment(shot.from, shot.to, viewport, '#ffffff', 2, false);
+        }
+        this.ctx.restore();
+    }
+
+    fillWorldPolygon(points, viewport, fillStyle) {
+        if (!points || points.length < 3) return;
+        this.ctx.beginPath();
+        const first = this.worldToScreen(points[0], viewport);
+        this.ctx.moveTo(first.x, first.y);
+        for (let index = 1; index < points.length; index += 1) {
+            const point = this.worldToScreen(points[index], viewport);
+            this.ctx.lineTo(point.x, point.y);
+        }
+        this.ctx.closePath();
+        this.ctx.fillStyle = fillStyle;
+        this.ctx.fill();
+    }
+
+    drawCornerSelection(viewport) {
+        const selection = this.state.selectedCorner;
+        if (!selection) return;
+        this.ctx.save();
+        for (const { path, index, weight } of selection.members) {
+            const screen = this.worldToScreen(this.track[path][index], viewport);
+            this.ctx.beginPath();
+            this.ctx.arc(screen.x, screen.y, 4 + weight * 2, 0, Math.PI * 2);
+            this.ctx.fillStyle = `rgba(251, 191, 36, ${0.3 + weight * 0.55})`;
+            this.ctx.fill();
+        }
+        const center = this.worldToScreen(selection.anchor, viewport);
+        this.ctx.beginPath();
+        this.ctx.arc(center.x, center.y, 12, 0, Math.PI * 2);
+        this.ctx.strokeStyle = '#fbbf24';
+        this.ctx.lineWidth = 2.5;
+        this.ctx.stroke();
+        this.ctx.beginPath();
+        this.ctx.arc(center.x, center.y, 3, 0, Math.PI * 2);
+        this.ctx.fillStyle = '#fbbf24';
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+
     drawDraftLoop(viewport) {
         const points = this.state.draftLoop;
         if (!points.length) return;
@@ -2982,31 +3186,6 @@ class MapmakerApp {
         this.ctx.restore();
     }
 
-    drawWallContinuations(viewport) {
-        const shots = wallContinuations(this.track.outer, this.track.inner, CAR_RADIUS * 2);
-        this.ctx.save();
-        for (const shot of shots) {
-            this.fillWorldPolygon(shot.clear, viewport, 'rgba(88, 223, 165, 0.9)');
-            this.fillWorldPolygon(shot.blocked, viewport, 'rgba(244, 63, 94, 0.9)');
-            this.drawLineSegment(shot.from, shot.to, viewport, '#ffffff', 2, false);
-        }
-        this.ctx.restore();
-    }
-
-    fillWorldPolygon(points, viewport, fillStyle) {
-        if (!points || points.length < 3) return;
-        this.ctx.beginPath();
-        const first = this.worldToScreen(points[0], viewport);
-        this.ctx.moveTo(first.x, first.y);
-        for (let index = 1; index < points.length; index += 1) {
-            const point = this.worldToScreen(points[index], viewport);
-            this.ctx.lineTo(point.x, point.y);
-        }
-        this.ctx.closePath();
-        this.ctx.fillStyle = fillStyle;
-        this.ctx.fill();
-    }
-
     draw() {
         this.syncCheckpointPanel();
         const ratio = window.devicePixelRatio || 1;
@@ -3065,6 +3244,7 @@ class MapmakerApp {
 
         if (this.state.tool === 'corner') {
             this.drawWallContinuations(viewport);
+            this.drawCornerSelection(viewport);
             return;
         }
 
