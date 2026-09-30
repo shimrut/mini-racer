@@ -76,6 +76,9 @@
       },
       "map-creator": {
         "height": "tall",
+        "entry": "pages/map-creator-launcher.html"
+      },
+      "map-creator-editor": {
         "entry": "pages/map-creator.html"
       },
       "map-creator-playtest": {

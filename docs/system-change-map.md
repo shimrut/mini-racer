@@ -71,7 +71,9 @@ flowchart LR
 - The Mini Racer Creator (`pages/map-creator.html`, `tools/mapmaker.js` in
   creator mode, `tools/mapmaker/creator-panels.js`) lets moderators make game
   tracks, edit the Daily list and build Campaign series in Reddit, with no app
-  release. The server keeps them per subreddit in Redis
+  release. The post is a small card (`pages/map-creator-launcher.html`);
+  **Open Creator** opens the Creator full screen. The server keeps them per
+  subreddit in Redis
   (`src/server/tracks/`, `src/server/daily/daily-schedule-store.ts`,
   `src/server/campaign/series-store.ts`) and checks moderator membership on
   every Creator route. Each request loads the stored tracks and published

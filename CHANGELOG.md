@@ -1,4 +1,4 @@
-- The Mini Racer Creator post shows the Creator. **Full screen** makes that same page larger.
+- **Open Creator** opens the Creator full screen, the same way **Race Now** opens a race. The post stays up so Reddit allows that.
 
 - In Mapmaker, **Corner** moves one bend. Drag the yellow handle, or use the arrow keys. **Selected corner** keeps that bend's own roundness when the track is saved. **Whole track** still sets every corner.
 

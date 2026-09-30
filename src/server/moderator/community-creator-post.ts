@@ -44,6 +44,14 @@ export async function ensureCommunityCreatorPostForSubreddit(subredditName: stri
         if (!current) return null;
         try {
             const post = await reddit.getPostById(current.postId);
+            // A removed post stays in the small window. Reddit will not open it full screen.
+            if (post?.removed) {
+                try {
+                    await post.approve();
+                } catch (error) {
+                    console.error(`Failed to restore Creator post for full screen:`, error);
+                }
+            }
             return typeof post?.url === 'string' && post.url.trim()
                 ? post.url.trim() : current.postUrl;
         } catch (error) {
@@ -77,9 +85,8 @@ export async function ensureCommunityCreatorPostForSubreddit(subredditName: stri
         });
         try {
             await post.lock();
-            await post.remove(false);
         } catch (error) {
-            console.error(`Failed to hide Creator host post for r/${subredditName}:`, error);
+            console.error(`Failed to lock Creator post for r/${subredditName}:`, error);
         }
         const postId = typeof post.id === 'string' && post.id.startsWith('t3_')
             ? post.id as `t3_${string}` : null;

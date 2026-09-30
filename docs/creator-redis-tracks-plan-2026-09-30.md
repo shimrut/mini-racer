@@ -68,8 +68,9 @@ Each stage is one commit, with the tests green.
 
 These need a real subreddit install. Do them in the test subreddit first.
 
-1. The Creator post opens from the moderator menu and shows the Creator.
-   **Full screen** makes that same page larger on desktop and on a phone.
+1. The Creator post opens from the moderator menu. **Open Creator** opens
+   the Creator full screen, on desktop and on a phone. The post is not
+   removed, because Reddit will not expand a removed post.
 2. Save, delete and the Daily list survive a reload of the post.
 3. Test Drive opens in its frame and records laps for the medal times.
 4. The copy button copies the unplayed tracks and the lists, and the report

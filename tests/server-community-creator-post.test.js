@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe('Community Creator host post', () => {
-    it('creates one dedicated hidden post after acquiring the creation lock', async () => {
+    it('creates one Creator post and leaves it up so it can open full screen', async () => {
         const post = {
             id: 't3_creator',
             url: 'https://reddit.com/creator',
@@ -53,9 +53,27 @@ describe('Community Creator host post', () => {
             postData: { tool: 'community-creator', subredditName: 'MiniRacer' },
         }));
         expect(post.lock).toHaveBeenCalled();
-        expect(post.remove).toHaveBeenCalledWith(false);
+        expect(post.remove).not.toHaveBeenCalled();
         expect(mockRedis.hSet).toHaveBeenCalled();
         expect(mockLocks.releaseRedisLock).toHaveBeenCalled();
+    });
+
+    it('puts a removed Creator post back so it can open full screen', async () => {
+        const post = {
+            url: 'https://reddit.com/creator',
+            removed: true,
+            approve: vi.fn(),
+        };
+        mockRedis.hGet.mockResolvedValue(JSON.stringify({
+            postId: 't3_creator',
+            postUrl: 'https://reddit.com/creator',
+        }));
+        mockReddit.getPostById.mockResolvedValue(post);
+        await expect(ensureCommunityCreatorPostForSubreddit('MiniRacer')).resolves.toEqual({
+            created: false,
+            postUrl: post.url,
+        });
+        expect(post.approve).toHaveBeenCalled();
     });
 
     it('reuses the existing Creator post', async () => {
