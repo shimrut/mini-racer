@@ -1,8 +1,13 @@
 import { redis } from '@devvit/redis';
-import { TRACK_SCHEDULE_KEYS, getTrackName, hasTrack, isBuiltInTrack } from '../../../game/track/catalog.js';
-import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
+import { TRACK_SCHEDULE_KEYS, hasTrack } from '../../../game/track/catalog.js';
+import { getTrackGround } from '../../../game/track/grounds.js';
+import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { TrackInputError } from '../tracks/track-shape.js';
-import { TrackConflictError, readStoredTrack } from '../tracks/track-store.js';
+import { TrackConflictError } from '../tracks/track-store.js';
+import { readCompleteTrack } from '../tracks/track-readiness.js';
+import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-placement-lock.js';
+import { findSeriesUsingTrack as readSeriesUsingTrack } from '../campaign/series-usage.js';
+import { readTrackUsage } from '../tracks/track-usage.js';
 
 // The Daily list: the order in which tracks become the Daily. The app has a
 // built-in list. After a moderator saves a list in the Creator, the Daily
@@ -25,8 +30,6 @@ type StoredDailySchedule = {
 };
 
 const SCHEDULE_KEY = 'dailygp:daily:schedule:v1';
-const SCHEDULE_WRITE_LOCK_KEY = 'dailygp:daily:schedule-write-lock:v1';
-const WRITE_LOCK_TTL_MS = 10_000;
 export const MAX_DAILY_SCHEDULE_LENGTH = 1_000;
 
 function parseSchedule(raw: string | null | undefined): StoredDailySchedule | null {
@@ -77,23 +80,6 @@ export async function isTrackInDailySchedule(trackKey: string): Promise<boolean>
     return (await readDailySchedule()).keys.includes(trackKey);
 }
 
-async function assertSchedulableTrack(trackKey: string): Promise<void> {
-    const record = await readStoredTrack(trackKey);
-    if (!record && isBuiltInTrack(trackKey)) {
-        if (!getTrackMedalThresholds(trackKey)) {
-            throw new TrackInputError(`${getTrackName(trackKey)} has no medal times.`);
-        }
-        return;
-    }
-    if (!record) throw new TrackInputError(`The game has no track called ${trackKey}.`);
-    if (!record.checksPassed) {
-        throw new TrackInputError(`${record.track.name} does not pass the checks yet.`);
-    }
-    if (!record.medalRow) {
-        throw new TrackInputError(`Set the medal times of ${record.track.name} first.`);
-    }
-}
-
 export type SaveDailyScheduleOptions = {
     username: string;
     baseRevision?: unknown;
@@ -119,29 +105,24 @@ export async function saveDailySchedule(
     if (new Set(keys).size !== keys.length) {
         throw new TrackInputError('A track can be in the Daily list only once.');
     }
-    for (const trackKey of keys) await assertSchedulableTrack(trackKey);
-    if (findSeriesUsingTrack) {
-        const previous = new Set((await readDailySchedule()).keys);
-        for (const trackKey of keys) {
-            if (previous.has(trackKey)) continue;
-            const seriesId = await findSeriesUsingTrack(trackKey);
-            if (seriesId) throw new TrackInputError(`${trackKey} is a stage of the Campaign series ${seriesId}.`);
-        }
-    }
-    if (currentTrackKey && !keys.includes(currentTrackKey)) {
-        throw new TrackInputError('Keep the track of the latest Daily in the list. The next Daily comes after it.');
-    }
-
-    const token = `${now.getTime()}:${Math.random().toString(36).slice(2)}`;
-    const acquired = await redis.set(SCHEDULE_WRITE_LOCK_KEY, token, {
-        nx: true,
-        expiration: new Date(now.getTime() + WRITE_LOCK_TTL_MS),
-    });
-    if (!acquired) throw new TrackConflictError('Someone else is saving the Daily list. Try again.');
-    try {
+    return withTrackPlacementLock((lock) => commitTrackPlacement([lock], [SCHEDULE_KEY], async () => {
         const current = await readDailySchedule();
         if (current.revision !== Number(baseRevision ?? 0)) {
             throw new TrackConflictError('The Daily list changed on another device. Open it again to see the new list.');
+        }
+        const previous = new Set(current.keys);
+        for (const trackKey of keys) {
+            const complete = await readCompleteTrack(trackKey);
+            if (previous.has(trackKey)) continue;
+            if (!isLiveGround(getTrackGround(complete.track).key)) {
+                throw new TrackInputError(`${complete.track.name} is on a ground that is not live.`);
+            }
+            const seriesId = await (findSeriesUsingTrack ?? readSeriesUsingTrack)(trackKey);
+            if (seriesId) throw new TrackInputError(`${trackKey} is a stage of the Campaign series ${seriesId}.`);
+        }
+        const latest = (await readTrackUsage()).latestDaily?.trackKey ?? currentTrackKey;
+        if (latest && !keys.includes(latest)) {
+            throw new TrackInputError('Keep the track of the latest Daily in the list. The next Daily comes after it.');
         }
         const next: StoredDailySchedule = {
             version: 1,
@@ -150,13 +131,9 @@ export async function saveDailySchedule(
             updatedAt: now.toISOString(),
             updatedBy: username,
         };
-        await redis.set(SCHEDULE_KEY, JSON.stringify(next));
-        return { ...next, source: 'stored' };
-    } finally {
-        try {
-            if (await redis.get(SCHEDULE_WRITE_LOCK_KEY) === token) await redis.del(SCHEDULE_WRITE_LOCK_KEY);
-        } catch (error) {
-            console.error('Failed to release the Daily list write lock:', error);
-        }
-    }
+        return { result: { ...next, source: 'stored' as const },
+            reconcile: async () => await redis.get(SCHEDULE_KEY) === JSON.stringify(next), mutate: async (transaction) => {
+            await transaction.set(SCHEDULE_KEY, JSON.stringify(next));
+        } };
+    }));
 }

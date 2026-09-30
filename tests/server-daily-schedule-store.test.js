@@ -1,3 +1,4 @@
+import { installTrackRedisTransactions } from './helpers/track-redis-transactions.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import roughCut from '../game/track/definitions/rough-cut.js';
 
@@ -31,6 +32,8 @@ const mockRedis = {
     hDel: vi.fn(async () => 1),
 };
 
+installTrackRedisTransactions(mockRedis, strings, hashes);
+
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
@@ -48,7 +51,7 @@ beforeEach(() => {
 });
 
 async function saveTrack(key, extra = {}) {
-    await store.saveStoredTrack(key, { track: { ...roughCut, name: 'Night Cut' }, medalRow, ...extra }, {
+    await store.saveStoredTrack(key, { track: { ...roughCut, name: 'Night Cut', ground: 'tarmac' }, medalRow, ...extra }, {
         username: 'ModOne',
     });
     await store.ensureStoredTracksLoaded();
@@ -82,7 +85,7 @@ describe('stored Daily list', () => {
         await expect(schedule.saveDailySchedule([], { username: 'ModOne' }))
             .rejects.toThrow('at least one');
         await expect(schedule.saveDailySchedule(['lapinLoop'], { username: 'ModOne' }))
-            .rejects.toThrow('Lapin Loop has no medal times');
+            .rejects.toThrow('Set all four medal times');
     });
 
     it('keeps the latest Daily track, and refuses an old revision', async () => {

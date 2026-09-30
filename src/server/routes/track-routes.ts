@@ -1,6 +1,7 @@
 import type { Application, Response } from 'express';
 import { TrackInputError } from '../tracks/track-shape.js';
 import { TrackConflictError } from '../tracks/track-store.js';
+import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 
 const MAX_PLAYER_TRACK_KEYS = 50;
 
@@ -34,6 +35,7 @@ export function errorResponse(res: Response, error: unknown): void {
     const message = error instanceof Error ? error.message : 'Track request failed.';
     const status = error instanceof TrackInputError ? 400
         : error instanceof TrackConflictError ? 409
+            : error instanceof TrackPlacementRetryError ? 503
             : message.includes('Moderator access required') || message.includes('acting username') ? 403
                 : 500;
     if (status === 500) console.error('Track request failed:', error);

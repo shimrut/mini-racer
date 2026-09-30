@@ -1,9 +1,11 @@
-import { redis } from '@devvit/redis';
+import { redis, type TxClientLike } from '@devvit/redis';
 import { context } from '@devvit/web/server';
 import { validateTrackQuality } from '../../../game/track/authoring/track-quality.js';
 import { getMedalRowError, normalizeMedalRow } from '../../../game/track/authoring/medal-rules.js';
 import { normalizeMedalRow as normalizeGameMedalRow } from '../../../game/medals/medal-timing.js';
 import { isBuiltInTrack } from '../../../game/track/catalog.js';
+import { BUILT_IN_TRACKS } from '../../../game/track/tracks.js';
+import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
 import { setStoredTrackResolver } from '../../../game/track/stored-tracks.js';
 import { createTrackFingerprint } from '../competition/pb-ghost-trace.js';
@@ -14,6 +16,12 @@ import {
     type Point,
     type TrackShape,
 } from './track-shape.js';
+
+import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/redis-lock.js';
+import { withTrackPlacementLock, commitTrackPlacement } from './track-placement-lock.js';
+import { getTrackCompletenessError } from './track-readiness.js';
+import { isTrackInDailySchedule } from '../daily/daily-schedule-store.js';
+import { findSeriesUsingTrack, readSeriesGround } from '../campaign/series-usage.js';
 
 // Tracks made in the Creator, and copies of built-in tracks that nobody has
 // raced. Each subreddit install has its own Redis, so each has its own list.
@@ -44,7 +52,7 @@ export type StoredTrackRecord = {
 
 export type StoredTrackSummary = Pick<StoredTrackRecord,
     'key' | 'checksPassed' | 'checkError' | 'origin' | 'revision' | 'updatedAt' | 'updatedBy'
-    | 'lockedAt' | 'lockReason' | 'medalRow'> & { name: string; ground: string };
+    | 'lockedAt' | 'lockReason' | 'medalRow'> & { name: string; ground: string; ready: boolean };
 
 // The form that the game uses to look up a track (game/track/stored-tracks.js).
 // `placed` is true once players can race the track.
@@ -120,6 +128,7 @@ export function summarizeStoredTrack(record: StoredTrackRecord): StoredTrackSumm
         lockedAt: record.lockedAt,
         lockReason: record.lockReason,
         medalRow: record.medalRow,
+        ready: !getTrackCompletenessError(record.track, record.draftLoop, record.medalRow),
     };
 }
 
@@ -246,28 +255,38 @@ export async function readPlacedStoredTracks(trackKeys: string[]): Promise<Store
 
 // ---- Writes ----
 
-async function withTrackWriteLock<T>(trackKey: string, work: () => Promise<T>): Promise<T> {
-    const token = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    const acquired = await redis.set(writeLockKey(trackKey), token, {
-        nx: true,
-        expiration: new Date(Date.now() + WRITE_LOCK_TTL_MS),
-    });
-    if (!acquired) throw new TrackConflictError('Someone else is saving this track. Try again.');
+async function withTrackWriteLock<T>(trackKey: string, work: (lock: RedisLock) => Promise<T>): Promise<T> {
+    const lock = await acquireRedisLock(writeLockKey(trackKey), WRITE_LOCK_TTL_MS);
+    if (!lock) throw new TrackConflictError('Someone else is saving this track. Try again.');
     try {
-        return await work();
+        return await work(lock);
     } finally {
         try {
-            if (await redis.get(writeLockKey(trackKey)) === token) await redis.del(writeLockKey(trackKey));
+            await releaseRedisLock(lock);
         } catch (error) {
             console.error(`Failed to release the write lock of track ${trackKey}:`, error);
         }
     }
 }
 
-async function writeRecord(record: StoredTrackRecord): Promise<void> {
-    await redis.set(recordKey(record.key), JSON.stringify(record));
-    await redis.hSet(INDEX_KEY, { [record.key]: String(record.revision) });
-    await redis.incrBy(REVISION_KEY, 1);
+export async function queueStoredTrackRecord(transaction: TxClientLike, record: StoredTrackRecord): Promise<void> {
+    await transaction.set(recordKey(record.key), JSON.stringify(record));
+    await transaction.hSet(INDEX_KEY, { [record.key]: String(record.revision) });
+    await transaction.incrBy(REVISION_KEY, 1);
+}
+
+export function freezeStoredTrack(record: StoredTrackRecord, reason: StoredTrackLockReason, now: Date): StoredTrackRecord {
+    return record.lockedAt ? record : { ...record, revision: record.revision + 1, lockedAt: now.toISOString(), lockReason: reason };
+}
+
+export async function readStoredTracksRevision(): Promise<number> {
+    return Number(await redis.get(REVISION_KEY) ?? 0);
+}
+
+export async function matchesStoredTrack(record: StoredTrackRecord, expectedRevision: number): Promise<boolean> {
+    return await redis.get(recordKey(record.key)) === JSON.stringify(record)
+        && await redis.hGet(INDEX_KEY, record.key) === String(record.revision)
+        && await readStoredTracksRevision() === expectedRevision;
 }
 
 function runTrackChecks(track: TrackShape, draftLoop: Point[]): { checksPassed: boolean; checkError: string | null } {
@@ -288,6 +307,7 @@ export type SaveStoredTrackOptions = {
     // its shape and its medal times, so the checks do not run again.
     trusted?: boolean;
     now?: Date;
+    assertUnplayed?: (trackKey: string) => Promise<void>;
 };
 
 // Creates a track, or saves a new revision of an unlocked one. A save must
@@ -295,7 +315,7 @@ export type SaveStoredTrackOptions = {
 export async function saveStoredTrack(
     trackKeyInput: unknown,
     input: unknown,
-    { username, baseRevision = 0, origin = 'creator', trusted = false, now = new Date() }: SaveStoredTrackOptions,
+    { username, baseRevision = 0, origin = 'creator', trusted = false, now = new Date(), assertUnplayed }: SaveStoredTrackOptions,
 ): Promise<StoredTrackRecord> {
     const trackKey = assertTrackKey(trackKeyInput);
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -319,40 +339,60 @@ export async function saveStoredTrack(
         ? { checksPassed: true, checkError: null }
         : runTrackChecks(track, draftLoop);
 
-    return withTrackWriteLock(trackKey, async () => {
-        const existing = await readStoredTrack(trackKey);
-        const expected = Number(baseRevision ?? 0);
-        if ((existing?.revision ?? 0) !== expected) {
-            throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
-        }
-        if (existing?.lockedAt) {
-            throw new TrackInputError('This track is locked, because players have raced it.');
-        }
-        if (!existing && origin === 'creator' && isBuiltInTrack(trackKey)) {
-            throw new TrackInputError('A track in the game already uses this key. Choose another name.');
-        }
-        const stamp = now.toISOString();
-        const record: StoredTrackRecord = {
-            version: 1,
-            key: trackKey,
-            track,
-            draftLoop,
-            medalRow,
-            checksPassed,
-            checkError,
-            fingerprint: createTrackFingerprint(track),
-            origin: existing?.origin ?? origin,
-            revision: (existing?.revision ?? 0) + 1,
-            createdAt: existing?.createdAt ?? stamp,
-            createdBy: existing?.createdBy ?? username,
-            updatedAt: stamp,
-            updatedBy: username,
-            lockedAt: null,
-            lockReason: null,
-        };
-        await writeRecord(record);
-        return record;
-    });
+    return withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
+        commitTrackPlacement([placementLock, trackLock], [], async () => {
+            const existing = await readStoredTrack(trackKey);
+            const expected = Number(baseRevision ?? 0);
+            if ((existing?.revision ?? 0) !== expected) {
+                throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
+            }
+            if (existing?.lockedAt) {
+                throw new TrackInputError('This track is locked, because players have raced it.');
+            }
+            if (!existing && origin === 'creator' && isBuiltInTrack(trackKey)) {
+                throw new TrackInputError('A track in the game already uses this key. Choose another name.');
+            }
+            if (assertUnplayed) await assertUnplayed(trackKey);
+            const seriesId = await findSeriesUsingTrack(trackKey);
+            const inDaily = await isTrackInDailySchedule(trackKey);
+            const assigned = inDaily || Boolean(seriesId);
+            const groundKey = getTrackGround(track).key;
+            const previousGround = getTrackGround(existing?.track ?? BUILT_IN_TRACKS[trackKey as keyof typeof BUILT_IN_TRACKS]).key;
+            if (inDaily && !isLiveGround(groundKey) && previousGround !== groundKey) {
+                throw new TrackInputError('Take this track out of the Daily list before changing to a ground that is not live.');
+            }
+            if (assigned && getTrackCompletenessError(track, draftLoop, medalRow)) {
+                throw new TrackInputError('Take this track out of the Daily list and the Campaign series before saving unfinished work.');
+            }
+            if (seriesId) {
+                const ground = await readSeriesGround(seriesId);
+                if (ground && groundKey !== ground) {
+                    throw new TrackInputError('Take this track out of its Campaign series before changing its ground.');
+                }
+            }
+            const stamp = now.toISOString();
+            const record: StoredTrackRecord = {
+                version: 1,
+                key: trackKey,
+                track,
+                draftLoop,
+                medalRow,
+                checksPassed,
+                checkError,
+                fingerprint: createTrackFingerprint(track),
+                origin: existing?.origin ?? origin,
+                revision: (existing?.revision ?? 0) + 1,
+                createdAt: existing?.createdAt ?? stamp,
+                createdBy: existing?.createdBy ?? username,
+                updatedAt: stamp,
+                updatedBy: username,
+                lockedAt: null,
+                lockReason: null,
+            };
+            const cacheRevision = await readStoredTracksRevision() + 1;
+            return { result: record, reconcile: () => matchesStoredTrack(record, cacheRevision),
+                mutate: (transaction) => queueStoredTrackRecord(transaction, record) };
+        })));
 }
 
 const LOCK_ATTEMPTS = 5;
@@ -371,17 +411,15 @@ export async function lockStoredTrack(
     if (!current || current.lockedAt) return false;
     for (let attempt = 1; ; attempt += 1) {
         try {
-            return await withTrackWriteLock(trackKey, async () => {
-                const existing = await readStoredTrack(trackKey);
-                if (!existing || existing.lockedAt) return false;
-                await writeRecord({
-                    ...existing,
-                    revision: existing.revision + 1,
-                    lockedAt: now.toISOString(),
-                    lockReason: reason,
-                });
-                return true;
-            });
+            return await withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
+                commitTrackPlacement([placementLock, trackLock], [], async () => {
+                    const existing = await readStoredTrack(trackKey);
+                    if (!existing || existing.lockedAt) return { result: false };
+                    const frozen = freezeStoredTrack(existing, reason, now);
+                    const cacheRevision = await readStoredTracksRevision() + 1;
+                    return { result: true, reconcile: () => matchesStoredTrack(frozen, cacheRevision),
+                        mutate: (transaction) => queueStoredTrackRecord(transaction, frozen) };
+                })));
         } catch (error) {
             if (!(error instanceof TrackConflictError) || attempt >= LOCK_ATTEMPTS) throw error;
             await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS * attempt));
@@ -401,21 +439,27 @@ export async function deleteStoredTrack(
     { baseRevision, isPlaced }: DeleteStoredTrackOptions = {},
 ): Promise<boolean> {
     const trackKey = assertTrackKey(trackKeyInput);
-    return withTrackWriteLock(trackKey, async () => {
-        const existing = await readStoredTrack(trackKey);
-        if (!existing) return false;
-        if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-            throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
-        }
-        if (existing.lockedAt) {
-            throw new TrackInputError('This track is locked, because players have raced it.');
-        }
-        if (isPlaced && await isPlaced(trackKey)) {
-            throw new TrackInputError('Take this track out of the Daily list and the Campaign series first.');
-        }
-        await redis.del(recordKey(trackKey));
-        await redis.hDel(INDEX_KEY, [trackKey]);
-        await redis.incrBy(REVISION_KEY, 1);
-        return true;
-    });
+    return withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
+        commitTrackPlacement([placementLock, trackLock], [], async () => {
+            const existing = await readStoredTrack(trackKey);
+            if (!existing) return { result: false };
+            if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
+                throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
+            }
+            if (existing.lockedAt) {
+                throw new TrackInputError('This track is locked, because players have raced it.');
+            }
+            if (await isTrackInDailySchedule(trackKey) || await findSeriesUsingTrack(trackKey)
+                || isPlaced && await isPlaced(trackKey)) {
+                throw new TrackInputError('Take this track out of the Daily list and the Campaign series first.');
+            }
+            const cacheRevision = await readStoredTracksRevision() + 1;
+            return { result: true, reconcile: async () => !await redis.get(recordKey(trackKey))
+                && !await redis.hGet(INDEX_KEY, trackKey) && await readStoredTracksRevision() === cacheRevision,
+                mutate: async (transaction) => {
+                await transaction.del(recordKey(trackKey));
+                await transaction.hDel(INDEX_KEY, [trackKey]);
+                await transaction.incrBy(REVISION_KEY, 1);
+            } };
+        })));
 }

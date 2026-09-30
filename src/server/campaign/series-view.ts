@@ -2,7 +2,7 @@ import { getCampaignSeries } from '../../../game/campaign/manifest.js';
 import { TRACK_CATALOG, getTrackName } from '../../../game/track/catalog.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
-import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
+import { isBuiltInTrackComplete } from '../tracks/track-readiness.js';
 import { readDailySchedule } from '../daily/daily-schedule-store.js';
 import { listStoredTracks } from '../tracks/track-store.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
@@ -43,8 +43,8 @@ export async function readCreatorSeriesView() {
                 source: storedTrack?.origin ?? 'app',
                 played: usage.playedTrackKeys.has(key),
                 ready: storedTrack
-                    ? storedTrack.checksPassed && Boolean(storedTrack.medalRow)
-                    : Boolean(getTrackMedalThresholds(key)),
+                    ? storedTrack.ready
+                    : isBuiltInTrackComplete(key),
                 usedBy: dailyKeys.has(key) ? 'daily' : seriesUse.get(key) ?? null,
             };
         }),

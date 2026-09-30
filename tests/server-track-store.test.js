@@ -1,3 +1,4 @@
+import { installTrackRedisTransactions } from './helpers/track-redis-transactions.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import roughCut from '../game/track/definitions/rough-cut.js';
 
@@ -33,6 +34,8 @@ const mockRedis = {
         return 1;
     }),
 };
+
+installTrackRedisTransactions(mockRedis, strings, hashes);
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
@@ -128,7 +131,7 @@ describe('stored track store', () => {
     });
 
     it('lets a migrated copy use the key of a built-in track', async () => {
-        const record = await store.saveStoredTrack('roughCut', { track: { ...roughCut, name: 'Rough Cut' } }, {
+        const record = await store.saveStoredTrack('roughCut', { track: { ...roughCut, name: 'Rough Cut' }, medalRow }, {
             username: 'ModOne',
             origin: 'migrated',
         });

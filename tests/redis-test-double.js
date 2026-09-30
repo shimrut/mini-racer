@@ -280,6 +280,9 @@ export class RedisTestDouble {
       hSet: async (...args) => {
         commands.push(() => this.hSet(...args));
       },
+      hSetNX: async (...args) => {
+        commands.push(() => this.hSetNX(...args));
+      },
       hDel: async (...args) => {
         commands.push(() => this.hDel(...args));
       },

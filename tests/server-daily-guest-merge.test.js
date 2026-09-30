@@ -50,6 +50,7 @@ function createMockTransaction(options = {}) {
     return {
         multi: vi.fn().mockResolvedValue(undefined),
         unwatch: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn().mockResolvedValue(undefined),
         del: vi.fn(async (...args) => {
             commands.push(() => mockRedis.del(...args));
         }),
@@ -58,6 +59,9 @@ function createMockTransaction(options = {}) {
         }),
         hSet: vi.fn(async (...args) => {
             commands.push(() => mockRedis.hSet(...args));
+        }),
+        hSetNX: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.hSetNX(...args));
         }),
         zAdd: vi.fn(async (...args) => {
             hasLeaderboardWrite = true;

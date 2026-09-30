@@ -7,7 +7,9 @@ import {
     hasTrack,
 } from '../../../game/track/catalog.js';
 import { readDailySchedulePool } from './daily-schedule-store.js';
-import { lockStoredTrack } from '../tracks/track-store.js';
+import { queueStoredTrackRecord, freezeStoredTrack, ensureStoredTracksLoaded, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import { readCompleteTrack } from '../tracks/track-readiness.js';
+import { withTrackPlacementLock, commitTrackPlacement, TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
@@ -737,16 +739,64 @@ async function maintainChallengeHistory(now = new Date()): Promise<void> {
     }
 }
 
-async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
-    await redis.hSet(
-        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
-        { [challenge.id]: JSON.stringify(challenge) },
-    );
-    await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
-    await lockDailyTrack(challenge);
-    await stampDailyCompetitionExpiry(challenge);
+const DAILY_COMMIT_ATTEMPTS = 5;
+const DAILY_COMMIT_RETRY_MS = 150;
+
+// Players who open a new Daily together all try to create it. One request
+// holds the placement lock and commits. The others wait, then return the
+// Daily that it committed. Only a committed Daily is returned.
+async function commitDailyChallenge(challenge: DailyGpChallenge, dayIndex?: number): Promise<DailyGpChallenge> {
+    for (let attempt = 1; ; attempt += 1) {
+        const stored = await readStoredDailyGpChallenge(challenge.id);
+        if (stored) return stored;
+        try {
+            return await placeDailyChallenge(challenge, dayIndex);
+        } catch (error) {
+            if (!(error instanceof TrackPlacementRetryError) || attempt >= DAILY_COMMIT_ATTEMPTS) throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, DAILY_COMMIT_RETRY_MS * attempt));
+    }
+}
+
+// History and a new stored track's freeze commit together. A failed write
+// leaves neither an orphan lock nor a playable, editable challenge.
+async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: number): Promise<DailyGpChallenge> {
+    const result = await withTrackPlacementLock((lock) => commitTrackPlacement(
+        [lock], [DAILY_GP_CHALLENGE_HISTORY_HASH_KEY], async () => {
+            const raw = await redis.hGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challenge.id);
+            const existing = parseStoredChallenge(raw);
+            if (existing) return { result: existing };
+            if (raw) throw new TrackPlacementRetryError('The Daily could not be confirmed. Retry before racing.');
+            const trackKey = dayIndex === undefined ? challenge.trackKey
+                : await pickNextTrackKeyForToday(getUtcDayStart(dayIndex));
+            const complete = await readCompleteTrack(trackKey);
+            if (dayIndex !== undefined && !isLiveGround(getTrackGround(complete.track).key)) {
+                throw new TrackPlacementRetryError('The Daily track changed. Retry before racing.');
+            }
+            const committed = dayIndex === undefined ? challenge : buildDailyGpChallengeForDayIndexWithTrack(
+                dayIndex, trackKey, { authorTime: Number((complete.medalRow as { author: number }).author) },
+            );
+            const frozen = complete.stored && !complete.stored.lockedAt
+                ? freezeStoredTrack(complete.stored, 'daily', new Date()) : null;
+            const cacheRevision = frozen ? await readStoredTracksRevision() + 1 : null;
+            return { result: committed, confirm: (results) => results[0] === 1,
+                reconcile: async () => await redis.hGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, committed.id) === JSON.stringify(committed)
+                    && (!frozen || await matchesStoredTrack(frozen, cacheRevision)),
+                mutate: async (transaction) => {
+                    await transaction.hSetNX(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, committed.id, JSON.stringify(committed));
+                    await transaction.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+                    if (frozen) await queueStoredTrackRecord(transaction, frozen);
+                } };
+        },
+    ));
+    await ensureStoredTracksLoaded();
+    await stampDailyCompetitionExpiry(result);
     await maintainChallengeHistory();
-    return challenge;
+    return result;
+}
+
+async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
+    return commitDailyChallenge(challenge);
 }
 
 async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
@@ -789,16 +839,6 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
 // The schedule skips it until its ground is live.
 function isScheduleTrackLive(trackKey: string): boolean {
     return isLiveGround(getTrackGround(TRACKS[trackKey]).key);
-}
-
-// A stored track cannot change after it becomes a Daily. A failed lock is
-// logged: the Daily still starts.
-async function lockDailyTrack(challenge: DailyGpChallenge): Promise<void> {
-    try {
-        await lockStoredTrack(challenge.trackKey, 'daily');
-    } catch (error) {
-        console.error(`Failed to lock the Daily track ${challenge.trackKey}:`, error);
-    }
 }
 
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
@@ -861,49 +901,13 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
         return stored;
     }
 
-    const trackKey = await pickNextTrackKeyForToday(startsAt);
-    const challenge = buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
+    const challenge = buildDailyGpChallengeForDayIndexWithTrack(dayIndex, DEFAULT_TRACK_KEY);
 
-    const didSet = await redis.hSetNX(
-        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
-        challengeId,
-        JSON.stringify(challenge),
-    );
-    if (didSet) {
-        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
-        await lockDailyTrack(challenge);
-        await stampDailyCompetitionExpiry(challenge);
-        await maintainChallengeHistory();
-        return challenge;
-    }
-
-    const reread = await readStoredDailyGpChallenge(challengeId);
-    return reread ?? challenge;
+    return commitDailyChallenge(challenge, dayIndex);
 }
 
-export async function persistServerDailyGpChallenge(
-    challenge: DailyGpChallenge,
-): Promise<DailyGpChallenge> {
-    const stored = await readStoredDailyGpChallenge(challenge.id);
-    if (stored) {
-        return stored;
-    }
-
-    const didSet = await redis.hSetNX(
-        DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
-        challenge.id,
-        JSON.stringify(challenge),
-    );
-    if (didSet) {
-        await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
-        await lockDailyTrack(challenge);
-        await stampDailyCompetitionExpiry(challenge);
-        await maintainChallengeHistory();
-        return challenge;
-    }
-
-    const reread = await readStoredDailyGpChallenge(challenge.id);
-    return reread ?? challenge;
+export async function persistServerDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
+    return commitDailyChallenge(challenge);
 }
 
 export function normalizeLimit(limit: unknown): number {
@@ -1197,7 +1201,9 @@ export async function getServerFinalDailyGpPodiumGhosts(
 }
 
 export async function getServerDailyGpPlayableChallenge(challengeId?: string | null): Promise<DailyGpChallenge | null> {
-    const challenge = await getServerDailyGpChallengeById(challengeId, { persistFallback: false });
+    const challenge = challengeId === getTodayChallengeId()
+        ? await resolveTodayDailyGpChallenge()
+        : await getServerDailyGpChallengeById(challengeId, { persistFallback: false });
     if (challenge && isDailyGpChallengePlayable(challenge)) {
         return challenge;
     }

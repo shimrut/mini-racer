@@ -1,5 +1,6 @@
 import type { Application } from 'express';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
+import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 
 type ServiceResult = {
     status: number;
@@ -76,10 +77,12 @@ export function registerCompetitionRoutes(
                 ? postBound
                 : await dependencies.getServerDailyGpChallenge();
             const storedTracks = dependencies.describeStoredTracks?.([challenge.trackKey]) ?? [];
-            res.status(200).json(storedTracks.length ? { ...challenge, storedTracks } : challenge);
+            res.status(200).json(dependencies.describeStoredTracks ? { ...challenge, storedTracks } : challenge);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer active challenge:', error);
-            res.status(500).json({ error: 'Active challenge lookup failed' });
+            res.status(error instanceof TrackPlacementRetryError ? 503 : 500).json({
+                error: error instanceof TrackPlacementRetryError ? error.message : 'Active challenge lookup failed',
+            });
         }
     });
 
@@ -89,10 +92,12 @@ export function registerCompetitionRoutes(
             const storedTracks = dependencies.describeStoredTracks?.(
                 challenges.map((challenge) => challenge.trackKey),
             ) ?? [];
-            res.status(200).json(storedTracks.length ? { challenges, storedTracks } : { challenges });
+            res.status(200).json(dependencies.describeStoredTracks ? { challenges, storedTracks } : { challenges });
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer daily playlist:', error);
-            res.status(500).json({ error: 'Daily playlist lookup failed' });
+            res.status(error instanceof TrackPlacementRetryError ? 503 : 500).json({
+                error: error instanceof TrackPlacementRetryError ? error.message : 'Daily playlist lookup failed',
+            });
         }
     });
 

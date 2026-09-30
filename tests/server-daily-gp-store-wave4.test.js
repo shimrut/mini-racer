@@ -93,9 +93,14 @@ describe('server daily gp store wave4', () => {
         mockRedis.watch.mockImplementation(() => ({
             multi: vi.fn().mockResolvedValue(undefined),
             unwatch: vi.fn().mockResolvedValue(undefined),
-            del: vi.fn(),
+            discard: vi.fn().mockResolvedValue(undefined),
+            del: vi.fn(async (key) => {
+                ownedLocks.delete(key);
+            }),
             set: vi.fn(),
             hSet: vi.fn(),
+            hSetNX: vi.fn(),
+            incrBy: vi.fn(),
             zAdd: vi.fn(),
             expire: vi.fn(),
             exec: vi.fn().mockResolvedValue([1]),

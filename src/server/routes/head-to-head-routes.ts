@@ -77,7 +77,7 @@ function withStoredTracks(body: unknown, dependencies: HeadToHeadRouteDependenci
     const challenge = (body as { challenge?: { trackKey?: unknown } }).challenge;
     const trackKey = typeof challenge?.trackKey === 'string' ? challenge.trackKey : '';
     const storedTracks = trackKey ? dependencies.describeStoredTracks([trackKey]) : [];
-    return storedTracks.length ? { ...body, storedTracks } : body;
+    return trackKey ? { ...body, storedTracks } : body;
 }
 
 export function registerHeadToHeadRoutes(

@@ -60,7 +60,11 @@ async function copyBuiltInTrack(trackKey: string, username: string, now: Date): 
     const record = await saveStoredTrack(trackKey, {
         track: builtIn,
         medalRow: APP_MEDAL_ROWS[trackKey] ?? null,
-    }, { username, origin: 'migrated', trusted: true, now });
+    }, { username, origin: 'migrated', trusted: true, now, assertUnplayed: async (key) => {
+        if ((await readTrackUsage()).playedTrackKeys.has(key)) {
+            throw new TrackInputError('This track became a race while the copy was running.');
+        }
+    } });
     if (record.fingerprint !== createTrackFingerprint(builtIn)) {
         await deleteStoredTrack(trackKey);
         throw new TrackInputError('The copy did not match the app track.');

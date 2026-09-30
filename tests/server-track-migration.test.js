@@ -1,3 +1,4 @@
+import { installTrackRedisTransactions } from './helpers/track-redis-transactions.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const strings = new Map();
@@ -37,6 +38,8 @@ const known = {
 };
 const mockRedis = new Proxy(known, { get: (target, name) => target[name] ?? (async () => null) });
 
+installTrackRedisTransactions(mockRedis, strings, hashes);
+
 vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
@@ -73,8 +76,8 @@ beforeEach(() => {
 
 describe('copy of unplayed tracks', () => {
     it('copies every unplayed built-in track once, with its fingerprint and medal times', async () => {
-        playDaily('2026-09-29', 'sunlitTemple');
-        playDaily('2026-09-30', 'smallSteps');
+        playDaily('2026-09-29', 'smallSteps');
+        playDaily('2026-09-30', 'sunlitTemple');
 
         const report = await runTrackMigration({ username: 'ModOne', now: noon });
 

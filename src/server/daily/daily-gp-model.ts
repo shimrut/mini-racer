@@ -185,8 +185,7 @@ function deterministicSeedIndex(seed: string, length: number): number {
     return (hash >>> 0) % length;
 }
 
-export function getDailyGpEligibleLapCounts(trackKey: string): readonly DailyGpLapCount[] {
-    const authorTime = getAuthorMedalSeconds(trackKey);
+export function getDailyGpEligibleLapCounts(trackKey: string, authorTime = getAuthorMedalSeconds(trackKey)): readonly DailyGpLapCount[] {
     if (!Number.isFinite(authorTime) || authorTime >= DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS) {
         return DAILY_GP_ONE_LAP_COUNTS;
     }
@@ -197,8 +196,9 @@ export function selectDailyGpLapCount(
     challengeId: string,
     trackKey: string,
     rulesRevision = DAILY_GP_RULES_REVISION,
+    authorTime?: number | null,
 ): DailyGpLapCount {
-    const eligible = getDailyGpEligibleLapCounts(trackKey);
+    const eligible = getDailyGpEligibleLapCounts(trackKey, authorTime);
     return eligible[deterministicSeedIndex(
         `${challengeId}:${trackKey}:${rulesRevision}`,
         eligible.length,
@@ -208,6 +208,7 @@ export function selectDailyGpLapCount(
 export function buildDailyGpChallengeForDayIndexWithTrack(
     dayIndex: number,
     trackKey: string,
+    { authorTime }: { authorTime?: number | null } = {},
 ): DailyGpChallenge {
     const startsAt = getUtcDayStart(dayIndex);
     const challengeDate = formatUtcChallengeDate(startsAt);
@@ -215,7 +216,7 @@ export function buildDailyGpChallengeForDayIndexWithTrack(
     const availableUntil = new Date(startsAt.getTime() + DAILY_GP_PLAYLIST_DAYS * DAY_MS);
 
     const id = createDailyChallengeId(challengeDate);
-    const lapCount = selectDailyGpLapCount(id, trackKey);
+    const lapCount = selectDailyGpLapCount(id, trackKey, DAILY_GP_RULES_REVISION, authorTime);
 
     return {
         id,

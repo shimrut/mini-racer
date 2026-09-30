@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { registerTrackRoutes } from '../src/server/routes/track-routes.ts';
 import { TrackInputError } from '../src/server/tracks/track-shape.ts';
 import { TrackConflictError } from '../src/server/tracks/track-store.ts';
+import { TrackPlacementRetryError } from '../src/server/tracks/track-placement-lock.ts';
 
 vi.mock('@devvit/web/server', () => ({ redis: {}, context: {} }));
 
@@ -107,6 +108,17 @@ describe('track routes', () => {
         const response = await fetch(`${base}/api/creator/tracks/nightCut?baseRevision=2`, { method: 'DELETE' });
         expect(response.status).toBe(400);
         expect(dependencies.deleteStoredTrack.mock.calls[0][1].baseRevision).toBe('2');
+    });
+
+    it('returns 503 for a busy placement fence without claiming a save', async () => {
+        const base = await startApp(deps({
+            saveStoredTrack: vi.fn(async () => { throw new TrackPlacementRetryError(); }),
+        }));
+        const response = await fetch(`${base}/api/creator/tracks/nightCut`, {
+            method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ track: {} }),
+        });
+        expect(response.status).toBe(503);
+        expect((await response.json()).error).toContain('Retry');
     });
 
     it('saves the Daily list and keeps the latest Daily track in it', async () => {

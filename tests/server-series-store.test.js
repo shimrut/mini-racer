@@ -1,3 +1,4 @@
+import { installTrackRedisTransactions } from './helpers/track-redis-transactions.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import smallSteps from '../game/track/definitions/small-steps.js';
 
@@ -36,6 +37,8 @@ const known = {
     expire: async () => true,
 };
 const mockRedis = new Proxy(known, { get: (target, name) => target[name] ?? (async () => null) });
+
+installTrackRedisTransactions(mockRedis, strings, hashes);
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
@@ -148,16 +151,16 @@ describe('stored Campaign series', () => {
         })).rejects.toThrow('Night Two is used somewhere else');
     });
 
-    it('refuses to publish a series with a track that is not ready, or on a held-back ground', async () => {
+    it('refuses incomplete stage assignment and publishing on a held-back ground', async () => {
         await tracks.saveStoredTrack('nightFour', { track: { ...smallSteps, name: 'Night Four' } }, { username: 'ModOne' });
         await reload();
-        await series.saveStoredSeries('night-v1', {
+        await expect(series.saveStoredSeries('night-v1', {
             ...draft,
             stages: [{ trackKey: 'nightFour', laps: 1, requiredMedals: 0 }],
-        }, { username: 'ModOne' });
-        await expect(series.publishStoredSeries('night-v1', { username: 'ModOne' }))
-            .rejects.toThrow('medal times');
-        await series.saveStoredSeries('snow-night-v1', { ...draft, ground: 'snow' }, { username: 'ModOne' });
+        }, { username: 'ModOne' })).rejects.toThrow('medal times');
+        await tracks.saveStoredTrack('snowNight', { track: { ...smallSteps, name: 'Snow Night', ground: 'snow' }, medalRow }, { username: 'ModOne' });
+        await reload();
+        await series.saveStoredSeries('snow-night-v1', { ...draft, ground: 'snow', stages: [{ trackKey: 'snowNight', laps: 1, requiredMedals: 0 }] }, { username: 'ModOne' });
         await expect(series.publishStoredSeries('snow-night-v1', { username: 'ModOne' }))
             .rejects.toThrow('live ground');
     });

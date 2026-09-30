@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import medalTimes from '../game/medals/medal-times.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACKS } from '../game/track/tracks.js';
@@ -45,6 +46,7 @@ const mockRedis = {
 const mockValidateDailyGpReplayDetailed = vi.fn();
 const ownedLocks = new Map();
 const storedStrings = new Map();
+const storedChallengeHistory = new Map();
 
 function checkpointSplitsForChallenge(challenge, bestTimeSec) {
     const count = TRACKS[challenge.trackKey]?.checkpoints?.length || 0;
@@ -86,11 +88,15 @@ function createMockTransaction(options = {}) {
     return {
         multi: vi.fn().mockResolvedValue(undefined),
         unwatch: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn().mockResolvedValue(undefined),
         del: vi.fn(async (...args) => {
             commands.push(() => mockRedis.del(...args));
         }),
         set: vi.fn(async (...args) => {
             commands.push(() => mockRedis.set(...args));
+        }),
+        hSetNX: vi.fn(async (...args) => {
+            commands.push(() => mockRedis.hSetNX(...args));
         }),
         hSet: vi.fn(async (...args) => {
             commands.push(() => mockRedis.hSet(...args));
@@ -132,6 +138,7 @@ describe('server daily gp store submissions', () => {
         vi.clearAllMocks();
         ownedLocks.clear();
         storedStrings.clear();
+        storedChallengeHistory.clear();
         mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? storedStrings.get(key) ?? null);
         mockRedis.mGet.mockResolvedValue([]);
         mockRedis.set.mockImplementation(async (key, value, options = {}) => {
@@ -148,10 +155,15 @@ describe('server daily gp store submissions', () => {
             storedStrings.delete(key);
         });
         mockRedis.incrBy.mockResolvedValue(1);
-        mockRedis.hGet.mockResolvedValue(null);
+        mockRedis.hGet.mockImplementation(async (key, field) => key === 'dailygp:challenges' ? storedChallengeHistory.get(field) ?? null : null);
         mockRedis.hMGet.mockResolvedValue([]);
         mockRedis.hSet.mockResolvedValue(1);
-        mockRedis.hSetNX.mockResolvedValue(1);
+        mockRedis.hSetNX.mockImplementation(async (key, field, value) => {
+            if (key !== 'dailygp:challenges') return 1;
+            if (storedChallengeHistory.has(field)) return 0;
+            storedChallengeHistory.set(field, value);
+            return 1;
+        });
         mockRedis.hGetAll.mockResolvedValue({});
         mockRedis.hScan.mockResolvedValue({ cursor: 0, fieldValues: [] });
         mockRedis.hDel.mockResolvedValue(0);
@@ -656,11 +668,8 @@ describe('server daily gp store submissions', () => {
             'harborPrincipality',
             'sunlitTemple',
         ]);
-        expect(mockRedis.hSet).toHaveBeenCalledWith(
-            'dailygp:challenges',
-            expect.objectContaining({
-                'daily-gp-2026-06-10': expect.stringContaining('"trackKey":"caspianBoulevard"'),
-            }),
+        expect(mockRedis.hSetNX).toHaveBeenCalledWith(
+            'dailygp:challenges', 'daily-gp-2026-06-10', expect.stringContaining('"trackKey":"caspianBoulevard"'),
         );
     });
 
@@ -814,7 +823,7 @@ describe('server daily gp store submissions', () => {
         );
     });
 
-    it('returns the race winner when post-bound persist loses hSetNX', async () => {
+    it('returns the race winner observed under WATCH before a post-bound commit', async () => {
         const incomingChallenge = {
             id: 'daily-gp-2026-07-16',
             challengeDate: '2026-07-16',
@@ -843,11 +852,7 @@ describe('server daily gp store submissions', () => {
             objectiveParams: { lapCount: 1 },
         });
 
-        expect(mockRedis.hSetNX).toHaveBeenCalledWith(
-            'dailygp:challenges',
-            incomingChallenge.id,
-            JSON.stringify(incomingChallenge),
-        );
+        expect(mockRedis.hSetNX).not.toHaveBeenCalled();
         expect(mockRedis.hSet).not.toHaveBeenCalledWith(
             'dailygp:challenges',
             expect.anything(),
@@ -1092,6 +1097,8 @@ describe('server daily gp store submissions', () => {
         const testTrackKey = 'catalogScheduleTestTrack';
         const priorTrackKey = TRACK_SCHEDULE_KEYS.at(-1);
         TRACK_CATALOG[testTrackKey] = { name: 'Catalog Schedule Test Track' };
+        TRACKS[testTrackKey] = { ...TRACKS.circuit, name: 'Catalog Schedule Test Track' };
+        medalTimes[testTrackKey] = { author: 9, gold: 10, silver: 11, bronze: 12 };
         TRACK_SCHEDULE_KEYS.push(testTrackKey);
         mockRedis.hGetAll.mockResolvedValue({
             'daily-gp-2030-01-10': JSON.stringify({
@@ -1112,6 +1119,8 @@ describe('server daily gp store submissions', () => {
         } finally {
             TRACK_SCHEDULE_KEYS.pop();
             delete TRACK_CATALOG[testTrackKey];
+            delete TRACKS[testTrackKey];
+            delete medalTimes[testTrackKey];
             vi.useRealTimers();
         }
     });
@@ -2861,7 +2870,7 @@ describe('server daily gp store submissions', () => {
                 if (key === 'dailygp:challenges' && field === expiredChallenge.id) {
                     return JSON.stringify(expiredChallenge);
                 }
-                return null;
+                return key === 'dailygp:challenges' ? storedChallengeHistory.get(field) ?? null : null;
             });
 
             const result = await submitServerDailyGpRun({
@@ -2899,7 +2908,7 @@ describe('server daily gp store submissions', () => {
                 if (index >= 0 && key.endsWith(':entries')) {
                     return entryPayloads[index];
                 }
-                return null;
+                return key === 'dailygp:challenges' ? storedChallengeHistory.get(field) ?? null : null;
             });
         }
 
@@ -2943,7 +2952,7 @@ describe('server daily gp store submissions', () => {
                 if (key === 'dailygp:challenges' && field === expiredChallenge.id) {
                     return JSON.stringify(expiredChallenge);
                 }
-                return null;
+                return key === 'dailygp:challenges' ? storedChallengeHistory.get(field) ?? null : null;
             });
 
             const snapshot = await getServerDailyGpSnapshot({ challengeId: expiredChallenge.id });
@@ -3386,15 +3395,11 @@ describe('server daily gp store submissions', () => {
             }
         });
 
-        it('returns the built today challenge when publication loses the hSetNX race and reread is empty', async () => {
+        it('requires retry when conditional Daily publication does not confirm a winner', async () => {
             mockRedis.hGet.mockResolvedValue(null);
             mockRedis.hSetNX.mockResolvedValue(0);
-
             const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
-            const challenge = await getServerDailyGpChallenge();
-
-            expect(challenge.id).toBe(getTodayChallengeIdForTest());
-            expect(challenge.trackKey).toBeTruthy();
+            await expect(getServerDailyGpChallenge()).rejects.toThrow('Retry before racing');
         });
 
         it('returns a stored today challenge without writing when persistFallback is false', async () => {
@@ -4023,7 +4028,7 @@ describe('server daily gp store submissions', () => {
                         updatedAt: '2026-01-01T00:00:00.000Z',
                     });
                 }
-                return null;
+                return key === 'dailygp:challenges' ? storedChallengeHistory.get(field) ?? null : null;
             });
             mockRedis.get.mockResolvedValue(null);
 

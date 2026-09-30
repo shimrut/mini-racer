@@ -22,12 +22,17 @@ export type CampaignRouteDependencies = {
 // tracks, so the game can show them without a second request.
 function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): ServiceResult {
     const storedSeries = dependencies.describeStoredSeries?.() ?? [];
-    if (!storedSeries.length || !result.body || typeof result.body !== 'object') return result;
-    const trackKeys = storedSeries.flatMap((series) => series.stages.map((stage) => stage.trackKey));
+    if (!result.body || typeof result.body !== 'object') return result;
+    const stages = (result.body as { stages?: { trackKey?: unknown }[] }).stages;
+    const trackKeys = [...new Set([
+        ...storedSeries.flatMap((series) => series.stages.map((stage) => stage.trackKey)),
+        ...(Array.isArray(stages) ? stages.flatMap((stage) => typeof stage?.trackKey === 'string' ? [stage.trackKey] : []) : []),
+    ])];
     const storedTracks = dependencies.describeStoredTracks?.(trackKeys) ?? [];
     return {
         ...result,
-        body: { ...result.body, storedSeries, ...(storedTracks.length ? { storedTracks } : {}) },
+        body: { ...result.body, ...(storedSeries.length ? { storedSeries } : {}),
+            ...(dependencies.describeStoredTracks ? { storedTracks } : {}) },
     };
 }
 

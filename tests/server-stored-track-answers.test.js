@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
 import { registerHeadToHeadRoutes } from '../src/server/routes/head-to-head-routes.ts';
 import { registerCampaignRoutes } from '../src/server/routes/campaign-routes.ts';
+import { TrackPlacementRetryError } from '../src/server/tracks/track-placement-lock.ts';
 
 function routeHandlers(register, dependencies) {
     const handlers = { get: {}, post: {} };
@@ -59,15 +60,27 @@ describe('answers that carry stored tracks', () => {
         expect(playlist.body.storedTracks).toEqual([stored]);
     });
 
-    it('keeps the Daily answers unchanged without stored tracks', async () => {
+    it('explicitly confirms built-in Daily definitions without stored tracks', async () => {
         const challenge = { id: 'daily-gp-2026-09-30', trackKey: 'circuit' };
         const handlers = routeHandlers(registerCompetitionRoutes, competitionDependencies([challenge]));
         const active = responseRecorder();
         await handlers.get['/api/daily/active']({}, active);
-        expect(active.body).toBe(challenge);
+        expect(active.body).toEqual({ ...challenge, storedTracks: [] });
         const playlist = responseRecorder();
         await handlers.get['/api/daily/playlist']({}, playlist);
-        expect(playlist.body).toEqual({ challenges: [challenge] });
+        expect(playlist.body).toEqual({ challenges: [challenge], storedTracks: [] });
+    });
+
+    it('returns retryable unavailability when Daily placement cannot commit', async () => {
+        const dependencies = competitionDependencies([]);
+        dependencies.getServerDailyGpChallenge = async () => { throw new TrackPlacementRetryError(); };
+        const response = responseRecorder();
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            await routeHandlers(registerCompetitionRoutes, dependencies).get['/api/daily/active']({}, response);
+            expect(response.statusCode).toBe(503);
+            expect(response.body.error).toContain('Retry');
+        } finally { log.mockRestore(); }
     });
 
     it('adds the stored track to a Head to Head answer', async () => {
@@ -83,6 +96,18 @@ describe('answers that carry stored tracks', () => {
         const response = responseRecorder();
         await handlers.get['/api/head-to-head']({ query: { challengeId: 'one' } }, response);
         expect(response.body.storedTracks).toEqual([stored]);
+    });
+
+    it('confirms an unchanged built-in Head to Head definition', async () => {
+        const handlers = routeHandlers(registerHeadToHeadRoutes, {
+            describeStoredTracks,
+            getHeadToHeadRequestContext: () => ({ username: null }),
+            readContextPostData: () => null,
+            getHeadToHead: async () => ({ status: 200, body: { challenge: { trackKey: 'circuit' } } }),
+        });
+        const response = responseRecorder();
+        await handlers.get['/api/head-to-head']({ query: {} }, response);
+        expect(response.body.storedTracks).toEqual([]);
     });
 
     it('adds the published Creator series and their tracks to the Campaign answer', async () => {
@@ -106,6 +131,20 @@ describe('answers that carry stored tracks', () => {
         const plain = responseRecorder();
         await routeHandlers(registerCampaignRoutes, { ...dependencies, describeStoredSeries: () => [] })
             .get['/api/campaign/bootstrap']({ query: {} }, plain);
-        expect(plain.body).toEqual({ campaignId: 'numbered-v1' });
+        expect(plain.body).toEqual({ campaignId: 'numbered-v1', storedTracks: [] });
+    });
+
+    it('confirms built-in Campaign stages without requiring a second track request', async () => {
+        const describeTracks = vi.fn(() => []);
+        const handlers = routeHandlers(registerCampaignRoutes, {
+            getRequestUsername: () => null,
+            getServerCampaignBootstrap: async () => ({ status: 200,
+                body: { campaignId: 'numbered-v1', stages: [{ trackKey: 'numberOne' }] } }),
+            describeStoredSeries: () => [], describeStoredTracks: describeTracks,
+        });
+        const response = responseRecorder();
+        await handlers.get['/api/campaign/bootstrap']({ query: {} }, response);
+        expect(describeTracks).toHaveBeenCalledWith(['numberOne']);
+        expect(response.body.storedTracks).toEqual([]);
     });
 });

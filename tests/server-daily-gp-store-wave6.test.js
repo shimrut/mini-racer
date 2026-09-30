@@ -21,6 +21,7 @@ const mockRedis = {
     zRank: vi.fn(),
     watch: vi.fn(),
 };
+const ownedLocks = new Map();
 const mockValidateDailyGpReplayDetailed = vi.fn();
 const mockMintGuestPlayerToken = vi.fn();
 const mockVerifyGuestPlayerToken = vi.fn();
@@ -63,9 +64,17 @@ function buildStoredEntry(overrides = {}) {
 describe('server daily gp store wave6', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRedis.get.mockResolvedValue(null);
+        ownedLocks.clear();
+        mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? null);
         mockRedis.mGet.mockResolvedValue([]);
-        mockRedis.set.mockResolvedValue('OK');
+        mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+            if (options.nx && ownedLocks.has(key)) return '';
+            if (String(key).includes('lock:')) ownedLocks.set(key, value);
+            return 'OK';
+        });
+        mockRedis.del.mockImplementation(async (key) => {
+            ownedLocks.delete(key);
+        });
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hMGet.mockResolvedValue([]);
         mockRedis.hSet.mockResolvedValue(1);
@@ -81,9 +90,14 @@ describe('server daily gp store wave6', () => {
         mockRedis.watch.mockImplementation(() => ({
             multi: vi.fn().mockResolvedValue(undefined),
             unwatch: vi.fn().mockResolvedValue(undefined),
-            del: vi.fn(),
+            discard: vi.fn().mockResolvedValue(undefined),
+            del: vi.fn(async (key) => {
+                ownedLocks.delete(key);
+            }),
             set: vi.fn(),
             hSet: vi.fn(),
+            hSetNX: vi.fn(),
+            incrBy: vi.fn(),
             zAdd: vi.fn(),
             expire: vi.fn(),
             exec: vi.fn().mockResolvedValue([1]),
@@ -242,10 +256,13 @@ describe('server daily gp store wave6', () => {
             playerId: member.member,
             bestTimeMs: 10000 + index,
         }))));
-        mockRedis.hGet.mockResolvedValue(JSON.stringify(buildStoredEntry({
+        const playerEntry = JSON.stringify(buildStoredEntry({
             playerId: 'reddit:rank-2',
             bestTimeMs: 10001,
-        })));
+        }));
+        mockRedis.hGet.mockImplementation(async (key) => (
+            key === 'dailygp:challenges' ? JSON.stringify(challenge) : playerEntry
+        ));
         mockRedis.zRank.mockResolvedValueOnce(1);
         mockRedis.mGet.mockResolvedValue([]);
 

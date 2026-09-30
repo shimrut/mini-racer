@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import smallSteps from '../game/track/definitions/small-steps.js';
+import { installTrackRedisTransactions } from './helpers/track-redis-transactions.js';
 
 const strings = new Map();
 const hashes = new Map();
@@ -55,6 +56,7 @@ const { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } = await import('../src/server/dail
 beforeEach(() => {
     strings.clear();
     hashes.clear();
+    installTrackRedisTransactions(known, strings, hashes);
     store.clearStoredTrackCacheForTests();
     store.installStoredTrackResolver();
 });

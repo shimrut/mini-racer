@@ -1,4 +1,4 @@
-import { redis } from '@devvit/redis';
+import { redis, type TxClientLike } from '@devvit/redis';
 import { context } from '@devvit/web/server';
 import seriesData from '../../../game/campaign/series.json' with { type: 'json' };
 import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeries } from '../../../game/campaign/manifest.js';
@@ -8,13 +8,15 @@ import {
     getRequiredMedalsError,
 } from '../../../game/campaign/series-rules.js';
 import { setStoredSeriesResolver } from '../../../game/campaign/stored-series.js';
-import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
-import { hasTrack, isBuiltInTrack } from '../../../game/track/catalog.js';
-import { TRACKS } from '../../../game/track/tracks.js';
+import { hasTrack } from '../../../game/track/catalog.js';
 import { getTrackGround, isTrackGroundKey } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { TrackInputError } from '../tracks/track-shape.js';
-import { TrackConflictError, lockStoredTrack, readStoredTrack } from '../tracks/track-store.js';
+import { TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+
+import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/redis-lock.js';
+import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-placement-lock.js';
+import { readCompleteTrack } from '../tracks/track-readiness.js';
 
 // Campaign series made in the Creator, and copies of the app series that are
 // not live. A draft is private. A published series is live for players: its
@@ -180,28 +182,36 @@ export function listAppSeriesDefinitions(): AppSeriesDefinition[] {
 
 // ---- Writes ----
 
-async function withSeriesWriteLock<T>(seriesId: string, work: () => Promise<T>): Promise<T> {
-    const token = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    const acquired = await redis.set(writeLockKey(seriesId), token, {
-        nx: true,
-        expiration: new Date(Date.now() + WRITE_LOCK_TTL_MS),
-    });
-    if (!acquired) throw new TrackConflictError('Someone else is saving this series. Try again.');
+async function withSeriesWriteLock<T>(seriesId: string, work: (lock: RedisLock) => Promise<T>): Promise<T> {
+    const lock = await acquireRedisLock(writeLockKey(seriesId), WRITE_LOCK_TTL_MS);
+    if (!lock) throw new TrackConflictError('Someone else is saving this series. Try again.');
     try {
-        return await work();
+        return await work(lock);
     } finally {
         try {
-            if (await redis.get(writeLockKey(seriesId)) === token) await redis.del(writeLockKey(seriesId));
+            await releaseRedisLock(lock);
         } catch (error) {
             console.error(`Failed to release the write lock of series ${seriesId}:`, error);
         }
     }
 }
 
-async function writeRecord(record: StoredSeriesRecord): Promise<void> {
-    await redis.set(recordKey(record.id), JSON.stringify(record));
-    await redis.hSet(INDEX_KEY, { [record.id]: String(record.revision) });
-    await redis.incrBy(REVISION_KEY, 1);
+async function queueRecord(transaction: TxClientLike, record: StoredSeriesRecord): Promise<void> {
+    await transaction.set(recordKey(record.id), JSON.stringify(record));
+    await transaction.hSet(INDEX_KEY, { [record.id]: String(record.revision) });
+    await transaction.incrBy(REVISION_KEY, 1);
+}
+
+async function matchesRecord(record: StoredSeriesRecord, cacheRevision: number): Promise<boolean> {
+    return await redis.get(recordKey(record.id)) === JSON.stringify(record)
+        && await redis.hGet(INDEX_KEY, record.id) === String(record.revision)
+        && Number(await redis.get(REVISION_KEY) ?? 0) === cacheRevision;
+}
+
+async function trackUsedElsewhere(trackKey: string, seriesId: string): Promise<boolean> {
+    const { isTrackInDailySchedule } = await import('../daily/daily-schedule-store.js');
+    const { findSeriesUsingTrack } = await import('./series-usage.js');
+    return await isTrackInDailySchedule(trackKey) || Boolean(await findSeriesUsingTrack(trackKey, seriesId));
 }
 
 function normalizeStages(value: unknown): StoredSeriesStage[] {
@@ -263,69 +273,58 @@ export async function saveStoredSeries(
     const ground = payload.ground as string;
     const stages = normalizeStages(payload.stages);
 
-    return withSeriesWriteLock(id, async () => {
-        const existing = await readStoredSeries(id);
-        if ((existing?.revision ?? 0) !== Number(baseRevision ?? 0)) {
-            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
-        }
-        if (!existing && origin === 'creator' && APP_SERIES_IDS.has(id)) {
-            throw new TrackInputError('A series in the game already uses this key. Choose another key.');
-        }
-        const fixed = existing?.publishedStageCount ?? 0;
-        if (fixed > 0) {
-            if (ground !== existing!.ground) {
-                throw new TrackInputError(`${existing!.name} is live, so its ground cannot change.`);
+    return withTrackPlacementLock((placementLock) => withSeriesWriteLock(id, (seriesLock) =>
+        commitTrackPlacement([placementLock, seriesLock], [], async () => {
+            const existing = await readStoredSeries(id);
+            if ((existing?.revision ?? 0) !== Number(baseRevision ?? 0)) {
+                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
             }
-            for (let index = 0; index < fixed; index += 1) {
-                if (!sameStage(stages[index], existing!.stages[index])) {
-                    throw new TrackInputError(
-                        `${existing!.name} is live, so its first ${fixed} stages are fixed. New stages go after them.`,
-                    );
+            if (!existing && origin === 'creator' && APP_SERIES_IDS.has(id)) {
+                throw new TrackInputError('A series in the game already uses this key. Choose another key.');
+            }
+            const fixed = existing?.publishedStageCount ?? 0;
+            if (fixed > 0) {
+                if (ground !== existing!.ground) {
+                    throw new TrackInputError(`${existing!.name} is live, so its ground cannot change.`);
+                }
+                for (let index = 0; index < fixed; index += 1) {
+                    if (!sameStage(stages[index], existing!.stages[index])) {
+                        throw new TrackInputError(
+                            `${existing!.name} is live, so its first ${fixed} stages are fixed. New stages go after them.`,
+                        );
+                    }
                 }
             }
-        }
-        if (isTrackUsedElsewhere) {
             for (const stage of stages.slice(fixed)) {
-                if (await isTrackUsedElsewhere(stage.trackKey, id)) {
-                    throw new TrackInputError(`${TRACKS[stage.trackKey]?.name ?? stage.trackKey} is used somewhere else already.`);
+                const complete = await readCompleteTrack(stage.trackKey);
+                if (getTrackGround(complete.track).key !== ground) {
+                    throw new TrackInputError(`${complete.track.name} is on another ground than the series.`);
+                }
+                if (await (isTrackUsedElsewhere ?? trackUsedElsewhere)(stage.trackKey, id)) {
+                    throw new TrackInputError(`${complete.track.name} is used somewhere else already.`);
                 }
             }
-        }
-        const stamp = now.toISOString();
-        const record: StoredSeriesRecord = {
-            version: 1,
-            id,
-            name,
-            ground,
-            stages,
-            status: existing?.status ?? 'draft',
-            publishedStageCount: fixed,
-            publishedAt: existing?.publishedAt ?? null,
-            origin: existing?.origin ?? origin,
-            revision: (existing?.revision ?? 0) + 1,
-            createdAt: existing?.createdAt ?? stamp,
-            createdBy: existing?.createdBy ?? username,
-            updatedAt: stamp,
-            updatedBy: username,
-        };
-        await writeRecord(record);
-        return record;
-    });
-}
-
-async function assertStageReady(stage: StoredSeriesStage, ground: string, index: number): Promise<void> {
-    const label = `Stage ${index + 1}`;
-    const stored = await readStoredTrack(stage.trackKey);
-    if (stored) {
-        if (!stored.checksPassed) throw new TrackInputError(`${label}: ${stored.track.name} does not pass the checks yet.`);
-        if (!stored.medalRow) throw new TrackInputError(`${label}: set the medal times of ${stored.track.name} first.`);
-    } else if (!isBuiltInTrack(stage.trackKey) || !getTrackMedalThresholds(stage.trackKey)) {
-        throw new TrackInputError(`${label}: the track has no medal times.`);
-    }
-    const trackGround = getTrackGround(TRACKS[stage.trackKey]).key;
-    if (trackGround !== ground) {
-        throw new TrackInputError(`${label}: the track is on another ground than the series.`);
-    }
+            const stamp = now.toISOString();
+            const record: StoredSeriesRecord = {
+                version: 1,
+                id,
+                name,
+                ground,
+                stages,
+                status: existing?.status ?? 'draft',
+                publishedStageCount: fixed,
+                publishedAt: existing?.publishedAt ?? null,
+                origin: existing?.origin ?? origin,
+                revision: (existing?.revision ?? 0) + 1,
+                createdAt: existing?.createdAt ?? stamp,
+                createdBy: existing?.createdBy ?? username,
+                updatedAt: stamp,
+                updatedBy: username,
+            };
+            const cacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+            return { result: record, reconcile: () => matchesRecord(record, cacheRevision),
+                mutate: (transaction) => queueRecord(transaction, record) };
+        })));
 }
 
 // Makes the series live, or makes its new stages live. The stages cannot
@@ -335,39 +334,53 @@ export async function publishStoredSeries(
     { username, baseRevision, now = new Date() }: { username: string; baseRevision?: unknown; now?: Date },
 ): Promise<StoredSeriesRecord> {
     const id = assertSeriesId(seriesIdInput);
-    return withSeriesWriteLock(id, async () => {
-        const existing = await readStoredSeries(id);
-        if (!existing) throw new TrackInputError('Save the series first.');
-        if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
-        }
-        if (!isLiveGround(existing.ground)) {
-            throw new TrackInputError('Only a series on a live ground can go live. Other grounds need an app release.');
-        }
-        if (existing.stages.length < getCampaignSeriesMinStages(existing)) {
-            throw new TrackInputError('Add more stages before the series goes live.');
-        }
-        if (existing.stages.length === existing.publishedStageCount) {
-            throw new TrackInputError('Every stage of this series is live already.');
-        }
-        for (const [index, stage] of existing.stages.entries()) {
-            await assertStageReady(stage, existing.ground, index);
-        }
-        for (const stage of existing.stages.slice(existing.publishedStageCount)) {
-            await lockStoredTrack(stage.trackKey, 'series', now);
-        }
-        const record: StoredSeriesRecord = {
-            ...existing,
-            status: 'published',
-            publishedStageCount: existing.stages.length,
-            publishedAt: existing.publishedAt ?? now.toISOString(),
-            revision: existing.revision + 1,
-            updatedAt: now.toISOString(),
-            updatedBy: username,
-        };
-        await writeRecord(record);
-        return record;
-    });
+    return withTrackPlacementLock((placementLock) => withSeriesWriteLock(id, (seriesLock) =>
+        commitTrackPlacement([placementLock, seriesLock], [], async () => {
+            const existing = await readStoredSeries(id);
+            if (!existing) throw new TrackInputError('Save the series first.');
+            if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
+                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+            }
+            if (!isLiveGround(existing.ground)) {
+                throw new TrackInputError('Only a series on a live ground can go live. Other grounds need an app release.');
+            }
+            if (existing.stages.length < getCampaignSeriesMinStages(existing)) {
+                throw new TrackInputError('Add more stages before the series goes live.');
+            }
+            if (existing.stages.length === existing.publishedStageCount) {
+                throw new TrackInputError('Every stage of this series is live already.');
+            }
+            const tracksToLock = [];
+            for (const stage of existing.stages.slice(existing.publishedStageCount)) {
+                const complete = await readCompleteTrack(stage.trackKey);
+                if (getTrackGround(complete.track).key !== existing.ground) {
+                    throw new TrackInputError(`${complete.track.name} is on another ground than the series.`);
+                }
+                if (await trackUsedElsewhere(stage.trackKey, id)) {
+                    throw new TrackInputError(`${complete.track.name} is used somewhere else already.`);
+                }
+                if (complete.stored && !complete.stored.lockedAt) tracksToLock.push(complete.stored);
+            }
+            const record: StoredSeriesRecord = {
+                ...existing,
+                status: 'published',
+                publishedStageCount: existing.stages.length,
+                publishedAt: existing.publishedAt ?? now.toISOString(),
+                revision: existing.revision + 1,
+                updatedAt: now.toISOString(),
+                updatedBy: username,
+            };
+            const frozenTracks = tracksToLock.map((track) => freezeStoredTrack(track, 'series', now));
+            const trackCacheRevision = await readStoredTracksRevision() + frozenTracks.length;
+            const seriesCacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+            return { result: record,
+                reconcile: async () => await matchesRecord(record, seriesCacheRevision)
+                    && (await Promise.all(frozenTracks.map((track) => matchesStoredTrack(track, trackCacheRevision)))).every(Boolean),
+                mutate: async (transaction) => {
+                    for (const track of frozenTracks) await queueStoredTrackRecord(transaction, track);
+                    await queueRecord(transaction, record);
+                } };
+        })));
 }
 
 export async function deleteStoredSeries(
@@ -375,20 +388,25 @@ export async function deleteStoredSeries(
     { baseRevision }: { baseRevision?: unknown } = {},
 ): Promise<boolean> {
     const id = assertSeriesId(seriesIdInput);
-    return withSeriesWriteLock(id, async () => {
-        const existing = await readStoredSeries(id);
-        if (!existing) return false;
-        if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
-        }
-        if (existing.publishedStageCount > 0) {
-            throw new TrackInputError(`${existing.name} is live, so it cannot be deleted.`);
-        }
-        await redis.del(recordKey(id));
-        await redis.hDel(INDEX_KEY, [id]);
-        await redis.incrBy(REVISION_KEY, 1);
-        return true;
-    });
+    return withTrackPlacementLock((placementLock) => withSeriesWriteLock(id, (seriesLock) =>
+        commitTrackPlacement([placementLock, seriesLock], [], async () => {
+            const existing = await readStoredSeries(id);
+            if (!existing) return { result: false };
+            if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
+                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+            }
+            if (existing.publishedStageCount > 0) {
+                throw new TrackInputError(`${existing.name} is live, so it cannot be deleted.`);
+            }
+            const cacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+            return { result: true, reconcile: async () => !await redis.get(recordKey(id))
+                && !await redis.hGet(INDEX_KEY, id) && Number(await redis.get(REVISION_KEY) ?? 0) === cacheRevision,
+                mutate: async (transaction) => {
+                await transaction.del(recordKey(id));
+                await transaction.hDel(INDEX_KEY, [id]);
+                await transaction.incrBy(REVISION_KEY, 1);
+            } };
+        })));
 }
 
 // Copies each app series that is not live into Redis as a draft, so the

@@ -2,7 +2,7 @@ import { TRACK_CATALOG, getTrackName } from '../../../game/track/catalog.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
-import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
+import { isBuiltInTrackComplete } from '../tracks/track-readiness.js';
 import { readDailySchedule, type DailySchedule } from './daily-schedule-store.js';
 import { listStoredTracks } from '../tracks/track-store.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
@@ -52,8 +52,8 @@ export async function readCreatorDailyView(): Promise<CreatorDailyView> {
             played: usage.playedTrackKeys.has(key),
             locked: Boolean(storedTrack?.lockedAt),
             ready: storedTrack
-                ? storedTrack.checksPassed && Boolean(storedTrack.medalRow)
-                : Boolean(getTrackMedalThresholds(key)),
+                ? storedTrack.ready
+                : isBuiltInTrackComplete(key),
             series: seriesUse.get(key) ?? null,
         };
     });

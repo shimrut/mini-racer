@@ -23,6 +23,30 @@ const mockRedis = {
     zRank: vi.fn(),
     watch: vi.fn(),
 };
+const ownedLocks = new Map();
+
+function createMockTransaction() {
+    const commands = [];
+    const queue = (method) => vi.fn(async (...args) => {
+        commands.push(() => mockRedis[method](...args));
+    });
+    return {
+        multi: vi.fn().mockResolvedValue(undefined),
+        unwatch: vi.fn().mockResolvedValue(undefined),
+        discard: vi.fn().mockResolvedValue(undefined),
+        del: queue('del'),
+        set: queue('set'),
+        hSet: queue('hSet'),
+        hSetNX: queue('hSetNX'),
+        incrBy: queue('incrBy'),
+        expire: queue('expire'),
+        exec: vi.fn(async () => {
+            const results = [];
+            for (const command of commands) results.push(await command());
+            return results;
+        }),
+    };
+}
 const mockValidateDailyGpReplayDetailed = vi.fn();
 
 vi.mock('@devvit/redis', () => ({
@@ -36,9 +60,18 @@ vi.mock('../src/server/competition/replay-validator.js', () => ({
 describe('server daily gp store wave 2', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockRedis.get.mockResolvedValue(null);
+        ownedLocks.clear();
+        mockRedis.get.mockImplementation(async (key) => ownedLocks.get(key) ?? null);
         mockRedis.mGet.mockResolvedValue([]);
-        mockRedis.set.mockResolvedValue('OK');
+        mockRedis.set.mockImplementation(async (key, value, options = {}) => {
+            if (options.nx && ownedLocks.has(key)) return '';
+            if (String(key).includes('lock:')) ownedLocks.set(key, value);
+            return 'OK';
+        });
+        mockRedis.del.mockImplementation(async (key) => {
+            ownedLocks.delete(key);
+        });
+        mockRedis.watch.mockImplementation(async () => createMockTransaction());
         mockRedis.hGet.mockResolvedValue(null);
         mockRedis.hMGet.mockResolvedValue([]);
         mockRedis.hSet.mockResolvedValue(1);
@@ -310,7 +343,9 @@ describe('server daily gp store wave 2', () => {
 
         const result = await persistServerDailyGpChallenge(challenger);
 
+        // The winner appears when the placement lock re-reads the history,
+        // so the challenger writes nothing.
         expect(result).toEqual(winner);
-        expect(mockRedis.hSetNX).toHaveBeenCalledTimes(1);
+        expect(mockRedis.hSetNX).not.toHaveBeenCalled();
     });
 });

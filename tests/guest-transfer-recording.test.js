@@ -489,6 +489,7 @@ describe('guest transfer recordings', () => {
             }
             expect(clean.replies.at(-1)).toMatchObject({ status: 'completed' });
             expect(stops).toBeGreaterThan(2);
-        });
+        // Each stop seeds the whole Daily history again, through the placement lock.
+        }, 30_000);
     }
 });

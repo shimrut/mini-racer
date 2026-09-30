@@ -1468,7 +1468,8 @@ describe("guest transfer cost and recovery", () => {
     await seedSevenDayPlaylist();
     await recordCompletedRace("guest:thrown-conflict");
     vi.spyOn(console, "error").mockImplementation(() => {});
-    redis.throwTransactionConflictAt = 2;
+    // The conflict hits the first transaction of the transfer.
+    redis.throwTransactionConflictAt = redis.execCount + 1;
 
     await expect(selectGuestProgress({
       guestPlayerId: "guest:thrown-conflict",
