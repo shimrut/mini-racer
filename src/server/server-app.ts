@@ -70,6 +70,16 @@ import { registerCampaignRoutes } from './routes/campaign-routes.js';
 import { registerHeadToHeadRoutes } from './routes/head-to-head-routes.js';
 import { registerLeaderboardRaceRoutes } from './routes/leaderboard-race-routes.js';
 import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
+import { registerTrackRoutes } from './routes/track-routes.js';
+import {
+    deleteStoredTrack,
+    ensureStoredTracksLoaded,
+    installStoredTrackResolver,
+    listStoredTracks,
+    readPlacedStoredTracks,
+    readStoredTrack,
+    saveStoredTrack,
+} from './tracks/track-store.js';
 import {
     ensureCommunityCreatorPostForSubreddit,
     resolveCreatorToolSubredditName,
@@ -115,7 +125,21 @@ const headToHeadService = createHeadToHeadService({
     readViewerBest: readHeadToHeadViewerBest,
 });
 
+// Every track lookup in this server reads the stored tracks of the current
+// request's subreddit first.
+installStoredTrackResolver();
+
 function registerProductionRoutes(app: express.Application): void {
+    registerTrackRoutes(app, {
+        resolveCreatorToolSubredditName,
+        assertModeratorForSubreddit,
+        listStoredTracks,
+        readStoredTrack,
+        saveStoredTrack,
+        deleteStoredTrack,
+        isTrackPlaced: async () => false,
+        readPlacedStoredTracks,
+    });
     registerCommunityMapRoutes(app, {
         resolveCreatorToolSubredditName,
         readContextSubredditName,
@@ -238,6 +262,14 @@ export function createServerApp({
 } = {}) {
     const app = express();
     app.use(express.json({ limit: '256kb' }));
+    app.use(async (_req, _res, next) => {
+        try {
+            await ensureStoredTracksLoaded();
+        } catch (error) {
+            console.error('Stored tracks could not load:', error);
+        }
+        next();
+    });
     app.use(createTelemetryRouter());
     registerRoutes(app);
     return app;
