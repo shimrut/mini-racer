@@ -103,7 +103,7 @@ export class CreatorPanels {
         }
         if (copyView && !this.copyLoading) {
             this.copyView = copyView;
-            this.renderCopy(copyView.report, copyView.preview);
+            this.renderCopy();
         }
     }
 
@@ -687,7 +687,9 @@ export class CreatorPanels {
         }
     }
 
-    // ---- Copy of unplayed tracks ----
+    // ---- Copies into Redis ----
+    // Unplayed tracks, played Dailies and the live Campaign each have their
+    // own copy. The two copies of played tracks write locked tracks.
 
     async loadCopy() {
         if (this.copyLoading) {
@@ -697,12 +699,11 @@ export class CreatorPanels {
         this.copyLoading = true;
         if (!this.copyView) this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Checking what can be copied…' }));
         try {
-            const { report, preview } = await creatorApi.readMigration();
-            this.copyView = { report, preview };
-            this.renderCopy(report, preview);
+            this.copyView = await creatorApi.readMigration();
+            this.renderCopy();
         } catch (error) {
             if (this.copyView) {
-                this.renderCopy(this.copyView.report, this.copyView.preview);
+                this.renderCopy();
             } else {
                 this.copyRoot.replaceChildren(
                     element('p', { className: 'creator-error', text: `Could not check the copy: ${error.message}` }),
@@ -715,61 +716,112 @@ export class CreatorPanels {
         }
     }
 
-    renderCopy(report, preview) {
+    copySection(kind, { title, lines, note, label, empty, report, copiedText }) {
+        const error = this.copyError?.kind === kind ? this.copyError.message : null;
+        const failed = report?.failed ?? [];
+        return element('section', { className: 'creator-copy-section' }, [
+            element('h3', { text: title }),
+            element('ul', { className: 'creator-copy-lines' }, lines.filter(Boolean).map((line) => element('li', { text: line }))),
+            note ? element('p', { className: 'field-hint', text: note }) : null,
+            button(label, () => this.runCopy(kind), { className: 'primary-btn', disabled: this.busy || empty }),
+            error ? element('p', { className: 'creator-error', text: error }) : null,
+            report ? element('p', {
+                className: 'field-hint',
+                text: `Last copy: ${formatDate(report.ranAt)} by u/${report.ranBy}. ${copiedText(report)}${failed.length ? `, ${failed.length} failed` : ''}.`,
+            }) : null,
+            failed.length ? element('ul', { className: 'creator-copy-lines' }, failed.map((failure) => (
+                element('li', { className: 'creator-error', text: `${failure.key}: ${failure.error}` })
+            ))) : null,
+        ]);
+    }
+
+    renderCopy() {
+        const { report, preview, playedDailies = {}, liveCampaign = {} } = this.copyView ?? {};
         const seriesPreview = preview?.extra?.series;
-        const nothingToCopy = !preview?.copied?.length && preview?.dailyList !== 'would-copy'
-            && !seriesPreview?.copied?.length;
-        const lines = [
-            `${preview?.copied?.length ?? 0} unplayed tracks to copy.`,
-            `${preview?.played ?? 0} played tracks stay in the app.`,
-            preview?.dailyList === 'would-copy' ? 'The Daily list is copied too.' : 'The Daily list is in Redis already.',
-            seriesPreview ? `${seriesPreview.copied?.length ?? 0} hidden series to copy as drafts.` : null,
-        ].filter(Boolean);
-        const children = [
+        const played = playedDailies.preview;
+        const campaign = liveCampaign.preview;
+        const lockedNote = 'The copies are locked: nobody can change a raced track.';
+        this.copyRoot.replaceChildren(
             element('div', { className: 'creator-panel-head' }, [element('h2', { text: 'Copy to Redis' })]),
             element('p', {
                 className: 'field-hint',
-                text: 'The copy moves every track that nobody has raced into Redis, so you can change it here. Played tracks and the live Campaign stay in the app.',
+                text: 'Each copy moves app tracks into Redis. The app keeps its own tracks until a later release removes them.',
             }),
-            element('ul', { className: 'creator-copy-lines' }, lines.map((line) => element('li', { text: line }))),
-            button('Copy now', () => this.runCopy(), { className: 'primary-btn', disabled: this.busy || nothingToCopy }),
-            this.copyError ? element('p', { className: 'creator-error', text: this.copyError }) : null,
-        ].filter(Boolean);
-        if (report) {
-            children.push(element('p', {
-                className: 'field-hint',
-                text: `Last copy: ${formatDate(report.ranAt)} by u/${report.ranBy}. ${report.copied.length} tracks copied${report.failed.length ? `, ${report.failed.length} failed` : ''}.`,
-            }));
-            if (report.failed.length) {
-                children.push(element('ul', { className: 'creator-copy-lines' }, report.failed.map((failure) => (
-                    element('li', { className: 'creator-error', text: `${failure.key}: ${failure.error}` })
-                ))));
-            }
-        }
-        this.copyRoot.replaceChildren(...children);
+            this.copySection('unplayed', {
+                title: 'Unplayed tracks',
+                lines: [
+                    `${preview?.copied?.length ?? 0} unplayed tracks to copy.`,
+                    preview?.dailyList === 'would-copy' ? 'The Daily list is copied too.' : 'The Daily list is in Redis already.',
+                    seriesPreview ? `${seriesPreview.copied?.length ?? 0} hidden series to copy as drafts.` : null,
+                ],
+                note: 'You can change these copies here.',
+                label: 'Copy unplayed',
+                empty: !preview?.copied?.length && preview?.dailyList !== 'would-copy' && !seriesPreview?.copied?.length,
+                report,
+                copiedText: (last) => `${last.copied.length} tracks copied`,
+            }),
+            this.copySection('played-dailies', {
+                title: 'Played Dailies',
+                lines: [
+                    `${played?.copied?.length ?? 0} past Daily tracks to copy.`,
+                    played?.waiting?.length ? `${played.waiting.length} wait until players can no longer race their Daily.` : null,
+                    played?.alreadyStored?.length ? `${played.alreadyStored.length} are in Redis already.` : null,
+                ],
+                note: lockedNote,
+                label: 'Copy played Dailies',
+                empty: !played?.copied?.length,
+                report: playedDailies.report,
+                copiedText: (last) => `${last.copied.length} tracks copied`,
+            }),
+            this.copySection('live-campaign', {
+                title: 'Live Campaign',
+                lines: [
+                    `${campaign?.copied?.length ?? 0} live series to copy, with ${campaign?.tracks?.length ?? 0} stage tracks.`,
+                    campaign?.alreadyStored?.length ? `${campaign.alreadyStored.length} live series are in Redis already.` : null,
+                ],
+                note: lockedNote,
+                label: 'Copy live Campaign',
+                empty: !campaign?.copied?.length,
+                report: liveCampaign.report,
+                copiedText: (last) => `${last.copied.length} series and ${last.tracks?.length ?? 0} tracks copied`,
+            }),
+        );
     }
 
-    async runCopy() {
+    async runCopy(kind = 'unplayed') {
         if (this.busy) return;
-        if (!await this.confirm({
-            title: 'Copy to Redis?',
-            message: 'Copy the unplayed tracks to Redis now?',
-            confirmLabel: 'Copy',
-        })) return;
+        const copy = {
+            unplayed: {
+                question: { title: 'Copy to Redis?', message: 'Copy the unplayed tracks to Redis now?' },
+                running: 'Copying the unplayed tracks…',
+                run: () => creatorApi.runMigration(),
+            },
+            'played-dailies': {
+                question: { title: 'Copy played Dailies?', message: 'Copy the tracks of past Dailies to Redis now? The copies are locked.' },
+                running: 'Copying the played Dailies…',
+                run: () => creatorApi.runPlayedDailyCopy(),
+            },
+            'live-campaign': {
+                question: { title: 'Copy the live Campaign?', message: 'Copy the live Campaign series and their tracks to Redis now? The copies are locked.' },
+                running: 'Copying the live Campaign…',
+                run: () => creatorApi.runLiveCampaignCopy(),
+            },
+        }[kind];
+        if (!await this.confirm({ ...copy.question, confirmLabel: 'Copy' })) return;
         if (this.busy) return;
         this.busy = true;
         this.copyError = null;
         this.writeGeneration += 1;
         // The result appears on this screen: the status line is on the Tracks screen.
-        this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Copying the unplayed tracks…' }));
+        this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: copy.running }));
         try {
-            const { report } = await creatorApi.runMigration();
-            this.setStatus(`Copied ${report.copied.length} tracks.`);
+            const { report } = await copy.run();
+            this.setStatus(`Copied ${report.copied.length} ${kind === 'live-campaign' ? 'series' : 'tracks'}.`);
             this.refresh('daily', 'campaign');
             this.onTracksChanged();
         } catch (error) {
-            this.copyError = `Could not copy: ${error.message}`;
-            this.setStatus(this.copyError, true);
+            this.copyError = { kind, message: `Could not copy: ${error.message}` };
+            this.setStatus(this.copyError.message, true);
         } finally {
             this.busy = false;
             this.writeGeneration += 1;

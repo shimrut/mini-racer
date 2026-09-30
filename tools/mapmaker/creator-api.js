@@ -53,4 +53,6 @@ export const creatorApi = {
     ),
     readMigration: () => creatorRequest('/api/creator/migration'),
     runMigration: () => creatorRequest('/api/creator/migration', { method: 'POST' }),
+    runPlayedDailyCopy: () => creatorRequest('/api/creator/migration/played-dailies', { method: 'POST' }),
+    runLiveCampaignCopy: () => creatorRequest('/api/creator/migration/live-campaign', { method: 'POST' }),
 };

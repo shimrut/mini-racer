@@ -315,7 +315,7 @@ describe('Creator copy screen', () => {
         copy.resolve(jsonResponse({ error: 'Tracks are being updated. Try again.' }, 503));
         await running;
         expect(root.textContent).toContain('Could not copy: Tracks are being updated. Try again.');
-        expect(buttonsByText(root, 'Copy now')[0].disabled).toBe(false);
+        expect(buttonsByText(root, 'Copy unplayed')[0].disabled).toBe(false);
     });
 });
 
@@ -336,6 +336,68 @@ describe('Creator Campaign questions', () => {
         expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Make live' }));
         expect(window.confirm).not.toHaveBeenCalled();
         expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
+    });
+});
+
+describe('Creator copies of played tracks', () => {
+    const copyView = {
+        report: null,
+        preview: { copied: [], played: 88, dailyList: 'kept' },
+        playedDailies: { report: null, preview: { copied: ['albertGardens', 'smallSteps'], waiting: ['babylonRace'], alreadyStored: [] } },
+        liveCampaign: { report: null, preview: { copied: ['numbered-v1'], tracks: ['numberZero', 'numberOne'], alreadyStored: [] } },
+    };
+
+    it('shows each copy with its own button, and disables a copy with nothing left', () => {
+        vi.stubGlobal('fetch', vi.fn());
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        panels.receiveViews({ copyView, generation: 0 });
+        const root = document.getElementById('creator-copy-view');
+        expect(root.textContent).toContain('2 past Daily tracks to copy.');
+        expect(root.textContent).toContain('1 wait until players can no longer race their Daily.');
+        expect(root.textContent).toContain('1 live series to copy, with 2 stage tracks.');
+        expect(buttonsByText(root, 'Copy unplayed')[0].disabled).toBe(true);
+        expect(buttonsByText(root, 'Copy played Dailies')[0].disabled).toBe(false);
+        expect(buttonsByText(root, 'Copy live Campaign')[0].disabled).toBe(false);
+    });
+
+    it('runs the played Daily copy, and shows its error only in its own section', async () => {
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'POST') return jsonResponse({ error: 'The copy is running already. Wait for it to finish.' }, 400);
+            return jsonResponse(copyView);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        panels.receiveViews({ copyView, generation: 0 });
+        await panels.runCopy('played-dailies');
+        expect(fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')[0]).toContain('/api/creator/migration/played-dailies');
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Copy played Dailies?' }));
+        const sections = [...document.querySelectorAll('#creator-copy-view .creator-copy-section')];
+        expect(sections[1].textContent).toContain('Could not copy: The copy is running already.');
+        expect(sections[0].textContent).not.toContain('Could not copy');
+        expect(sections[2].textContent).not.toContain('Could not copy');
+    });
+
+    it('runs the live Campaign copy, then reloads the tracks and the other tabs', async () => {
+        const report = { dryRun: false, ranAt: '2026-10-01T12:00:00.000Z', ranBy: 'RaceMod', copied: ['numbered-v1'], tracks: ['numberZero', 'numberOne'], alreadyStored: [], failed: [] };
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'POST') return jsonResponse({ report });
+            if (String(url).includes('/api/creator/migration')) {
+                return jsonResponse({ ...copyView, liveCampaign: { report, preview: { copied: [], tracks: [], alreadyStored: ['numbered-v1'] } } });
+            }
+            if (String(url).includes('/api/creator/daily')) return jsonResponse(dailyView);
+            return jsonResponse({ series: [], appSeries: [], tracks: [] });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const onTracksChanged = vi.fn();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged, setStatus: vi.fn() });
+        panels.receiveViews({ copyView, generation: 0 });
+        await panels.runCopy('live-campaign');
+        expect(fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')[0]).toContain('/api/creator/migration/live-campaign');
+        expect(onTracksChanged).toHaveBeenCalled();
+        const root = document.getElementById('creator-copy-view');
+        expect(root.textContent).toContain('1 series and 2 tracks copied.');
+        expect(buttonsByText(root, 'Copy live Campaign')[0].disabled).toBe(true);
+        await vi.waitFor(() => expect(panels.dailyLoading || panels.seriesLoading).toBe(false));
     });
 });
 
@@ -376,7 +438,7 @@ describe('Creator tabs keep their data', () => {
         openPanels();
         expect(calls).toEqual({ daily: 0, series: 0, copy: 0 });
         expect(document.getElementById('creator-daily-view').textContent).toContain('Royal Plateau');
-        expect(document.getElementById('creator-copy-view').textContent).toContain('88 played tracks stay in the app.');
+        expect(document.getElementById('creator-copy-view').textContent).toContain('0 unplayed tracks to copy.');
     });
 
     it('reloads every tab at once after a track change, and keeps the earlier data on screen', async () => {

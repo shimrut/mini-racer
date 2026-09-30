@@ -187,6 +187,21 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     line-height: 1.6;
 }
 
+.creator-copy-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--maker-border);
+}
+
+.creator-copy-section h3 {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.creator-copy-section .field-hint {
+    margin: 0 0 0.75rem;
+}
+
 .creator-series-layout:not([hidden]) {
     display: grid;
     grid-template-columns: minmax(14rem, 18rem) 1fr;
