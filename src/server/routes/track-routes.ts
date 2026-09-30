@@ -8,6 +8,7 @@ export type TrackRouteDependencies = {
     resolveCreatorToolSubredditName(): string | null;
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
     listStoredTracks(): Promise<unknown[]>;
+    listStoredTrackRecords(): Promise<unknown[]>;
     readStoredTrack(trackKey: string): Promise<unknown | null>;
     saveStoredTrack(
         trackKey: unknown,
@@ -57,10 +58,14 @@ function readTrackKeysQuery(value: unknown): string[] {
 }
 
 export function registerTrackRoutes(app: Application, dependencies: TrackRouteDependencies): void {
-    app.get('/api/creator/tracks', async (_req, res) => {
+    app.get('/api/creator/tracks', async (req, res) => {
         try {
             await creatorUsername(dependencies);
-            res.json({ tracks: await dependencies.listStoredTracks() });
+            res.json({
+                tracks: req.query.full === '1'
+                    ? await dependencies.listStoredTrackRecords()
+                    : await dependencies.listStoredTracks(),
+            });
         } catch (error) {
             errorResponse(res, error);
         }

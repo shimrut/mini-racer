@@ -1,73 +1,331 @@
+/* The Creator: the Mapmaker with game tracks, the Daily list, the Campaign
+   Planner and the copy of unplayed tracks. It works on desktop and on phones. */
+
 .creator-mode .creator-hidden,
-.creator-mode #track-picker-btn,
-.creator-mode #track-picker-dialog,
 .creator-mode #restore-drafts-dialog,
-.creator-drive #frame-toggle,
-.creator-drive .mobile-controls {
+.creator-drive #frame-toggle {
     display: none !important;
 }
 
-.creator-mode .creator-title {
-    color: #f8fafc;
-    font-size: 1rem;
-    white-space: nowrap;
+.creator-header {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+    padding-block: 0.4rem;
+}
+
+.creator-tabs button[aria-pressed="true"] {
+    background: rgba(59, 115, 246, 0.2);
+    color: #e8f0ff;
+    box-shadow: inset 0 0 0 1px rgba(102, 153, 255, 0.65);
+}
+
+body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
+    display: none !important;
 }
 
 .creator-save-status {
-    color: #b9c8d9;
-    font-size: .83rem;
-    max-width: 20rem;
+    color: var(--maker-muted);
+    font-size: 0.83rem;
+    max-width: 16rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.creator-save-status[data-state="saved"] { color: #89e6bb; }
-.creator-save-status[data-state="error"] { color: #ffadad; }
-.creator-save-status[data-state="unsaved"] { color: #ffd48d; }
+.creator-save-status[data-state="saved"] { color: var(--maker-green); }
+.creator-save-status[data-state="error"] { color: var(--maker-danger-text); }
+.creator-save-status[data-state="unsaved"],
+.creator-save-status[data-state="locked"] { color: var(--maker-gold); }
 
-.creator-library {
-    background: #111e2f;
-    border-top: 1px solid #33445b;
-    color: #e9f0f7;
-    padding: .75rem 1rem;
-    max-height: 12rem;
-    overflow: auto;
+.creator-lock-note {
+    position: absolute;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(12, 18, 28, 0.9);
+    border: 1px solid var(--maker-border-strong);
+    color: var(--maker-gold);
+    font-size: 0.83rem;
+    white-space: nowrap;
 }
 
-.creator-library-head {
-    align-items: center;
+.maker-stage { position: relative; }
+
+/* The Daily, Campaign and Copy screens */
+
+.creator-view {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1rem;
+    max-width: 60rem;
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.creator-view[hidden],
+.maker-editor[hidden] {
+    display: none;
+}
+
+.creator-panel-head {
     display: flex;
-    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.creator-panel-head h2 {
+    margin: 0 auto 0 0;
+    font-size: 1.05rem;
+}
+
+.creator-list {
+    list-style: none;
+    margin: 0.75rem 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.creator-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--maker-border);
+    border-radius: var(--maker-radius);
+    background: var(--maker-panel);
+}
+
+.creator-row-index {
+    min-width: 1.8rem;
+    color: var(--maker-muted);
+    font-family: var(--maker-mono);
+    font-size: 0.8rem;
+}
+
+.creator-row-name,
+.creator-link {
+    flex: 1 1 8rem;
+    min-width: 0;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.creator-link {
+    border: 0;
+    background: none;
+    padding: 0;
+    color: var(--maker-blue);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.creator-row-badges {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.creator-row-actions {
+    display: inline-flex;
+    gap: 0.25rem;
+    margin-left: auto;
+}
+
+.creator-row-actions button {
+    min-width: 2.25rem;
+    padding: 0 0.5rem;
+}
+
+.creator-row-error {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--maker-danger-text);
+    font-size: 0.8rem;
+}
+
+.creator-inline-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--maker-muted);
+}
+
+.creator-inline-field input {
+    width: 4rem;
+}
+
+.creator-adder {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.creator-adder select {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.creator-error {
+    color: var(--maker-danger-text);
+}
+
+.creator-copy-lines {
+    margin: 0.5rem 0 1rem;
+    padding-left: 1.2rem;
+    line-height: 1.6;
+}
+
+.creator-series-layout:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(14rem, 18rem) 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.creator-series-list {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.creator-series-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.creator-series-pick {
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+.creator-series-pick.is-current {
+    box-shadow: inset 0 0 0 1px rgba(102, 153, 255, 0.65);
+}
+
+.creator-series-app {
+    color: var(--maker-muted);
+    font-size: 0.85rem;
+}
+
+.creator-series-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.5rem;
+}
+
+/* Test Drive runs in a frame over the editor */
+
+.creator-drive-dialog {
+    width: min(100vw, 72rem);
+    height: min(100dvh, 48rem);
+    max-width: 100vw;
+    max-height: 100dvh;
+    padding: 0;
+    border: 1px solid var(--maker-border-strong);
+    border-radius: 12px;
+    background: var(--maker-bg);
+    color: var(--maker-text);
+    overflow: hidden;
+}
+
+.creator-drive-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.creator-drive-dialog::backdrop {
+    background: rgba(3, 6, 12, 0.7);
+}
+
+.creator-drive-bar {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--maker-border);
 }
 
-.creator-library h2 { font-size: .9rem; margin: 0; }
-.creator-library p { color: #b9c8d9; font-size: .8rem; margin: .45rem 0; }
-.creator-map-list { display: flex; flex-wrap: wrap; gap: .5rem; }
-.creator-map {
-    align-items: center;
-    background: #1d3048;
-    border: 1px solid #39536f;
-    border-radius: .5rem;
-    display: flex;
-    gap: .6rem;
-    padding: .35rem .5rem;
+.creator-drive-dialog iframe {
+    flex: 1;
+    width: 100%;
+    border: 0;
 }
-.creator-map span { font-size: .8rem; }
-.creator-map button { font-size: .75rem; }
 
-@media (hover: none) and (pointer: coarse) {
-    .creator-mode .maker-header,
-    .creator-mode .maker-editor,
-    .creator-mode .creator-library,
-    .creator-drive .drive-header,
-    .creator-drive .drive-stage { display: none !important; }
-    .creator-mode::before,
-    .creator-drive::before {
-        content: 'Mini Racer Creator works on desktop. Open this post from a desktop browser to make or test maps.';
-        color: #f8fafc;
-        display: block;
-        font: 600 1.2rem/1.5 system-ui, sans-serif;
-        margin: 3rem auto;
-        max-width: 28rem;
-        padding: 1.5rem;
+@media (max-width: 700px) {
+    .creator-series-layout:not([hidden]) {
+        grid-template-columns: 1fr;
     }
+
+    .creator-header {
+        gap: 0.35rem;
+    }
+
+    .creator-tabs {
+        flex: 1 1 100%;
+    }
+
+    .creator-tabs button {
+        flex: 1;
+    }
+
+    .creator-header .track-picker-btn {
+        flex: 1 1 8rem;
+        min-width: 0;
+    }
+
+    /* The Save button shows Save or Saved, so the phone keeps only the
+       states that need words. */
+    .creator-save-status:not([data-state="error"]):not([data-state="locked"]) {
+        display: none;
+    }
+
+    .creator-save-status {
+        max-width: 9rem;
+    }
+
+    .creator-drive-dialog {
+        width: 100vw;
+        height: 100dvh;
+        border-radius: 0;
+    }
+}
+
+/* The small card in the feed that opens the Creator */
+
+.creator-launcher {
+    align-items: center;
+    justify-content: center;
+}
+
+.creator-launcher-card {
+    max-width: 24rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.creator-launcher-card h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.4rem;
+}
+
+.creator-launcher-card p {
+    color: var(--maker-muted);
 }

@@ -68,14 +68,19 @@ flowchart LR
 - `game/track/assets.js` caches geometry, runtime collision data, and rendered track canvases.
 - `game/track/engine-methods.js` owns track loading, resize behavior, and track presentation refresh.
 - Track creation and integration steps are documented in `docs/track-authoring.md`.
-- Moderator-authored Community maps use the separate desktop Creator post
-  (`pages/map-creator.html`, `tools/mapmaker.js`), shared authoring checks in
-  `game/track/authoring/`, and Redis draft, immutable-map, and publication
-  records in `src/server/community/`. `src/server/routes/community-map-routes.ts`
-  gates authoring by moderator membership and serves published snapshots to
-  the game's `game/community/` browser and one-lap unranked race. See
-  `docs/community-map-creator-options-2026-09-30.md` for the release boundary
-  and Daily/Campaign promotion options.
+- The Mini Racer Creator (`pages/map-creator.html`, `tools/mapmaker.js` in
+  creator mode, `tools/mapmaker/creator-panels.js`) lets moderators make game
+  tracks, edit the Daily list and build Campaign series in Reddit, with no app
+  release. The server keeps them per subreddit in Redis
+  (`src/server/tracks/`, `src/server/daily/daily-schedule-store.ts`,
+  `src/server/campaign/series-store.ts`) and checks moderator membership on
+  every Creator route. Each request loads the stored tracks and published
+  series into `game/track/stored-tracks.js` and
+  `game/campaign/stored-series.js`, so `TRACKS`, the catalog, the medal times
+  and the Campaign lists find them before the built-in ones. A stored track
+  locks when it becomes a Daily or its series goes live. See
+  `docs/creator-redis-tracks-plan-2026-09-30.md`. Community maps
+  (`game/community/`, `src/server/community/`) stay hidden from players.
 - Developer tooling is removed at build time, not gated at runtime. `tools/debug-module-stubs.js` lists each developer-only module, and `vite.config.js` resolves every one of them to a no-op `.stub.js` for the client build, so none of that code reaches `dist/client`. A runtime check could not do this: the client is in the player's hands, so a hostname or storage gate can be spoofed by serving or patching the bundle, and a minifier will not drop an unreferenced class method. This is why the hooks live in their own modules rather than on the engine class. `tests/debug-module-stubs.test.js` fails if a stub stops covering its module's exports or if engine/launcher code assigns a debug global directly.
 - Local development exposes the deterministic gameplay state and time-step helpers through `window.__RACER_DEBUG__` plus the standard `render_game_to_text` / `advanceTime` browser-game test contract, from `game/debug/test-hooks.js`; the launcher posts expose their own smaller contract from `game/debug/launcher-hooks.js`. Loopback hosts and `.local` development aliases are treated as local.
 - Local builds enable PB ghost sizing automatically; `?debugPbGhostSize=1` or `window.__PB_GHOST_SIZE_DEBUG__.enable()` also enables it on any unbundled game URL. `game/ghost/pb-ghost-size-debug.js` mirrors the schema-v2 pose recorder, writes JSON byte counts to browser storage synchronously at finish, fills gzip/base64 Redis-envelope fields asynchronously using the native stream API or a portable gzip fallback, reloads prior reports into the next debug session, keeps the last ten complete reports in browser storage, and exposes them through developer-only hooks. It remains browser-local and does not change submission or Redis persistence.

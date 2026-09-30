@@ -5,6 +5,7 @@ import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { readDailySchedule, type DailySchedule } from './daily-schedule-store.js';
 import { listStoredTracks } from '../tracks/track-store.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
+import { readSeriesTrackUse } from '../campaign/series-usage.js';
 
 // What the Creator shows for the Daily list: the list, the latest Daily, and
 // every track that the list can use.
@@ -18,6 +19,8 @@ export type CreatorDailyTrack = {
     played: boolean;
     locked: boolean;
     ready: boolean;
+    // The Campaign series that uses the track. Such a track cannot be a Daily.
+    series: string | null;
 };
 
 export type CreatorDailyView = {
@@ -28,10 +31,11 @@ export type CreatorDailyView = {
 };
 
 export async function readCreatorDailyView(): Promise<CreatorDailyView> {
-    const [schedule, usage, stored] = await Promise.all([
+    const [schedule, usage, stored, seriesUse] = await Promise.all([
         readDailySchedule(),
         readTrackUsage(),
         listStoredTracks(),
+        readSeriesTrackUse(),
     ]);
     const storedByKey = new Map(stored.map((track) => [track.key, track]));
     const keys = [...new Set([...Object.keys(TRACK_CATALOG), ...storedByKey.keys()])];
@@ -47,6 +51,7 @@ export async function readCreatorDailyView(): Promise<CreatorDailyView> {
             played: usage.playedTrackKeys.has(key),
             locked: Boolean(storedTrack?.lockedAt),
             ready: storedTrack ? storedTrack.checksPassed && Boolean(storedTrack.medalRow) : true,
+            series: seriesUse.get(key) ?? null,
         };
     });
     return {

@@ -76,6 +76,9 @@
       },
       "map-creator": {
         "height": "tall",
+        "entry": "pages/map-creator-launcher.html"
+      },
+      "map-creator-editor": {
         "entry": "pages/map-creator.html"
       },
       "map-creator-playtest": {
@@ -162,7 +165,7 @@
       },
       {
         "label": "Open Mini Racer Creator",
-        "description": "Make and publish desktop Community maps",
+        "description": "Make tracks, the Daily list and Campaign series",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/community-creator-open"

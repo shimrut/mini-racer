@@ -71,7 +71,7 @@ export async function ensureCommunityCreatorPostForSubreddit(subredditName: stri
                 text: [
                     '# Mini Racer Creator',
                     '',
-                    'Open this tool from the subreddit moderator menu on desktop to make Community maps.',
+                    'Moderators open this tool from the subreddit menu to make tracks, the Daily list and Campaign series.',
                 ].join('\n'),
             },
         });

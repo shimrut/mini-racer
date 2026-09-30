@@ -217,6 +217,14 @@ export async function readStoredTrack(trackKey: string): Promise<StoredTrackReco
     return parseRecord(await redis.get(recordKey(trackKey)));
 }
 
+// Every stored track with its shape, newest change first. Only the Creator
+// reads this list.
+export async function listStoredTrackRecords(): Promise<StoredTrackRecord[]> {
+    const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
+    const records = await readRecords(Object.keys(index));
+    return [...records.values()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
 export async function listStoredTracks(): Promise<StoredTrackSummary[]> {
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
     const records = await readRecords(Object.keys(index));

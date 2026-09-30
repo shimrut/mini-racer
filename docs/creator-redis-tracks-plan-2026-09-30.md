@@ -1,6 +1,7 @@
 # Creator tracks in Redis: plan
 
-Date: 2026-09-30. Branch: `ingame-mapmaker`. Status: in progress.
+Date: 2026-09-30. Branch: `ingame-mapmaker`. Status: all stages built and
+tested locally. The checks on a real Reddit post are still open (see the end).
 
 ## Goal
 
@@ -62,3 +63,18 @@ Each stage is one commit, with the tests green.
   cache when it changes.
 - `dailygp:daily:schedule:v1`: the stored Daily list.
 - `dailygp:campaign:series:v1:<seriesId>`: one stored series.
+
+## Open checks on Reddit
+
+These need a real subreddit install. Do them in the test subreddit first.
+
+1. The Creator post opens from the moderator menu, and **Open Creator** opens
+   the full view on desktop and on a phone.
+2. Save, delete and the Daily list survive a reload of the post.
+3. Test Drive opens in its frame and records laps for the medal times.
+4. The copy button copies the unplayed tracks and the lists, and the report
+   shows no failures.
+5. A stored track becomes the Daily at midnight UTC, locks, and players can
+   race it and submit times.
+6. A published series appears in the Campaign, with the series screen, and
+   players can race and unlock its stages.

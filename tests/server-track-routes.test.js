@@ -28,6 +28,7 @@ function deps(overrides = {}) {
         resolveCreatorToolSubredditName: () => 'MiniRacer',
         assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
         listStoredTracks: vi.fn(async () => []),
+        listStoredTrackRecords: vi.fn(async () => [{ key: 'nightCut', track: {} }]),
         readStoredTrack: vi.fn(async () => null),
         saveStoredTrack: vi.fn(async (key) => ({ key, revision: 1 })),
         deleteStoredTrack: vi.fn(async () => true),
