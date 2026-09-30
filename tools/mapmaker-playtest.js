@@ -54,12 +54,16 @@ const ui = {
 };
 // Online, the Mapmaker is the index page of /mapmaker/.
 if (MAPMAKER_ONLINE && !CREATOR_PLAYTEST) document.querySelector('.drive-back').href = './';
-// In the Creator, Test Drive runs in a frame of the Creator page. The back
-// button closes the frame, so the Creator page never reloads.
-if (CREATOR_PLAYTEST && window.parent !== window) {
-    document.querySelector('.drive-back')?.addEventListener('click', (event) => {
-        event.preventDefault();
-        window.parent.postMessage({ type: 'creator-test-drive-close' }, window.location.origin);
+// In the Creator, Test Drive runs in a frame of the Creator page. Close
+// closes the frame, so the Creator page never reloads. Opened as a page,
+// Close goes back to the Creator.
+if (CREATOR_PLAYTEST) {
+    document.getElementById('drive-close')?.addEventListener('click', () => {
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'creator-test-drive-close' }, window.location.origin);
+        } else {
+            window.location.assign('map-creator.html');
+        }
     });
 }
 
@@ -73,9 +77,11 @@ let state = null;
 let paused = false;
 let raceFrame = 'desktop';
 // Same cutoff as the game: a phone or a narrow window is already the phone view.
-const deviceMobileQuery = window.matchMedia(
-    '(max-width: 768px), (hover: none) and (pointer: coarse), (max-height: 600px) and (orientation: landscape)',
-);
+// The Creator runs Test Drive in a frame, so the frame size says nothing about
+// the device there: only a touch screen forces the phone view.
+const deviceMobileQuery = window.matchMedia(CREATOR_PLAYTEST
+    ? '(hover: none) and (pointer: coarse)'
+    : '(max-width: 768px), (hover: none) and (pointer: coarse), (max-height: 600px) and (orientation: landscape)');
 let wallContacts = 0;
 let contactSpots = [];
 let lapTime = null;

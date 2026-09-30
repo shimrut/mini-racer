@@ -13,8 +13,7 @@
 </head>
 <body class="drive-body creator-drive" data-creator-playtest="true">
     <header class="drive-header">
-        <a class="drive-back" href="map-creator.html">&larr; Creator</a>
-        <h1 id="track-title">Test Drive</h1>
+        <h1 class="drive-title">Test Drive <span class="drive-divider" aria-hidden="true"></span> <span id="track-title"></span></h1>
         <p id="drive-feedback" class="drive-status">Loading draft…</p>
         <div class="drive-actions">
             <div id="frame-toggle" class="frame-toggle" role="group" aria-label="Race screen">
@@ -22,6 +21,8 @@
                 <button id="frame-mobile" type="button" aria-pressed="false">Mobile</button>
             </div>
             <button id="reset-button" type="button">Reset</button>
+            <span class="drive-divider" aria-hidden="true"></span>
+            <button id="drive-close" type="button">Close</button>
         </div>
     </header>
 

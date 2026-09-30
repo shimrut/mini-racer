@@ -3599,8 +3599,6 @@ class MapmakerApp {
         this.creatorTabs.forEach((button) => {
             button.addEventListener('click', () => this.showCreatorTab(button.dataset.tab));
         });
-        document.getElementById('creator-drive-close')
-            ?.addEventListener('click', () => this.closeCreatorTestDrive());
         this.creatorDriveDialog?.addEventListener('cancel', (event) => {
             event.preventDefault();
             this.closeCreatorTestDrive();
@@ -3638,7 +3636,13 @@ class MapmakerApp {
             try {
                 loaded = frame.contentDocument?.body?.dataset.creatorPlaytest === 'true';
             } catch {}
-            if (loaded || frame.src === 'about:blank') return;
+            if (loaded) {
+                // The keys drive the car at once, not a button of the Creator.
+                frame.focus();
+                frame.contentWindow?.focus();
+                return;
+            }
+            if (frame.src === 'about:blank') return;
             // The frame did not open Test Drive. The page opens it instead,
             // after a save, because leaving the page drops unsaved changes.
             this.closeCreatorTestDrive();
