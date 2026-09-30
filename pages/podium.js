@@ -1,4 +1,6 @@
 import { TRACKS } from '../game/track/tracks.js';
+import { isBuiltInTrack } from '../game/track/catalog.js';
+import { ensureStoredTracks } from '../game/track/stored-track-service.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../game/track/presentation.js';
@@ -37,6 +39,7 @@ export function normalizePodium(value) {
     return {
         challengeId: cleanText(podium.challengeId),
         challengeDate: cleanText(podium.challengeDate),
+        trackKey: cleanText(podium.trackKey),
         trackName: cleanText(podium.trackName) || 'Daily GP',
         lapCount: podium.lapCount === 2 || podium.lapCount === 3 ? podium.lapCount : 1,
         positions: Array.from({ length: PODIUM_SIZE }, (_, index) => (
@@ -225,7 +228,8 @@ async function boot() {
     const preview = shouldUseLocalPodiumPreview() ? createLocalPodiumPreview() : null;
     installLocalPodiumPreview(preview);
     const podium = renderPodium(document, readPodiumPostData());
-    renderPodiumTrack(podium.trackName);
+    await loadStoredPodiumTrack(podium, preview ? async () => preview.replays : fetchPodiumReplays);
+    renderPodiumTrack(podium);
     bindPodiumPlayNow(document);
     bindPodiumReplay(document, {
         canvas: document.getElementById('podium-track'),
@@ -331,7 +335,7 @@ export function bindPodiumReplay(documentRef, {
     documentRef.getElementById('podium-replay-back')?.addEventListener('click', () => {
         controller.exit();
         const podium = renderPodium(documentRef, readPodiumPostData());
-        renderPodiumTrack(podium.trackName, documentRef);
+        renderPodiumTrack(podium, documentRef);
         syncButton();
         documentRef.getElementById('podium-view-replays')?.focus();
     });
@@ -385,10 +389,28 @@ function resolveTrackByName(trackName) {
     return null;
 }
 
-function renderPodiumTrack(trackName, documentRef = typeof document !== 'undefined' ? document : null) {
+// A podium post names its track. A track made in the Creator is not in the
+// app, so the page learns its key from the replay data and loads it.
+let storedPodiumTrackKey = '';
+
+function resolvePodiumTrack(podium) {
+    const trackKey = podium?.trackKey || storedPodiumTrackKey;
+    if (trackKey && TRACKS[trackKey]) return { trackKey, track: TRACKS[trackKey] };
+    return resolveTrackByName(podium?.trackName) || { trackKey: 'circuit', track: TRACKS.circuit };
+}
+
+async function loadStoredPodiumTrack(podium, fetchReplays) {
+    if (podium.trackKey || resolveTrackByName(podium.trackName)) return;
+    const trackKey = cleanText((await fetchReplays())?.trackKey);
+    if (!trackKey || isBuiltInTrack(trackKey)) return;
+    await ensureStoredTracks([trackKey]);
+    if (TRACKS[trackKey]) storedPodiumTrackKey = trackKey;
+}
+
+function renderPodiumTrack(podium, documentRef = typeof document !== 'undefined' ? document : null) {
     const canvas = documentRef?.getElementById('podium-track');
     if (!canvas) return;
-    const resolved = resolveTrackByName(trackName) || { trackKey: 'circuit', track: TRACKS.circuit };
+    const resolved = resolvePodiumTrack(podium);
     const { trackKey, track } = resolved;
     if (!track) return;
 
@@ -438,6 +460,6 @@ if (typeof document !== 'undefined') {
             return;
         }
         const podium = normalizePodium(readPodiumPostData());
-        renderPodiumTrack(podium.trackName);
+        renderPodiumTrack(podium);
     });
 }

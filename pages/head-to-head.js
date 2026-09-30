@@ -1,5 +1,6 @@
 import { TRACKS } from '../game/track/tracks.js';
-import { getTrackName } from '../game/track/catalog.js';
+import { getTrackName, isBuiltInTrack } from '../game/track/catalog.js';
+import { ensureStoredTracks } from '../game/track/stored-track-service.js';
 import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { createPosterCarDrive, loadPosterCar } from '../game/track/poster-car.js';
 import {
@@ -224,8 +225,15 @@ export function bootHeadToHead(documentRef = document, root = globalThis) {
     if (challenge.trackKey) void loadPosterCar(TRACKS[challenge.trackKey]).then(posterCarDrive.drive);
 }
 
+// A track made in the Creator is not in the app, so the page loads it first.
+async function startHeadToHead() {
+    const trackKey = cleanText(readHeadToHeadPostData(globalThis)?.trackKey);
+    if (trackKey && !isBuiltInTrack(trackKey)) await ensureStoredTracks([trackKey]);
+    bootHeadToHead();
+}
+
 if (typeof document !== 'undefined') {
-    const start = () => bootHeadToHead();
+    const start = () => void startHeadToHead();
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', start);
     } else {

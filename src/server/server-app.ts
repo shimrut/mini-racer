@@ -73,6 +73,7 @@ import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
 import { registerTrackRoutes } from './routes/track-routes.js';
 import {
     deleteStoredTrack,
+    describePlacedStoredTracks,
     ensureStoredTracksLoaded,
     installStoredTrackResolver,
     listStoredTracks,
@@ -190,6 +191,7 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
     });
     registerHeadToHeadRoutes(app, {
+        describeStoredTracks: describePlacedStoredTracks,
         getHeadToHeadRequestContext: () => ({
             username: getRequestUsername(),
             userId: getRequestUserId(),
@@ -224,6 +226,7 @@ function registerProductionRoutes(app: express.Application): void {
         getServerDailyGpSnapshot: (input) => getServerDailyGpSnapshot(input),
         submitServerDailyGpRun: (input) => submitServerDailyGpRun(input),
         isDailyGpChallengePlayable,
+        describeStoredTracks: describePlacedStoredTracks,
     });
     registerShareRoutes(app, {
         getDailyGpShareRequestContext,

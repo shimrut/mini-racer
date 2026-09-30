@@ -7,6 +7,8 @@ import type {
 export type HeadToHeadRouteDependencies = {
     getHeadToHeadRequestContext(): Promise<HeadToHeadRequestContext>
         | HeadToHeadRequestContext;
+    // The placed stored tracks among these keys, so the game can load them.
+    describeStoredTracks?(trackKeys: string[]): unknown[];
     readContextPostData(): Record<string, unknown> | null;
     previewHeadToHead(
         input: Record<string, unknown>,
@@ -68,6 +70,16 @@ function withRequestIdentity(
         guestToken: typeof input?.guestToken === 'string' ? input.guestToken : null,
     };
 }
+// A challenge on a track made in the Creator carries that track, so the game
+// can load it without a second request.
+function withStoredTracks(body: unknown, dependencies: HeadToHeadRouteDependencies): unknown {
+    if (!body || typeof body !== 'object' || !dependencies.describeStoredTracks) return body;
+    const challenge = (body as { challenge?: { trackKey?: unknown } }).challenge;
+    const trackKey = typeof challenge?.trackKey === 'string' ? challenge.trackKey : '';
+    const storedTracks = trackKey ? dependencies.describeStoredTracks([trackKey]) : [];
+    return storedTracks.length ? { ...body, storedTracks } : body;
+}
+
 export function registerHeadToHeadRoutes(
     app: Application,
     dependencies: HeadToHeadRouteDependencies,
@@ -110,7 +122,7 @@ export function registerHeadToHeadRoutes(
                     req.query as Record<string, unknown>,
                 ),
             );
-            res.status(result.status).json(result.body);
+            res.status(result.status).json(withStoredTracks(result.body, dependencies));
         } catch (error) {
             console.error('Failed to load Mini Racer head-to-head:', error);
             res.status(500).json({ status: 'challenge_failed', error: 'Could not load this challenge.' });

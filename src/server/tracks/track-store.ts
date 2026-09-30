@@ -45,12 +45,14 @@ export type StoredTrackSummary = Pick<StoredTrackRecord,
     | 'lockedAt' | 'lockReason' | 'medalRow'> & { name: string; ground: string };
 
 // The form that the game uses to look up a track (game/track/stored-tracks.js).
+// `placed` is true once players can race the track.
 export type StoredTrackEntry = {
     key: string;
     name: string;
     ground: string;
     medalRow: ReturnType<typeof normalizeGameMedalRow>;
     track: Readonly<TrackShape>;
+    placed: boolean;
 };
 
 // A save that started from an older revision of the track.
@@ -98,6 +100,7 @@ function toEntry(record: StoredTrackRecord): StoredTrackEntry {
         ground: getTrackGround(record.track).key,
         medalRow: normalizeGameMedalRow(record.medalRow),
         track,
+        placed: Boolean(record.lockedAt),
     });
 }
 
@@ -143,6 +146,18 @@ function readInstallScope(): string | null {
 export function resolveStoredTrackForRequest(trackKey: string): StoredTrackEntry | null {
     const scope = readInstallScope();
     return scope ? cacheByInstall.get(scope)?.entries.get(trackKey) ?? null : null;
+}
+
+// The placed stored tracks among these keys, from this request's cache. An
+// answer that names a track carries them, so the game needs no second request.
+export function describePlacedStoredTracks(trackKeys: string[]): StoredTrackEntry[] {
+    const scope = readInstallScope();
+    const entries = scope ? cacheByInstall.get(scope)?.entries : null;
+    if (!entries?.size) return [];
+    return [...new Set(trackKeys)].flatMap((trackKey) => {
+        const entry = typeof trackKey === 'string' ? entries.get(trackKey) : null;
+        return entry?.placed ? [entry] : [];
+    });
 }
 
 export function installStoredTrackResolver(): void {

@@ -104,7 +104,8 @@ describe('stored track overlay', () => {
         expect(getLoadedClientTrack('fetchedLoop')).toBe(first);
     });
 
-    it('returns no track for an unknown key without a loader', async () => {
+    it('returns no track for an unknown key that the server does not have', async () => {
+        setStoredTrackLoader(async () => {});
         expect(await loadClientTrack('missingLoop')).toBeNull();
     });
 

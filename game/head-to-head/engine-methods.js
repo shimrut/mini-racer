@@ -1,4 +1,5 @@
 import { getTrackName } from '../track/catalog.js';
+import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
 import {
     confirmHeadToHeadComment,
     getHeadToHead,
@@ -214,6 +215,8 @@ export const headToHeadEngineMethods = {
         if (challengeReady && typeof this.loadTrack === 'function') {
             try {
                 onTrackPhase?.();
+                registerStoredTracksFromPayload(response.body?.storedTracks);
+                await ensureStoredTracks([challenge.trackKey]);
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,

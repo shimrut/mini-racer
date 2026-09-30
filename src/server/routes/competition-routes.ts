@@ -15,6 +15,8 @@ export type CompetitionRouteDependencies = {
     getServerDailyGpSnapshot(input: Record<string, unknown>): Promise<unknown>;
     submitServerDailyGpRun(input: Record<string, unknown>): Promise<ServiceResult>;
     isDailyGpChallengePlayable(challenge: DailyGpChallenge): boolean;
+    // The placed stored tracks among these keys, so the game can load them.
+    describeStoredTracks?(trackKeys: string[]): unknown[];
 };
 
 function parseOptionalInteger(value: unknown): number | undefined {
@@ -73,7 +75,8 @@ export function registerCompetitionRoutes(
             const challenge = postBound && dependencies.isDailyGpChallengePlayable(postBound)
                 ? postBound
                 : await dependencies.getServerDailyGpChallenge();
-            res.status(200).json(challenge);
+            const storedTracks = dependencies.describeStoredTracks?.([challenge.trackKey]) ?? [];
+            res.status(200).json(storedTracks.length ? { ...challenge, storedTracks } : challenge);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer active challenge:', error);
             res.status(500).json({ error: 'Active challenge lookup failed' });
@@ -82,9 +85,11 @@ export function registerCompetitionRoutes(
 
     app.get('/api/daily/playlist', async (_req, res) => {
         try {
-            res.status(200).json({
-                challenges: await dependencies.getServerDailyGpPlaylist(),
-            });
+            const challenges = await dependencies.getServerDailyGpPlaylist();
+            const storedTracks = dependencies.describeStoredTracks?.(
+                challenges.map((challenge) => challenge.trackKey),
+            ) ?? [];
+            res.status(200).json(storedTracks.length ? { challenges, storedTracks } : { challenges });
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer daily playlist:', error);
             res.status(500).json({ error: 'Daily playlist lookup failed' });

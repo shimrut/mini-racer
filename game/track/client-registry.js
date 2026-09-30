@@ -1,15 +1,17 @@
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 import { getStoredTrack } from './stored-tracks.js';
+import { ensureStoredTracks } from './stored-track-service.js';
 
 const DEFINITION_MODULES = import.meta.glob('./definitions/*.js');
 const loadedTracks = new Map();
 const pendingLoads = new Map();
 export const CLIENT_TRACK_LOAD_TIMEOUT_MS = 20_000;
 // Asks the server for a stored track that the game does not have yet.
-let storedTrackLoader = null;
+const defaultStoredTrackLoader = (trackKey) => ensureStoredTracks([trackKey]);
+let storedTrackLoader = defaultStoredTrackLoader;
 
 export function setStoredTrackLoader(loader) {
-    storedTrackLoader = typeof loader === 'function' ? loader : null;
+    storedTrackLoader = typeof loader === 'function' ? loader : defaultStoredTrackLoader;
 }
 
 export function communityTrackKey(mapId) {

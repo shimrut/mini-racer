@@ -4,6 +4,7 @@ import {
     hasTrack,
 } from '../track/catalog.js';
 import { isLocalEnvironment } from '../track/environment.js';
+import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
 import {
     API_ROUTES,
     clampRequestLimit,
@@ -726,6 +727,7 @@ export async function getActiveDailyChallenge({
         clearDailyStartOverride();
     }
 
+    if (!ignorePostData) await ensureStoredTracks([readDevvitPostData()?.challenge?.trackKey]);
     const postChallenge = ignorePostData ? null : getPostBoundDailyChallengeFromContext();
     if (postChallenge) {
         cacheDailyChallengePlaylist([postChallenge]);
@@ -740,6 +742,8 @@ export async function getActiveDailyChallenge({
     if (config && typeof fetch === 'function') {
         try {
             const payload = await readDailyJson(config.dailyActiveUrl, { method: 'GET' });
+            registerStoredTracksFromPayload(payload?.storedTracks);
+            await ensureStoredTracks([payload?.trackKey]);
             const challenge = normalizeDailyChallenge(payload);
             if (challenge) {
                 writeActiveDailyCacheStorable(challenge);
@@ -773,6 +777,8 @@ async function loadDailyChallengePlaylist() {
                 : Array.isArray(payload?.challenges)
                     ? payload.challenges
                     : [];
+            registerStoredTracksFromPayload(payload?.storedTracks);
+            await ensureStoredTracks(rawChallenges.map((challenge) => challenge?.trackKey));
             const parsed = rawChallenges
                 .map((challenge) => normalizeDailyChallenge(challenge))
                 .filter(Boolean);
