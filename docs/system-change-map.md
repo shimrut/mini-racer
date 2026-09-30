@@ -83,6 +83,13 @@ flowchart LR
   locks when it becomes a Daily or its series goes live. See
   `docs/creator-redis-tracks-plan-2026-09-30.md`. Community maps
   (`game/community/`, `src/server/community/`) stay hidden from players.
+- Creator completeness is shared by admission, assigned-track saves, and
+  publication. An ownership-fenced placement lock coordinates membership and
+  authoring; Daily history/track locking and Campaign publication/track locking
+  commit atomically. Ranked client starts confirm stored overrides before
+  constructing geometry, and cache identity includes the full race shape.
+  Creator save acknowledgements retain edits made during requests; navigation
+  fallback checks all unsaved authoring state.
 - Developer tooling is removed at build time, not gated at runtime. `tools/debug-module-stubs.js` lists each developer-only module, and `vite.config.js` resolves every one of them to a no-op `.stub.js` for the client build, so none of that code reaches `dist/client`. A runtime check could not do this: the client is in the player's hands, so a hostname or storage gate can be spoofed by serving or patching the bundle, and a minifier will not drop an unreferenced class method. This is why the hooks live in their own modules rather than on the engine class. `tests/debug-module-stubs.test.js` fails if a stub stops covering its module's exports or if engine/launcher code assigns a debug global directly.
 - Local development exposes the deterministic gameplay state and time-step helpers through `window.__RACER_DEBUG__` plus the standard `render_game_to_text` / `advanceTime` browser-game test contract, from `game/debug/test-hooks.js`; the launcher posts expose their own smaller contract from `game/debug/launcher-hooks.js`. Loopback hosts and `.local` development aliases are treated as local.
 - Local builds enable PB ghost sizing automatically; `?debugPbGhostSize=1` or `window.__PB_GHOST_SIZE_DEBUG__.enable()` also enables it on any unbundled game URL. `game/ghost/pb-ghost-size-debug.js` mirrors the schema-v2 pose recorder, writes JSON byte counts to browser storage synchronously at finish, fills gzip/base64 Redis-envelope fields asynchronously using the native stream API or a portable gzip fallback, reloads prior reports into the next debug session, keeps the last ten complete reports in browser storage, and exposes them through developer-only hooks. It remains browser-local and does not change submission or Redis persistence.

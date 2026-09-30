@@ -6,6 +6,12 @@ function jsonResponse(body, status = 200) {
     return { ok: status < 400, status, json: async () => body };
 }
 
+function deferred() {
+    let resolve;
+    const promise = new Promise((done) => { resolve = done; });
+    return { promise, resolve };
+}
+
 const dailyView = {
     schedule: { keys: ['circuit', 'sunlitTemple', 'royalPlateau'], revision: 3, source: 'stored' },
     latestTrackKey: 'sunlitTemple',
@@ -77,6 +83,53 @@ describe('Creator Daily list', () => {
         const removeButtons = buttonsByText(document.getElementById('creator-daily-view'), '✕');
         expect(removeButtons.map((button) => button.disabled)).toEqual([false, true, false]);
     });
+
+    it('retains reordered entries during Save and uses the acknowledged revision for the next Save', async () => {
+        const pending = deferred();
+        const fetchMock = vi.fn(async (_url, options) => options?.method === 'PUT'
+            ? pending.promise : jsonResponse(dailyView));
+        vi.stubGlobal('fetch', fetchMock);
+        const setStatus = vi.fn();
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
+        await panels.loadDaily();
+        panels.moveDaily(2, 1);
+        const sent = [...panels.dailyKeys];
+        const saving = panels.saveDaily();
+        panels.moveDaily(1, 0);
+        const edited = [...panels.dailyKeys];
+        expect(panels.hasUnsavedChanges()).toBe(true);
+        pending.resolve(jsonResponse({ ...dailyView, schedule: { keys: sent, revision: 4 } }));
+        await saving;
+        expect(panels.dailyKeys).toEqual(edited);
+        expect(panels.dailyDirty).toBe(true);
+        expect(panels.daily.schedule.revision).toBe(4);
+        expect(setStatus).toHaveBeenLastCalledWith(expect.stringContaining('still unsaved'));
+        fetchMock.mockImplementation(async (_url, options) => {
+            const body = JSON.parse(options.body);
+            expect(body).toEqual({ keys: edited, baseRevision: 4 });
+            return jsonResponse({ ...dailyView, schedule: { keys: body.keys, revision: 5 } });
+        });
+        await panels.saveDaily();
+        expect(panels.dailyDirty).toBe(false);
+    });
+
+    it('deduplicates pending reads and never applies a read over newer Daily edits', async () => {
+        const pending = deferred();
+        const fetchMock = vi.fn(async () => jsonResponse(dailyView));
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadDaily();
+        fetchMock.mockImplementation(() => pending.promise);
+        const loading = panels.loadDaily();
+        await panels.loadDaily();
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        panels.moveDaily(2, 0);
+        const edited = [...panels.dailyKeys];
+        pending.resolve(jsonResponse(dailyView));
+        await loading;
+        expect(panels.dailyKeys).toEqual(edited);
+        expect(panels.dailyDirty).toBe(true);
+    });
 });
 
 describe('Creator Campaign Planner', () => {
@@ -121,6 +174,85 @@ describe('Creator Campaign Planner', () => {
         const put = fetchMock.mock.calls.find(([, options]) => options?.method === 'PUT');
         expect(put[0]).toBe('/api/creator/series/night-v1');
         expect(JSON.parse(put[1].body)).toMatchObject({ baseRevision: 5, stages: [{ trackKey: 'nightLoop' }, { trackKey: 'dayLoop' }] });
+    });
+
+    it('keeps newer series edits and acknowledges only the sent snapshot', async () => {
+        const pending = deferred();
+        const fetchMock = vi.fn(async (_url, options) => options?.method === 'PUT'
+            ? pending.promise : jsonResponse(structuredClone(seriesView)));
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        panels.seriesDraft.name = 'Sent name';
+        panels.seriesDirty = true;
+        const saving = panels.saveSeries();
+        panels.seriesDraft.name = 'Later name';
+        panels.seriesDraft.stages.push({ trackKey: 'dayLoop', laps: 2, requiredMedals: 2 });
+        pending.resolve(jsonResponse({ series: { ...seriesView.series[0], name: 'Sent name', revision: 6 } }));
+        await saving;
+        expect(panels.seriesDraft.name).toBe('Later name');
+        expect(panels.seriesDraft.stages.at(-1).laps).toBe(2);
+        expect(panels.seriesDraft.revision).toBe(6);
+        expect(panels.seriesDirty).toBe(true);
+        expect(JSON.parse(fetchMock.mock.calls.find(([, options]) => options?.method === 'PUT')[1].body).stages).toHaveLength(1);
+        expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'GET')).toHaveLength(1);
+    });
+
+    it('does not select the saved series over a different draft selected during Save', async () => {
+        const pending = deferred();
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => options?.method === 'PUT'
+            ? pending.promise : jsonResponse(structuredClone(seriesView))));
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        panels.seriesDirty = true;
+        const saving = panels.saveSeries();
+        panels.startNewSeries();
+        panels.seriesDraft.name = 'Another series';
+        pending.resolve(jsonResponse({ series: { ...seriesView.series[0], revision: 6 } }));
+        await saving;
+        expect(panels.selectedSeriesId).toBeNull();
+        expect(panels.seriesDraft.name).toBe('Another series');
+        expect(panels.seriesDirty).toBe(true);
+        expect(panels.seriesView.series.find((series) => series.id === 'night-v1').revision).toBe(6);
+    });
+
+    it('deduplicates reads and retains a draft selected while a read is pending', async () => {
+        const pending = deferred();
+        const fetchMock = vi.fn(async () => jsonResponse(structuredClone(seriesView)));
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        fetchMock.mockImplementation(() => pending.promise);
+        const loading = panels.loadSeries();
+        await panels.loadSeries();
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        panels.startNewSeries();
+        panels.seriesDraft.name = 'Keep this draft';
+        pending.resolve(jsonResponse(structuredClone(seriesView)));
+        await loading;
+        expect(panels.seriesDraft.name).toBe('Keep this draft');
+        expect(panels.seriesDirty).toBe(true);
+    });
+
+    it('offers only completed Campaign candidates and disables editing during publication', async () => {
+        const pending = deferred();
+        const view = structuredClone(seriesView);
+        view.series[0].publishedStageCount = 0;
+        view.series[0].status = 'draft';
+        view.tracks.push({ key: 'unfinishedLoop', name: 'Unfinished', ground: 'tarmac', ready: false });
+        vi.stubGlobal('fetch', vi.fn(async (_url, options) => options?.method === 'POST'
+            ? pending.promise : jsonResponse(view)));
+        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        const root = document.getElementById('creator-series-view');
+        expect([...root.querySelector('.creator-adder select').options].map((option) => option.value)).not.toContain('unfinishedLoop');
+        const publishing = panels.publishSeries();
+        expect([...root.querySelectorAll('input, button, select')].every((control) => control.disabled)).toBe(true);
+        panels.startNewSeries();
+        expect(panels.selectedSeriesId).toBe('night-v1');
+        pending.resolve(jsonResponse({ series: { ...seriesView.series[0], revision: 6 } }));
+        await publishing;
+        expect(panels.busy).toBe(false);
     });
 });
 

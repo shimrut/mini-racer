@@ -30,6 +30,26 @@ release is necessary for a new track or a new series.
 5. Only moderators can use the Creator routes. The server checks each request.
 6. Players can read a stored track only when it is placed: in the Daily
    history, today's Daily, or a published series.
+7. A track must be complete before it enters the Daily list or any Campaign
+   draft: finished walls, no unfinished drawing, passing geometry checks,
+   and positive author/gold/silver/bronze times in that order. Assigned tracks
+   must remain complete when saved. Remove an editable placement first to
+   save unfinished work. Daily admission also requires a live ground;
+   existing held-back app schedule entries retain their release gate.
+8. Track edits and placement changes share an ownership-fenced Redis lock.
+   Daily history and its stored-track lock commit together; Campaign
+   publication and all its newly live track locks commit together. An
+   interrupted transaction must not create a partially placed competition.
+   Requests that open a new Daily together get the Daily that the first one
+   commits. They wait for it; they do not make a second one.
+9. Ranked starts confirm the authoritative layout, including overrides of
+   built-in keys. Failure requires Retry before racing. Geometry determines
+   cache identity; an active attempt keeps its walls, and a changed definition
+   requires a new attempt before ranked results can save.
+10. Save acknowledges the submitted snapshot, even after editing or selecting
+    another track/series. Newer edits remain unsaved. A failed embedded Test
+    Drive may navigate only when every track, drawing and panel is saved and
+    no write is pending.
 
 ## Stages
 
@@ -63,6 +83,36 @@ Each stage is one commit, with the tests green.
   cache when it changes.
 - `dailygp:daily:schedule:v1`: the stored Daily list.
 - `dailygp:campaign:series:v1:<seriesId>`: one stored series.
+- `dailygp:tracks:v1:placement-write-lock:v1`: coordinates admission,
+  authoring changes, and immutable placement commits.
+
+## Safety fixes before first release
+
+No Creator tracks have been created or copied in production. These fixes
+prevent inconsistent new state; they do not migrate player results or repair
+legacy Creator data. Existing Numbers stages and replay fingerprints remain
+unchanged.
+
+Regression coverage must delay acknowledgements while editing/switching,
+interleave admission/publication with track saves, expire lock ownership,
+abort transactions, lose a successful commit's response, and hydrate changed
+built-in geometry on an already-open Daily post. Browser checks must include
+unfinished medal input surviving refresh and other drafts surviving a failed
+Test Drive frame.
+
+Progress on 2026-09-30:
+
+- Done in three commits: layout confirmation before ranked starts; complete
+  tracks only, the placement lock, and atomic Daily and Campaign placement;
+  Creator save acknowledgements and the Test Drive guard.
+- The typecheck passes, and every client and server entry bundles.
+- The full suite passes, except three tests outside this work: two that
+  already fail on tracks without medal times, and one for a dirt speed
+  change that is not committed.
+- On the local server, a mock Daily starts, races and restarts on desktop
+  and phone sizes. The Creator page loads without errors.
+- Open: the Creator browser checks above and the Reddit checks below. They
+  need the Creator routes, so they need a test subreddit install.
 
 ## Open checks on Reddit
 
@@ -79,3 +129,7 @@ These need a real subreddit install. Do them in the test subreddit first.
    race it and submit times.
 6. A published series appears in the Campaign, with the series screen, and
    players can race and unlock its stages.
+7. Concurrent moderator edits and midnight placement either commit a complete
+   immutable version or return a retryable error. Players who open the new
+   Daily together all get the same Daily. Failed layout requests block ranked
+   starts until Retry confirms the correct version.

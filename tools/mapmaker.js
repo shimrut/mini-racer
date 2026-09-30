@@ -44,6 +44,7 @@ import {
 import { TrackPreviews } from './mapmaker/track-preview.js';
 import { creatorApi } from './mapmaker/creator-api.js';
 import { CreatorPanels } from './mapmaker/creator-panels.js';
+import { creatorTrackContent, hasCreatorUnsavedWork, saveCreatorTrackSnapshot } from './mapmaker/creator-track-save.js';
 import { MAPMAKER_ONLINE, deleteCloudMap, listCloudMaps, saveCloudMap } from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
@@ -331,7 +332,7 @@ class MapmakerApp {
 
         const initialTrackKey = this.creatorMode ? 'newTrack' : Object.keys(TRACKS)[0];
         this.state = {
-            tracks: this.creatorMode ? { newTrack: createBlankTrack() } : cloneTracks(TRACKS),
+            tracks: this.creatorMode ? { newTrack: createBlankTrack() } : cloneTracks({ ...TRACKS }),
             selectedTrackKey: initialTrackKey,
             tool: 'edit',
             selectedHandle: null,
@@ -388,6 +389,11 @@ class MapmakerApp {
         this.creatorLoading = false;
         // Track key -> its stored record in the Creator: revision, lock, origin.
         this.creatorRecords = new Map();
+        this.creatorSaveErrors = new Map();
+        this.creatorSavingKey = null;
+        this.creatorDeletingKey = null;
+        this.creatorWriteGeneration = 0;
+        this.creatorRefreshPending = false;
         this.creatorPanels = null;
         // Track key -> the key of its saved cloud map.
         this.cloudKeyByKey = new Map();
@@ -1102,7 +1108,7 @@ class MapmakerApp {
             if (this.skipBeforeUnload) return;
             const panelChanges = this.creatorPanels?.hasUnsavedChanges() ?? false;
             const trackChanges = this.creatorMode
-                ? this.state.dirtyTrackKeys.size > 0
+                ? hasCreatorUnsavedWork(this)
                 : this.state.dirtyTrackKeys.size > 0 || this.state.draftLoop.length > 0 || this.draftLoopsByKey.size > 0;
             if (!trackChanges && !panelChanges) return;
             event.preventDefault();
@@ -1284,7 +1290,7 @@ class MapmakerApp {
         const row = this.medalRowByKey.get(trackKey)
             ?? this.medalTimes[this.state.originalTrackKeyByKey.get(trackKey) ?? trackKey]
             ?? null;
-        const fixed = this.medalTimesFixed(trackKey);
+        const fixed = this.medalTimesFixed(trackKey) || Boolean(this.creatorDeletingKey);
         for (const tier of MEDAL_TIERS) {
             const value = Number(row?.[tier]);
             this.medalInputs[tier].value = Number.isFinite(value) && value > 0 ? value.toFixed(2) : '';
@@ -1356,6 +1362,7 @@ class MapmakerApp {
     }
 
     loadTrack(trackKey) {
+        if (this.creatorDeletingKey) return;
         if (!this.state.tracks[trackKey]) {
             return;
         }
@@ -1446,6 +1453,9 @@ class MapmakerApp {
             this.state.originalTrackKeyByKey.set(nextKey, originalTrackKey);
         }
         this.state.dirtyTrackKeys.delete(currentKey);
+        const saveError = this.creatorSaveErrors.get(currentKey);
+        this.creatorSaveErrors.delete(currentKey);
+        if (saveError) this.creatorSaveErrors.set(nextKey, saveError);
         this.state.dirtyTrackKeys.add(nextKey);
         this.state.selectedTrackKey = nextKey;
         this.state.dirtyTrackKeys.add(nextKey);
@@ -1454,7 +1464,8 @@ class MapmakerApp {
 
     applyDerivedTrackKey(name) {
         // A track in Redis keeps its key. A new name changes only the name.
-        if (this.creatorMode && this.creatorRecords.has(this.state.selectedTrackKey)) return true;
+        if (this.creatorMode && (this.creatorRecords.has(this.state.selectedTrackKey)
+            || this.creatorSavingKey === this.state.selectedTrackKey)) return true;
         const nextKey = trackKeyFromName(name);
         if (!nextKey || nextKey === this.state.selectedTrackKey) {
             return true;
@@ -3342,7 +3353,9 @@ class MapmakerApp {
     syncCreatorTrackState() {
         const key = this.state.selectedTrackKey;
         const record = this.creatorRecords.get(key);
-        const editable = this.creatorLoaded && !record?.lockedAt;
+        const editable = this.creatorLoaded && !record?.lockedAt && !this.creatorDeletingKey;
+        this.trackPickerBtn.disabled = Boolean(this.creatorDeletingKey);
+        this.newTrackBtn.disabled = !this.creatorLoaded || Boolean(this.creatorDeletingKey);
         this.setCreatorEditable(editable);
         if (editable) {
             // These controls know when they must stay off.
@@ -3352,6 +3365,10 @@ class MapmakerApp {
         if (!this.creatorLoaded) return;
         if (record?.lockedAt) {
             this.setCreatorSaveStatus(record.lockReason === 'series' ? 'Locked: in a live series' : 'Locked: raced', 'locked');
+        } else if (this.creatorSavingKey === key) {
+            this.setCreatorSaveStatus('Saving…', 'saving');
+        } else if (this.creatorSaveErrors.has(key)) {
+            this.setCreatorSaveStatus(this.creatorSaveErrors.get(key), 'error');
         } else if (this.state.dirtyTrackKeys.has(key)) {
             this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
         } else if (record) {
@@ -3407,7 +3424,12 @@ class MapmakerApp {
     // Loads the tracks in Redis. Tracks with unsaved changes in this page keep them.
     async loadCreatorTracks({ keepSelection = false } = {}) {
         if (this.creatorLoading) return;
+        if (this.creatorSavingKey || this.creatorDeletingKey) {
+            this.creatorRefreshPending = true;
+            return;
+        }
         this.creatorLoading = true;
+        const writeGeneration = this.creatorWriteGeneration;
         if (!this.creatorLoaded) this.setCreatorSaveStatus('Loading tracks…', 'saving');
         try {
             const [{ tracks }, daily, seriesView] = await Promise.all([
@@ -3415,19 +3437,28 @@ class MapmakerApp {
                 creatorApi.readDaily(),
                 creatorApi.readSeries(),
             ]);
+            if (writeGeneration !== this.creatorWriteGeneration) {
+                this.creatorRefreshPending = true;
+                return;
+            }
             const previousKey = this.state.selectedTrackKey;
             const unsaved = [...this.state.dirtyTrackKeys]
                 .filter((key) => this.state.tracks[key])
-                .map((key) => [key, this.state.tracks[key], this.editHistories.get(key)]);
+                .map((key) => ({ key, content: creatorTrackContent(this, key),
+                    history: this.editHistories.get(key), record: this.creatorRecords.get(key),
+                }));
             this.state.tracks = {};
             this.creatorRecords.clear();
             this.editHistories = new Map();
             // The picker lists the newest tracks first.
             for (const record of [...tracks].reverse()) this.addCreatorRecord(record);
-            for (const [key, track, history] of unsaved) {
-                if (this.isCreatorLocked(key)) continue;
-                this.state.tracks[key] = track;
-                this.editHistories.set(key, history ?? createEditHistory(track));
+            for (const { key, content, history, record } of unsaved) {
+                this.state.tracks[key] = content.track;
+                this.editHistories.set(key, history ?? createEditHistory(content.track));
+                if (record && !this.isCreatorLocked(key)) this.creatorRecords.set(key, record);
+                if (content.medalRow) this.medalRowByKey.set(key, content.medalRow);
+                if (content.draftLoop.length) this.draftLoopsByKey.set(key, content.draftLoop);
+                else this.draftLoopsByKey.delete(key);
                 this.state.dirtyTrackKeys.add(key);
             }
             this.applyCreatorPlaces(daily, seriesView);
@@ -3449,6 +3480,10 @@ class MapmakerApp {
             document.getElementById('creator-retry-btn').hidden = false;
         } finally {
             this.creatorLoading = false;
+            if (this.creatorRefreshPending && !this.creatorSavingKey && !this.creatorDeletingKey) {
+                this.creatorRefreshPending = false;
+                void this.loadCreatorTracks({ keepSelection: true });
+            }
         }
     }
 
@@ -3463,6 +3498,7 @@ class MapmakerApp {
 
     async saveCreatorTrack() {
         if (!this.creatorLoaded || this.busy) return false;
+        if (!this.applyDerivedTrackKey(this.track.name)) return false;
         const key = this.state.selectedTrackKey;
         if (this.isCreatorLocked(key)) return false;
         const record = this.creatorRecords.get(key);
@@ -3481,36 +3517,16 @@ class MapmakerApp {
             this.setStatus(`Cannot save ${name}: ${medalError}`, true);
             return false;
         }
-        this.busy = true;
-        this.setCreatorSaveStatus('Saving…', 'saving');
-        this.syncActionButtons();
-        try {
-            const { track: saved } = await creatorApi.saveTrack(key, {
-                track: this.track,
-                draftLoop: this.state.draftLoop,
-                medalRow: medalRow ? normalizeMedalRow(medalRow) : null,
-                baseRevision: record?.revision ?? 0,
-            });
-            this.creatorRecords.set(key, this.creatorRecordMeta(saved));
-            this.state.originalTrackKeyByKey.set(key, key);
-            if (saved.medalRow) this.medalTimes[key] = saved.medalRow;
-            else delete this.medalTimes[key];
-            this.medalRowByKey.delete(key);
-            this.markSaved(saved.checksPassed
-                ? `Saved ${saved.track.name}.`
-                : `Saved ${saved.track.name}. ${saved.checkError} It cannot be a Daily yet.`);
-            return true;
-        } catch (error) {
-            this.setStatus(`Save failed: ${error.message}`, true);
-            this.setCreatorSaveStatus('Not saved', 'error');
-            return false;
-        } finally {
-            this.busy = false;
-            this.syncCreatorTrackState();
+        const saved = await saveCreatorTrackSnapshot(this, key, geometrySignature);
+        if (this.creatorRefreshPending && !this.creatorLoading) {
+            this.creatorRefreshPending = false;
+            void this.loadCreatorTracks({ keepSelection: true });
         }
+        return saved;
     }
 
     async deleteCreatorTrack() {
+        if (this.busy || !this.creatorLoaded) return;
         const key = this.state.selectedTrackKey;
         const record = this.creatorRecords.get(key);
         const name = this.track.name;
@@ -3521,8 +3537,11 @@ class MapmakerApp {
                 ? `Delete the Redis copy of ${name}? The game uses the app track again.`
                 : `Delete ${name}? You cannot undo this.`;
         if (!await this.confirmTrackRemoval(message)) return;
+        if (this.busy || this.state.selectedTrackKey !== key) return;
         this.busy = true;
-        this.syncActionButtons();
+        this.creatorDeletingKey = key;
+        this.creatorWriteGeneration += 1;
+        this.syncCreatorTrackState();
         try {
             if (record) await creatorApi.deleteTrack(key, record.revision);
             const keys = Object.keys(this.state.tracks);
@@ -3536,19 +3555,28 @@ class MapmakerApp {
             delete this.medalTimes[key];
             this.state.originalTrackKeyByKey.delete(key);
             this.state.dirtyTrackKeys.delete(key);
+            this.creatorSaveErrors.delete(key);
+            this.state.draftLoop = [];
             if (!nextKey) {
                 nextKey = 'newTrack';
                 this.state.tracks.newTrack = createBlankTrack();
                 this.editHistories.set(nextKey, createEditHistory(this.state.tracks.newTrack));
             }
             this.resetView();
+            this.creatorDeletingKey = null;
             this.loadTrack(nextKey);
             this.setStatus(record ? `Deleted ${name}.` : `Discarded ${name}.`);
         } catch (error) {
             this.setStatus(`Could not delete ${name}: ${error.message}`, true);
         } finally {
             this.busy = false;
+            this.creatorDeletingKey = null;
+            this.creatorWriteGeneration += 1;
             this.syncCreatorTrackState();
+            if (this.creatorRefreshPending && !this.creatorLoading) {
+                this.creatorRefreshPending = false;
+                void this.loadCreatorTracks({ keepSelection: true });
+            }
         }
     }
 
@@ -3580,8 +3608,8 @@ class MapmakerApp {
             view.hidden = view.dataset.creatorView !== tab;
         }
         const panels = this.creatorPanels;
-        if (tab === 'daily' && !panels.dailyDirty) void panels.loadDaily();
-        if (tab === 'campaign' && !panels.seriesDirty) void panels.loadSeries();
+        if (tab === 'daily' && !panels.dailyDirty && !panels.busy) void panels.loadDaily();
+        if (tab === 'campaign' && !panels.seriesDirty && !panels.busy) void panels.loadSeries();
         if (tab === 'copy') void panels.loadCopy();
         if (tab === 'tracks') {
             this.resizeCanvas();
@@ -3600,8 +3628,8 @@ class MapmakerApp {
             // The frame did not open Test Drive. The page opens it instead,
             // after a save, because leaving the page drops unsaved changes.
             this.closeCreatorTestDrive();
-            if (this.state.dirtyTrackKeys.has(this.state.selectedTrackKey)) {
-                this.setStatus('Save the track, then open Test Drive again.', true);
+            if (hasCreatorUnsavedWork(this)) {
+                this.setStatus('Save or discard all unsaved tracks and Daily or Campaign changes, then open Test Drive again.', true);
                 return;
             }
             this.skipBeforeUnload = true;

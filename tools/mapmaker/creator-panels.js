@@ -69,18 +69,33 @@ export class CreatorPanels {
         this.seriesDraft = null;
         this.seriesDirty = false;
         this.busy = false;
+        this.seriesDestructive = false;
+        this.seriesSavingDraft = null;
+        this.dailyLoading = false;
+        this.seriesLoading = false;
+        this.writeGeneration = 0;
+        this.dailySaveError = null;
+        this.seriesSaveError = null;
     }
 
     hasUnsavedChanges() {
-        return this.dailyDirty || this.seriesDirty;
+        return this.busy || this.dailyDirty || this.seriesDirty;
     }
 
     // ---- Daily list ----
 
     async loadDaily() {
+        if (this.dailyLoading) return;
+        this.dailyLoading = true;
+        const generation = this.writeGeneration;
         this.dailyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Daily list…' }));
         try {
-            this.daily = await creatorApi.readDaily();
+            const daily = await creatorApi.readDaily();
+            if (generation !== this.writeGeneration || this.dailyDirty) {
+                if (this.daily) this.renderDaily();
+                return;
+            }
+            this.daily = daily;
             this.dailyKeys = [...this.daily.schedule.keys];
             this.dailyDirty = false;
             this.renderDaily();
@@ -89,6 +104,8 @@ export class CreatorPanels {
                 element('p', { className: 'creator-error', text: `Could not load the Daily list: ${error.message}` }),
                 button('Try again', () => this.loadDaily()),
             );
+        } finally {
+            this.dailyLoading = false;
         }
     }
 
@@ -166,7 +183,9 @@ export class CreatorPanels {
             button('Add as next Daily', () => add(true), { disabled: !candidates.length }),
             button('Add at the end', () => add(false), { disabled: !candidates.length }),
         ]);
-        this.dailyRoot.replaceChildren(head, intro, adder, element('ol', { className: 'creator-list' }, rows));
+        this.dailyRoot.replaceChildren(head, intro,
+            ...(this.dailySaveError ? [element('p', { className: 'creator-error', text: this.dailySaveError })] : []),
+            adder, element('ol', { className: 'creator-list' }, rows));
     }
 
     moveDaily(from, to) {
@@ -182,17 +201,27 @@ export class CreatorPanels {
     }
 
     async saveDaily() {
+        if (this.busy) return;
+        const keys = [...this.dailyKeys];
+        const baseRevision = this.daily.schedule.revision;
+        this.dailySaveError = null;
         this.busy = true;
+        this.writeGeneration += 1;
         this.renderDaily();
         try {
-            this.daily = await creatorApi.saveDaily(this.dailyKeys, this.daily.schedule.revision);
-            this.dailyKeys = [...this.daily.schedule.keys];
-            this.dailyDirty = false;
-            this.setStatus('Saved the Daily list.');
+            this.daily = await creatorApi.saveDaily(keys, baseRevision);
+            if (JSON.stringify(this.dailyKeys) === JSON.stringify(keys)) {
+                this.dailyKeys = [...this.daily.schedule.keys];
+            }
+            this.dailyDirty = JSON.stringify(this.dailyKeys) !== JSON.stringify(this.daily.schedule.keys);
+            this.setStatus(this.dailyDirty
+                ? 'Saved the earlier Daily list. Newer changes are still unsaved.' : 'Saved the Daily list.');
         } catch (error) {
-            this.setStatus(`Could not save the Daily list: ${error.message}`, true);
+            this.dailySaveError = `Could not save the Daily list: ${error.message}`;
+            this.setStatus(this.dailySaveError, true);
         } finally {
             this.busy = false;
+            this.writeGeneration += 1;
             this.renderDaily();
         }
     }
@@ -200,19 +229,36 @@ export class CreatorPanels {
     // ---- Campaign Planner ----
 
     async loadSeries(selectId = this.selectedSeriesId) {
+        if (this.seriesLoading) return;
+        this.seriesLoading = true;
+        const generation = this.writeGeneration;
+        const selectedId = this.selectedSeriesId;
+        const draft = this.seriesDraft;
         this.seriesRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Campaign…' }));
         try {
-            this.seriesView = await creatorApi.readSeries();
+            const seriesView = await creatorApi.readSeries();
+            if (generation !== this.writeGeneration) {
+                if (this.seriesView) this.renderSeries();
+                return;
+            }
+            this.seriesView = seriesView;
+            if (this.seriesDirty || this.seriesDraft !== draft || this.selectedSeriesId !== selectedId) {
+                this.renderSeries();
+                return;
+            }
             this.selectSeries(selectId, { force: true });
         } catch (error) {
             this.seriesRoot.replaceChildren(
                 element('p', { className: 'creator-error', text: `Could not load the Campaign: ${error.message}` }),
                 button('Try again', () => this.loadSeries()),
             );
+        } finally {
+            this.seriesLoading = false;
         }
     }
 
     selectSeries(seriesId, { force = false } = {}) {
+        if (this.seriesDestructive) return;
         if (!force && this.seriesDirty && !window.confirm('Discard the unsaved changes to this series?')) return;
         const stored = this.seriesView.series.find((series) => series.id === seriesId) ?? null;
         this.selectedSeriesId = stored ? stored.id : null;
@@ -222,6 +268,7 @@ export class CreatorPanels {
     }
 
     startNewSeries() {
+        if (this.seriesDestructive) return;
         if (this.seriesDirty && !window.confirm('Discard the unsaved changes to this series?')) return;
         this.selectedSeriesId = null;
         this.seriesDraft = {
@@ -266,6 +313,11 @@ export class CreatorPanels {
             }),
         ]);
         this.seriesRoot.replaceChildren(side, this.renderSeriesEditor());
+        if (this.seriesDestructive) {
+            this.seriesRoot.querySelectorAll('button, input, select').forEach((control) => {
+                control.disabled = true;
+            });
+        }
     }
 
     renderSeriesEditor() {
@@ -286,13 +338,14 @@ export class CreatorPanels {
         const nameInput = element('input', { attrs: { type: 'text', maxlength: 40, value: draft.name } });
         nameInput.addEventListener('change', () => {
             draft.name = nameInput.value;
-            if (draft.isNew && !draft.idTouched) {
+            if (draft.isNew && !draft.idTouched && this.seriesSavingDraft !== draft) {
                 const base = nameInput.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
                 draft.id = base ? `${/^[a-z]/.test(base) ? base : `s-${base}`}-v1`.slice(0, 40) : '';
             }
             changed();
         });
-        const idInput = element('input', { attrs: { type: 'text', maxlength: 40, value: draft.id, disabled: !draft.isNew } });
+        const idInput = element('input', { attrs: { type: 'text', maxlength: 40, value: draft.id,
+            disabled: !draft.isNew || this.seriesSavingDraft === draft } });
         idInput.addEventListener('change', () => {
             draft.id = idInput.value.trim();
             draft.idTouched = true;
@@ -371,7 +424,7 @@ export class CreatorPanels {
 
         const inSeries = new Set(draft.stages.map((stage) => stage.trackKey));
         const candidates = tracks
-            .filter((track) => !inSeries.has(track.key) && track.ground === draft.ground
+            .filter((track) => track.ready && !inSeries.has(track.key) && track.ground === draft.ground
                 && (!track.usedBy || track.usedBy === draft.id))
             .sort((a, b) => a.name.localeCompare(b.name));
         const addSelect = element('select', { attrs: { 'aria-label': 'Track to add' } }, [
@@ -410,6 +463,8 @@ export class CreatorPanels {
                     disabled: this.busy || draft.isNew || fixed > 0,
                 }),
             ]),
+            this.seriesSaveError?.draft === draft
+                ? element('p', { className: 'creator-error', text: this.seriesSaveError.message }) : null,
             element('div', { className: 'creator-series-fields' }, [
                 element('label', { className: 'field' }, [element('span', { text: 'Name' }), nameInput]),
                 element('label', { className: 'field' }, [element('span', { text: 'Key' }), idInput]),
@@ -432,62 +487,100 @@ export class CreatorPanels {
     }
 
     async saveSeries() {
+        if (this.busy) return;
         const draft = this.seriesDraft;
         if (!SERIES_ID_RE.test(draft.id)) {
             this.setStatus('Give the series a key of small letters, digits and dashes.', true);
             return;
         }
+        const seriesId = draft.id;
+        const snapshot = structuredClone({ name: draft.name, ground: draft.ground, stages: draft.stages });
+        const baseRevision = draft.isNew ? 0 : draft.revision;
+        this.seriesSavingDraft = draft;
+        this.seriesSaveError = null;
         this.busy = true;
+        this.writeGeneration += 1;
         this.renderSeries();
         try {
-            const { series } = await creatorApi.saveSeries(draft.id, {
-                name: draft.name,
-                ground: draft.ground,
-                stages: draft.stages,
-                baseRevision: draft.isNew ? 0 : draft.revision,
-            });
-            this.setStatus(`Saved ${series.name}.`);
-            this.seriesDirty = false;
-            await this.loadSeries(series.id);
+            const { series } = await creatorApi.saveSeries(seriesId, { ...snapshot, baseRevision });
+            this.seriesView.series = [
+                ...this.seriesView.series.filter((entry) => entry.id !== series.id), series,
+            ];
+            const assigned = new Set(series.stages.map((stage) => stage.trackKey));
+            this.seriesView.tracks = this.seriesView.tracks.map((track) => ({ ...track,
+                usedBy: assigned.has(track.key) ? series.id : track.usedBy === series.id ? null : track.usedBy,
+            }));
+            if (this.seriesDraft === draft) {
+                const unchanged = JSON.stringify({ name: draft.name, ground: draft.ground, stages: draft.stages })
+                    === JSON.stringify(snapshot);
+                this.selectedSeriesId = series.id;
+                if (unchanged) this.seriesDraft = structuredClone(series);
+                else Object.assign(draft, { id: series.id, isNew: false, revision: series.revision,
+                    status: series.status, publishedStageCount: series.publishedStageCount });
+                this.seriesDirty = !unchanged;
+                this.setStatus(unchanged ? `Saved ${series.name}.`
+                    : `Saved the earlier changes to ${series.name}. Newer changes are still unsaved.`);
+            } else this.setStatus(`Saved ${series.name}.`);
         } catch (error) {
-            this.setStatus(`Could not save the series: ${error.message}`, true);
+            this.seriesSaveError = { draft, message: `Could not save the series: ${error.message}` };
+            this.setStatus(this.seriesSaveError.message, true);
         } finally {
             this.busy = false;
+            this.seriesSavingDraft = null;
+            this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
         }
     }
 
     async publishSeries() {
+        if (this.busy) return;
         const draft = this.seriesDraft;
         if (!window.confirm(`Make ${draft.name} live? Players see it at once, and its stages cannot change after this.`)) return;
         this.busy = true;
+        this.seriesDestructive = true;
+        this.seriesSaveError = null;
+        this.writeGeneration += 1;
         this.renderSeries();
         try {
             const { series } = await creatorApi.publishSeries(draft.id, draft.revision);
             this.setStatus(`${series.name} is live.`);
+            this.seriesDestructive = false;
             await this.loadSeries(series.id);
             this.onTracksChanged();
         } catch (error) {
-            this.setStatus(`Could not make the series live: ${error.message}`, true);
+            this.seriesSaveError = { draft, message: `Could not make the series live: ${error.message}` };
+            this.setStatus(this.seriesSaveError.message, true);
         } finally {
             this.busy = false;
+            this.seriesDestructive = false;
+            this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
         }
     }
 
     async deleteSeries() {
+        if (this.busy) return;
         const draft = this.seriesDraft;
         if (!window.confirm(`Delete the draft ${draft.name}?`)) return;
         this.busy = true;
+        this.seriesDestructive = true;
+        this.seriesSaveError = null;
+        this.writeGeneration += 1;
+        this.renderSeries();
         try {
             await creatorApi.deleteSeries(draft.id, draft.revision);
             this.setStatus(`Deleted ${draft.name}.`);
             this.seriesDirty = false;
+            this.seriesDestructive = false;
             await this.loadSeries(null);
         } catch (error) {
-            this.setStatus(`Could not delete the series: ${error.message}`, true);
+            this.seriesSaveError = { draft, message: `Could not delete the series: ${error.message}` };
+            this.setStatus(this.seriesSaveError.message, true);
         } finally {
             this.busy = false;
+            this.seriesDestructive = false;
+            this.writeGeneration += 1;
+            if (this.seriesView) this.renderSeries();
         }
     }
 
@@ -540,8 +633,10 @@ export class CreatorPanels {
     }
 
     async runCopy() {
+        if (this.busy) return;
         if (!window.confirm('Copy the unplayed tracks to Redis now?')) return;
         this.busy = true;
+        this.writeGeneration += 1;
         try {
             const { report } = await creatorApi.runMigration();
             this.setStatus(`Copied ${report.copied.length} tracks.`);
@@ -550,6 +645,7 @@ export class CreatorPanels {
             this.setStatus(`Could not copy: ${error.message}`, true);
         } finally {
             this.busy = false;
+            this.writeGeneration += 1;
             await this.loadCopy();
         }
     }

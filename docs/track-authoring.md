@@ -308,6 +308,21 @@ matching tracks; click a track to open the list it is in.
   four medal times cannot become a stage.
 - Every change writes `series.json` and the Daily schedule at once.
 
+## In-game Creator safety
+
+The Redis Creator may save incomplete tracks as unassigned drafts. A track
+must have finished walls, passing Checks, and all four valid medal times
+before it can enter the Daily list or a Campaign draft. A track assigned to
+either must stay complete when saved; remove its editable placement first to
+save unfinished work. Daily admission requires a live ground, and Campaign
+stages must match their series ground. Published tracks remain immutable.
+
+Save records the version submitted when pressed. You may keep editing or
+select another track/series while it runs; newer edits remain unsaved. Failed
+saves retain those edits and the last acknowledged revision. Test Drive
+normally opens inside the Creator. If the frame fails, save or discard every
+unsaved track, drawing, Daily list, and Campaign draft before leaving the page.
+
 ## Medal Times
 
 The **Medal times** section of the panel sets the four medal times of one lap:
