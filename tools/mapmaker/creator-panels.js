@@ -80,42 +80,57 @@ export class CreatorPanels {
         this.seriesSaveError = null;
         this.copyError = null;
         this.copyView = null;
-        // A tab loads once and keeps its data. It loads again only when a
-        // change elsewhere can make its data out of date.
-        this.dailyStale = true;
-        this.seriesStale = true;
-        this.copyStale = true;
+        this.copyLoading = false;
+        // Showing a tab never asks the server. The Creator loads every tab
+        // when it opens, and a change reloads the tabs it affects at once,
+        // in the background. A reload that must wait for a write waits here.
+        this.pendingRefresh = new Set();
     }
 
-    // The editor shows a tab. Only a tab without current data asks the server.
-    showTab(tab) {
-        if (tab === 'daily' && this.dailyStale && !this.dailyDirty && !this.busy) void this.loadDaily();
-        if (tab === 'campaign' && this.seriesStale && !this.seriesDirty && !this.busy) void this.loadSeries();
-        if (tab === 'copy' && this.copyStale && !this.busy) void this.loadCopy();
-    }
-
-    // A track was saved or deleted: its readiness and places can change.
-    markStale() {
-        this.dailyStale = true;
-        this.seriesStale = true;
-        this.copyStale = true;
-    }
-
-    // The editor reads the Daily list and the Campaign when it loads the
-    // tracks. Those answers fill the tabs, unless a tab has changed since.
-    receiveViews({ daily, seriesView, generation }) {
+    // The editor reads every tab when it opens the Creator. Those answers
+    // fill the tabs, unless a tab has changed since the read started.
+    receiveViews({ daily, seriesView, copyView, generation }) {
         if (generation !== this.writeGeneration || this.busy) return;
         if (daily && !this.dailyLoading && !this.dailyDirty) {
             this.daily = daily;
             this.dailyKeys = [...daily.schedule.keys];
-            this.dailyStale = false;
             this.renderDaily();
         }
         if (seriesView && !this.seriesLoading) {
             this.seriesView = seriesView;
-            this.seriesStale = false;
             if (this.seriesDirty) this.renderSeries();
             else void this.selectSeries(this.selectedSeriesId, { force: true });
+        }
+        if (copyView && !this.copyLoading) {
+            this.copyView = copyView;
+            this.renderCopy(copyView.report, copyView.preview);
+        }
+    }
+
+    // Reloads these tabs now, or after the write that is running.
+    refresh(...tabs) {
+        tabs.forEach((tab) => this.pendingRefresh.add(tab));
+        this.flushRefresh();
+    }
+
+    // A track was saved or deleted: its readiness and places can change.
+    refreshAll() {
+        this.refresh('daily', 'campaign', 'copy');
+    }
+
+    flushRefresh() {
+        if (this.busy) return;
+        const loaders = {
+            daily: [this.dailyLoading, () => this.loadDaily()],
+            campaign: [this.seriesLoading, () => this.loadSeries()],
+            copy: [this.copyLoading, () => this.loadCopy()],
+        };
+        for (const tab of [...this.pendingRefresh]) {
+            const [loading, load] = loaders[tab];
+            // A running load flushes again when it ends.
+            if (loading) continue;
+            this.pendingRefresh.delete(tab);
+            void load();
         }
     }
 
@@ -135,7 +150,10 @@ export class CreatorPanels {
     // ---- Daily list ----
 
     async loadDaily() {
-        if (this.dailyLoading) return;
+        if (this.dailyLoading) {
+            this.pendingRefresh.add('daily');
+            return;
+        }
         this.dailyLoading = true;
         const generation = this.writeGeneration;
         // A reload keeps the earlier list on screen until the answer comes.
@@ -149,15 +167,18 @@ export class CreatorPanels {
             this.daily = daily;
             this.dailyKeys = [...this.daily.schedule.keys];
             this.dailyDirty = false;
-            this.dailyStale = false;
             this.renderDaily();
         } catch (error) {
-            this.dailyRoot.replaceChildren(
-                element('p', { className: 'creator-error', text: `Could not load the Daily list: ${error.message}` }),
-                button('Try again', () => this.loadDaily()),
-            );
+            // A failed reload keeps the list that is on screen.
+            if (!this.daily) {
+                this.dailyRoot.replaceChildren(
+                    element('p', { className: 'creator-error', text: `Could not load the Daily list: ${error.message}` }),
+                    button('Try again', () => this.loadDaily()),
+                );
+            }
         } finally {
             this.dailyLoading = false;
+            this.flushRefresh();
         }
     }
 
@@ -268,8 +289,7 @@ export class CreatorPanels {
             this.dailyDirty = JSON.stringify(this.dailyKeys) !== JSON.stringify(this.daily.schedule.keys);
             // The Campaign shows which tracks are in the Daily list, and the
             // copy shows whether the list is in Redis.
-            this.seriesStale = true;
-            this.copyStale = true;
+            this.refresh('campaign', 'copy');
             this.setStatus(this.dailyDirty
                 ? 'Saved the earlier Daily list. Newer changes are still unsaved.' : 'Saved the Daily list.');
         } catch (error) {
@@ -279,13 +299,17 @@ export class CreatorPanels {
             this.busy = false;
             this.writeGeneration += 1;
             this.renderDaily();
+            this.flushRefresh();
         }
     }
 
     // ---- Campaign Planner ----
 
     async loadSeries(selectId = this.selectedSeriesId) {
-        if (this.seriesLoading) return;
+        if (this.seriesLoading) {
+            this.pendingRefresh.add('campaign');
+            return;
+        }
         this.seriesLoading = true;
         const generation = this.writeGeneration;
         const selectedId = this.selectedSeriesId;
@@ -298,19 +322,21 @@ export class CreatorPanels {
                 return;
             }
             this.seriesView = seriesView;
-            this.seriesStale = false;
             if (this.seriesDirty || this.seriesDraft !== draft || this.selectedSeriesId !== selectedId) {
                 this.renderSeries();
                 return;
             }
             await this.selectSeries(selectId, { force: true });
         } catch (error) {
-            this.seriesRoot.replaceChildren(
-                element('p', { className: 'creator-error', text: `Could not load the Campaign: ${error.message}` }),
-                button('Try again', () => this.loadSeries()),
-            );
+            if (!this.seriesView) {
+                this.seriesRoot.replaceChildren(
+                    element('p', { className: 'creator-error', text: `Could not load the Campaign: ${error.message}` }),
+                    button('Try again', () => this.loadSeries()),
+                );
+            }
         } finally {
             this.seriesLoading = false;
+            this.flushRefresh();
         }
     }
 
@@ -570,8 +596,7 @@ export class CreatorPanels {
                 usedBy: assigned.has(track.key) ? series.id : track.usedBy === series.id ? null : track.usedBy,
             }));
             // The Daily list shows which tracks are Campaign stages.
-            this.dailyStale = true;
-            this.copyStale = true;
+            this.refresh('daily', 'copy');
             if (this.seriesDraft === draft) {
                 const unchanged = JSON.stringify({ name: draft.name, ground: draft.ground, stages: draft.stages })
                     === JSON.stringify(snapshot);
@@ -591,6 +616,7 @@ export class CreatorPanels {
             this.seriesSavingDraft = null;
             this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
+            this.flushRefresh();
         }
     }
 
@@ -611,8 +637,7 @@ export class CreatorPanels {
         try {
             const { series } = await creatorApi.publishSeries(draft.id, draft.revision);
             this.setStatus(`${series.name} is live.`);
-            this.dailyStale = true;
-            this.copyStale = true;
+            this.refresh('daily', 'copy');
             this.seriesDestructive = false;
             await this.loadSeries(series.id);
             this.onTracksChanged();
@@ -624,6 +649,7 @@ export class CreatorPanels {
             this.seriesDestructive = false;
             this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
+            this.flushRefresh();
         }
     }
 
@@ -645,8 +671,7 @@ export class CreatorPanels {
         try {
             await creatorApi.deleteSeries(draft.id, draft.revision);
             this.setStatus(`Deleted ${draft.name}.`);
-            this.dailyStale = true;
-            this.copyStale = true;
+            this.refresh('daily', 'copy');
             this.seriesDirty = false;
             this.seriesDestructive = false;
             await this.loadSeries(null);
@@ -658,23 +683,35 @@ export class CreatorPanels {
             this.seriesDestructive = false;
             this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
+            this.flushRefresh();
         }
     }
 
     // ---- Copy of unplayed tracks ----
 
     async loadCopy() {
+        if (this.copyLoading) {
+            this.pendingRefresh.add('copy');
+            return;
+        }
+        this.copyLoading = true;
         if (!this.copyView) this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Checking what can be copied…' }));
         try {
             const { report, preview } = await creatorApi.readMigration();
             this.copyView = { report, preview };
-            this.copyStale = false;
             this.renderCopy(report, preview);
         } catch (error) {
-            this.copyRoot.replaceChildren(
-                element('p', { className: 'creator-error', text: `Could not check the copy: ${error.message}` }),
-                button('Try again', () => this.loadCopy()),
-            );
+            if (this.copyView) {
+                this.renderCopy(this.copyView.report, this.copyView.preview);
+            } else {
+                this.copyRoot.replaceChildren(
+                    element('p', { className: 'creator-error', text: `Could not check the copy: ${error.message}` }),
+                    button('Try again', () => this.loadCopy()),
+                );
+            }
+        } finally {
+            this.copyLoading = false;
+            this.flushRefresh();
         }
     }
 
@@ -728,7 +765,7 @@ export class CreatorPanels {
         try {
             const { report } = await creatorApi.runMigration();
             this.setStatus(`Copied ${report.copied.length} tracks.`);
-            this.markStale();
+            this.refresh('daily', 'campaign');
             this.onTracksChanged();
         } catch (error) {
             this.copyError = `Could not copy: ${error.message}`;

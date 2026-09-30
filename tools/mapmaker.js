@@ -455,6 +455,8 @@ class MapmakerApp {
                 confirm: (options) => this.confirmAction(options),
             });
             this.bindCreatorTabs();
+            document.getElementById('creator-loader-retry')
+                ?.addEventListener('click', () => void this.loadCreatorTracks());
             void this.loadCreatorTracks();
         } else {
             this.offerDraftRecovery();
@@ -3445,12 +3447,17 @@ class MapmakerApp {
         this.creatorLoading = true;
         const writeGeneration = this.creatorWriteGeneration;
         const panelGeneration = this.creatorPanels.writeGeneration;
-        if (!this.creatorLoaded) this.setCreatorSaveStatus('Loading tracks…', 'saving');
+        if (!this.creatorLoaded) {
+            this.setCreatorSaveStatus('Loading tracks…', 'saving');
+            this.showCreatorLoader('Loading the Creator…');
+        }
         try {
-            const [{ tracks }, daily, seriesView] = await Promise.all([
+            // Every tab loads here, so switching tabs never waits for the server.
+            const [{ tracks }, daily, seriesView, copyView] = await Promise.all([
                 creatorApi.listTracks(),
                 creatorApi.readDaily(),
                 creatorApi.readSeries(),
+                creatorApi.readMigration(),
             ]);
             if (writeGeneration !== this.creatorWriteGeneration) {
                 this.creatorRefreshPending = true;
@@ -3477,8 +3484,9 @@ class MapmakerApp {
                 this.state.dirtyTrackKeys.add(key);
             }
             this.applyCreatorPlaces(daily, seriesView);
-            this.creatorPanels.receiveViews({ daily, seriesView, generation: panelGeneration });
+            this.creatorPanels.receiveViews({ daily, seriesView, copyView, generation: panelGeneration });
             this.creatorLoaded = true;
+            this.showCreatorLoader(null);
             this.newTrackBtn.disabled = false;
             document.getElementById('creator-retry-btn').hidden = true;
             let openKey = keepSelection && this.state.tracks[previousKey]
@@ -3494,6 +3502,7 @@ class MapmakerApp {
         } catch (error) {
             this.setCreatorSaveStatus(`Could not load tracks: ${error.message}`, 'error');
             document.getElementById('creator-retry-btn').hidden = false;
+            if (!this.creatorLoaded) this.showCreatorLoader(`Could not load the Creator: ${error.message}`, { failed: true });
         } finally {
             this.creatorLoading = false;
             if (this.creatorRefreshPending && !this.creatorSavingKey && !this.creatorDeletingKey) {
@@ -3501,6 +3510,16 @@ class MapmakerApp {
                 void this.loadCreatorTracks({ keepSelection: true });
             }
         }
+    }
+
+    // The page covers the Creator until every tab has loaded once.
+    showCreatorLoader(message, { failed = false } = {}) {
+        const loader = document.getElementById('creator-loader');
+        if (!loader) return;
+        loader.hidden = message === null;
+        loader.dataset.state = failed ? 'error' : 'loading';
+        if (message !== null) document.getElementById('creator-loader-text').textContent = message;
+        document.getElementById('creator-loader-retry').hidden = !failed;
     }
 
     openCreatorTrack(trackKey) {
@@ -3534,7 +3553,7 @@ class MapmakerApp {
             return false;
         }
         const saved = await saveCreatorTrackSnapshot(this, key, geometrySignature);
-        if (saved) this.creatorPanels.markStale();
+        if (saved) this.creatorPanels.refreshAll();
         if (this.creatorRefreshPending && !this.creatorLoading) {
             this.creatorRefreshPending = false;
             void this.loadCreatorTracks({ keepSelection: true });
@@ -3562,7 +3581,7 @@ class MapmakerApp {
         try {
             if (record) {
                 await creatorApi.deleteTrack(key, record.revision);
-                this.creatorPanels.markStale();
+                this.creatorPanels.refreshAll();
             }
             const keys = Object.keys(this.state.tracks);
             const index = keys.indexOf(key);
@@ -3625,7 +3644,6 @@ class MapmakerApp {
         for (const view of document.querySelectorAll('[data-creator-view]')) {
             view.hidden = view.dataset.creatorView !== tab;
         }
-        this.creatorPanels.showTab(tab);
         if (tab === 'tracks') {
             this.resizeCanvas();
             this.draw();

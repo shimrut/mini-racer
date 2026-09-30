@@ -184,8 +184,12 @@ describe('Creator Campaign Planner', () => {
 
     it('keeps newer series edits and acknowledges only the sent snapshot', async () => {
         const pending = deferred();
-        const fetchMock = vi.fn(async (_url, options) => options?.method === 'PUT'
-            ? pending.promise : jsonResponse(structuredClone(seriesView)));
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'PUT') return pending.promise;
+            if (String(url).includes('/api/creator/daily')) return jsonResponse(dailyView);
+            if (String(url).includes('/api/creator/migration')) return jsonResponse({ report: null, preview: { copied: [] } });
+            return jsonResponse(structuredClone(seriesView));
+        });
         vi.stubGlobal('fetch', fetchMock);
         const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
@@ -201,7 +205,9 @@ describe('Creator Campaign Planner', () => {
         expect(panels.seriesDraft.revision).toBe(6);
         expect(panels.seriesDirty).toBe(true);
         expect(JSON.parse(fetchMock.mock.calls.find(([, options]) => options?.method === 'PUT')[1].body).stages).toHaveLength(1);
-        expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'GET')).toHaveLength(1);
+        // The save reloads the Daily list and the copy, but never the Campaign over newer edits.
+        expect(fetchMock.mock.calls.filter(([url, options]) => options?.method === 'GET'
+            && String(url).includes('/api/creator/series'))).toHaveLength(1);
     });
 
     it('does not select the saved series over a different draft selected during Save', async () => {
@@ -335,70 +341,76 @@ describe('Creator Campaign questions', () => {
 
 describe('Creator tabs keep their data', () => {
     const emptySeriesView = { series: [], appSeries: [], tracks: [] };
+    const copyView = { report: null, preview: { copied: [], played: 88, dailyList: 'kept' } };
 
-    function countingFetch() {
-        const calls = { daily: 0, series: 0 };
-        const fetchMock = vi.fn(async (url, options) => {
+    function countingFetch({ dailyPut } = {}) {
+        const calls = { daily: 0, series: 0, copy: 0 };
+        vi.stubGlobal('fetch', vi.fn(async (url, options) => {
             if (String(url).includes('/api/creator/daily')) {
-                calls.daily += 1;
                 if (options?.method === 'PUT') {
+                    if (dailyPut) await dailyPut;
                     const body = JSON.parse(options.body);
                     return jsonResponse({ ...dailyView, schedule: { ...dailyView.schedule, keys: body.keys, revision: 4 } });
                 }
+                calls.daily += 1;
                 return jsonResponse(dailyView);
+            }
+            if (String(url).includes('/api/creator/migration')) {
+                calls.copy += 1;
+                return jsonResponse(copyView);
             }
             calls.series += 1;
             return jsonResponse(emptySeriesView);
-        });
-        vi.stubGlobal('fetch', fetchMock);
+        }));
         return calls;
     }
 
-    it('loads a tab once, and again only when a change makes it out of date', async () => {
-        const calls = countingFetch();
+    function openPanels() {
         const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
-        const root = document.getElementById('creator-daily-view');
-        panels.showTab('daily');
-        await vi.waitFor(() => expect(panels.dailyStale).toBe(false));
-        panels.showTab('daily');
-        expect(calls.daily).toBe(1);
+        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, copyView, generation: 0 });
+        return panels;
+    }
 
-        panels.markStale();
-        panels.showTab('daily');
-        // The reload keeps the earlier list on screen.
+    it('fills every tab from the answers the Creator reads when it opens', () => {
+        const calls = countingFetch();
+        openPanels();
+        expect(calls).toEqual({ daily: 0, series: 0, copy: 0 });
+        expect(document.getElementById('creator-daily-view').textContent).toContain('Royal Plateau');
+        expect(document.getElementById('creator-copy-view').textContent).toContain('88 played tracks stay in the app.');
+    });
+
+    it('reloads every tab at once after a track change, and keeps the earlier data on screen', async () => {
+        const calls = countingFetch();
+        const panels = openPanels();
+        panels.refreshAll();
+        expect(calls).toEqual({ daily: 1, series: 1, copy: 1 });
+        const root = document.getElementById('creator-daily-view');
         expect(root.textContent).not.toContain('Loading the Daily list…');
         expect(root.textContent).toContain('Royal Plateau');
-        await vi.waitFor(() => expect(panels.dailyStale).toBe(false));
-        expect(calls.daily).toBe(2);
+        await vi.waitFor(() => expect(panels.dailyLoading || panels.seriesLoading || panels.copyLoading).toBe(false));
     });
 
-    it('fills the Daily and Campaign tabs from the answers the editor already has', async () => {
-        const calls = countingFetch();
-        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
-        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 0 });
-        panels.showTab('daily');
-        panels.showTab('campaign');
-        expect(calls).toEqual({ daily: 0, series: 0 });
-        expect(document.getElementById('creator-daily-view').textContent).toContain('Royal Plateau');
-    });
-
-    it('ignores an editor answer that started before a save', async () => {
+    it('ignores an answer that started before a save', () => {
         countingFetch();
         const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         panels.writeGeneration = 2;
-        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 1 });
+        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, copyView, generation: 1 });
         expect(panels.daily).toBeNull();
-        expect(panels.dailyStale).toBe(true);
+        expect(panels.copyView).toBeNull();
     });
 
-    it('marks the Campaign out of date after a Daily save', async () => {
-        const calls = countingFetch();
-        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
-        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 0 });
+    it('reloads the Campaign and the Copy tab after a Daily save ends', async () => {
+        const save = deferred();
+        const calls = countingFetch({ dailyPut: save.promise });
+        const panels = openPanels();
         panels.dailyKeys = ['circuit', 'sunlitTemple', 'royalPlateau', 'nightLoop'];
         panels.dailyDirty = true;
-        await panels.saveDaily();
-        panels.showTab('campaign');
-        await vi.waitFor(() => expect(calls.series).toBe(1));
+        const saving = panels.saveDaily();
+        panels.refresh('campaign');
+        // A reload asked for during the save waits for the save.
+        expect(calls.series).toBe(0);
+        save.resolve();
+        await saving;
+        expect(calls).toMatchObject({ series: 1, copy: 1 });
     });
 });
