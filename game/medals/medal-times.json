@@ -678,10 +678,10 @@
     "bronze": 8.64
   },
   "mantisBend": {
-    "author": 10.82,
-    "gold": 10.99,
-    "silver": 11.35,
-    "bronze": 11.71
+    "author": 10.24,
+    "gold": 10.47,
+    "silver": 10.71,
+    "bronze": 10.99
   },
   "brokenAntler": {
     "author": 9.75,
@@ -940,5 +940,17 @@
     "gold": 9.54,
     "silver": 10.02,
     "bronze": 10.61
+  },
+  "budapestRun": {
+    "author": 10.33,
+    "gold": 10.48,
+    "silver": 10.79,
+    "bronze": 11.09
+  },
+  "bucharestScramble": {
+    "author": 10.41,
+    "gold": 10.62,
+    "silver": 10.84,
+    "bronze": 11.11
   }
 }

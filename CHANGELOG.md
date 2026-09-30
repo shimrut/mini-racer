@@ -1,3 +1,5 @@
+- **Budapest Run** and **Bucharest Scramble** join the Daily rotation. **Mantis Bend** was redrawn, and its medal times are faster.
+
 - The Mapmaker button is now **Test Drive**. The track list can be filtered by Daily, Campaign, Not used or Cloud, and by ground.
 
 - **Old Mountain** is the earlier Mountain Peak layout, kept in the game but not in the Daily rotation. Its medal times are the ones that layout had before Mountain Peak was redrawn.

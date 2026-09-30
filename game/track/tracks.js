@@ -155,6 +155,8 @@ import wildCrest from './definitions/wild-crest.js';
 import dirtValley from './definitions/dirt-valley.js';
 import warpedLoop from './definitions/warped-loop.js';
 import oldMountain from './definitions/old-mountain.js';
+import budapestRun from './definitions/budapest-run.js';
+import bucharestScramble from './definitions/bucharest-scramble.js';
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
 
 const TRACK_GEOMETRY = {
@@ -315,6 +317,8 @@ const TRACK_GEOMETRY = {
     dirtValley,
     warpedLoop,
     oldMountain,
+    budapestRun,
+    bucharestScramble,
 };
 
 // Compatibility registry for existing gameplay and server consumers.

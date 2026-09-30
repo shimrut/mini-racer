@@ -156,6 +156,8 @@ export const TRACK_CATALOG = {
     dirtValley: { name: "Dirt Valley" },
     warpedLoop: { name: "Warped Loop" },
     oldMountain: { name: "Old Mountain" },
+    budapestRun: { name: "Budapest Run" },
+    bucharestScramble: { name: "Bucharest Scramble" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -286,6 +288,8 @@ export const TRACK_SCHEDULE_KEYS = [
     'waterCircuit',
     'spaceCircuit',
     'warpedLoop',
+    'budapestRun',
+    'bucharestScramble',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';
