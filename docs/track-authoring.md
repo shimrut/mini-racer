@@ -100,7 +100,7 @@ open `tools/runner.html`.
 ### Layout and Flow tips
 
 The map fills the window. The top bar has the track name (click it to open
-another track), **New track**, **Draw** and **Edit**, then
+another track), **New track**, **Draw**, **Edit** and **Corner**, then
 **Campaign Planner**, **Test Drive**, **Save** and the panel button. **Save**
 reads **Saved** when the open track has no unsaved changes. The panel on the
 right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and
@@ -112,6 +112,11 @@ first. Press Enter in its search box to open the first match. Messages about
 the last action show for a few seconds in the hint at the bottom of the map.
 In Edit, click an item to select it, drag to move it, Shift+click a wall to add
 a point, and Delete to remove the selected wall point or checkpoint.
+
+While **Corner** is open, a line runs from the end of each bend straight to
+the start of the next, through the middle of the road. It is as wide as the
+car. Green means the car can drive that straight shot. Red is where that shot
+leaves the road.
 
 Each checkpoint is labelled on the map with its lap order (CP 1, CP 2, …).
 **Checkpoints** shows how many the track has. **Add** puts a new one in the

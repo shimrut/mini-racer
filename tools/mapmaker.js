@@ -16,6 +16,7 @@ import {
     saveDraftRecovery,
 } from './mapmaker/edit-history.js';
 import { snapLineBuildPoint } from './mapmaker/line-build.js';
+import { wallContinuations } from './mapmaker/wall-continuation.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline, fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
 import {
@@ -1145,8 +1146,8 @@ class MapmakerApp {
     }
 
     setTool(tool, selectedHandle) {
-        this.state.tool = tool === 'draw' ? 'draw' : 'edit';
-        if (this.state.tool === 'draw') {
+        this.state.tool = tool === 'draw' || tool === 'corner' ? tool : 'edit';
+        if (this.state.tool === 'draw' || this.state.tool === 'corner') {
             this.state.selectedHandle = null;
         } else if (arguments.length > 1) {
             this.state.selectedHandle = selectedHandle ? { ...selectedHandle } : null;
@@ -1632,6 +1633,9 @@ class MapmakerApp {
         }
         if (!this.hasTrackGeometry()) {
             return 'No road yet. Use Draw.';
+        }
+        if (this.state.tool === 'corner') {
+            return 'The line from bend to bend is the straight shot. Green fits the car. Red leaves the road.';
         }
         const kind = this.state.selectedHandle?.kind;
         if (kind === 'startPos') {
@@ -2978,6 +2982,31 @@ class MapmakerApp {
         this.ctx.restore();
     }
 
+    drawWallContinuations(viewport) {
+        const shots = wallContinuations(this.track.outer, this.track.inner, CAR_RADIUS * 2);
+        this.ctx.save();
+        for (const shot of shots) {
+            this.fillWorldPolygon(shot.clear, viewport, 'rgba(88, 223, 165, 0.9)');
+            this.fillWorldPolygon(shot.blocked, viewport, 'rgba(244, 63, 94, 0.9)');
+            this.drawLineSegment(shot.from, shot.to, viewport, '#ffffff', 2, false);
+        }
+        this.ctx.restore();
+    }
+
+    fillWorldPolygon(points, viewport, fillStyle) {
+        if (!points || points.length < 3) return;
+        this.ctx.beginPath();
+        const first = this.worldToScreen(points[0], viewport);
+        this.ctx.moveTo(first.x, first.y);
+        for (let index = 1; index < points.length; index += 1) {
+            const point = this.worldToScreen(points[index], viewport);
+            this.ctx.lineTo(point.x, point.y);
+        }
+        this.ctx.closePath();
+        this.ctx.fillStyle = fillStyle;
+        this.ctx.fill();
+    }
+
     draw() {
         this.syncCheckpointPanel();
         const ratio = window.devicePixelRatio || 1;
@@ -3033,6 +3062,11 @@ class MapmakerApp {
         this.drawQualityMarkers(viewport);
 
         this.drawDraftLoop(viewport);
+
+        if (this.state.tool === 'corner') {
+            this.drawWallContinuations(viewport);
+            return;
+        }
 
         const handles = this.getAllHandles().sort((a, b) => {
             const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 2

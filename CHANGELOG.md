@@ -1,3 +1,5 @@
+- In Mapmaker Corner, a car-wide line shows the straight shot from each bend to the next. Green stays on the road. Red is where the car would leave it.
+
 - Test Drive drives like the game. Tap the speed or press Escape to pause. On a phone, tap the left or right side of the screen to steer. The Mobile button shows only on a computer, where it previews that phone screen. Whole track and the arrow buttons are gone.
 
 - **Budapest Run** and **Bucharest Scramble** join the Daily rotation. **Mantis Bend** was redrawn, and its medal times are faster.
