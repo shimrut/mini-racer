@@ -310,22 +310,3 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
 
 /* The small card in the feed that opens the Creator */
 
-.creator-launcher {
-    align-items: center;
-    justify-content: center;
-}
-
-.creator-launcher-card {
-    max-width: 24rem;
-    padding: 1.5rem;
-    text-align: center;
-}
-
-.creator-launcher-card h1 {
-    margin: 0 0 0.5rem;
-    font-size: 1.4rem;
-}
-
-.creator-launcher-card p {
-    color: var(--maker-muted);
-}
