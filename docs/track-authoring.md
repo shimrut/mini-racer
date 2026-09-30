@@ -29,10 +29,12 @@ every consumer load the large geometry registry.
 
 ## Scale Reference
 
-Mapmaker draws a race-style track preview using the same corner rounding,
-asphalt fill, curbs, and start/finish paint as the game. Sharp outer/inner
-construction walls stay faintly visible on top so editable corners remain
-easy to see.
+Mapmaker draws an editor-only schematic on a navy drafting grid. It uses the
+game's corner rounding and road geometry, with a softly tinted road for each
+ground, a coral outer wall, a pale-blue inner wall, and colored edit points.
+The sharp outer/inner construction walls stay faintly visible so editable
+corners remain easy to see. Curbs, ground scenery, and finish paint remain
+in Test Drive and the game, not in the schematic.
 
 Mapmaker draws a ghost car at the finished start position using the real race
 collision size (`0.55u` wide × `1.23u` long).

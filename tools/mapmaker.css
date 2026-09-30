@@ -21,6 +21,24 @@
     --maker-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
+/* The editor uses a drafting palette; the Campaign Planner shares this sheet. */
+body.mapmaker-editor-body {
+    --maker-bg: #0e1825;
+    --maker-canvas: #0c1723;
+    --maker-panel: #131e2c;
+    --maker-raised: #1b2a3d;
+    --maker-field: #101a28;
+    --maker-border: rgba(151, 180, 211, 0.15);
+    --maker-border-strong: rgba(151, 180, 211, 0.34);
+    --maker-text: #ecf3ff;
+    --maker-muted: #9aaec5;
+    --maker-accent: #3b73f6;
+    --maker-blue: #8ac3ff;
+    --maker-green: #58dfa5;
+    --maker-gold: #f4c961;
+    --maker-danger-text: #ff93a7;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -54,6 +72,10 @@ select {
     padding: 0 0.75rem;
     border-bottom: 1px solid var(--maker-border);
     background: var(--maker-panel);
+}
+
+.mapmaker-editor-body .maker-header {
+    background: linear-gradient(180deg, #162231, #111b29);
 }
 
 .maker-header button {
@@ -119,6 +141,10 @@ button:disabled {
 .primary-btn:hover:not(:disabled) {
     border-color: transparent;
     background: #e11d48;
+}
+
+.mapmaker-editor-body .primary-btn:hover:not(:disabled) {
+    background: #5689ff;
 }
 
 .primary-btn:disabled {
@@ -266,6 +292,13 @@ summary:focus-visible,
     background: var(--maker-raised);
     color: var(--maker-text);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--maker-border-strong);
+}
+
+.mapmaker-editor-body .segmented button[data-active="true"],
+.mapmaker-editor-body .segmented input:checked + span {
+    background: rgba(59, 115, 246, 0.2);
+    color: #e8f0ff;
+    box-shadow: inset 0 0 0 1px rgba(102, 153, 255, 0.65);
 }
 
 .segmented label {
@@ -439,6 +472,10 @@ button.track-card:hover:not(:disabled) {
     border-left: 1px solid var(--maker-border);
 }
 
+.mapmaker-editor-body .maker-panel-side {
+    background: linear-gradient(120deg, #14202f, #111b28);
+}
+
 .maker-panel-side[hidden] {
     display: none;
 }
@@ -449,6 +486,10 @@ button.track-card:hover:not(:disabled) {
     min-width: 0;
     overflow: hidden;
     background: var(--maker-canvas);
+}
+
+.mapmaker-editor-body .maker-stage {
+    background: radial-gradient(ellipse at 51% 47%, #142438 0%, #0c1723 76%);
 }
 
 #map-canvas {
@@ -482,6 +523,10 @@ button.track-card:hover:not(:disabled) {
     text-align: center;
     transform: translateX(-50%);
     pointer-events: none;
+}
+
+.mapmaker-editor-body .canvas-hint {
+    background: rgba(15, 25, 38, 0.88);
 }
 
 .canvas-hint[data-kind="status"] {
@@ -544,6 +589,13 @@ button.track-card:hover:not(:disabled) {
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+}
+
+.mapmaker-editor-body .panel-section h2 {
+    color: #dce9f9;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-size: 0.82rem;
 }
 
 .panel-footer {
@@ -611,6 +663,10 @@ button.track-card:hover:not(:disabled) {
 .quality-issues li[data-severity="error"] {
     border-color: var(--maker-accent);
     background: rgba(244, 63, 94, 0.09);
+}
+
+.mapmaker-editor-body .quality-issues li[data-severity="error"] {
+    border-color: var(--maker-danger-text);
 }
 
 .flow-rules li[data-flow="miss"] {

@@ -1,10 +1,4 @@
 import { CONFIG } from '../game/config.js';
-import {
-    drawTrackBoundaries,
-    drawTrackFinishLine,
-    fillTrackPresentation,
-} from '../game/track/canvas.js';
-import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
@@ -68,6 +62,17 @@ const CORNER_RADIUS_PRESETS = [
     { value: 5, label: 'Soft' },
 ];
 const CORNER_RADIUS_VALUES = CORNER_RADIUS_PRESETS.map((preset) => preset.value);
+
+// Editor-only schematic colors. Ground remains visible through a restrained road tint.
+const EDITOR_ROAD_TONES = Object.freeze({
+    tarmac: ['#344255', '#273548'],
+    grip: ['#344255', '#273548'],
+    dirt: ['#4a403d', '#342f30'],
+    snow: ['#526174', '#3d4d60'],
+    water: ['#2d5366', '#244154'],
+    space: ['#3b3c60', '#292d4d'],
+});
+const EDITOR_EDGE = Object.freeze({ outer: '#ff8ca4', inner: '#c0deff' });
 
 const CAR_RADIUS = CONFIG.carRadius;
 const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
@@ -2657,7 +2662,7 @@ class MapmakerApp {
 
         for (let x = startX; x < width; x += minor) {
             const worldX = Math.round((x - viewport.offsetX) / viewport.scale);
-            ctx.strokeStyle = worldX % 5 === 0 ? 'rgba(148, 163, 184, 0.18)' : 'rgba(148, 163, 184, 0.08)';
+            ctx.strokeStyle = worldX % 5 === 0 ? 'rgba(139, 171, 204, 0.16)' : 'rgba(139, 171, 204, 0.065)';
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, height);
@@ -2666,7 +2671,7 @@ class MapmakerApp {
 
         for (let y = startY; y < height; y += minor) {
             const worldY = Math.round((y - viewport.offsetY) / viewport.scale);
-            ctx.strokeStyle = worldY % 5 === 0 ? 'rgba(148, 163, 184, 0.18)' : 'rgba(148, 163, 184, 0.08)';
+            ctx.strokeStyle = worldY % 5 === 0 ? 'rgba(139, 171, 204, 0.16)' : 'rgba(139, 171, 204, 0.065)';
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(width, y);
@@ -2691,24 +2696,7 @@ class MapmakerApp {
         return path;
     }
 
-    drawRaceCurbs(path, presentation, lineWidth) {
-        const dash = Math.max(6, lineWidth * 3);
-        this.ctx.save();
-        this.ctx.lineWidth = lineWidth;
-        this.ctx.lineJoin = 'round';
-        this.ctx.lineCap = 'butt';
-        this.ctx.setLineDash([dash, dash]);
-        this.ctx.strokeStyle = presentation.curbRed || CONFIG.curbRed;
-        this.ctx.stroke(path);
-        this.ctx.lineDashOffset = dash;
-        this.ctx.strokeStyle = presentation.curbWhite || CONFIG.curbWhite;
-        this.ctx.stroke(path);
-        this.ctx.setLineDash([]);
-        this.ctx.lineDashOffset = 0;
-        this.ctx.restore();
-    }
-
-    drawRaceTrackPreview(viewport) {
+    drawSchematicTrackPreview(viewport) {
         const geometry = buildTrackGeometry({
             outer: this.track.outer,
             inner: this.track.inner,
@@ -2718,38 +2706,34 @@ class MapmakerApp {
             return;
         }
 
-        const presentation = resolveTrackPresentation(this.state.selectedTrackKey, { ground: this.track.ground });
         const outerPath = this.buildScreenPath(geometry.outer, viewport);
         const innerPath = this.buildScreenPath(geometry.inner, viewport);
         const surfacePath = new Path2D();
         surfacePath.addPath(outerPath);
         surfacePath.addPath(innerPath);
 
-        const curbWidth = clamp(viewport.scale * 0.18, 2, 6);
-        const finishWidth = clamp(viewport.scale * 0.35, 4, 12);
+        const [roadTop, roadBottom] = EDITOR_ROAD_TONES[getTrackGround(this.track).key];
+        const roadFill = this.ctx.createLinearGradient(0, 0, 0, viewport.height);
+        roadFill.addColorStop(0, roadTop);
+        roadFill.addColorStop(1, roadBottom);
+        this.ctx.save();
+        this.ctx.fillStyle = roadFill;
+        this.ctx.fill(surfacePath, 'evenodd');
+        this.ctx.fillStyle = '#112034';
+        this.ctx.fill(innerPath);
 
-        fillTrackPresentation(this.ctx, surfacePath, innerPath, presentation);
-
-        const startLine = this.track.startLine;
-        if (startLine?.p1 && startLine?.p2) {
-            this.ctx.save();
-            this.ctx.clip(surfacePath, 'evenodd');
-            drawTrackFinishLine(
-                this.ctx,
-                this.worldToScreen(startLine.p1, viewport),
-                this.worldToScreen(startLine.p2, viewport),
-                finishWidth,
-                presentation,
-            );
-            this.ctx.restore();
-        }
-
-        if (presentation.showCurbs !== false) {
-            this.drawRaceCurbs(outerPath, presentation, curbWidth);
-            this.drawRaceCurbs(innerPath, presentation, curbWidth);
-        }
-
-        drawTrackBoundaries(this.ctx, outerPath, innerPath, presentation);
+        this.ctx.lineJoin = 'round';
+        this.ctx.lineWidth = 5;
+        this.ctx.strokeStyle = 'rgba(255, 140, 164, 0.16)';
+        this.ctx.stroke(outerPath);
+        this.ctx.strokeStyle = 'rgba(192, 222, 255, 0.16)';
+        this.ctx.stroke(innerPath);
+        this.ctx.lineWidth = 2.25;
+        this.ctx.strokeStyle = EDITOR_EDGE.outer;
+        this.ctx.stroke(outerPath);
+        this.ctx.strokeStyle = EDITOR_EDGE.inner;
+        this.ctx.stroke(innerPath);
+        this.ctx.restore();
     }
 
     drawPolygon(points, viewport, fillStyle, strokeStyle, options = {}) {
@@ -2794,9 +2778,9 @@ class MapmakerApp {
         const radius = isSelected ? 8 : isHovered ? 7 : 4.5;
         let fill = '#f8fafc';
         if (handle.kind === 'polygon') {
-            fill = handle.path === 'outer' ? '#f43f5e' : '#38bdf8';
+            fill = handle.path === 'outer' ? EDITOR_EDGE.outer : '#79b7ff';
         } else if (handle.kind === 'checkpoint') {
-            fill = '#22c55e';
+            fill = '#58dfa5';
         } else if (handle.kind === 'startPos') {
             fill = '#fbbf24';
         } else if (handle.kind === 'startLine') {
@@ -2804,10 +2788,10 @@ class MapmakerApp {
         }
 
         this.ctx.save();
-        this.ctx.globalAlpha = isSelected || isHovered ? 1 : 0.45;
+        this.ctx.globalAlpha = isSelected || isHovered ? 1 : 0.88;
         this.ctx.beginPath();
         this.ctx.fillStyle = fill;
-        this.ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.5)';
+        this.ctx.strokeStyle = isSelected ? '#ffffff' : '#102033';
         this.ctx.lineWidth = isSelected ? 3 : 2;
         this.ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
         this.ctx.fill();
@@ -2835,7 +2819,7 @@ class MapmakerApp {
             const road = new Path2D();
             road.addPath(this.buildScreenPath(roadPreview.outer, viewport));
             road.addPath(this.buildScreenPath(roadPreview.inner, viewport));
-            this.ctx.fillStyle = 'rgba(71, 85, 105, 0.96)';
+            this.ctx.fillStyle = 'rgba(45, 59, 77, 0.96)';
             this.ctx.fill(road, 'evenodd');
             this.drawPolygon(roadPreview.outer, viewport, 'transparent', '#fbbf24', { lineWidth: 2 });
             this.drawPolygon(roadPreview.inner, viewport, 'transparent', '#fbbf24', { lineWidth: 2 });
@@ -2846,7 +2830,7 @@ class MapmakerApp {
             this.ctx.strokeStyle = '#fbbf24';
             this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale + 4;
             this.ctx.stroke(openPath);
-            this.ctx.strokeStyle = '#475569';
+            this.ctx.strokeStyle = '#2d3b4d';
             this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale;
             this.ctx.stroke(openPath);
         }
@@ -3004,19 +2988,19 @@ class MapmakerApp {
         this.drawGrid(viewport);
 
         if (this.hasTrackGeometry()) {
-            this.drawRaceTrackPreview(viewport);
+            this.drawSchematicTrackPreview(viewport);
             this.drawPolygon(
                 this.track.outer,
                 viewport,
                 'transparent',
-                'rgba(244, 63, 94, 0.38)',
+                'rgba(255, 140, 164, 0.38)',
                 { lineWidth: 1.5 },
             );
             this.drawPolygon(
                 this.track.inner,
                 viewport,
                 'transparent',
-                'rgba(56, 189, 248, 0.38)',
+                'rgba(192, 222, 255, 0.38)',
                 { lineWidth: 1.5 },
             );
             this.drawLineSegment(
@@ -3038,7 +3022,7 @@ class MapmakerApp {
                     checkpoint.p1,
                     checkpoint.p2,
                     viewport,
-                    active ? '#4ade80' : 'rgba(74, 222, 128, 0.45)',
+                    active ? '#58dfa5' : 'rgba(88, 223, 165, 0.72)',
                     active ? 4 : 2
                 );
             });
