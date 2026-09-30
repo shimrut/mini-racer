@@ -89,8 +89,8 @@ New structural errors block export and **Save**;
 warnings invite a driving check. Existing integrated tracks with a known
 baseline issue can still be renamed or have metadata saved while their race
 geometry is unchanged. Geometry edits must resolve any remaining hard error.
-Use **Drive Draft** to test the current unsaved track with the real race
-simulation before integration. The draft drive runs only in the browser and
+Use **Test Drive** to test the current unsaved track with the real race
+simulation before integration. The test drive runs only in the browser and
 does not publish or save a definition. It reports checkpoint progress, lap
 completion, and wall contacts. To run the Runner Lab bots on a saved track,
 open `tools/runner.html`.
@@ -99,12 +99,13 @@ open `tools/runner.html`.
 
 The map fills the window. The top bar has the track name (click it to open
 another track), **New track**, **Draw** and **Edit**, then
-**Campaign Planner**, **Drive Draft**, **Save** and the panel button. **Save**
+**Campaign Planner**, **Test Drive**, **Save** and the panel button. **Save**
 reads **Saved** when the open track has no unsaved changes. The panel on the
 right can be hidden; it holds **Name**, **Checks**, **Shape** (wall corners and
 ground), **Checkpoints** and **Medal times**, with **Remove track** at the
 bottom. The track
-picker is searchable, shows a preview of every track, and lists the newest
+picker is searchable and can be filtered by Daily, Campaign, Not used or
+Cloud, and by ground. It shows a preview of every track and lists the newest
 first. Press Enter in its search box to open the first match. Messages about
 the last action show for a few seconds in the hint at the bottom of the map.
 In Edit, click an item to select it, drag to move it, Shift+click a wall to add
@@ -140,28 +141,28 @@ While Draw is open, each straight longer than 14 units is marked with
 its length. A straight of that length takes about 1 s at top speed. A bend
 counts only when the fast line must turn tighter than a 15-unit radius.
 
-After a finished lap, **Drive Draft** also shows **Flow on this lap**. This is
+After a finished lap, **Test Drive** also shows **Flow on this lap**. This is
 your slowest speed, your longest time without steering, your steering beat and
 your left-right changes. The numbers describe your own lap, so a wall hit
 shows as a slow point.
 
-**Drive Draft** is the race view. Time, best lap and speed are the race HUD.
+**Test Drive** is the race view. Time, best lap and speed are the race HUD.
 The bar shows the next gate and wall contacts, plus **Desktop**, **Mobile**,
 Pause, Reset and Whole track. **Desktop** fills the wide view with the desktop
 race camera. **Mobile** uses a tall phone screen and the phone race camera.
-Drive Draft keeps your
+Test Drive keeps your
 10 best laps for each layout in the browser. A change to a wall, gate, start
 point, corner or ground starts a new list.
 
 Undo (Cmd+Z) and Redo (Shift+Cmd+Z) cover wall, gate, start, name, and corner
 edits; a pointer drag is one undo step. While Draw is open, Undo removes the last sketch
 point. The browser keeps unsaved maps and open sketches locally and offers to
-restore them after a reload. Returning from **Drive Draft** restores the map
+restore them after a reload. Returning from **Test Drive** restores the map
 automatically in the same tab.
 
 ## Online Mapmaker
 
-The Mapmaker and **Drive Draft** also run at `https://miniracer.club/mapmaker`,
+The Mapmaker and **Test Drive** also run at `https://miniracer.club/mapmaker`,
 so maps can be made on a laptop, tablet or phone.
 
 - **Passcode.** The page asks for a passcode and then stays open for 30 days
@@ -286,7 +287,7 @@ matching tracks; click a track to open the list it is in.
 The **Medal times** section of the panel sets the four medal times of one lap:
 author, gold, silver and bronze.
 
-- The panel lists your 10 best **Drive Draft** laps on the current layout, and
+- The panel lists your 10 best **Test Drive** laps on the current layout, and
   their average. Click one to use it as the author time. It is rounded up to
   0.01 s, so that lap earns the author medal.
 - You can also type the author time.
@@ -364,7 +365,7 @@ Each track has one ground for the full lap. Choose it with **Ground** under
   Snow cars are. A jet ski has a rider who holds the handlebars, and the
   handlebars turn with the steering. The garage shows them as **Jet skis**
   and **Spaceships**. A player picks one for each ground.
-- **Drive Draft** drives with the chosen ground.
+- **Test Drive** drives with the chosen ground.
 
 The game and the server replay check read the same definition file, so the
 server drives every run on the same ground. The server's "same track" hash

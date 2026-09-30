@@ -1,4 +1,4 @@
-// Medal times in the Mapmaker, and the Drive Draft laps that help to choose them.
+// Medal times in the Mapmaker, and the Test Drive laps that help to choose them.
 
 // Median gaps between the author time and the other medals on the current tracks.
 export const MEDAL_GAP_RATIOS = Object.freeze({ gold: 1.025, silver: 1.055, bronze: 1.088 });
@@ -61,7 +61,7 @@ export function sameMedalRow(first, second) {
 }
 
 // A short hash of the track layout. A change to a wall, gate, start point,
-// corner or ground gives a new hash, so old Drive Draft laps do not count.
+// corner or ground gives a new hash, so old Test Drive laps do not count.
 export function trackLayoutHash(track) {
     const { name: _name, ...layout } = track && typeof track === 'object' ? track : {};
     const text = JSON.stringify(layout);

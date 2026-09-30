@@ -6,6 +6,7 @@ import {
 } from '../game/track/canvas.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
+import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';
 import {
@@ -276,6 +277,8 @@ class MapmakerApp {
         this.trackPickerName = document.getElementById('track-picker-name');
         this.trackPickerDialog = document.getElementById('track-picker-dialog');
         this.trackSearch = document.getElementById('track-search');
+        this.trackPlaceFilters = document.getElementById('track-place-filters');
+        this.trackGroundFilters = document.getElementById('track-ground-filters');
         this.trackPickerList = document.getElementById('track-picker-list');
         this.panel = document.getElementById('maker-panel');
         this.panelToggleBtn = document.getElementById('panel-toggle-btn');
@@ -368,6 +371,9 @@ class MapmakerApp {
         // The local Mapmaker lists the cloud maps in the track picker.
         this.cloudMaps = [];
         this.cloudMapsError = '';
+        this.scheduleKeys = new Set(TRACK_SCHEDULE_KEYS);
+        this.trackPickerPlace = 'all';
+        this.trackPickerGround = 'all';
         this.touchInput = window.matchMedia('(pointer: coarse)').matches;
         this.touchPoints = new Map();
         this.pinch = null;
@@ -380,6 +386,23 @@ class MapmakerApp {
             value: key,
             label: TRACK_GROUNDS[key].label,
         })));
+        this.buildFilterGroup(this.trackPlaceFilters, [
+            { value: 'all', label: 'All' },
+            { value: 'daily', label: 'Daily' },
+            { value: 'campaign', label: 'Campaign' },
+            { value: 'unused', label: 'Not used' },
+            { value: 'cloud', label: 'Cloud' },
+        ], (value) => {
+            this.trackPickerPlace = value;
+            this.renderTrackPicker();
+        });
+        this.buildFilterGroup(this.trackGroundFilters, [
+            { value: 'all', label: 'Any ground' },
+            ...TRACK_GROUND_KEYS.map((key) => ({ value: key, label: TRACK_GROUNDS[key].label })),
+        ], (value) => {
+            this.trackPickerGround = value;
+            this.renderTrackPicker();
+        });
         let storedPanelHidden = null;
         try { storedPanelHidden = getBrowserStorage('localStorage')?.getItem(PANEL_HIDDEN_KEY); } catch {}
         this.setPanelHidden(storedPanelHidden === null
@@ -547,7 +570,7 @@ class MapmakerApp {
             this.addCloudMap(map);
             this.state.dirtyTrackKeys.delete(map.trackKey);
         }
-        // Open the track just driven in Drive Draft, else the newest cloud map.
+        // Open the track just driven in Test Drive, else the newest cloud map.
         let drivenKey = null;
         try {
             drivenKey = JSON.parse(getBrowserStorage('sessionStorage')?.getItem(PLAYTEST_DRAFT_KEY) ?? 'null')?.trackKey ?? null;
@@ -758,6 +781,33 @@ class MapmakerApp {
         return CORNER_RADIUS_VALUES.reduce((best, candidate) => (
             Math.abs(candidate - radius) < Math.abs(best - radius) ? candidate : best
         ), DEFAULT_CORNER_RADIUS);
+    }
+
+    buildFilterGroup(container, options, onPick) {
+        container.replaceChildren(...options.map(({ value, label }) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.value = value;
+            button.textContent = label;
+            button.addEventListener('click', () => onPick(value));
+            return button;
+        }));
+    }
+
+    syncFilterGroup(container, value) {
+        for (const button of container.querySelectorAll('button')) {
+            const active = button.dataset.value === value;
+            button.dataset.active = String(active);
+            button.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    // Daily, a campaign series, or neither. Cloud maps are a separate list.
+    trackListPlace(trackKey) {
+        const savedKey = this.state.originalTrackKeyByKey.get(trackKey) ?? trackKey;
+        if (findTrackStage(this.seriesData, savedKey)) return 'campaign';
+        if (this.scheduleKeys.has(savedKey)) return 'daily';
+        return 'unused';
     }
 
     buildOptionGroup(container, name, options) {
@@ -1009,8 +1059,13 @@ class MapmakerApp {
 
     renderTrackPicker() {
         this.trackPreviews.reset();
+        this.syncFilterGroup(this.trackPlaceFilters, this.trackPickerPlace);
+        this.syncFilterGroup(this.trackGroundFilters, this.trackPickerGround);
         const query = this.trackSearch.value.trim().toLowerCase();
-        const matches = (track) => !query || track.name.toLowerCase().includes(query);
+        const place = this.trackPickerPlace;
+        const ground = this.trackPickerGround;
+        const nameMatches = (track) => !query || track.name.toLowerCase().includes(query);
+        const groundMatches = (track) => ground === 'all' || getTrackGround(track).key === ground;
         const createCard = (key, track, meta) => {
             const card = this.trackPreviews.createCard('button', key, track.name, meta);
             card.type = 'button';
@@ -1023,9 +1078,12 @@ class MapmakerApp {
             return element;
         };
 
+        const showCloud = place === 'all' || place === 'cloud';
         const cloudItems = [];
-        const cloudMaps = this.cloudMaps.filter((map) => matches(map.track));
-        if (cloudMaps.length || (this.cloudMapsError && !query)) {
+        const cloudMaps = showCloud
+            ? this.cloudMaps.filter((map) => nameMatches(map.track) && groundMatches(map.track))
+            : [];
+        if (cloudMaps.length || (showCloud && this.cloudMapsError && !query && ground === 'all')) {
             cloudItems.push(createText('h3', 'track-cards-heading', 'Cloud maps'));
             if (this.cloudMapsError) cloudItems.push(createText('p', 'field-hint', this.cloudMapsError));
             cloudItems.push(...cloudMaps.map((map) => createCard(
@@ -1033,22 +1091,42 @@ class MapmakerApp {
                 map.track,
                 `Saved ${new Date(map.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
             )));
-            cloudItems.push(createText('h3', 'track-cards-heading', 'Tracks'));
+            if (place !== 'cloud') cloudItems.push(createText('h3', 'track-cards-heading', 'Tracks'));
         }
 
-        const keys = Object.keys(this.state.tracks).reverse().filter((key) => matches(this.state.tracks[key]));
-        const trackItems = keys.map((key) => {
-            const track = this.state.tracks[key];
-            const meta = [
-                getTrackGround(track).label,
-                this.cloudKeyByKey.has(key) ? 'Cloud' : '',
-                this.state.dirtyTrackKeys.has(key) ? 'Unsaved' : '',
-            ].filter(Boolean).join(' · ');
-            const card = createCard(key, track, meta);
-            if (key === this.state.selectedTrackKey) card.setAttribute('aria-current', 'true');
-            return card;
-        });
-        if (!keys.length) trackItems.push(createText('p', 'field-hint', 'No track has that name. Use New track to start one.'));
+        const trackItems = [];
+        if (place !== 'cloud') {
+            const keys = Object.keys(this.state.tracks).reverse().filter((key) => {
+                const track = this.state.tracks[key];
+                return nameMatches(track)
+                    && groundMatches(track)
+                    && (place === 'all' || this.trackListPlace(key) === place);
+            });
+            trackItems.push(...keys.map((key) => {
+                const track = this.state.tracks[key];
+                const meta = [
+                    getTrackGround(track).label,
+                    this.cloudKeyByKey.has(key) ? 'Cloud' : '',
+                    this.state.dirtyTrackKeys.has(key) ? 'Unsaved' : '',
+                ].filter(Boolean).join(' · ');
+                const card = createCard(key, track, meta);
+                if (key === this.state.selectedTrackKey) card.setAttribute('aria-current', 'true');
+                return card;
+            }));
+            if (!keys.length) {
+                trackItems.push(createText(
+                    'p',
+                    'field-hint',
+                    query ? 'No track has that name. Use New track to start one.' : 'No tracks match.',
+                ));
+            }
+        } else if (!cloudMaps.length && !(this.cloudMapsError && !query && ground === 'all')) {
+            cloudItems.push(createText(
+                'p',
+                'field-hint',
+                query ? 'No cloud map has that name.' : 'No cloud maps.',
+            ));
+        }
         this.trackPickerList.replaceChildren(...cloudItems, ...trackItems);
     }
 
@@ -1136,7 +1214,7 @@ class MapmakerApp {
         if (!laps.length) {
             const note = document.createElement('p');
             note.className = 'field-hint';
-            note.textContent = 'No Drive Draft laps yet.';
+            note.textContent = 'No Test Drive laps yet.';
             this.draftLapsList.appendChild(note);
         }
 
@@ -2985,7 +3063,7 @@ class MapmakerApp {
     driveDraft() {
         const track = this.track;
         if (!track || track.outer.length < 3 || track.inner.length < 3) {
-            this.setStatus('Draw a closed road before driving the draft.', true);
+            this.setStatus('Draw a closed road before a test drive.', true);
             return;
         }
         try {
@@ -2998,7 +3076,7 @@ class MapmakerApp {
             this.skipBeforeUnload = true;
             window.location.assign('mapmaker-playtest.html');
         } catch (error) {
-            this.setStatus('Drive Draft could not open in this browser.', true);
+            this.setStatus('Test Drive could not open in this browser.', true);
             console.error(error);
         }
     }

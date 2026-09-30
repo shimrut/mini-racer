@@ -372,7 +372,7 @@ const DRIVE_LAUNCH_SHARE = 0.5;
 const DRIVE_TAP_MERGE_SEC = 0.25;
 
 /**
- * Summarize how a real Drive Draft lap flowed, from per-step samples of
+ * Summarize how a real Test Drive lap flowed, from per-step samples of
  * { time, speed, steer } where steer is -1 (left), 0 or 1 (right).
  * The standing start is skipped: the lap is read from the moment the car
  * first reaches half its top speed. Taps on one side less than a quarter

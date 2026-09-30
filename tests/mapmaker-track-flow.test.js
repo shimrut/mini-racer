@@ -115,7 +115,7 @@ describe('Line Build straight guide', () => {
     });
 });
 
-describe('Drive Draft lap flow', () => {
+describe('Test Drive lap flow', () => {
     function drive(pattern, seconds, dt = 1 / 60) {
         const samples = [];
         for (let time = 0; time < seconds; time += dt) {

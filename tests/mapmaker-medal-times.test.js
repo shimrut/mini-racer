@@ -42,7 +42,7 @@ describe('Mapmaker medal times', () => {
         expect(getMedalRowError({ author: 9.3, gold: 9.2, silver: 9.5, bronze: 9.9 })).toMatch('go up');
     });
 
-    it('keeps the 10 best Drive Draft laps for one layout', () => {
+    it('keeps the 10 best Test Drive laps for one layout', () => {
         const storage = memoryStorage();
         const key = draftLapsStorageKey('testTrack', TRACK);
         for (const lap of [12, 11, 13, 10.5, 14, 15, 16, 17, 18, 19, 20, 9.9]) {

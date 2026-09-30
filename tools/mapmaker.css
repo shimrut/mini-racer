@@ -328,9 +328,16 @@ summary:focus-visible,
 
 .track-picker-head {
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.6rem;
     padding: 1rem;
     border-bottom: 1px solid var(--maker-border);
+}
+
+.track-filters {
+    display: flex;
+    flex-wrap: wrap;
 }
 
 #track-picker-list {

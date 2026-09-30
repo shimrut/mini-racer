@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
 // Builds site/dist for the miniracer.club Pages project: the promo page from
-// LP/, the online Mapmaker with Drive Draft at /mapmaker, and the car pictures
-// that Drive Draft loads from /assets/cars. site/functions guards /mapmaker.
+// LP/, the online Mapmaker with Test Drive at /mapmaker, and the car pictures
+// that Test Drive loads from /assets/cars. site/functions guards /mapmaker.
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(repoRoot, 'site', 'dist');
 const mapmakerDist = join(dist, 'mapmaker');

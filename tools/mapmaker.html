@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer Mapmaker</title>
-    <link rel="stylesheet" href="mapmaker.css?v=3.7">
+    <link rel="stylesheet" href="mapmaker.css?v=3.8">
 </head>
 <body class="mapmaker-body">
     <header class="maker-header">
@@ -20,7 +20,7 @@
         </div>
         <div class="maker-header-actions">
             <a class="maker-link local-only" href="campaign-planner.html">Campaign Planner</a>
-            <button id="drive-draft-btn" type="button">Drive Draft</button>
+            <button id="drive-draft-btn" type="button">Test Drive</button>
             <button id="save-track-btn" type="button" class="primary-btn">Save</button>
             <button id="panel-toggle-btn" type="button" class="icon-btn" aria-controls="maker-panel" aria-label="Show or hide the panel" title="Show or hide the panel">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13"/></svg>
@@ -121,6 +121,8 @@
     <dialog id="track-picker-dialog" class="maker-dialog track-picker-dialog" closedby="any" aria-label="Tracks">
         <div class="track-picker-head">
             <input id="track-search" type="search" placeholder="Find a track" aria-label="Find a track" autocomplete="off">
+            <div id="track-place-filters" class="segmented track-filters" role="group" aria-label="Where the track is used"></div>
+            <div id="track-ground-filters" class="segmented track-filters" role="group" aria-label="Ground"></div>
         </div>
         <div id="track-picker-list" class="track-cards"></div>
     </dialog>
@@ -147,6 +149,6 @@
         </form>
     </dialog>
 
-    <script type="module" src="mapmaker.js?v=3.10"></script>
+    <script type="module" src="mapmaker.js?v=3.11"></script>
 </body>
 </html>

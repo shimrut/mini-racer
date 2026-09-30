@@ -97,7 +97,7 @@ function readDraft() {
     try {
         saved = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null');
     } catch {
-        throw new Error('The browser could not read this draft. Return to Mapmaker and try Drive Draft again.');
+        throw new Error('The browser could not read this track. Return to Mapmaker and try Test Drive again.');
     }
     const track = saved?.track;
     if (!track || !Array.isArray(track.outer) || !Array.isArray(track.inner)
@@ -106,7 +106,7 @@ function readDraft() {
         || !isFinitePoint(track.startPos) || !Number.isFinite(track.startAngle)
         || !validGate(track.startLine)
         || !Array.isArray(track.checkpoints) || !track.checkpoints.every(validGate)) {
-        throw new Error('No drivable draft is available. Return to Mapmaker and choose Drive Draft.');
+        throw new Error('No track is ready to drive. Return to Mapmaker and choose Test Drive.');
     }
     return {
         trackKey: typeof saved.trackKey === 'string' ? saved.trackKey : 'draft',
@@ -174,7 +174,7 @@ function loadCar() {
             render();
         },
         onError: () => {
-            console.warn(`Unable to load ${assetName}; Drive Draft shows a plain car.`);
+            console.warn(`Unable to load ${assetName}; Test Drive shows a plain car.`);
         },
     });
 }
@@ -579,7 +579,7 @@ window.addEventListener('resize', render);
 
 try {
     draft = readDraft();
-    ui.title.textContent = draft.track.name || draft.trackKey || 'Draft Drive';
+    ui.title.textContent = draft.track.name || draft.trackKey || 'Test Drive';
     geometry = buildTrackGeometry(draft.track);
     bounds = getBounds();
     collision = buildCollisionRuntime(geometry);

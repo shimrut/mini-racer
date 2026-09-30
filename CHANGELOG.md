@@ -1,3 +1,5 @@
+- The Mapmaker button is now **Test Drive**. The track list can be filtered by Daily, Campaign, Not used or Cloud, and by ground.
+
 - **Old Mountain** is the earlier Mountain Peak layout, kept in the game but not in the Daily rotation. Its medal times are the ones that layout had before Mountain Peak was redrawn.
 
 - Mapmaker Wall Corners now reshape both walls of a corner. Before, only corners made of a single point got rounder; the curve on the other wall, made of many points, stayed the same, so the road got wider in corners. Now that curve is rebuilt to stay one road width away: rounder settings give it a wider curve with more points, and Sharp gives back the tight curve. Switching back and forth returns the same walls, and Draw builds its walls for the chosen setting. Curves shaped by hand are left alone. Saved tracks change only when you pick a setting and save.
