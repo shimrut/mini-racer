@@ -332,3 +332,73 @@ describe('Creator Campaign questions', () => {
         expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
     });
 });
+
+describe('Creator tabs keep their data', () => {
+    const emptySeriesView = { series: [], appSeries: [], tracks: [] };
+
+    function countingFetch() {
+        const calls = { daily: 0, series: 0 };
+        const fetchMock = vi.fn(async (url, options) => {
+            if (String(url).includes('/api/creator/daily')) {
+                calls.daily += 1;
+                if (options?.method === 'PUT') {
+                    const body = JSON.parse(options.body);
+                    return jsonResponse({ ...dailyView, schedule: { ...dailyView.schedule, keys: body.keys, revision: 4 } });
+                }
+                return jsonResponse(dailyView);
+            }
+            calls.series += 1;
+            return jsonResponse(emptySeriesView);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        return calls;
+    }
+
+    it('loads a tab once, and again only when a change makes it out of date', async () => {
+        const calls = countingFetch();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const root = document.getElementById('creator-daily-view');
+        panels.showTab('daily');
+        await vi.waitFor(() => expect(panels.dailyStale).toBe(false));
+        panels.showTab('daily');
+        expect(calls.daily).toBe(1);
+
+        panels.markStale();
+        panels.showTab('daily');
+        // The reload keeps the earlier list on screen.
+        expect(root.textContent).not.toContain('Loading the Daily list…');
+        expect(root.textContent).toContain('Royal Plateau');
+        await vi.waitFor(() => expect(panels.dailyStale).toBe(false));
+        expect(calls.daily).toBe(2);
+    });
+
+    it('fills the Daily and Campaign tabs from the answers the editor already has', async () => {
+        const calls = countingFetch();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 0 });
+        panels.showTab('daily');
+        panels.showTab('campaign');
+        expect(calls).toEqual({ daily: 0, series: 0 });
+        expect(document.getElementById('creator-daily-view').textContent).toContain('Royal Plateau');
+    });
+
+    it('ignores an editor answer that started before a save', async () => {
+        countingFetch();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        panels.writeGeneration = 2;
+        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 1 });
+        expect(panels.daily).toBeNull();
+        expect(panels.dailyStale).toBe(true);
+    });
+
+    it('marks the Campaign out of date after a Daily save', async () => {
+        const calls = countingFetch();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        panels.receiveViews({ daily: dailyView, seriesView: emptySeriesView, generation: 0 });
+        panels.dailyKeys = ['circuit', 'sunlitTemple', 'royalPlateau', 'nightLoop'];
+        panels.dailyDirty = true;
+        await panels.saveDaily();
+        panels.showTab('campaign');
+        await vi.waitFor(() => expect(calls.series).toBe(1));
+    });
+});

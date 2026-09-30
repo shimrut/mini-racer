@@ -3444,6 +3444,7 @@ class MapmakerApp {
         }
         this.creatorLoading = true;
         const writeGeneration = this.creatorWriteGeneration;
+        const panelGeneration = this.creatorPanels.writeGeneration;
         if (!this.creatorLoaded) this.setCreatorSaveStatus('Loading tracks…', 'saving');
         try {
             const [{ tracks }, daily, seriesView] = await Promise.all([
@@ -3476,6 +3477,7 @@ class MapmakerApp {
                 this.state.dirtyTrackKeys.add(key);
             }
             this.applyCreatorPlaces(daily, seriesView);
+            this.creatorPanels.receiveViews({ daily, seriesView, generation: panelGeneration });
             this.creatorLoaded = true;
             this.newTrackBtn.disabled = false;
             document.getElementById('creator-retry-btn').hidden = true;
@@ -3532,6 +3534,7 @@ class MapmakerApp {
             return false;
         }
         const saved = await saveCreatorTrackSnapshot(this, key, geometrySignature);
+        if (saved) this.creatorPanels.markStale();
         if (this.creatorRefreshPending && !this.creatorLoading) {
             this.creatorRefreshPending = false;
             void this.loadCreatorTracks({ keepSelection: true });
@@ -3557,7 +3560,10 @@ class MapmakerApp {
         this.creatorWriteGeneration += 1;
         this.syncCreatorTrackState();
         try {
-            if (record) await creatorApi.deleteTrack(key, record.revision);
+            if (record) {
+                await creatorApi.deleteTrack(key, record.revision);
+                this.creatorPanels.markStale();
+            }
             const keys = Object.keys(this.state.tracks);
             const index = keys.indexOf(key);
             let nextKey = keys[index + 1] || keys[index - 1];
@@ -3619,10 +3625,7 @@ class MapmakerApp {
         for (const view of document.querySelectorAll('[data-creator-view]')) {
             view.hidden = view.dataset.creatorView !== tab;
         }
-        const panels = this.creatorPanels;
-        if (tab === 'daily' && !panels.dailyDirty && !panels.busy) void panels.loadDaily();
-        if (tab === 'campaign' && !panels.seriesDirty && !panels.busy) void panels.loadSeries();
-        if (tab === 'copy') void panels.loadCopy();
+        this.creatorPanels.showTab(tab);
         if (tab === 'tracks') {
             this.resizeCanvas();
             this.draw();

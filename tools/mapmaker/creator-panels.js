@@ -79,6 +79,44 @@ export class CreatorPanels {
         this.dailySaveError = null;
         this.seriesSaveError = null;
         this.copyError = null;
+        this.copyView = null;
+        // A tab loads once and keeps its data. It loads again only when a
+        // change elsewhere can make its data out of date.
+        this.dailyStale = true;
+        this.seriesStale = true;
+        this.copyStale = true;
+    }
+
+    // The editor shows a tab. Only a tab without current data asks the server.
+    showTab(tab) {
+        if (tab === 'daily' && this.dailyStale && !this.dailyDirty && !this.busy) void this.loadDaily();
+        if (tab === 'campaign' && this.seriesStale && !this.seriesDirty && !this.busy) void this.loadSeries();
+        if (tab === 'copy' && this.copyStale && !this.busy) void this.loadCopy();
+    }
+
+    // A track was saved or deleted: its readiness and places can change.
+    markStale() {
+        this.dailyStale = true;
+        this.seriesStale = true;
+        this.copyStale = true;
+    }
+
+    // The editor reads the Daily list and the Campaign when it loads the
+    // tracks. Those answers fill the tabs, unless a tab has changed since.
+    receiveViews({ daily, seriesView, generation }) {
+        if (generation !== this.writeGeneration || this.busy) return;
+        if (daily && !this.dailyLoading && !this.dailyDirty) {
+            this.daily = daily;
+            this.dailyKeys = [...daily.schedule.keys];
+            this.dailyStale = false;
+            this.renderDaily();
+        }
+        if (seriesView && !this.seriesLoading) {
+            this.seriesView = seriesView;
+            this.seriesStale = false;
+            if (this.seriesDirty) this.renderSeries();
+            else void this.selectSeries(this.selectedSeriesId, { force: true });
+        }
     }
 
     confirmDiscardSeries() {
@@ -100,7 +138,8 @@ export class CreatorPanels {
         if (this.dailyLoading) return;
         this.dailyLoading = true;
         const generation = this.writeGeneration;
-        this.dailyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Daily list…' }));
+        // A reload keeps the earlier list on screen until the answer comes.
+        if (!this.daily) this.dailyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Daily list…' }));
         try {
             const daily = await creatorApi.readDaily();
             if (generation !== this.writeGeneration || this.dailyDirty) {
@@ -110,6 +149,7 @@ export class CreatorPanels {
             this.daily = daily;
             this.dailyKeys = [...this.daily.schedule.keys];
             this.dailyDirty = false;
+            this.dailyStale = false;
             this.renderDaily();
         } catch (error) {
             this.dailyRoot.replaceChildren(
@@ -226,6 +266,10 @@ export class CreatorPanels {
                 this.dailyKeys = [...this.daily.schedule.keys];
             }
             this.dailyDirty = JSON.stringify(this.dailyKeys) !== JSON.stringify(this.daily.schedule.keys);
+            // The Campaign shows which tracks are in the Daily list, and the
+            // copy shows whether the list is in Redis.
+            this.seriesStale = true;
+            this.copyStale = true;
             this.setStatus(this.dailyDirty
                 ? 'Saved the earlier Daily list. Newer changes are still unsaved.' : 'Saved the Daily list.');
         } catch (error) {
@@ -246,7 +290,7 @@ export class CreatorPanels {
         const generation = this.writeGeneration;
         const selectedId = this.selectedSeriesId;
         const draft = this.seriesDraft;
-        this.seriesRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Campaign…' }));
+        if (!this.seriesView) this.seriesRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Loading the Campaign…' }));
         try {
             const seriesView = await creatorApi.readSeries();
             if (generation !== this.writeGeneration) {
@@ -254,6 +298,7 @@ export class CreatorPanels {
                 return;
             }
             this.seriesView = seriesView;
+            this.seriesStale = false;
             if (this.seriesDirty || this.seriesDraft !== draft || this.selectedSeriesId !== selectedId) {
                 this.renderSeries();
                 return;
@@ -524,6 +569,9 @@ export class CreatorPanels {
             this.seriesView.tracks = this.seriesView.tracks.map((track) => ({ ...track,
                 usedBy: assigned.has(track.key) ? series.id : track.usedBy === series.id ? null : track.usedBy,
             }));
+            // The Daily list shows which tracks are Campaign stages.
+            this.dailyStale = true;
+            this.copyStale = true;
             if (this.seriesDraft === draft) {
                 const unchanged = JSON.stringify({ name: draft.name, ground: draft.ground, stages: draft.stages })
                     === JSON.stringify(snapshot);
@@ -563,6 +611,8 @@ export class CreatorPanels {
         try {
             const { series } = await creatorApi.publishSeries(draft.id, draft.revision);
             this.setStatus(`${series.name} is live.`);
+            this.dailyStale = true;
+            this.copyStale = true;
             this.seriesDestructive = false;
             await this.loadSeries(series.id);
             this.onTracksChanged();
@@ -595,6 +645,8 @@ export class CreatorPanels {
         try {
             await creatorApi.deleteSeries(draft.id, draft.revision);
             this.setStatus(`Deleted ${draft.name}.`);
+            this.dailyStale = true;
+            this.copyStale = true;
             this.seriesDirty = false;
             this.seriesDestructive = false;
             await this.loadSeries(null);
@@ -612,9 +664,11 @@ export class CreatorPanels {
     // ---- Copy of unplayed tracks ----
 
     async loadCopy() {
-        this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Checking what can be copied…' }));
+        if (!this.copyView) this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Checking what can be copied…' }));
         try {
             const { report, preview } = await creatorApi.readMigration();
+            this.copyView = { report, preview };
+            this.copyStale = false;
             this.renderCopy(report, preview);
         } catch (error) {
             this.copyRoot.replaceChildren(
@@ -674,6 +728,7 @@ export class CreatorPanels {
         try {
             const { report } = await creatorApi.runMigration();
             this.setStatus(`Copied ${report.copied.length} tracks.`);
+            this.markStale();
             this.onTracksChanged();
         } catch (error) {
             this.copyError = `Could not copy: ${error.message}`;
