@@ -1,5 +1,6 @@
 import { redis } from '@devvit/redis';
-import { TRACK_SCHEDULE_KEYS, hasTrack, isBuiltInTrack } from '../../../game/track/catalog.js';
+import { TRACK_SCHEDULE_KEYS, getTrackName, hasTrack, isBuiltInTrack } from '../../../game/track/catalog.js';
+import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
 import { TrackInputError } from '../tracks/track-shape.js';
 import { TrackConflictError, readStoredTrack } from '../tracks/track-store.js';
 
@@ -77,8 +78,13 @@ export async function isTrackInDailySchedule(trackKey: string): Promise<boolean>
 }
 
 async function assertSchedulableTrack(trackKey: string): Promise<void> {
-    if (isBuiltInTrack(trackKey) && !(await readStoredTrack(trackKey))) return;
     const record = await readStoredTrack(trackKey);
+    if (!record && isBuiltInTrack(trackKey)) {
+        if (!getTrackMedalThresholds(trackKey)) {
+            throw new TrackInputError(`${getTrackName(trackKey)} has no medal times.`);
+        }
+        return;
+    }
     if (!record) throw new TrackInputError(`The game has no track called ${trackKey}.`);
     if (!record.checksPassed) {
         throw new TrackInputError(`${record.track.name} does not pass the checks yet.`);

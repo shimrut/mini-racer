@@ -81,6 +81,8 @@ describe('stored Daily list', () => {
             .rejects.toThrow('no track called');
         await expect(schedule.saveDailySchedule([], { username: 'ModOne' }))
             .rejects.toThrow('at least one');
+        await expect(schedule.saveDailySchedule(['lapinLoop'], { username: 'ModOne' }))
+            .rejects.toThrow('Lapin Loop has no medal times');
     });
 
     it('keeps the latest Daily track, and refuses an old revision', async () => {
