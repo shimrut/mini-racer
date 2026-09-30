@@ -20,6 +20,11 @@ export type TrackRouteDependencies = {
     ): Promise<boolean>;
     isTrackPlaced(trackKey: string): Promise<boolean>;
     readPlacedStoredTracks(trackKeys: string[]): Promise<unknown[]>;
+    readCreatorDailyView(): Promise<{ latestTrackKey: string | null }>;
+    saveDailySchedule(
+        keys: unknown,
+        options: { username: string; baseRevision?: unknown; currentTrackKey?: string | null },
+    ): Promise<unknown>;
 };
 
 function errorResponse(res: Response, error: unknown): void {
@@ -95,6 +100,30 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
                 return;
             }
             res.json({ deleted: true });
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.get('/api/creator/daily', async (_req, res) => {
+        try {
+            await creatorUsername(dependencies);
+            res.json(await dependencies.readCreatorDailyView());
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.put('/api/creator/daily', async (req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            const { latestTrackKey } = await dependencies.readCreatorDailyView();
+            await dependencies.saveDailySchedule(req.body?.keys, {
+                username,
+                baseRevision: req.body?.baseRevision,
+                currentTrackKey: latestTrackKey,
+            });
+            res.json(await dependencies.readCreatorDailyView());
         } catch (error) {
             errorResponse(res, error);
         }

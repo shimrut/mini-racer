@@ -71,6 +71,8 @@ import { registerHeadToHeadRoutes } from './routes/head-to-head-routes.js';
 import { registerLeaderboardRaceRoutes } from './routes/leaderboard-race-routes.js';
 import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
 import { registerTrackRoutes } from './routes/track-routes.js';
+import { isTrackInDailySchedule, saveDailySchedule } from './daily/daily-schedule-store.js';
+import { readCreatorDailyView } from './daily/daily-schedule-view.js';
 import {
     deleteStoredTrack,
     describePlacedStoredTracks,
@@ -138,8 +140,10 @@ function registerProductionRoutes(app: express.Application): void {
         readStoredTrack,
         saveStoredTrack,
         deleteStoredTrack,
-        isTrackPlaced: async () => false,
+        isTrackPlaced: isTrackInDailySchedule,
         readPlacedStoredTracks,
+        readCreatorDailyView,
+        saveDailySchedule,
     });
     registerCommunityMapRoutes(app, {
         resolveCreatorToolSubredditName,

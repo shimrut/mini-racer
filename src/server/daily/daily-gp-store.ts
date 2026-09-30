@@ -5,8 +5,9 @@ import {
     DEFAULT_TRACK_KEY,
     getTrackName,
     hasTrack,
-    TRACK_SCHEDULE_KEYS,
 } from '../../../game/track/catalog.js';
+import { readDailySchedulePool } from './daily-schedule-store.js';
+import { lockStoredTrack } from '../tracks/track-store.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
@@ -742,6 +743,7 @@ async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise
         { [challenge.id]: JSON.stringify(challenge) },
     );
     await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+    await lockDailyTrack(challenge);
     await stampDailyCompetitionExpiry(challenge);
     await maintainChallengeHistory();
     return challenge;
@@ -759,6 +761,13 @@ async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Prom
     }
 
     return writeStoredDailyGpChallenge(backfilled);
+}
+
+// Every stored Daily, oldest first. The history keeps each day for 50 years.
+export async function readDailyChallengeHistory(): Promise<DailyGpChallenge[]> {
+    return (await readStoredChallengeEntries())
+        .filter((entry) => Number.isFinite(Date.parse(entry.startsAt)))
+        .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }
 
 async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
@@ -782,8 +791,18 @@ function isScheduleTrackLive(trackKey: string): boolean {
     return isLiveGround(getTrackGround(TRACKS[trackKey]).key);
 }
 
+// A stored track cannot change after it becomes a Daily. A failed lock is
+// logged: the Daily still starts.
+async function lockDailyTrack(challenge: DailyGpChallenge): Promise<void> {
+    try {
+        await lockStoredTrack(challenge.trackKey, 'daily');
+    } catch (error) {
+        console.error(`Failed to lock the Daily track ${challenge.trackKey}:`, error);
+    }
+}
+
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
-    const pool = TRACK_SCHEDULE_KEYS;
+    const pool = await readDailySchedulePool();
     if (pool.length === 0) {
         return DEFAULT_TRACK_KEY;
     }
@@ -852,6 +871,7 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     );
     if (didSet) {
         await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await lockDailyTrack(challenge);
         await stampDailyCompetitionExpiry(challenge);
         await maintainChallengeHistory();
         return challenge;
@@ -876,6 +896,7 @@ export async function persistServerDailyGpChallenge(
     );
     if (didSet) {
         await redis.expire(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS);
+        await lockDailyTrack(challenge);
         await stampDailyCompetitionExpiry(challenge);
         await maintainChallengeHistory();
         return challenge;

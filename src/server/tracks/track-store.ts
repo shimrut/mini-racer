@@ -1,4 +1,5 @@
-import { context, redis } from '@devvit/web/server';
+import { redis } from '@devvit/redis';
+import { context } from '@devvit/web/server';
 import { validateTrackQuality } from '../../../game/track/authoring/track-quality.js';
 import { getMedalRowError, normalizeMedalRow } from '../../../game/track/authoring/medal-rules.js';
 import { normalizeMedalRow as normalizeGameMedalRow } from '../../../game/medals/medal-timing.js';
@@ -336,8 +337,12 @@ export async function saveStoredTrack(
     });
 }
 
+const LOCK_ATTEMPTS = 5;
+const LOCK_RETRY_MS = 150;
+
 // Locks a stored track when players can start to race it. It does nothing to
-// a built-in track or to a track that is locked already.
+// a built-in track or to a track that is locked already. A save that holds
+// the track at the same moment makes it wait and try again.
 export async function lockStoredTrack(
     trackKey: string,
     reason: StoredTrackLockReason,
@@ -346,17 +351,24 @@ export async function lockStoredTrack(
     if (!TRACK_KEY_RE.test(trackKey)) return false;
     const current = await readStoredTrack(trackKey);
     if (!current || current.lockedAt) return false;
-    return withTrackWriteLock(trackKey, async () => {
-        const existing = await readStoredTrack(trackKey);
-        if (!existing || existing.lockedAt) return false;
-        await writeRecord({
-            ...existing,
-            revision: existing.revision + 1,
-            lockedAt: now.toISOString(),
-            lockReason: reason,
-        });
-        return true;
-    });
+    for (let attempt = 1; ; attempt += 1) {
+        try {
+            return await withTrackWriteLock(trackKey, async () => {
+                const existing = await readStoredTrack(trackKey);
+                if (!existing || existing.lockedAt) return false;
+                await writeRecord({
+                    ...existing,
+                    revision: existing.revision + 1,
+                    lockedAt: now.toISOString(),
+                    lockReason: reason,
+                });
+                return true;
+            });
+        } catch (error) {
+            if (!(error instanceof TrackConflictError) || attempt >= LOCK_ATTEMPTS) throw error;
+            await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS * attempt));
+        }
+    }
 }
 
 export type DeleteStoredTrackOptions = {

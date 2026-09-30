@@ -34,6 +34,7 @@ const mockRedis = {
     }),
 };
 
+vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
 const store = await import('../src/server/tracks/track-store.ts');

@@ -33,6 +33,8 @@ function deps(overrides = {}) {
         deleteStoredTrack: vi.fn(async () => true),
         isTrackPlaced: vi.fn(async () => false),
         readPlacedStoredTracks: vi.fn(async (keys) => keys.map((key) => ({ key }))),
+        readCreatorDailyView: vi.fn(async () => ({ latestTrackKey: 'circuit', schedule: { keys: ['circuit'] } })),
+        saveDailySchedule: vi.fn(async () => ({})),
         ...overrides,
     };
 }
@@ -102,6 +104,34 @@ describe('track routes', () => {
         const response = await fetch(`${base}/api/creator/tracks/nightCut?baseRevision=2`, { method: 'DELETE' });
         expect(response.status).toBe(400);
         expect(dependencies.deleteStoredTrack.mock.calls[0][1].baseRevision).toBe('2');
+    });
+
+    it('saves the Daily list and keeps the latest Daily track in it', async () => {
+        const dependencies = deps();
+        const base = await startApp(dependencies);
+        const response = await fetch(`${base}/api/creator/daily`, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ keys: ['circuit', 'nightCut'], baseRevision: 4 }),
+        });
+        expect(response.status).toBe(200);
+        expect(dependencies.saveDailySchedule).toHaveBeenCalledWith(['circuit', 'nightCut'], {
+            username: 'RaceMod',
+            baseRevision: 4,
+            currentTrackKey: 'circuit',
+        });
+        expect((await response.json()).schedule.keys).toEqual(['circuit']);
+    });
+
+    it('checks moderator membership before the Daily list', async () => {
+        const dependencies = deps({
+            assertModeratorForSubreddit: vi.fn(async () => {
+                throw new Error('Moderator access required for r/MiniRacer.');
+            }),
+        });
+        const base = await startApp(dependencies);
+        expect((await fetch(`${base}/api/creator/daily`)).status).toBe(403);
+        expect(dependencies.readCreatorDailyView).not.toHaveBeenCalled();
     });
 
     it('gives players placed tracks without a moderator check, 50 keys at most', async () => {
