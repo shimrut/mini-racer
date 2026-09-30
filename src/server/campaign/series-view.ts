@@ -1,4 +1,4 @@
-import { getCampaignSeries } from '../../../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeries } from '../../../game/campaign/manifest.js';
 import { TRACK_CATALOG, getTrackName } from '../../../game/track/catalog.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
@@ -11,14 +11,17 @@ import { readSeriesTrackUse } from './series-usage.js';
 
 // What the Creator's Campaign Planner shows: the stored series, the app series
 // that no stored copy replaces, and every track with the place that uses it.
+// The locked copy of Numbers is not listed: the game reads Numbers from the
+// app, and nobody can change it.
 export async function readCreatorSeriesView() {
-    const [stored, schedule, usage, storedTracks, seriesUse] = await Promise.all([
+    const [allStored, schedule, usage, storedTracks, seriesUse] = await Promise.all([
         listStoredSeries(),
         readDailySchedule(),
         readTrackUsage(),
         listStoredTracks(),
         readSeriesTrackUse(),
     ]);
+    const stored = allStored.filter((series) => series.id !== CAMPAIGN_NUMBERS_SERIES_ID);
     const storedIds = new Set(stored.map((series) => series.id));
     const dailyKeys = new Set(schedule.keys);
     const storedByKey = new Map(storedTracks.map((track) => [track.key, track]));

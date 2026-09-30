@@ -26,6 +26,7 @@ export type TrackRouteDependencies = {
     runTrackMigration(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     readMigrationReport(): Promise<unknown>;
     runPlayedDailyCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
+    runLiveCampaignCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     readLockedCopyReport(kind: 'played-dailies' | 'live-campaign'): Promise<unknown>;
     saveDailySchedule(
         keys: unknown,
@@ -147,16 +148,19 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.get('/api/creator/migration', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            const [report, preview, playedReport, playedPreview] = await Promise.all([
+            const [report, preview, playedReport, playedPreview, campaignReport, campaignPreview] = await Promise.all([
                 dependencies.readMigrationReport(),
                 dependencies.runTrackMigration({ username, dryRun: true }),
                 dependencies.readLockedCopyReport('played-dailies'),
                 dependencies.runPlayedDailyCopy({ username, dryRun: true }),
+                dependencies.readLockedCopyReport('live-campaign'),
+                dependencies.runLiveCampaignCopy({ username, dryRun: true }),
             ]);
             res.json({
                 report,
                 preview,
                 playedDailies: { report: playedReport, preview: playedPreview },
+                liveCampaign: { report: campaignReport, preview: campaignPreview },
             });
         } catch (error) {
             errorResponse(res, error);
@@ -167,6 +171,15 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
         try {
             const username = await creatorUsername(dependencies);
             res.json({ report: await dependencies.runPlayedDailyCopy({ username }) });
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.post('/api/creator/migration/live-campaign', async (_req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            res.json({ report: await dependencies.runLiveCampaignCopy({ username }) });
         } catch (error) {
             errorResponse(res, error);
         }

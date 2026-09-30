@@ -12,7 +12,11 @@ import { hasTrack } from '../../../game/track/catalog.js';
 import { getTrackGround, isTrackGroundKey } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { TrackInputError } from '../tracks/track-shape.js';
-import { TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import {
+    TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTrack,
+    readStoredTrackKeys, readStoredTracksRevision, type StoredTrackRecord,
+} from '../tracks/track-store.js';
+import { buildLockedTrackCopy } from '../tracks/track-copy.js';
 
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/redis-lock.js';
 import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-placement-lock.js';
@@ -409,8 +413,101 @@ export async function deleteStoredSeries(
         })));
 }
 
+// Writes a copy of a live app series and the stage tracks that Redis does
+// not hold yet, in one transaction, so a copy is never half done.
+async function commitLiveSeriesCopy(
+    record: StoredSeriesRecord,
+    trackRecords: StoredTrackRecord[],
+): Promise<{ written: boolean; tracks: string[] }> {
+    return withTrackPlacementLock((placementLock) => withSeriesWriteLock(record.id, (seriesLock) =>
+        commitTrackPlacement<{ written: boolean; tracks: string[] }>([placementLock, seriesLock], [], async () => {
+            if (await readStoredSeries(record.id)) return { result: { written: false, tracks: [] } };
+            const missing: StoredTrackRecord[] = [];
+            for (const track of trackRecords) {
+                if (!await readStoredTrack(track.key)) missing.push(track);
+            }
+            const trackCacheRevision = await readStoredTracksRevision() + missing.length;
+            const seriesCacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+            return {
+                result: { written: true, tracks: missing.map((track) => track.key) },
+                reconcile: async () => await matchesRecord(record, seriesCacheRevision)
+                    && (await Promise.all(missing.map((track) => matchesStoredTrack(track, trackCacheRevision))))
+                        .every(Boolean),
+                mutate: async (transaction) => {
+                    for (const track of missing) await queueStoredTrackRecord(transaction, track);
+                    await queueRecord(transaction, record);
+                },
+            };
+        })));
+}
+
+function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
+    return definition.id === CAMPAIGN_NUMBERS_SERIES_ID || Boolean(getCampaignSeries(definition.id));
+}
+
+// Copies each live app series as players race it now: published with all
+// its stages, and each stage track locked, as an exact copy of the app
+// track. The game still reads Numbers from the app; the copy is ready for
+// the release that removes the app tracks.
+export async function copyLiveAppSeries({
+    dryRun,
+    username,
+    now = new Date(),
+}: {
+    dryRun: boolean;
+    username: string;
+    now?: Date;
+}): Promise<{ copied: string[]; alreadyStored: string[]; tracks: string[]; failed: { key: string; error: string }[] }> {
+    const report = { copied: [] as string[], alreadyStored: [] as string[], tracks: [] as string[], failed: [] as { key: string; error: string }[] };
+    const storedKeys = await readStoredTrackKeys();
+    for (const definition of APP_SERIES_DEFINITIONS) {
+        if (!isLiveAppSeries(definition)) continue;
+        if (await readStoredSeries(definition.id)) {
+            report.alreadyStored.push(definition.id);
+            continue;
+        }
+        const stages: StoredSeriesStage[] = (definition.stages ?? [])
+            .map(({ trackKey, laps, requiredMedals }) => ({ trackKey, laps, requiredMedals }));
+        const missing = stages.map((stage) => stage.trackKey).filter((trackKey) => !storedKeys.has(trackKey));
+        if (dryRun) {
+            report.copied.push(definition.id);
+            report.tracks.push(...missing);
+            continue;
+        }
+        try {
+            const trackRecords = missing.map((trackKey) => buildLockedTrackCopy(trackKey, { username, reason: 'series', now }));
+            const stamp = now.toISOString();
+            const result = await commitLiveSeriesCopy({
+                version: 1,
+                id: definition.id,
+                name: definition.name ?? definition.id,
+                ground: definition.ground ?? 'tarmac',
+                stages,
+                status: 'published',
+                publishedStageCount: stages.length,
+                publishedAt: stamp,
+                origin: 'migrated',
+                revision: 1,
+                createdAt: stamp,
+                createdBy: username,
+                updatedAt: stamp,
+                updatedBy: username,
+            }, trackRecords);
+            if (result.written) {
+                report.copied.push(definition.id);
+                report.tracks.push(...result.tracks);
+            } else {
+                report.alreadyStored.push(definition.id);
+            }
+        } catch (error) {
+            report.failed.push({ key: definition.id, error: error instanceof Error ? error.message : String(error) });
+        }
+    }
+    return report;
+}
+
 // Copies each app series that is not live into Redis as a draft, so the
-// Creator can change it. A live app series stays in the app.
+// Creator can change it. A live app series goes with the live Campaign copy.
 export async function copyAppSeriesDrafts({
     dryRun,
     username,

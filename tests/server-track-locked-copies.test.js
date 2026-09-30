@@ -42,7 +42,11 @@ vi.mock('@devvit/web/server', () => ({ redis, context: { subredditId: 't5_copies
 
 const tracks = await import('../src/server/tracks/track-store.ts');
 const { buildLockedTrackCopy, matchesAppTrack } = await import('../src/server/tracks/track-copy.ts');
-const { runPlayedDailyCopy, readLockedCopyReport } = await import('../src/server/tracks/track-migration.ts');
+const { runPlayedDailyCopy, runLiveCampaignCopy, readLockedCopyReport } = await import('../src/server/tracks/track-migration.ts');
+const series = await import('../src/server/campaign/series-store.ts');
+const { readCreatorSeriesView } = await import('../src/server/campaign/series-view.ts');
+const { campaignHasSeriesChoice, getCampaignSeries } = await import('../game/campaign/manifest.js');
+const seriesData = (await import('../game/campaign/series.json', { with: { type: 'json' } })).default;
 const { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } = await import('../src/server/daily/daily-gp-model.ts');
 const { PUBLISHED_DAILY_GP_TRACKS_BY_DATE } = await import('../game/shared/daily-gp-history-backfill.js');
 const { BUILT_IN_TRACKS, TRACKS } = await import('../game/track/tracks.js');
@@ -71,10 +75,25 @@ beforeEach(() => {
     installTrackRedisTransactions(redis, strings, hashes);
     tracks.clearStoredTrackCacheForTests();
     tracks.installStoredTrackResolver();
+    series.clearStoredSeriesCacheForTests();
+    series.installStoredSeriesResolver();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(noon);
 });
 afterEach(() => vi.useRealTimers());
+
+function rejectCommit(shouldReject) {
+    const watch = redis.watch.getMockImplementation();
+    redis.watch.mockImplementation(async (...keys) => {
+        const transaction = await watch(...keys);
+        const exec = transaction.exec.getMockImplementation();
+        transaction.exec.mockImplementation(async () => shouldReject(transaction.commands) ? [] : exec());
+        return transaction;
+    });
+}
+
+const copyLiveSeries = (options) => series.copyLiveAppSeries(options);
+const numbers = seriesData.series.find((entry) => entry.id === 'numbered-v1');
 
 describe('exact copies of app tracks', () => {
     it('copies every app track exactly, with its fingerprint and medal times', () => {
@@ -147,5 +166,53 @@ describe('copy of played Dailies', () => {
     it('waits while the Daily changes at midnight UTC', async () => {
         await expect(runPlayedDailyCopy({ username: 'Mod', now: new Date('2030-03-10T23:58:00.000Z') }))
             .rejects.toThrow('midnight UTC');
+    });
+});
+
+describe('copy of the live Campaign', () => {
+    it('copies Numbers published with every stage, and its stage tracks locked', async () => {
+        const stageKeys = numbers.stages.map((stage) => stage.trackKey);
+        const preview = await runLiveCampaignCopy({ username: 'Mod', dryRun: true, now: noon, copyLiveSeries });
+        expect(preview).toMatchObject({ copied: ['numbered-v1'], tracks: stageKeys, failed: [] });
+        expect(await series.readStoredSeries('numbered-v1')).toBeNull();
+
+        const report = await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        expect(report).toMatchObject({ copied: ['numbered-v1'], tracks: stageKeys, failed: [] });
+        const copy = await series.readStoredSeries('numbered-v1');
+        expect(copy).toMatchObject({ status: 'published', publishedStageCount: numbers.stages.length, origin: 'migrated' });
+        expect(copy.stages).toEqual(numbers.stages);
+        for (const trackKey of stageKeys) {
+            const track = await tracks.readStoredTrack(trackKey);
+            expect(track, trackKey).toMatchObject({ lockReason: 'series', lockedAt: noon.toISOString() });
+            expect(matchesAppTrack(track)).toBe(true);
+        }
+        expect((await readLockedCopyReport('live-campaign')).copied).toEqual(['numbered-v1']);
+
+        // The game still races Numbers from the app, and the Creator does not offer the copy.
+        await series.ensureStoredSeriesLoaded();
+        expect(getCampaignSeries('numbered-v1').stages.map((stage) => stage.trackKey)).toEqual(stageKeys);
+        expect(campaignHasSeriesChoice()).toBe(false);
+        const view = await readCreatorSeriesView();
+        expect(view.series.map((entry) => entry.id)).not.toContain('numbered-v1');
+        expect(view.appSeries.find((entry) => entry.id === 'numbered-v1')).toMatchObject({ live: true });
+
+        const again = await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        expect(again).toMatchObject({ copied: [], alreadyStored: ['numbered-v1'], tracks: [] });
+    });
+
+    it('writes neither the series nor any stage track when its save fails', async () => {
+        rejectCommit((commands) => commands.some(([method, args]) => method === 'set' && args[0].includes(':series:')));
+        const report = await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        expect(report.copied).toEqual([]);
+        expect(report.failed).toEqual([{ key: 'numbered-v1', error: expect.stringContaining('Retry') }]);
+        expect(await series.readStoredSeries('numbered-v1')).toBeNull();
+        expect(await tracks.readStoredTrackKeys()).toEqual(new Set());
+    });
+
+    it('lets the played Daily copy leave a Campaign stage to the Campaign copy', async () => {
+        addDaily('2030-02-02', 'numberOne');
+        expect((await runPlayedDailyCopy({ username: 'Mod', now: noon })).copied).not.toContain('numberOne');
+        await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        expect(await tracks.readStoredTrack('numberOne')).toMatchObject({ lockReason: 'series' });
     });
 });
