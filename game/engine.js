@@ -49,6 +49,7 @@ import { raceEngineMethods } from "./race/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
 import { modeRouterEngineMethods } from "./modes/engine-methods.js";
+import { communityEngineMethods } from "./community/engine-methods.js";
 import { playerProfileEngineMethods } from "./player/engine-methods.js";
 import { createCarEffectsAudio } from "./audio/car-effects-audio.js";
 import { createMedalEffectsAudio } from "./audio/medal-effects-audio.js";
@@ -373,6 +374,10 @@ export class RealTimeRacer {
     });
     this.lobbyUi = new LobbyUi({
       onSelectDaily: () => void this.activateMode("daily"),
+      onSelectCommunity: () => this.showCommunityLobby(),
+      onLoadMoreCommunity: () => void this.loadCommunityMaps({ more: true }),
+      onRefreshCommunity: () => void this.loadCommunityMaps(),
+      onStartCommunity: (mapId) => void this.startCommunityMap(mapId),
       onCarouselNavigate: (mode, direction) => (
         mode === "campaign"
           ? this.campaignCarousel.handleNavDirection(direction)
@@ -1033,5 +1038,6 @@ Object.assign(
   scoreboardEngineMethods,
   opponentRaceEngineMethods,
   modeRouterEngineMethods,
+  communityEngineMethods,
   playerProfileEngineMethods,
 );

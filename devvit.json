@@ -21,6 +21,13 @@
     "stryker.config.mjs",
     "tests/",
     "tools/*",
+    "!tools/mapmaker.js",
+    "!tools/mapmaker-playtest.js",
+    "!tools/mapmaker.css",
+    "!tools/mapmaker-playtest.css",
+    "!tools/geometry.js",
+    "!tools/mapmaker/",
+    "!tools/mapmaker/**",
     "!tools/generate-player-car-assets.js",
     "!tools/generate-share-images.js",
     "vite.mapmaker.config.js",
@@ -66,6 +73,14 @@
       "mod-analytics": {
         "height": "tall",
         "entry": "pages/mod-analytics.html"
+      },
+      "map-creator": {
+        "height": "tall",
+        "entry": "pages/map-creator.html"
+      },
+      "map-creator-playtest": {
+        "height": "tall",
+        "entry": "pages/map-creator-playtest.html"
       }
     }
   },
@@ -144,6 +159,13 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/mod-analytics-open"
+      },
+      {
+        "label": "Open Mini Racer Creator",
+        "description": "Make and publish desktop Community maps",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/community-creator-open"
       }
     ]
   },

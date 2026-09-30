@@ -69,6 +69,19 @@ import { registerPodiumRoutes } from './routes/podium-routes.js';
 import { registerCampaignRoutes } from './routes/campaign-routes.js';
 import { registerHeadToHeadRoutes } from './routes/head-to-head-routes.js';
 import { registerLeaderboardRaceRoutes } from './routes/leaderboard-race-routes.js';
+import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
+import {
+    ensureCommunityCreatorPostForSubreddit,
+    resolveCreatorToolSubredditName,
+} from './moderator/community-creator-post.js';
+import {
+    readCommunityDraft,
+    saveCommunityDraft,
+    publishCommunityDraft,
+    listCommunityMaps,
+    readPublicCommunityMap,
+    changeCommunityMapStatus,
+} from './community/community-map-store.js';
 import {
     getServerCampaignBootstrap,
     getServerCampaignPbGhost,
@@ -103,6 +116,17 @@ const headToHeadService = createHeadToHeadService({
 });
 
 function registerProductionRoutes(app: express.Application): void {
+    registerCommunityMapRoutes(app, {
+        resolveCreatorToolSubredditName,
+        readContextSubredditName,
+        assertModeratorForSubreddit,
+        readCommunityDraft,
+        saveCommunityDraft,
+        publishCommunityDraft,
+        listCommunityMaps,
+        readPublicCommunityMap,
+        changeCommunityMapStatus,
+    });
     registerAnalyticsRoutes(app, {
         resolveAnalyticsToolSubredditName,
         assertModeratorForSubreddit,
@@ -201,6 +225,8 @@ function registerProductionRoutes(app: express.Application): void {
         readAllDailyAutopostSubscriptions,
         readAllDailyPodiumAutopostSubscriptions,
         ensureModeratorAnalyticsPostForSubreddit,
+        assertModeratorForSubreddit,
+        ensureCommunityCreatorPostForSubreddit,
         sweepHeadToHeadCatalog,
     });
 }

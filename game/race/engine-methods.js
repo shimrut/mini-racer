@@ -359,7 +359,7 @@ export const raceEngineMethods = {
   },
 
   startSequence() {
-    if (isVerificationQueueSubmissionBlocked()) return;
+    if (this.activeRaceMode !== 'community' && isVerificationQueueSubmissionBlocked()) return;
     if (this.status !== "ready") return;
 
     this.beginPbGhostSizeRun?.();
@@ -810,7 +810,9 @@ export const raceEngineMethods = {
           skin: this.activeDailyChallenge?.skin ?? null,
           trackName: this.activeDailyChallenge
             ? getDailyChallengeTrackName(this.activeDailyChallenge)
-            : getTrackName(this.currentTrackKey, this.currentTrackKey),
+            : this.activeRaceMode === 'community'
+              ? this.currentTrack?.name || 'Community map'
+              : getTrackName(this.currentTrackKey, this.currentTrackKey),
           bestTime,
         },
         settingsAction: () => this.settings.openSettings(),

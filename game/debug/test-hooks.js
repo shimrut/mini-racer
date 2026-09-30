@@ -1,4 +1,5 @@
 import { getLargestPbGhostSizeReport } from "../ghost/pb-ghost-size-debug.js";
+import { setCommunityMapsFixtureForLocalDebug } from '../community/service.js';
 
 export function renderGameToText(engine) {
   return JSON.stringify({
@@ -75,6 +76,7 @@ export function exposeTestHooks(engine) {
     getPbGhostSizeReports,
     getLastPbGhostSizeReport,
     getLargestPbGhostSizeReport: getLargestPbGhostSizeReportForDebug,
+    setCommunityMapsFixture: setCommunityMapsFixtureForLocalDebug,
   });
   window.render_game_to_text = renderText;
   window.advanceTime = advanceTime;

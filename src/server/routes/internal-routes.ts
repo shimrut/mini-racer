@@ -49,6 +49,8 @@ export type InternalRouteDependencies = {
     readAllDailyAutopostSubscriptions(): Promise<DailyAutopostSubscription[]>;
     readAllDailyPodiumAutopostSubscriptions(): Promise<DailyPodiumAutopostSubscription[]>;
     ensureModeratorAnalyticsPostForSubreddit(subredditName: string): Promise<PostResult>;
+    assertModeratorForSubreddit(subredditName: string): Promise<string>;
+    ensureCommunityCreatorPostForSubreddit(subredditName: string): Promise<PostResult>;
     runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
@@ -221,6 +223,34 @@ export function registerInternalRoutes(
                     text: result.created
                         ? `Mini Racer analytics is ready for r/${subredditName}.`
                         : `Opening Mini Racer analytics for r/${subredditName}.`,
+                    appearance: 'success',
+                },
+                navigateTo: result.postUrl,
+            });
+        },
+    );
+
+    registerMenuAction(
+        app,
+        dependencies,
+        '/internal/menu/community-creator-open',
+        {
+            missingContextMessage: 'Reddit did not provide a subreddit context for Creator.',
+            failureLogMessage: 'Failed to open Mini Racer Creator:',
+            failureToastPrefix: 'Could not open Mini Racer Creator',
+        },
+        async (subredditName, res) => {
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            const result = await dependencies.ensureCommunityCreatorPostForSubreddit(subredditName);
+            if (!result.postUrl) {
+                res.json(createMenuToast(`Mini Racer Creator could not open for r/${subredditName}.`));
+                return;
+            }
+            res.json({
+                showToast: {
+                    text: result.created
+                        ? `Mini Racer Creator is ready for r/${subredditName}.`
+                        : `Opening Mini Racer Creator for r/${subredditName}.`,
                     appearance: 'success',
                 },
                 navigateTo: result.postUrl,

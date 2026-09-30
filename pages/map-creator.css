@@ -1,0 +1,73 @@
+.creator-mode .creator-hidden,
+.creator-mode #track-picker-btn,
+.creator-mode #track-picker-dialog,
+.creator-mode #restore-drafts-dialog,
+.creator-drive #frame-toggle,
+.creator-drive .mobile-controls {
+    display: none !important;
+}
+
+.creator-mode .creator-title {
+    color: #f8fafc;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.creator-save-status {
+    color: #b9c8d9;
+    font-size: .83rem;
+    max-width: 20rem;
+}
+
+.creator-save-status[data-state="saved"] { color: #89e6bb; }
+.creator-save-status[data-state="error"] { color: #ffadad; }
+.creator-save-status[data-state="unsaved"] { color: #ffd48d; }
+
+.creator-library {
+    background: #111e2f;
+    border-top: 1px solid #33445b;
+    color: #e9f0f7;
+    padding: .75rem 1rem;
+    max-height: 12rem;
+    overflow: auto;
+}
+
+.creator-library-head {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.creator-library h2 { font-size: .9rem; margin: 0; }
+.creator-library p { color: #b9c8d9; font-size: .8rem; margin: .45rem 0; }
+.creator-map-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+.creator-map {
+    align-items: center;
+    background: #1d3048;
+    border: 1px solid #39536f;
+    border-radius: .5rem;
+    display: flex;
+    gap: .6rem;
+    padding: .35rem .5rem;
+}
+.creator-map span { font-size: .8rem; }
+.creator-map button { font-size: .75rem; }
+
+@media (hover: none) and (pointer: coarse) {
+    .creator-mode .maker-header,
+    .creator-mode .maker-editor,
+    .creator-mode .creator-library,
+    .creator-drive .drive-header,
+    .creator-drive .drive-stage { display: none !important; }
+    .creator-mode::before,
+    .creator-drive::before {
+        content: 'Mini Racer Creator works on desktop. Open this post from a desktop browser to make or test maps.';
+        color: #f8fafc;
+        display: block;
+        font: 600 1.2rem/1.5 system-ui, sans-serif;
+        margin: 3rem auto;
+        max-width: 28rem;
+        padding: 1.5rem;
+    }
+}

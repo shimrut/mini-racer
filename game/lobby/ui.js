@@ -22,7 +22,7 @@ import { CAMPAIGN_HAS_SERIES_CHOICE } from '../campaign/manifest.js';
 import { CampaignSeriesPicker } from './campaign-series-picker.js';
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
 
-const LOBBY_MODES = ['home', 'daily', 'campaign', 'challenge'];
+const LOBBY_MODES = ['home', 'daily', 'campaign', 'community', 'challenge'];
 const TOGGLE_MODES = ['daily', 'campaign'];
 const BLOCKING_OVERLAY_IDS = [
     'modal',
@@ -107,6 +107,10 @@ export class LobbyUi {
         onSelectDaily = null,
         onCarouselNavigate = null,
         onSelectCampaign = null,
+        onSelectCommunity = null,
+        onLoadMoreCommunity = null,
+        onRefreshCommunity = null,
+        onStartCommunity = null,
         onSelectCampaignSeries = null,
         onOpenCampaignSeries = null,
         onBackToCampaignSeries = null,
@@ -122,6 +126,10 @@ export class LobbyUi {
         this.onSelectDaily = onSelectDaily;
         this.onCarouselNavigate = onCarouselNavigate;
         this.onSelectCampaign = onSelectCampaign;
+        this.onSelectCommunity = onSelectCommunity;
+        this.onLoadMoreCommunity = onLoadMoreCommunity;
+        this.onRefreshCommunity = onRefreshCommunity;
+        this.onStartCommunity = onStartCommunity;
         this._openCampaignSeries = (seriesId) => onOpenCampaignSeries?.(seriesId);
         this.onBackToCampaignSeries = onBackToCampaignSeries;
         this.seriesPicker = new CampaignSeriesPicker({
@@ -138,6 +146,13 @@ export class LobbyUi {
         this.mode = 'home';
         this.campaignState = normalizeCampaignLobbyState();
         this.challengeState = normalizeChallengeLobbyState();
+        this.communityMaps = [];
+        this.communitySelectedMapId = null;
+        this.communityNextCursor = null;
+        this.communityLoading = false;
+        this.communityStartPending = false;
+        this.communityError = null;
+        this.communityStartError = null;
         this._campaignPrimaryLoading = false;
         this._campaignSelectedStage = null;
         this._dailySelectedTrackName = null;
@@ -158,6 +173,7 @@ export class LobbyUi {
     get activePane() { return document.getElementById(`lobby-${this.mode}-pane`); }
     get dailyPrimaryBtn() { return document.getElementById('daily-challenge-start-btn'); }
     get campaignPrimaryBtn() { return document.getElementById('campaign-primary-btn'); }
+    get communityPrimaryBtn() { return document.getElementById('community-primary-btn'); }
     get campaignSeriesList() { return document.getElementById('campaign-series-list'); }
 
     // The Campaign screen shows the series list first, then the stages of one series.
@@ -175,6 +191,17 @@ export class LobbyUi {
             ?.addEventListener('click', () => this.onSelectDaily?.());
         document.getElementById('lobby-home-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
+        document.getElementById('lobby-home-community-btn')
+            ?.addEventListener('click', () => this.onSelectCommunity?.());
+        document.getElementById('community-load-more-btn')
+            ?.addEventListener('click', () => this.onLoadMoreCommunity?.());
+        document.getElementById('community-retry-btn')
+            ?.addEventListener('click', () => this.onRefreshCommunity?.());
+        this.communityPrimaryBtn?.addEventListener('click', () => {
+            this.communityStartError = null;
+            this.renderCommunity();
+            this.onStartCommunity?.(this.communitySelectedMapId);
+        });
         document.getElementById('lobby-switch-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
         document.getElementById('challenge-won-daily-btn')
@@ -230,6 +257,86 @@ export class LobbyUi {
         this.renderCampaign();
         this.showPane('campaign');
         this.renderCampaignView();
+    }
+
+    showCommunity() {
+        this.renderCommunity();
+        this.showPane('community');
+    }
+
+    setCommunityMaps({ maps = [], nextCursor = null, loading = false, error = null } = {}) {
+        this.communityMaps = maps;
+        this.communityNextCursor = nextCursor;
+        this.communityLoading = loading;
+        this.communityError = error;
+        if (!maps.some((map) => map.id === this.communitySelectedMapId)) {
+            this.communitySelectedMapId = maps[0]?.id || null;
+        }
+        this.renderCommunity();
+    }
+
+    setCommunityStartPending(pending) {
+        this.communityStartPending = Boolean(pending);
+        this.renderCommunity();
+    }
+
+    setCommunityStartError(message) {
+        this.communityStartError = message;
+        this.renderCommunity();
+    }
+
+    selectCommunityMap(id) {
+        if (!this.communityMaps.some((map) => map.id === id)) return;
+        this.communitySelectedMapId = id;
+        this.communityStartError = null;
+        this.renderCommunity();
+    }
+
+    renderCommunity() {
+        const list = document.getElementById('community-map-list');
+        if (list) {
+            list.replaceChildren();
+            for (const map of this.communityMaps) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'community-map';
+                button.dataset.lobbyAction = '';
+                button.setAttribute('aria-pressed', String(map.id === this.communitySelectedMapId));
+                const title = document.createElement('strong');
+                title.textContent = map.name || 'Untitled map';
+                const author = document.createElement('span');
+                const authorName = typeof map.authorName === 'string' && map.authorName.trim()
+                    ? map.authorName.trim().replace(/^u\//, '') : 'a moderator';
+                author.textContent = `by u/${authorName}`;
+                button.append(title, author);
+                button.addEventListener('click', () => this.selectCommunityMap(map.id));
+                list.appendChild(button);
+            }
+        }
+        const message = document.getElementById('community-list-message');
+        if (message) {
+            message.textContent = this.communityError
+                || (this.communityLoading ? 'Loading maps…'
+                    : this.communityMaps.length ? '' : 'No published maps yet.');
+            message.hidden = !message.textContent;
+        }
+        const retry = document.getElementById('community-retry-btn');
+        if (retry) retry.hidden = !this.communityError;
+        const more = document.getElementById('community-load-more-btn');
+        if (more) {
+            more.hidden = !this.communityNextCursor;
+            more.disabled = this.communityLoading;
+        }
+        const selected = this.communityMaps.find((map) => map.id === this.communitySelectedMapId);
+        const start = this.communityPrimaryBtn;
+        if (start) {
+            start.disabled = !selected || this.communityStartPending;
+            setSwappingText(start.querySelector('.main-menu__label'),
+                this.communityStartPending ? 'Loading map…' : 'Start Race');
+            setRaceBriefText(start.querySelector('.main-menu__race-brief'), selected?.name, 1);
+        }
+        this.renderRaceStartMessage('community-start-message', this.communityStartError);
+        if (this.mode === 'community') this.syncLobbySubheadDetail();
     }
 
     showChallenge(state = this.challengeState) {
@@ -339,6 +446,14 @@ export class LobbyUi {
             this.syncLobbySubheadDetail();
             return;
         }
+        if (mode === 'community') {
+            if (subhead) subhead.hidden = false;
+            if (toggle) toggle.hidden = true;
+            label.hidden = false;
+            label.textContent = 'Community';
+            this.syncLobbySubheadDetail();
+            return;
+        }
         if (mode === 'challenge') {
             if (subhead) subhead.hidden = false;
             if (toggle) toggle.hidden = true;
@@ -376,6 +491,8 @@ export class LobbyUi {
                 ? this._campaignSelectedBillingLabel
                 : this.mode === 'challenge'
                     ? this.challengeState?.trackName?.trim() || null
+                    : this.mode === 'community'
+                        ? this.communityMaps.find((map) => map.id === this.communitySelectedMapId)?.name || null
                     : null;
         const billingLaps = this.mode === 'daily'
             ? this._dailySelectedLaps
@@ -383,6 +500,8 @@ export class LobbyUi {
                 ? this.getCampaignPrimaryLaps()
                 : this.mode === 'challenge'
                     ? this.challengeState?.laps ?? null
+                    : this.mode === 'community'
+                        ? 1
                     : null;
         const billingTrackKey = this.mode === 'daily'
             ? this._dailySelectedTrackKey
@@ -430,7 +549,7 @@ export class LobbyUi {
     syncModeToolbarState() {
         const standings = document.getElementById('lobby-mode-standings-btn');
         if (!standings) return;
-        standings.disabled = false;
+        standings.disabled = this.mode === 'community';
     }
 
     getPaneAriaLabel(mode = this.mode) {
@@ -438,6 +557,7 @@ export class LobbyUi {
             home: 'Mini Racer mode selection',
             daily: 'Daily challenge',
             campaign: 'Campaign',
+            community: 'Community maps',
             challenge: 'Player challenge',
         }[mode] || 'Mini Racer lobby';
     }
@@ -448,6 +568,8 @@ export class LobbyUi {
             ? this.dailyPrimaryBtn
             : this.mode === 'campaign'
                 ? this.campaignPrimaryBtn
+                : this.mode === 'community'
+                    ? this.communityPrimaryBtn
                 : this.challengeAcceptBtn;
         if (!button || button.hidden) return null;
         return button;

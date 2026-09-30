@@ -31,8 +31,10 @@ import {
     recordDraftLap,
 } from './mapmaker/medal-times.js';
 import { MAPMAKER_ONLINE } from './mapmaker/cloud-maps.js';
+import { recordCreatorLap } from './mapmaker/creator-workflow.js';
 
 const DRAFT_KEY = 'mapmaker:playtest-draft:v1';
+const CREATOR_PLAYTEST = document.body?.dataset.creatorPlaytest === 'true';
 const STEP = CONFIG.fixedDt;
 const canvas = document.getElementById('drive-canvas');
 const context = canvas.getContext('2d', { alpha: false });
@@ -52,7 +54,7 @@ const ui = {
     flowSwitch: document.getElementById('flow-switch'),
 };
 // Online, the Mapmaker is the index page of /mapmaker/.
-if (MAPMAKER_ONLINE) document.querySelector('.drive-back').href = './';
+if (MAPMAKER_ONLINE && !CREATOR_PLAYTEST) document.querySelector('.drive-back').href = './';
 
 let draft = null;
 let geometry = null;
@@ -114,6 +116,8 @@ function readDraft() {
     return {
         trackKey: typeof saved.trackKey === 'string' ? saved.trackKey : 'draft',
         track,
+        creatorSignature: typeof saved.creatorSignature === 'string' ? saved.creatorSignature : null,
+        creatorLayoutHash: typeof saved.creatorLayoutHash === 'string' ? saved.creatorLayoutHash : null,
     };
 }
 
@@ -290,7 +294,16 @@ function tick() {
         lapTime = events.challengeCompletedLapTime;
         flowSummary = summarizeDriveFlow(flowSamples);
         const previousBest = draftLaps[0] ?? null;
-        draftLaps = recordDraftLap(getStorage(), draftLapsKey, lapTime);
+        if (CREATOR_PLAYTEST) {
+            try {
+                recordCreatorLap(sessionStorage, draft, lapTime);
+            } catch (error) {
+                feedback = `Lap complete, but your browser could not keep the completion: ${error.message}`;
+                return;
+            }
+        } else {
+            draftLaps = recordDraftLap(getStorage(), draftLapsKey, lapTime);
+        }
         syncBestLap();
         hud?.syncHud({ time: lapTime, speed: state.cachedSpeed, force: true });
         const bestText = previousBest === null || lapTime < previousBest ? ' New best on this layout.' : '';
@@ -600,8 +613,10 @@ try {
     hud = new RaceHud();
     hud.setMaxSpeed(getTrackGroundMaxSpeedKph(CONFIG.maxSpeed, draft.track));
     hud.setGround(getTrackGround(draft.track).key);
-    draftLapsKey = draftLapsStorageKey(draft.trackKey, draft.track);
-    draftLaps = readDraftLaps(getStorage(), draftLapsKey);
+    if (!CREATOR_PLAYTEST) {
+        draftLapsKey = draftLapsStorageKey(draft.trackKey, draft.track);
+        draftLaps = readDraftLaps(getStorage(), draftLapsKey);
+    }
     resetRun();
     syncBestLap();
     loadCar();

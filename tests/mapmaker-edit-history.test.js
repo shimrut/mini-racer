@@ -84,6 +84,14 @@ describe('Mapmaker edit history', () => {
         expect(history.commitEdit({ x: 1 })).toBe(false);
         expect(history.canUndo).toBe(false);
     });
+
+    it('keeps earlier undo steps when the saved draft is normalized', () => {
+        const history = createEditHistory({ x: 0 });
+        history.recordEdit({ x: 0 }, { x: 1 });
+        history.replaceCurrent({ x: 1, serverNormalized: true });
+        expect(history.undo()).toEqual({ x: 0 });
+        expect(history.redo()).toEqual({ x: 1, serverNormalized: true });
+    });
 });
 
 describe('Mapmaker draft recovery', () => {

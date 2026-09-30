@@ -40,12 +40,15 @@ import {
     normalizeMedalRow,
     readDraftLaps,
     suggestMedalTimes,
+    trackLayoutHash,
 } from './mapmaker/medal-times.js';
 import { TrackPreviews } from './mapmaker/track-preview.js';
+import { clearCreatorLap as clearCreatorLapStorage, completedCreatorLapSignature } from './mapmaker/creator-workflow.js';
 import { MAPMAKER_ONLINE, deleteCloudMap, listCloudMaps, saveCloudMap } from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
 const PLAYTEST_DRAFT_KEY = 'mapmaker:playtest-draft:v1';
+const CREATOR_MODE = document.body?.dataset.creator === 'true';
 const STATUS_MS = 3500;
 const STATUS_ERROR_MS = 8000;
 const STATUS_MS_PER_CHAR = 60;
@@ -278,6 +281,7 @@ function createBlankTrack(name = 'New Track') {
 
 class MapmakerApp {
     constructor() {
+        this.creatorMode = CREATOR_MODE;
         this.canvas = document.getElementById('map-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.trackPickerBtn = document.getElementById('track-picker-btn');
@@ -305,6 +309,12 @@ class MapmakerApp {
         this.cornerRadiusHint = document.getElementById('corner-radius-hint');
         this.groundOptions = document.getElementById('ground-options');
         this.saveTrackBtn = document.getElementById('save-track-btn');
+        this.creatorSaveStatus = document.getElementById('creator-save-status');
+        this.creatorPublishBtn = document.getElementById('creator-publish-btn');
+        this.creatorLibraryStatus = document.getElementById('creator-library-status');
+        this.creatorMapList = document.getElementById('creator-map-list');
+        this.creatorMoreBtn = document.getElementById('creator-more-btn');
+        this.creatorNextCursor = null;
         this.newTrackBtn = document.getElementById('new-track-btn');
         this.removeTrackBtn = document.getElementById('remove-track-btn');
         this.checkpointCount = document.getElementById('checkpoint-count');
@@ -321,9 +331,9 @@ class MapmakerApp {
         this.flowCount = document.getElementById('flow-count');
         this.flowRules = document.getElementById('flow-rules');
 
-        const initialTrackKey = Object.keys(TRACKS)[0];
+        const initialTrackKey = this.creatorMode ? 'newTrack' : Object.keys(TRACKS)[0];
         this.state = {
-            tracks: cloneTracks(TRACKS),
+            tracks: this.creatorMode ? { newTrack: createBlankTrack() } : cloneTracks(TRACKS),
             selectedTrackKey: initialTrackKey,
             tool: 'edit',
             selectedHandle: null,
@@ -333,9 +343,8 @@ class MapmakerApp {
             hoverSegment: null,
             drag: null,
             dirtyTrackKeys: new Set(),
-            originalTrackKeyByKey: new Map(
-                Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey]),
-            ),
+            originalTrackKeyByKey: new Map(this.creatorMode ? []
+                : Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey])),
             isSpaceDown: false,
             skipDrawClick: false,
             draftLoop: [],
@@ -377,6 +386,10 @@ class MapmakerApp {
         this.statusIsError = false;
         this.statusTimer = null;
         this.busy = false;
+        this.creatorLoaded = !this.creatorMode;
+        this.creatorSavedSignature = null;
+        this.creatorCompletedLapSignature = null;
+        this.creatorSaveError = '';
         // Track key -> the key of its saved cloud map.
         this.cloudKeyByKey = new Map();
         // The local Mapmaker lists the cloud maps in the track picker.
@@ -416,7 +429,7 @@ class MapmakerApp {
         });
         let storedPanelHidden = null;
         try { storedPanelHidden = getBrowserStorage('localStorage')?.getItem(PANEL_HIDDEN_KEY); } catch {}
-        this.setPanelHidden(storedPanelHidden === null
+        this.setPanelHidden(this.creatorMode ? false : storedPanelHidden === null
             ? window.matchMedia('(max-width: 900px)').matches
             : storedPanelHidden === '1');
         this.bindEvents();
@@ -425,8 +438,16 @@ class MapmakerApp {
 
         const resizeObserver = new ResizeObserver(() => this.resizeCanvas());
         resizeObserver.observe(this.canvas.parentElement);
-        this.offerDraftRecovery();
-        if (MAPMAKER_ONLINE) this.loadCloudMapsOnline();
+        if (this.creatorMode) {
+            this.canvas.style.pointerEvents = 'none';
+            this.trackNameInput.disabled = true;
+            this.newTrackBtn.disabled = true;
+            this.loadCreatorDraft();
+            this.loadCreatorMaps();
+        } else {
+            this.offerDraftRecovery();
+            if (MAPMAKER_ONLINE) this.loadCloudMapsOnline();
+        }
     }
 
     get track() {
@@ -474,11 +495,13 @@ class MapmakerApp {
     }
 
     scheduleDraftRecovery() {
+        if (this.creatorMode) return;
         if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
         this.recoveryTimer = setTimeout(() => this.flushDraftRecovery(), 200);
     }
 
     flushDraftRecovery() {
+        if (this.creatorMode) return;
         if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
         this.recoveryTimer = null;
         // Until Restore or Discard is chosen, the stored maps are not in the editor yet.
@@ -642,6 +665,7 @@ class MapmakerApp {
         this.syncMedalTimesPanel();
         this.qualityReport = report;
         this.qualityTrackKey = key;
+        if (this.creatorMode) this.syncActionButtons();
         const errors = report.issues.filter((issue) => issue.severity === 'error');
         const warnings = report.issues.filter((issue) => issue.severity === 'warning');
         const hasGeometry = this.hasTrackGeometry();
@@ -1037,6 +1061,10 @@ class MapmakerApp {
         this.deleteCheckpointBtn.addEventListener('click', () => this.deleteCheckpoint());
         this.driveDraftBtn.addEventListener('click', () => this.driveDraft());
         this.saveTrackBtn.addEventListener('click', () => this.saveAndIntegrateTrack());
+        this.creatorPublishBtn?.addEventListener('click', () => this.publishCreatorMap());
+        document.getElementById('creator-refresh-btn')?.addEventListener('click', () => this.loadCreatorMaps());
+        this.creatorMoreBtn?.addEventListener('click', () => this.loadCreatorMaps(false));
+        document.getElementById('creator-retry-btn')?.addEventListener('click', () => this.loadCreatorDraft());
 
         this.touchTools.addEventListener('click', (event) => {
             const action = event.target.closest?.('button[data-action]')?.dataset.action;
@@ -1102,7 +1130,9 @@ class MapmakerApp {
     setPanelHidden(hidden) {
         this.panel.hidden = hidden;
         this.panelToggleBtn.setAttribute('aria-expanded', String(!hidden));
-        try { getBrowserStorage('localStorage')?.setItem(PANEL_HIDDEN_KEY, hidden ? '1' : '0'); } catch {}
+        if (!this.creatorMode) {
+            try { getBrowserStorage('localStorage')?.setItem(PANEL_HIDDEN_KEY, hidden ? '1' : '0'); } catch {}
+        }
     }
 
     openTrackPicker() {
@@ -1434,7 +1464,30 @@ class MapmakerApp {
         return this.renameTrackKey(nextKey);
     }
 
-    createTrack() {
+    async createTrack() {
+        if (this.creatorMode) {
+            if (!this.creatorLoaded || this.busy) return;
+            if (this.creatorSavedSignature || this.state.dirtyTrackKeys.size || this.state.draftLoop.length) {
+                const approved = await this.confirmTrackRemoval(
+                    'Replace the current draft with a blank map? The saved draft stays in Redis until you save the replacement.',
+                );
+                if (!approved) return;
+            }
+            this.state.tracks = { newTrack: createBlankTrack() };
+            this.state.selectedTrackKey = 'newTrack';
+            this.state.dirtyTrackKeys.clear();
+            this.state.originalTrackKeyByKey.clear();
+            this.editHistories = new Map([['newTrack', createEditHistory(this.state.tracks.newTrack)]]);
+            this.draftLoopsByKey.clear();
+            this.creatorSavedSignature = null;
+            this.clearCreatorLap();
+            this.loadTrack('newTrack');
+            this.markDirty('New draft. Save it to replace the previous saved draft.');
+            this.setPanelHidden(false);
+            this.trackNameInput.focus();
+            this.trackNameInput.select();
+            return;
+        }
         let name = 'New Track';
         for (let number = 2; this.state.tracks[trackKeyFromName(name)]; number += 1) {
             name = `New Track ${number}`;
@@ -2067,8 +2120,13 @@ class MapmakerApp {
 
     // Online, Save keeps an unfinished road, so a drawn point is a change to save.
     draftLoopChanged() {
-        if (MAPMAKER_ONLINE) {
+        if (MAPMAKER_ONLINE || this.creatorMode) {
             this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
+            if (this.creatorMode) {
+                this.clearCreatorLap();
+                this.setCreatorSaveStatus(this.creatorSaveError || 'Unsaved changes',
+                    this.creatorSaveError ? 'error' : 'unsaved');
+            }
             this.syncActionButtons();
         }
         this.scheduleDraftRecovery();
@@ -2773,6 +2831,11 @@ class MapmakerApp {
             history.recordEdit(history.current(), this.track);
         }
         this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
+        if (this.creatorMode) {
+            this.clearCreatorLap();
+            this.setCreatorSaveStatus(this.creatorSaveError || 'Unsaved changes',
+                this.creatorSaveError ? 'error' : 'unsaved');
+        }
         this.syncActionButtons();
         if (updateStatus) {
             this.setStatus(message);
@@ -2785,6 +2848,20 @@ class MapmakerApp {
     syncActionButtons() {
         const key = this.state.selectedTrackKey;
         const isDirty = this.state.dirtyTrackKeys.has(key);
+        if (this.creatorMode) {
+            this.saveTrackBtn.textContent = 'Save draft';
+            this.saveTrackBtn.disabled = this.busy || !this.creatorLoaded || !isDirty;
+            const checksPass = this.track?.outer?.length >= 3 && !this.state.draftLoop.length
+                && this.qualityTrackKey === key && !this.qualityReport?.hasErrors;
+            this.creatorPublishBtn.disabled = this.busy || !this.creatorLoaded || isDirty
+                || !checksPass || !this.creatorSavedSignature
+                || this.creatorCompletedLapSignature !== this.creatorSavedSignature;
+            this.creatorPublishBtn.title = !checksPass ? 'Fix the map checks first.'
+                : isDirty || !this.creatorSavedSignature ? 'Save this draft first.'
+                    : this.creatorCompletedLapSignature !== this.creatorSavedSignature
+                        ? 'Complete one Test Drive lap on this saved map first.' : 'Publish to Community.';
+            return;
+        }
         this.saveTrackBtn.textContent = isDirty ? 'Save' : 'Saved';
         this.saveTrackBtn.disabled = this.busy || !isDirty;
         // Only the local Mapmaker can remove a track from the game.
@@ -3258,21 +3335,207 @@ class MapmakerApp {
         handles.forEach((handle) => this.drawHandle(handle, viewport));
     }
 
-    driveDraft() {
-        const track = this.track;
+    setCreatorSaveStatus(message, state) {
+        if (!this.creatorSaveStatus) return;
+        this.creatorSaveStatus.textContent = message;
+        this.creatorSaveStatus.dataset.state = state;
+    }
+
+    clearCreatorLap() {
+        if (!this.creatorMode) return;
+        this.creatorCompletedLapSignature = null;
+        clearCreatorLapStorage(getBrowserStorage('sessionStorage'));
+        this.syncActionButtons();
+    }
+
+    async creatorRequest(path, options) {
+        const response = await fetch(path, options);
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
+        return body;
+    }
+
+    async loadCreatorDraft() {
+        if (this.creatorLoaded && (this.state.dirtyTrackKeys.size || this.busy)) return;
+        this.setCreatorSaveStatus('Loading draft…', 'saving');
+        try {
+            const { draft } = await this.creatorRequest('/api/creator/draft');
+            if (draft) {
+                const key = trackKeyFromName(draft.track.name) || 'creatorDraft';
+                this.state.tracks = { [key]: draft.track };
+                this.state.dirtyTrackKeys.clear();
+                this.state.originalTrackKeyByKey.clear();
+                this.editHistories = new Map([[key, createEditHistory(draft.track)]]);
+                this.draftLoopsByKey = new Map(draft.draftLoop?.length ? [[key, draft.draftLoop]] : []);
+                this.creatorSavedSignature = draft.geometrySignature;
+                this.state.selectedTrackKey = 'newTrack';
+                this.loadTrack(key);
+                this.creatorCompletedLapSignature = completedCreatorLapSignature(
+                    getBrowserStorage('sessionStorage'), draft,
+                );
+                this.setCreatorSaveStatus(this.creatorCompletedLapSignature
+                    ? 'Saved in Reddit · Test Drive complete' : 'Saved in Reddit', 'saved');
+            } else {
+                this.setCreatorSaveStatus('New draft · save after editing', 'unsaved');
+            }
+            this.creatorSaveError = '';
+            this.creatorLoaded = true;
+            this.canvas.style.pointerEvents = '';
+            this.trackNameInput.disabled = false;
+            this.newTrackBtn.disabled = false;
+            document.getElementById('creator-retry-btn').hidden = true;
+            this.syncActionButtons();
+        } catch (error) {
+            this.creatorSaveError = `Could not load draft: ${error.message}`;
+            this.setCreatorSaveStatus(this.creatorSaveError, 'error');
+            document.getElementById('creator-retry-btn').hidden = false;
+        }
+    }
+
+    async saveCreatorDraft() {
+        if (!this.creatorLoaded || this.busy) return false;
+        const snapshot = JSON.stringify({ track: this.track, draftLoop: this.state.draftLoop });
+        this.busy = true;
+        this.setCreatorSaveStatus('Saving…', 'saving');
+        this.syncActionButtons();
+        try {
+            const { draft } = await this.creatorRequest('/api/creator/draft', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: snapshot,
+            });
+            if (JSON.stringify({ track: this.track, draftLoop: this.state.draftLoop }) !== snapshot) {
+                this.creatorSavedSignature = null;
+                this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
+                return false;
+            }
+            // Use the server's normalized snapshot for Test Drive and future
+            // edits, so the completed lap matches the stored publication data.
+            this.state.tracks[this.state.selectedTrackKey] = draft.track;
+            this.state.draftLoop = draft.draftLoop;
+            this.getEditHistory().replaceCurrent(draft.track);
+            this.trackNameInput.value = draft.track.name;
+            this.creatorSavedSignature = draft.geometrySignature;
+            this.creatorSaveError = '';
+            this.markSaved('Draft saved in Reddit.');
+            this.setCreatorSaveStatus('Saved in Reddit', 'saved');
+            return true;
+        } catch (error) {
+            this.creatorSaveError = `Save failed: ${error.message}`;
+            this.setCreatorSaveStatus(this.creatorSaveError, 'error');
+            this.setStatus(this.creatorSaveError, true);
+            return false;
+        } finally {
+            this.busy = false;
+            this.syncActionButtons();
+        }
+    }
+
+    async publishCreatorMap() {
+        if (!this.creatorMode || this.creatorPublishBtn.disabled) return;
+        this.busy = true;
+        this.syncActionButtons();
+        try {
+            const { map } = await this.creatorRequest('/api/creator/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completedLapSignature: this.creatorCompletedLapSignature }),
+            });
+            this.clearCreatorLap();
+            this.setStatus(`Published ${map.name} to Community.`);
+            await this.loadCreatorMaps();
+        } catch (error) {
+            this.setStatus(`Publish failed: ${error.message}`, true);
+        } finally {
+            this.busy = false;
+            this.syncActionButtons();
+        }
+    }
+
+    async loadCreatorMaps(reset = true) {
+        if (!this.creatorMode) return;
+        this.creatorLibraryStatus.textContent = 'Loading maps…';
+        this.creatorMoreBtn.disabled = true;
+        try {
+            const path = !reset && this.creatorNextCursor
+                ? `/api/creator/maps?cursor=${encodeURIComponent(this.creatorNextCursor)}`
+                : '/api/creator/maps';
+            const { maps, nextCursor } = await this.creatorRequest(path);
+            if (reset) this.creatorMapList.replaceChildren();
+            for (const map of maps || []) {
+                const row = document.createElement('div');
+                row.className = 'creator-map';
+                const label = document.createElement('span');
+                label.textContent = `${map.name} · by u/${map.authorName} · ${map.status === 'published' ? 'Live' : 'Unpublished'}`;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = map.status === 'published' ? 'Unpublish' : 'Restore';
+                button.addEventListener('click', () => this.setCreatorMapStatus(map.id,
+                    map.status === 'published' ? 'unpublished' : 'published', button));
+                row.append(label, button);
+                this.creatorMapList.append(row);
+            }
+            this.creatorNextCursor = nextCursor || null;
+            this.creatorMoreBtn.hidden = !this.creatorNextCursor;
+            this.creatorLibraryStatus.textContent = this.creatorMapList.childElementCount ? '' : 'No published maps yet.';
+        } catch (error) {
+            this.creatorLibraryStatus.textContent = `Could not load maps: ${error.message}`;
+        } finally {
+            this.creatorMoreBtn.disabled = false;
+        }
+    }
+
+    async setCreatorMapStatus(id, status, button) {
+        button.disabled = true;
+        try {
+            await this.creatorRequest(`/api/creator/maps/${encodeURIComponent(id)}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+            await this.loadCreatorMaps();
+        } catch (error) {
+            this.creatorLibraryStatus.textContent = `Could not ${status === 'published' ? 'restore' : 'unpublish'} map: ${error.message}`;
+            button.disabled = false;
+        }
+    }
+
+    async driveDraft() {
+        let track = this.track;
+        if (this.creatorMode && this.state.draftLoop.length) {
+            this.setStatus('Finish or clear the road you are drawing before Test Drive.', true);
+            return;
+        }
         if (!track || track.outer.length < 3 || track.inner.length < 3) {
             this.setStatus('Draw a closed road before a test drive.', true);
             return;
+        }
+        if (this.creatorMode) {
+            if (!this.creatorLoaded || this.busy) return;
+            const invalidTrack = this.validateTrack(track);
+            if (invalidTrack) {
+                this.setStatus(`Fix the checks before Test Drive: ${invalidTrack}.`, true);
+                return;
+            }
+            if (this.state.dirtyTrackKeys.size || !this.creatorSavedSignature) {
+                const saved = await this.saveCreatorDraft();
+                if (!saved) return;
+                track = this.track;
+            }
         }
         try {
             window.sessionStorage.setItem(PLAYTEST_DRAFT_KEY, JSON.stringify({
                 trackKey: this.state.selectedTrackKey,
                 track,
+                ...(this.creatorMode ? {
+                    creatorSignature: this.creatorSavedSignature,
+                    creatorLayoutHash: trackLayoutHash(track),
+                } : {}),
             }));
-            window.sessionStorage.setItem('mapmaker:return-from-playtest:v1', '1');
+            if (!this.creatorMode) window.sessionStorage.setItem('mapmaker:return-from-playtest:v1', '1');
             this.flushDraftRecovery();
             this.skipBeforeUnload = true;
-            window.location.assign('mapmaker-playtest.html');
+            window.location.assign(this.creatorMode ? 'map-creator-playtest.html' : 'mapmaker-playtest.html');
         } catch (error) {
             this.setStatus('Test Drive could not open in this browser.', true);
             console.error(error);
@@ -3307,6 +3570,10 @@ class MapmakerApp {
     }
 
     async saveAndIntegrateTrack() {
+        if (this.creatorMode) {
+            await this.saveCreatorDraft();
+            return;
+        }
         if (MAPMAKER_ONLINE) {
             await this.saveToCloud();
             return;

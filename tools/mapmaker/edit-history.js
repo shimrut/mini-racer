@@ -33,6 +33,10 @@ export function createEditHistory(initialSnapshot, { limit = 50 } = {}) {
         get canUndo() { return index > 0; },
         get canRedo() { return index < entries.length - 1; },
         current() { return copySnapshot(entries[index]); },
+        replaceCurrent(snapshot) {
+            entries[index] = copySnapshot(snapshot);
+            beforeEdit = null;
+        },
         reset(snapshot) {
             entries = [copySnapshot(snapshot)];
             index = 0;

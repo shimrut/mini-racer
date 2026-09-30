@@ -159,6 +159,10 @@
                                 data-lobby-action>
                                 <span class="lobby-mode-action__label">Campaign</span>
                             </button>
+                            <button id="lobby-home-community-btn" class="lobby-mode-action" type="button"
+                                data-lobby-action>
+                                <span class="lobby-mode-action__label">Community</span>
+                            </button>
                             <button id="menu-btn-garage" class="lobby-mode-action" type="button"
                                 data-lobby-action aria-expanded="false" aria-controls="garage-modal">
                                 <span class="lobby-mode-action__label">Garage</span>
@@ -252,6 +256,31 @@
                             <button id="campaign-primary-btn"
                                 class="main-menu__item main-menu__item--primary" type="button"
                                 data-lobby-action>
+                                <span class="main-menu__label">Start Race</span>
+                                <span class="main-menu__race-brief" hidden>
+                                    <span class="main-menu__race-brief-track"></span>
+                                    <span class="main-menu__race-brief-separator" aria-hidden="true">·</span>
+                                    <span class="main-menu__race-brief-laps"></span>
+                                </span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <section id="lobby-community-pane" class="lobby-pane lobby-pane--community main-menu"
+                        data-lobby-pane="community" aria-label="Community maps" hidden>
+                        <p class="community-intro">Maps made by the community. One lap, unranked.</p>
+                        <div id="community-map-list" class="community-map-list" role="group"
+                            aria-label="Published community maps"></div>
+                        <p id="community-list-message" class="community-message" role="status"></p>
+                        <button id="community-retry-btn" class="community-more-btn" type="button"
+                            data-lobby-action hidden>Try again</button>
+                        <button id="community-load-more-btn" class="community-more-btn" type="button"
+                            data-lobby-action hidden>More maps</button>
+                        <div class="lobby-primary-row lobby-primary-row--race">
+                            <p id="community-start-message" class="challenge-sign-in-message" role="alert" hidden></p>
+                            <button id="community-primary-btn"
+                                class="main-menu__item main-menu__item--primary" type="button"
+                                data-lobby-action disabled>
                                 <span class="main-menu__label">Start Race</span>
                                 <span class="main-menu__race-brief" hidden>
                                     <span class="main-menu__race-brief-track"></span>

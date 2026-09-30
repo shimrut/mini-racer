@@ -55,6 +55,7 @@ export const modeRouterEngineMethods = {
     },
 
     handleActiveRaceLapCompleted(lapTime, details) {
+        if (this.activeRaceMode === 'community') return;
         if (typeof this.handleChallengeLapCompleted === 'function') {
             this.handleChallengeLapCompleted(lapTime, details);
             return;
@@ -63,6 +64,10 @@ export const modeRouterEngineMethods = {
     },
 
     handleActiveRaceWin(winData) {
+        if (this.activeRaceMode === 'community') {
+            this.handleCommunityWin(winData);
+            return;
+        }
         if (this.activeRaceMode === 'campaign') {
             void this.handleCampaignWin(winData);
             return;
@@ -75,6 +80,10 @@ export const modeRouterEngineMethods = {
     },
 
     restartActiveRace() {
+        if (this.activeRaceMode === 'community') {
+            this.restartCommunityRace();
+            return;
+        }
         if (isVerificationQueueSubmissionBlocked()) return;
         if (this.activeRaceMode === 'daily') {
             this.restartDailyChallenge({ reason: 'restart' });
@@ -88,6 +97,7 @@ export const modeRouterEngineMethods = {
     },
 
     returnToActiveLobby() {
+        if (this.activeRaceMode === 'community') return this.showCommunityLobby();
         if (this.activeRaceMode === 'campaign') return this.showCampaignLobby();
         if (this.activeRaceMode === 'challenge') {
             return this.showChallengeLobby();

@@ -68,6 +68,7 @@ body[data-lobby-home-returned="true"] .lobby-title,
 }
 
 body[data-lobby-mode="challenge"] .lobby-header,
+body[data-lobby-mode="community"] .lobby-header,
 body[data-lobby-mode="daily"] .lobby-header,
 body[data-lobby-mode="campaign"] .lobby-header {
     position: relative;
@@ -76,6 +77,7 @@ body[data-lobby-mode="campaign"] .lobby-header {
 }
 
 body[data-lobby-mode="challenge"] .lobby-title,
+body[data-lobby-mode="community"] .lobby-title,
 body[data-lobby-mode="daily"] .lobby-title,
 body[data-lobby-mode="campaign"] .lobby-title {
     --lobby-title-cap: clamp(1.5rem, 8.5vw, 3rem);
@@ -85,6 +87,7 @@ body[data-lobby-mode="campaign"] .lobby-title {
 }
 
 body[data-lobby-mode="challenge"] .lobby-title__mini,
+body[data-lobby-mode="community"] .lobby-title__mini,
 body[data-lobby-mode="daily"] .lobby-title__mini,
 body[data-lobby-mode="campaign"] .lobby-title__mini {
     font-size: 0.62em;
@@ -92,6 +95,7 @@ body[data-lobby-mode="campaign"] .lobby-title__mini {
 }
 
 body[data-lobby-mode="challenge"] .lobby-title__racer,
+body[data-lobby-mode="community"] .lobby-title__racer,
 body[data-lobby-mode="daily"] .lobby-title__racer,
 body[data-lobby-mode="campaign"] .lobby-title__racer {
     font-size: 1em;
@@ -99,6 +103,7 @@ body[data-lobby-mode="campaign"] .lobby-title__racer {
 }
 
 body[data-lobby-mode="challenge"] .lobby-mode-toolbar,
+body[data-lobby-mode="community"] .lobby-mode-toolbar,
 body[data-lobby-mode="daily"] .lobby-mode-toolbar,
 body[data-lobby-mode="campaign"] .lobby-mode-toolbar {
     position: absolute;
@@ -116,7 +121,13 @@ body[data-lobby-mode="challenge"] #lobby-mode-tracks-btn {
     display: none;
 }
 
+body[data-lobby-mode="community"] #lobby-mode-standings-btn,
+body[data-lobby-mode="community"] #lobby-mode-tracks-btn {
+    display: none;
+}
+
 body[data-lobby-mode="challenge"] .lobby-subhead,
+body[data-lobby-mode="community"] .lobby-subhead,
 body[data-lobby-mode="daily"] .lobby-subhead,
 body[data-lobby-mode="campaign"] .lobby-subhead {
     display: grid;
@@ -127,12 +138,14 @@ body[data-lobby-mode="campaign"] .lobby-subhead {
 }
 
 body[data-lobby-mode="challenge"] .lobby-subhead__text,
+body[data-lobby-mode="community"] .lobby-subhead__text,
 body[data-lobby-mode="daily"] .lobby-subhead__text,
 body[data-lobby-mode="campaign"] .lobby-subhead__text {
     display: contents;
 }
 
 body[data-lobby-mode="challenge"] .lobby-back-btn,
+body[data-lobby-mode="community"] .lobby-back-btn,
 body[data-lobby-mode="daily"] .lobby-back-btn,
 body[data-lobby-mode="campaign"] .lobby-back-btn {
     display: none;
@@ -207,6 +220,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-switch::before {
 }
 
 body[data-lobby-mode="challenge"] .lobby-mode-label,
+body[data-lobby-mode="community"] .lobby-mode-label,
 body[data-lobby-mode="daily"] .lobby-mode-label,
 body[data-lobby-mode="campaign"] .lobby-mode-label {
     grid-column: 1;
@@ -220,6 +234,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-label {
 }
 
 body[data-lobby-mode="challenge"] .lobby-subhead__rule,
+body[data-lobby-mode="community"] .lobby-subhead__rule,
 body[data-lobby-mode="daily"] .lobby-subhead__rule,
 body[data-lobby-mode="campaign"] .lobby-subhead__rule {
     grid-column: 2;
@@ -230,6 +245,7 @@ body[data-lobby-mode="campaign"] .lobby-subhead__rule {
 }
 
 body[data-lobby-mode="challenge"] .lobby-mode-selection,
+body[data-lobby-mode="community"] .lobby-mode-selection,
 body[data-lobby-mode="daily"] .lobby-mode-selection,
 body[data-lobby-mode="campaign"] .lobby-mode-selection {
     grid-column: 3;
@@ -262,6 +278,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection {
 }
 
 body[data-lobby-mode="challenge"] .lobby-panes,
+body[data-lobby-mode="community"] .lobby-panes,
 body[data-lobby-mode="daily"] .lobby-panes,
 body[data-lobby-mode="campaign"] .lobby-panes {
     position: relative;
@@ -403,6 +420,73 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     bottom: 0;
     margin-block: auto;
 }
+
+.lobby-pane--community {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 100%;
+}
+
+.community-intro,
+.community-message {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.community-map-list {
+    display: grid;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.2rem;
+}
+
+.community-map {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-color);
+    text-align: left;
+    cursor: pointer;
+}
+
+.community-map[aria-pressed="true"] {
+    border-color: var(--accent-color);
+    box-shadow: inset 3px 0 0 var(--accent-color);
+}
+
+.community-map strong {
+    font-family: var(--header-font);
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.community-map span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.community-more-btn {
+    align-self: flex-start;
+    border: 0;
+    background: none;
+    color: var(--text-color);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 
 #challenge-poster .track-carousel__card-foot {
     display: flex;

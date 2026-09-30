@@ -5,6 +5,21 @@ const loadedTracks = new Map();
 const pendingLoads = new Map();
 export const CLIENT_TRACK_LOAD_TIMEOUT_MS = 20_000;
 
+export function communityTrackKey(mapId) {
+    return `community:${mapId}`;
+}
+
+export function registerCommunityTrack(mapId, name, track) {
+    if (typeof mapId !== 'string' || !/^[a-f0-9-]{36}$/i.test(mapId)
+        || !track || typeof track !== 'object') {
+        throw new Error('Invalid Community map.');
+    }
+    const key = communityTrackKey(mapId);
+    const definition = Object.freeze({ ...track, name: String(name || track.name || 'Community map') });
+    loadedTracks.set(key, definition);
+    return key;
+}
+
 export function waitForClientTrackDefinition(
     loadPromise,
     trackKey,
@@ -46,6 +61,9 @@ export function getLoadedClientTrack(trackKey) {
 }
 
 export async function loadClientTrack(trackKey) {
+    if (typeof trackKey === 'string' && trackKey.startsWith('community:')) {
+        return loadedTracks.get(trackKey) || null;
+    }
     if (!Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey)) return null;
     const existing = loadedTracks.get(trackKey);
     if (existing) return existing;
