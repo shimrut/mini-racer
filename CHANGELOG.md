@@ -1,3 +1,5 @@
+- **Open Creator** on the Mini Racer Creator post opens the full Creator when pressed.
+
 - In Mapmaker, **Corner** moves one bend. Drag the yellow handle, or use the arrow keys. **Selected corner** keeps that bend's own roundness when the track is saved. **Whole track** still sets every corner.
 
 - **Babylon Race**, **Central District**, **Small Steps**, and **Lapin Loop** are in the game, not in the Daily rotation. Babylon Race and Small Steps have medal times.

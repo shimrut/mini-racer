@@ -1,13 +1,16 @@
 // The Creator post shows this small card in the feed. The Creator itself needs
 // the whole screen, so the button opens it in Reddit's full view.
+// Reddit only accepts that request during the click itself, so the open
+// function is loaded with this page and called immediately.
+
+import { requestExpandedMode } from '@devvit/web/client';
 
 export async function openCreator(event, {
     requestExpanded = null,
     documentRef = document,
 } = {}) {
     try {
-        const expand = requestExpanded
-            || (await import('@devvit/web/client')).requestExpandedMode;
+        const expand = requestExpanded || requestExpandedMode;
         await expand(event, 'map-creator-editor');
         return true;
     } catch (error) {

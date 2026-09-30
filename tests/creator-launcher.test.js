@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@devvit/web/client', () => ({
+    requestExpandedMode: vi.fn(async () => {}),
+}));
+
 import { openCreator } from '../pages/map-creator-launcher.js';
 
 describe('Creator launcher', () => {
