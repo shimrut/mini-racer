@@ -5,7 +5,7 @@ import { BUILT_IN_TRACKS } from '../../../game/track/tracks.js';
 import { createTrackFingerprint } from '../competition/pb-ghost-trace.js';
 import { readDailySchedule, saveDailySchedule } from '../daily/daily-schedule-store.js';
 import { TrackInputError } from './track-shape.js';
-import { deleteStoredTrack, readStoredTrack, saveStoredTrack } from './track-store.js';
+import { deleteStoredTrack, readStoredTrackKeys, saveStoredTrack } from './track-store.js';
 import { readTrackUsage } from './track-usage.js';
 
 // Copies what nobody has raced into Redis, so the Creator can change it:
@@ -95,6 +95,9 @@ export async function runTrackMigration({
     }
     try {
         const usage = await readTrackUsage();
+        // One read of the stored keys, not one read per track: the Copy tab
+        // runs this trial when it loads.
+        const storedKeys = await readStoredTrackKeys();
         const report: MigrationReport = {
             dryRun,
             ranAt: now.toISOString(),
@@ -110,7 +113,7 @@ export async function runTrackMigration({
                 report.played += 1;
                 continue;
             }
-            if (await readStoredTrack(trackKey)) {
+            if (storedKeys.has(trackKey)) {
                 report.alreadyStored.push(trackKey);
                 continue;
             }

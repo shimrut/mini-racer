@@ -115,6 +115,18 @@ describe('copy of unplayed tracks', () => {
         expect(await readMigrationReport()).toBeNull();
     });
 
+    it('finds the stored tracks in one read on a dry run, not one read per track', async () => {
+        await store.saveStoredTrack('babylonRace', {
+            track: BUILT_IN_TRACKS.babylonRace,
+        }, { username: 'ModOne', origin: 'migrated', trusted: true, now: noon });
+        const get = vi.spyOn(known, 'get');
+        const report = await runTrackMigration({ username: 'ModOne', dryRun: true, now: noon });
+        expect(report.alreadyStored).toEqual(['babylonRace']);
+        expect(report.copied).not.toContain('babylonRace');
+        expect(get.mock.calls.filter(([key]) => String(key).includes(':track:'))).toEqual([]);
+        get.mockRestore();
+    });
+
     it('waits while the Daily changes at midnight UTC', async () => {
         expect(isNearUtcMidnight(new Date('2026-10-01T23:57:00.000Z'))).toBe(true);
         expect(isNearUtcMidnight(new Date('2026-10-01T00:03:00.000Z'))).toBe(true);
