@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
     mockReddit,
     mockContext,
+    mockServerContext,
+    sharedCache,
 } = vi.hoisted(() => ({
     mockReddit: {
         getSubredditInfoById: vi.fn(),
@@ -12,10 +14,19 @@ const {
         getRequestUsername: vi.fn(),
         readContextSubredditName: vi.fn(),
     },
+    // Without a subreddit in the context, the shared cache is not used.
+    mockServerContext: { subredditId: undefined },
+    sharedCache: new Map(),
 }));
 
 vi.mock('@devvit/web/server', () => ({
     reddit: mockReddit,
+    context: mockServerContext,
+    // Like Devvit's cache: keeps a returned value for its key, never a thrown read.
+    cache: async (source, { key }) => {
+        if (!sharedCache.has(key)) sharedCache.set(key, await source());
+        return sharedCache.get(key);
+    },
 }));
 vi.mock('../src/server/request/request-context.js', () => mockContext);
 
@@ -28,6 +39,8 @@ const {
 describe('moderator workflows', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        sharedCache.clear();
+        mockServerContext.subredditId = undefined;
         mockContext.getRequestUsername.mockReturnValue('RaceMod');
         mockContext.readContextSubredditName.mockReturnValue(null);
     });
@@ -131,4 +144,21 @@ describe('moderator workflows', () => {
         expect(mockReddit.getSubredditByName).not.toHaveBeenCalled();
     });
 
+
+    it('shares the moderator list, so a second check does not call Reddit', async () => {
+        mockServerContext.subredditId = 't5_mini';
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockReddit.getSubredditByName.mockRejectedValueOnce(new Error('unavailable'));
+        await expect(isModeratorForSubreddit('MiniRacer', 'RaceMod')).resolves.toBe(false);
+        errorSpy.mockRestore();
+
+        mockReddit.getSubredditByName.mockResolvedValue({
+            getModerators: () => ({ all: async () => [{ username: 'RaceMod' }] }),
+        });
+        await expect(isModeratorForSubreddit('MiniRacer', 'RaceMod')).resolves.toBe(true);
+        await expect(isModeratorForSubreddit('miniracer', 'OtherMod')).resolves.toBe(false);
+        await expect(assertModeratorForSubreddit('MiniRacer')).resolves.toBe('RaceMod');
+        // One failed read that was not kept, then one read for all three checks.
+        expect(mockReddit.getSubredditByName).toHaveBeenCalledTimes(2);
+    });
 });

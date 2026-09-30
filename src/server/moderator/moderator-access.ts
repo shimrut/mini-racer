@@ -1,4 +1,5 @@
 import { reddit } from '@devvit/web/server';
+import { cacheSharedJson } from '../redis/shared-cache.js';
 import {
     getRequestUsername,
     readContextSubredditName,
@@ -14,17 +15,31 @@ export async function resolveMenuTargetSubredditName(targetId: string): Promise<
         : null;
 }
 
+// Every Creator request checks the moderator, and the moderator list costs two
+// calls to Reddit. The list is shared for a few minutes, so a moderator added
+// or removed on Reddit counts here within that time. A failed read is not kept.
+const MODERATOR_LIST_TTL_SECONDS = 5 * 60;
+
+async function readModeratorNames(subredditName: string): Promise<string[]> {
+    return cacheSharedJson(async () => {
+        const subreddit = await reddit.getSubredditByName(subredditName);
+        const moderators = await subreddit.getModerators({ limit: 1000, pageSize: 100 }).all();
+        return moderators.flatMap((moderator) => (
+            typeof moderator?.username === 'string' ? [moderator.username.trim().toLowerCase()] : []
+        ));
+    }, {
+        key: `mini-racer:moderators:v1:${subredditName.trim().toLowerCase()}`,
+        ttl: MODERATOR_LIST_TTL_SECONDS,
+    });
+}
+
 export async function isModeratorForSubreddit(
     subredditName: string,
     username: string,
 ): Promise<boolean> {
     try {
-        const subreddit = await reddit.getSubredditByName(subredditName);
-        const moderators = await subreddit.getModerators({ limit: 1000, pageSize: 100 }).all();
-        return moderators.some((moderator) => (
-            typeof moderator?.username === 'string'
-            && moderator.username.trim().toLowerCase() === username.trim().toLowerCase()
-        ));
+        const names = await readModeratorNames(subredditName);
+        return names.includes(username.trim().toLowerCase());
     } catch (error) {
         console.error(`Failed to verify moderator access for r/${subredditName}:`, error);
         return false;
