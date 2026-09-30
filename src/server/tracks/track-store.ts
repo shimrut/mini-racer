@@ -432,6 +432,18 @@ export async function lockStoredTrack(
     }
 }
 
+// Writes a locked copy of a played app track (track-copy.ts). It never
+// replaces a track that Redis holds already, and answers whether it wrote.
+export async function saveLockedTrackCopy(record: StoredTrackRecord): Promise<boolean> {
+    return withTrackPlacementLock((placementLock) => withTrackWriteLock(record.key, (trackLock) =>
+        commitTrackPlacement([placementLock, trackLock], [], async () => {
+            if (await readStoredTrack(record.key)) return { result: false };
+            const cacheRevision = await readStoredTracksRevision() + 1;
+            return { result: true, reconcile: () => matchesStoredTrack(record, cacheRevision),
+                mutate: (transaction) => queueStoredTrackRecord(transaction, record) };
+        })));
+}
+
 export type DeleteStoredTrackOptions = {
     baseRevision?: unknown;
     isPlaced?: (trackKey: string) => Promise<boolean>;

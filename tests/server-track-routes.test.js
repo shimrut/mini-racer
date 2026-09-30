@@ -39,6 +39,8 @@ function deps(overrides = {}) {
         saveDailySchedule: vi.fn(async () => ({})),
         runTrackMigration: vi.fn(async (options) => ({ dryRun: Boolean(options.dryRun), copied: ['smallSteps'] })),
         readMigrationReport: vi.fn(async () => null),
+        runPlayedDailyCopy: vi.fn(async (options) => ({ dryRun: Boolean(options.dryRun), copied: ['albertGardens'] })),
+        readLockedCopyReport: vi.fn(async () => null),
         ...overrides,
     };
 }
@@ -153,10 +155,18 @@ describe('track routes', () => {
         const dependencies = deps();
         const base = await startApp(dependencies);
         const preview = await (await fetch(`${base}/api/creator/migration`)).json();
-        expect(preview).toEqual({ report: null, preview: { dryRun: true, copied: ['smallSteps'] } });
+        expect(preview).toEqual({
+            report: null,
+            preview: { dryRun: true, copied: ['smallSteps'] },
+            playedDailies: { report: null, preview: { dryRun: true, copied: ['albertGardens'] } },
+        });
         const run = await (await fetch(`${base}/api/creator/migration`, { method: 'POST' })).json();
         expect(run.report.dryRun).toBe(false);
         expect(dependencies.runTrackMigration).toHaveBeenLastCalledWith({ username: 'RaceMod' });
+        const played = await (await fetch(`${base}/api/creator/migration/played-dailies`, { method: 'POST' })).json();
+        expect(played.report).toEqual({ dryRun: false, copied: ['albertGardens'] });
+        expect(dependencies.runPlayedDailyCopy).toHaveBeenLastCalledWith({ username: 'RaceMod' });
+        expect(dependencies.readLockedCopyReport).toHaveBeenCalledWith('played-dailies');
     });
 
     it('gives players placed tracks without a moderator check, 50 keys at most', async () => {

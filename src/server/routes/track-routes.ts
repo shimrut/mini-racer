@@ -25,6 +25,8 @@ export type TrackRouteDependencies = {
     readCreatorDailyView(): Promise<{ latestTrackKey: string | null }>;
     runTrackMigration(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     readMigrationReport(): Promise<unknown>;
+    runPlayedDailyCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
+    readLockedCopyReport(kind: 'played-dailies' | 'live-campaign'): Promise<unknown>;
     saveDailySchedule(
         keys: unknown,
         options: { username: string; baseRevision?: unknown; currentTrackKey?: string | null },
@@ -141,14 +143,30 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
         }
     });
 
-    // The last copy of unplayed tracks, and what a copy now would do.
+    // The last run of each copy, and what a copy now would do.
     app.get('/api/creator/migration', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
+            const [report, preview, playedReport, playedPreview] = await Promise.all([
+                dependencies.readMigrationReport(),
+                dependencies.runTrackMigration({ username, dryRun: true }),
+                dependencies.readLockedCopyReport('played-dailies'),
+                dependencies.runPlayedDailyCopy({ username, dryRun: true }),
+            ]);
             res.json({
-                report: await dependencies.readMigrationReport(),
-                preview: await dependencies.runTrackMigration({ username, dryRun: true }),
+                report,
+                preview,
+                playedDailies: { report: playedReport, preview: playedPreview },
             });
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.post('/api/creator/migration/played-dailies', async (_req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            res.json({ report: await dependencies.runPlayedDailyCopy({ username }) });
         } catch (error) {
             errorResponse(res, error);
         }

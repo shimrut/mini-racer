@@ -73,7 +73,7 @@ import { registerCommunityMapRoutes } from './routes/community-map-routes.js';
 import { registerTrackRoutes } from './routes/track-routes.js';
 import { isTrackInDailySchedule, saveDailySchedule } from './daily/daily-schedule-store.js';
 import { readCreatorDailyView } from './daily/daily-schedule-view.js';
-import { readMigrationReport, runTrackMigration } from './tracks/track-migration.js';
+import { readLockedCopyReport, readMigrationReport, runPlayedDailyCopy, runTrackMigration } from './tracks/track-migration.js';
 import { registerCreatorSeriesRoutes } from './routes/creator-series-routes.js';
 import {
     copyAppSeriesDrafts,
@@ -174,6 +174,8 @@ function registerProductionRoutes(app: express.Application): void {
             hooks: { copySeries: (copyOptions) => copyAppSeriesDrafts(copyOptions) },
         }),
         readMigrationReport,
+        runPlayedDailyCopy,
+        readLockedCopyReport,
     });
     registerCreatorSeriesRoutes(app, {
         resolveCreatorToolSubredditName,
