@@ -29,7 +29,7 @@ export type TrackRouteDependencies = {
     ): Promise<unknown>;
 };
 
-function errorResponse(res: Response, error: unknown): void {
+export function errorResponse(res: Response, error: unknown): void {
     const message = error instanceof Error ? error.message : 'Track request failed.';
     const status = error instanceof TrackInputError ? 400
         : error instanceof TrackConflictError ? 409
@@ -39,7 +39,10 @@ function errorResponse(res: Response, error: unknown): void {
     res.status(status).json({ error: message });
 }
 
-async function creatorUsername(dependencies: TrackRouteDependencies): Promise<string> {
+export async function creatorUsername(dependencies: {
+    resolveCreatorToolSubredditName(): string | null;
+    assertModeratorForSubreddit(subredditName: string): Promise<string>;
+}): Promise<string> {
     const subredditName = dependencies.resolveCreatorToolSubredditName();
     if (!subredditName) {
         throw new TrackInputError('Open the Mini Racer Creator from its moderator menu.');

@@ -74,6 +74,20 @@ import { registerTrackRoutes } from './routes/track-routes.js';
 import { isTrackInDailySchedule, saveDailySchedule } from './daily/daily-schedule-store.js';
 import { readCreatorDailyView } from './daily/daily-schedule-view.js';
 import { readMigrationReport, runTrackMigration } from './tracks/track-migration.js';
+import { registerCreatorSeriesRoutes } from './routes/creator-series-routes.js';
+import {
+    copyAppSeriesDrafts,
+    deleteStoredSeries,
+    ensureStoredSeriesLoaded,
+    installStoredSeriesResolver,
+    isTrackInStoredSeries,
+    publishStoredSeries,
+    readStoredSeries,
+    resolveStoredSeriesForRequest,
+    saveStoredSeries,
+} from './campaign/series-store.js';
+import { findSeriesUsingTrack } from './campaign/series-usage.js';
+import { readCreatorSeriesView } from './campaign/series-view.js';
 import {
     deleteStoredTrack,
     describePlacedStoredTracks,
@@ -130,8 +144,13 @@ const headToHeadService = createHeadToHeadService({
 });
 
 // Every track lookup in this server reads the stored tracks of the current
-// request's subreddit first.
+// request's subreddit first, and the Campaign reads its published series.
 installStoredTrackResolver();
+installStoredSeriesResolver();
+
+async function isTrackPlaced(trackKey: string): Promise<boolean> {
+    return await isTrackInDailySchedule(trackKey) || await isTrackInStoredSeries(trackKey);
+}
 
 function registerProductionRoutes(app: express.Application): void {
     registerTrackRoutes(app, {
@@ -141,12 +160,31 @@ function registerProductionRoutes(app: express.Application): void {
         readStoredTrack,
         saveStoredTrack,
         deleteStoredTrack,
-        isTrackPlaced: isTrackInDailySchedule,
+        isTrackPlaced,
         readPlacedStoredTracks,
         readCreatorDailyView,
-        saveDailySchedule,
-        runTrackMigration: (options) => runTrackMigration(options),
+        saveDailySchedule: (keys, options) => saveDailySchedule(keys, {
+            ...options,
+            findSeriesUsingTrack: (trackKey) => findSeriesUsingTrack(trackKey),
+        }),
+        runTrackMigration: (options) => runTrackMigration({
+            ...options,
+            hooks: { copySeries: (copyOptions) => copyAppSeriesDrafts(copyOptions) },
+        }),
         readMigrationReport,
+    });
+    registerCreatorSeriesRoutes(app, {
+        resolveCreatorToolSubredditName,
+        assertModeratorForSubreddit,
+        readCreatorSeriesView,
+        readStoredSeries,
+        saveStoredSeries: (seriesId, input, options) => saveStoredSeries(seriesId, input, {
+            ...options,
+            isTrackUsedElsewhere: async (trackKey, id) => await isTrackInDailySchedule(trackKey)
+                || Boolean(await findSeriesUsingTrack(trackKey, id)),
+        }),
+        publishStoredSeries,
+        deleteStoredSeries,
     });
     registerCommunityMapRoutes(app, {
         resolveCreatorToolSubredditName,
@@ -196,6 +234,8 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
         submitServerCampaignRun: (input) => submitServerCampaignRun(input),
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
+        describeStoredSeries: resolveStoredSeriesForRequest,
+        describeStoredTracks: describePlacedStoredTracks,
     });
     registerHeadToHeadRoutes(app, {
         describeStoredTracks: describePlacedStoredTracks,
@@ -275,6 +315,7 @@ export function createServerApp({
     app.use(async (_req, _res, next) => {
         try {
             await ensureStoredTracksLoaded();
+            await ensureStoredSeriesLoaded();
         } catch (error) {
             console.error('Stored tracks could not load:', error);
         }

@@ -18,7 +18,7 @@ import { formatLapsLabel } from '../shared/laps-label.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { TRACK_GROUNDS, getStoredTrackGroundKey } from '../track/grounds.js';
 import { setText } from '../ui/dom.js';
-import { CAMPAIGN_HAS_SERIES_CHOICE } from '../campaign/manifest.js';
+import { campaignHasSeriesChoice } from '../campaign/manifest.js';
 import { CampaignSeriesPicker } from './campaign-series-picker.js';
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
 import { COMMUNITY_VISIBLE } from '../community/visibility.js';
@@ -475,7 +475,7 @@ export class LobbyUi {
         // On the Campaign screen the series choice takes the place of the track name,
         // which the Start Race button also shows. With one live series, there is no choice.
         const seriesShown = this.seriesPicker.sync(
-            this.mode === 'campaign' && !this.isCampaignSeriesView() && CAMPAIGN_HAS_SERIES_CHOICE
+            this.mode === 'campaign' && !this.isCampaignSeriesView() && campaignHasSeriesChoice()
                 ? this.campaignState
                 : null,
         );
@@ -763,7 +763,7 @@ export class LobbyUi {
             event.preventDefault?.();
             event.stopPropagation?.();
             if (this.mode === 'campaign' && !this.isCampaignSeriesView()
-                && CAMPAIGN_HAS_SERIES_CHOICE && this.onBackToCampaignSeries) {
+                && campaignHasSeriesChoice() && this.onBackToCampaignSeries) {
                 this.onBackToCampaignSeries();
                 return;
             }

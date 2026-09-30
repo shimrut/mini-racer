@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { registerCompetitionRoutes } from '../src/server/routes/competition-routes.ts';
 import { registerHeadToHeadRoutes } from '../src/server/routes/head-to-head-routes.ts';
+import { registerCampaignRoutes } from '../src/server/routes/campaign-routes.ts';
 
 function routeHandlers(register, dependencies) {
     const handlers = { get: {}, post: {} };
@@ -82,5 +83,29 @@ describe('answers that carry stored tracks', () => {
         const response = responseRecorder();
         await handlers.get['/api/head-to-head']({ query: { challengeId: 'one' } }, response);
         expect(response.body.storedTracks).toEqual([stored]);
+    });
+
+    it('adds the published Creator series and their tracks to the Campaign answer', async () => {
+        const nightSeries = { id: 'night-v1', stages: [{ trackKey: 'nightLoop' }, { trackKey: 'circuit' }] };
+        const dependencies = {
+            getRequestUsername: () => null,
+            getRequestRateLimitIdentity: () => null,
+            getServerCampaignBootstrap: async () => ({ status: 200, body: { campaignId: 'numbered-v1' } }),
+            describeStoredSeries: () => [nightSeries],
+            describeStoredTracks,
+        };
+        const handlers = routeHandlers(registerCampaignRoutes, dependencies);
+        const response = responseRecorder();
+        await handlers.get['/api/campaign/bootstrap']({ query: {} }, response);
+        expect(response.body).toEqual({
+            campaignId: 'numbered-v1',
+            storedSeries: [nightSeries],
+            storedTracks: [stored],
+        });
+
+        const plain = responseRecorder();
+        await routeHandlers(registerCampaignRoutes, { ...dependencies, describeStoredSeries: () => [] })
+            .get['/api/campaign/bootstrap']({ query: {} }, plain);
+        expect(plain.body).toEqual({ campaignId: 'numbered-v1' });
     });
 });

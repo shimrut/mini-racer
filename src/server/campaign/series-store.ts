@@ -1,0 +1,431 @@
+import { redis } from '@devvit/redis';
+import { context } from '@devvit/web/server';
+import seriesData from '../../../game/campaign/series.json' with { type: 'json' };
+import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeries } from '../../../game/campaign/manifest.js';
+import {
+    CAMPAIGN_STAGE_MAX_LAPS,
+    getCampaignSeriesMinStages,
+    getRequiredMedalsError,
+} from '../../../game/campaign/series-rules.js';
+import { setStoredSeriesResolver } from '../../../game/campaign/stored-series.js';
+import { getTrackMedalThresholds } from '../../../game/medals/medal-timing.js';
+import { hasTrack, isBuiltInTrack } from '../../../game/track/catalog.js';
+import { TRACKS } from '../../../game/track/tracks.js';
+import { getTrackGround, isTrackGroundKey } from '../../../game/track/grounds.js';
+import { isLiveGround } from '../../../game/track/live-grounds.js';
+import { TrackInputError } from '../tracks/track-shape.js';
+import { TrackConflictError, lockStoredTrack, readStoredTrack } from '../tracks/track-store.js';
+
+// Campaign series made in the Creator, and copies of the app series that are
+// not live. A draft is private. A published series is live for players: its
+// stages are fixed, and new stages can only go after the last one.
+
+export type StoredSeriesStage = { trackKey: string; laps: number; requiredMedals: number };
+export type StoredSeriesStatus = 'draft' | 'published';
+
+export type StoredSeriesRecord = {
+    version: 1;
+    id: string;
+    name: string;
+    ground: string;
+    stages: StoredSeriesStage[];
+    status: StoredSeriesStatus;
+    // The stages that players can race. They cannot change.
+    publishedStageCount: number;
+    publishedAt: string | null;
+    origin: 'creator' | 'migrated';
+    revision: number;
+    createdAt: string;
+    createdBy: string;
+    updatedAt: string;
+    updatedBy: string;
+};
+
+export type StoredSeriesDefinition = {
+    id: string;
+    name: string;
+    ground: string;
+    stages: StoredSeriesStage[];
+};
+
+export const SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+const MAX_SERIES_ID_LENGTH = 40;
+const MAX_SERIES_NAME_LENGTH = 40;
+const MAX_SERIES_STAGES = 50;
+const SERIES_PREFIX = 'dailygp:campaign:series:v1';
+const INDEX_KEY = `${SERIES_PREFIX}:index`;
+const REVISION_KEY = `${SERIES_PREFIX}:revision`;
+const WRITE_LOCK_TTL_MS = 10_000;
+
+type AppSeriesDefinition = { id: string; name?: string; ground?: string; stages?: StoredSeriesStage[] };
+const APP_SERIES_DEFINITIONS = ((seriesData as { series?: AppSeriesDefinition[] }).series ?? []);
+const APP_SERIES_IDS = new Set(APP_SERIES_DEFINITIONS.map((series) => series.id));
+
+function recordKey(seriesId: string): string {
+    return `${SERIES_PREFIX}:series:${seriesId}`;
+}
+
+function writeLockKey(seriesId: string): string {
+    return `${SERIES_PREFIX}:write-lock:${seriesId}`;
+}
+
+export function assertSeriesId(value: unknown): string {
+    if (typeof value !== 'string' || !SERIES_ID_RE.test(value) || value.length > MAX_SERIES_ID_LENGTH) {
+        throw new TrackInputError('A series key has small letters, digits and dashes, and starts with a letter.');
+    }
+    if (value === CAMPAIGN_NUMBERS_SERIES_ID) {
+        throw new TrackInputError('Numbers stays in the app. Choose another series key.');
+    }
+    return value;
+}
+
+function parseRecord(raw: string | null | undefined): StoredSeriesRecord | null {
+    if (!raw) return null;
+    try {
+        const record = JSON.parse(raw);
+        return record?.version === 1 && typeof record.id === 'string' && Array.isArray(record.stages)
+            ? record as StoredSeriesRecord : null;
+    } catch {
+        return null;
+    }
+}
+
+export function toSeriesDefinition(record: StoredSeriesRecord): StoredSeriesDefinition {
+    return {
+        id: record.id,
+        name: record.name,
+        ground: record.ground,
+        // Players see only the published stages.
+        stages: record.stages.slice(0, record.publishedStageCount).map((stage) => ({ ...stage })),
+    };
+}
+
+// ---- The per-install cache that the Campaign manifest reads ----
+
+type InstallCache = { revision: string; published: readonly StoredSeriesDefinition[] };
+const cacheByInstall = new Map<string, InstallCache>();
+const EMPTY: readonly StoredSeriesDefinition[] = Object.freeze([]);
+
+function readInstallScope(): string | null {
+    try {
+        const id = (context as { subredditId?: unknown }).subredditId;
+        if (typeof id === 'string' && id) return id;
+        const name = (context as { subredditName?: unknown }).subredditName;
+        return typeof name === 'string' && name ? name.toLowerCase() : null;
+    } catch {
+        return null;
+    }
+}
+
+export function resolveStoredSeriesForRequest(): readonly StoredSeriesDefinition[] {
+    const scope = readInstallScope();
+    return scope ? cacheByInstall.get(scope)?.published ?? EMPTY : EMPTY;
+}
+
+export function installStoredSeriesResolver(): void {
+    setStoredSeriesResolver(resolveStoredSeriesForRequest);
+}
+
+async function readAllRecords(): Promise<StoredSeriesRecord[]> {
+    const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
+    const ids = Object.keys(index);
+    if (!ids.length) return [];
+    const values = await redis.mGet(ids.map(recordKey));
+    return ids.flatMap((id, offset) => {
+        const record = parseRecord(values[offset]);
+        return record?.id === id ? [record] : [];
+    });
+}
+
+// Brings this install's published series up to date before a request reads
+// the Campaign. It reads one value when nothing changed.
+export async function ensureStoredSeriesLoaded(): Promise<void> {
+    const scope = readInstallScope();
+    if (!scope) return;
+    const revision = (await redis.get(REVISION_KEY)) ?? '0';
+    if (cacheByInstall.get(scope)?.revision === revision) return;
+    const records = revision === '0' ? [] : await readAllRecords();
+    const published = Object.freeze(records
+        .filter((record) => record.status === 'published' && record.publishedStageCount > 0)
+        .sort((a, b) => Date.parse(a.publishedAt ?? '') - Date.parse(b.publishedAt ?? ''))
+        .map((record) => Object.freeze(toSeriesDefinition(record))));
+    cacheByInstall.set(scope, { revision, published });
+}
+
+export function clearStoredSeriesCacheForTests(): void {
+    cacheByInstall.clear();
+}
+
+// ---- Reads ----
+
+export async function readStoredSeries(seriesId: string): Promise<StoredSeriesRecord | null> {
+    if (!SERIES_ID_RE.test(seriesId)) return null;
+    return parseRecord(await redis.get(recordKey(seriesId)));
+}
+
+export async function listStoredSeries(): Promise<StoredSeriesRecord[]> {
+    return (await readAllRecords()).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+}
+
+export async function isTrackInStoredSeries(trackKey: string, exceptSeriesId?: string): Promise<boolean> {
+    return (await readAllRecords()).some((record) => record.id !== exceptSeriesId
+        && record.stages.some((stage) => stage.trackKey === trackKey));
+}
+
+// The app series that are not in Redis yet. A copy of a hidden app series
+// replaces it after it is published.
+export function listAppSeriesDefinitions(): AppSeriesDefinition[] {
+    return APP_SERIES_DEFINITIONS;
+}
+
+// ---- Writes ----
+
+async function withSeriesWriteLock<T>(seriesId: string, work: () => Promise<T>): Promise<T> {
+    const token = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const acquired = await redis.set(writeLockKey(seriesId), token, {
+        nx: true,
+        expiration: new Date(Date.now() + WRITE_LOCK_TTL_MS),
+    });
+    if (!acquired) throw new TrackConflictError('Someone else is saving this series. Try again.');
+    try {
+        return await work();
+    } finally {
+        try {
+            if (await redis.get(writeLockKey(seriesId)) === token) await redis.del(writeLockKey(seriesId));
+        } catch (error) {
+            console.error(`Failed to release the write lock of series ${seriesId}:`, error);
+        }
+    }
+}
+
+async function writeRecord(record: StoredSeriesRecord): Promise<void> {
+    await redis.set(recordKey(record.id), JSON.stringify(record));
+    await redis.hSet(INDEX_KEY, { [record.id]: String(record.revision) });
+    await redis.incrBy(REVISION_KEY, 1);
+}
+
+function normalizeStages(value: unknown): StoredSeriesStage[] {
+    if (!Array.isArray(value) || value.length > MAX_SERIES_STAGES) {
+        throw new TrackInputError(`A series can have at most ${MAX_SERIES_STAGES} stages.`);
+    }
+    const stages = value.map((stage, index): StoredSeriesStage => {
+        const input = stage && typeof stage === 'object' ? stage as Record<string, unknown> : {};
+        const trackKey = typeof input.trackKey === 'string' ? input.trackKey : '';
+        if (!hasTrack(trackKey)) throw new TrackInputError(`Stage ${index + 1} has no track.`);
+        const laps = Number(input.laps);
+        if (!Number.isInteger(laps) || laps < 1 || laps > CAMPAIGN_STAGE_MAX_LAPS) {
+            throw new TrackInputError(`Laps must be a whole number from 1 to ${CAMPAIGN_STAGE_MAX_LAPS}.`);
+        }
+        return { trackKey, laps, requiredMedals: Number(input.requiredMedals) };
+    });
+    const keys = stages.map((stage) => stage.trackKey);
+    if (new Set(keys).size !== keys.length) {
+        throw new TrackInputError('A track can be in a series only once.');
+    }
+    stages.forEach((stage, index) => {
+        const error = getRequiredMedalsError(
+            stage.requiredMedals,
+            index,
+            index > 0 ? stages[index - 1].requiredMedals : 0,
+        );
+        if (error) throw new TrackInputError(`Stage ${index + 1}: ${error}`);
+    });
+    return stages;
+}
+
+function sameStage(a: StoredSeriesStage | undefined, b: StoredSeriesStage | undefined): boolean {
+    return Boolean(a && b) && a!.trackKey === b!.trackKey && a!.laps === b!.laps
+        && a!.requiredMedals === b!.requiredMedals;
+}
+
+export type SaveStoredSeriesOptions = {
+    username: string;
+    baseRevision?: unknown;
+    origin?: 'creator' | 'migrated';
+    // Checks each stage track against the other series and the Daily list.
+    isTrackUsedElsewhere?: (trackKey: string, seriesId: string) => Promise<boolean>;
+    now?: Date;
+};
+
+export async function saveStoredSeries(
+    seriesIdInput: unknown,
+    input: unknown,
+    { username, baseRevision = 0, origin = 'creator', isTrackUsedElsewhere, now = new Date() }: SaveStoredSeriesOptions,
+): Promise<StoredSeriesRecord> {
+    const id = assertSeriesId(seriesIdInput);
+    const payload = input && typeof input === 'object' && !Array.isArray(input)
+        ? input as Record<string, unknown> : {};
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    if (!name || name.length > MAX_SERIES_NAME_LENGTH) {
+        throw new TrackInputError(`Give the series a name of at most ${MAX_SERIES_NAME_LENGTH} characters.`);
+    }
+    if (!isTrackGroundKey(payload.ground)) throw new TrackInputError('Choose the ground of the series.');
+    const ground = payload.ground as string;
+    const stages = normalizeStages(payload.stages);
+
+    return withSeriesWriteLock(id, async () => {
+        const existing = await readStoredSeries(id);
+        if ((existing?.revision ?? 0) !== Number(baseRevision ?? 0)) {
+            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+        }
+        if (!existing && origin === 'creator' && APP_SERIES_IDS.has(id)) {
+            throw new TrackInputError('A series in the game already uses this key. Choose another key.');
+        }
+        const fixed = existing?.publishedStageCount ?? 0;
+        if (fixed > 0) {
+            if (ground !== existing!.ground) {
+                throw new TrackInputError(`${existing!.name} is live, so its ground cannot change.`);
+            }
+            for (let index = 0; index < fixed; index += 1) {
+                if (!sameStage(stages[index], existing!.stages[index])) {
+                    throw new TrackInputError(
+                        `${existing!.name} is live, so its first ${fixed} stages are fixed. New stages go after them.`,
+                    );
+                }
+            }
+        }
+        if (isTrackUsedElsewhere) {
+            for (const stage of stages.slice(fixed)) {
+                if (await isTrackUsedElsewhere(stage.trackKey, id)) {
+                    throw new TrackInputError(`${TRACKS[stage.trackKey]?.name ?? stage.trackKey} is used somewhere else already.`);
+                }
+            }
+        }
+        const stamp = now.toISOString();
+        const record: StoredSeriesRecord = {
+            version: 1,
+            id,
+            name,
+            ground,
+            stages,
+            status: existing?.status ?? 'draft',
+            publishedStageCount: fixed,
+            publishedAt: existing?.publishedAt ?? null,
+            origin: existing?.origin ?? origin,
+            revision: (existing?.revision ?? 0) + 1,
+            createdAt: existing?.createdAt ?? stamp,
+            createdBy: existing?.createdBy ?? username,
+            updatedAt: stamp,
+            updatedBy: username,
+        };
+        await writeRecord(record);
+        return record;
+    });
+}
+
+async function assertStageReady(stage: StoredSeriesStage, ground: string, index: number): Promise<void> {
+    const label = `Stage ${index + 1}`;
+    const stored = await readStoredTrack(stage.trackKey);
+    if (stored) {
+        if (!stored.checksPassed) throw new TrackInputError(`${label}: ${stored.track.name} does not pass the checks yet.`);
+        if (!stored.medalRow) throw new TrackInputError(`${label}: set the medal times of ${stored.track.name} first.`);
+    } else if (!isBuiltInTrack(stage.trackKey) || !getTrackMedalThresholds(stage.trackKey)) {
+        throw new TrackInputError(`${label}: the track has no medal times.`);
+    }
+    const trackGround = getTrackGround(TRACKS[stage.trackKey]).key;
+    if (trackGround !== ground) {
+        throw new TrackInputError(`${label}: the track is on another ground than the series.`);
+    }
+}
+
+// Makes the series live, or makes its new stages live. The stages cannot
+// change after this, and their stored tracks are locked.
+export async function publishStoredSeries(
+    seriesIdInput: unknown,
+    { username, baseRevision, now = new Date() }: { username: string; baseRevision?: unknown; now?: Date },
+): Promise<StoredSeriesRecord> {
+    const id = assertSeriesId(seriesIdInput);
+    return withSeriesWriteLock(id, async () => {
+        const existing = await readStoredSeries(id);
+        if (!existing) throw new TrackInputError('Save the series first.');
+        if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
+            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+        }
+        if (!isLiveGround(existing.ground)) {
+            throw new TrackInputError('Only a series on a live ground can go live. Other grounds need an app release.');
+        }
+        if (existing.stages.length < getCampaignSeriesMinStages(existing)) {
+            throw new TrackInputError('Add more stages before the series goes live.');
+        }
+        if (existing.stages.length === existing.publishedStageCount) {
+            throw new TrackInputError('Every stage of this series is live already.');
+        }
+        for (const [index, stage] of existing.stages.entries()) {
+            await assertStageReady(stage, existing.ground, index);
+        }
+        for (const stage of existing.stages.slice(existing.publishedStageCount)) {
+            await lockStoredTrack(stage.trackKey, 'series', now);
+        }
+        const record: StoredSeriesRecord = {
+            ...existing,
+            status: 'published',
+            publishedStageCount: existing.stages.length,
+            publishedAt: existing.publishedAt ?? now.toISOString(),
+            revision: existing.revision + 1,
+            updatedAt: now.toISOString(),
+            updatedBy: username,
+        };
+        await writeRecord(record);
+        return record;
+    });
+}
+
+export async function deleteStoredSeries(
+    seriesIdInput: unknown,
+    { baseRevision }: { baseRevision?: unknown } = {},
+): Promise<boolean> {
+    const id = assertSeriesId(seriesIdInput);
+    return withSeriesWriteLock(id, async () => {
+        const existing = await readStoredSeries(id);
+        if (!existing) return false;
+        if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
+            throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+        }
+        if (existing.publishedStageCount > 0) {
+            throw new TrackInputError(`${existing.name} is live, so it cannot be deleted.`);
+        }
+        await redis.del(recordKey(id));
+        await redis.hDel(INDEX_KEY, [id]);
+        await redis.incrBy(REVISION_KEY, 1);
+        return true;
+    });
+}
+
+// Copies each app series that is not live into Redis as a draft, so the
+// Creator can change it. A live app series stays in the app.
+export async function copyAppSeriesDrafts({
+    dryRun,
+    username,
+    now = new Date(),
+}: {
+    dryRun: boolean;
+    username: string;
+    now?: Date;
+}): Promise<{ copied: string[]; alreadyStored: string[]; live: string[]; failed: { id: string; error: string }[] }> {
+    const report = { copied: [] as string[], alreadyStored: [] as string[], live: [] as string[], failed: [] as { id: string; error: string }[] };
+    for (const definition of APP_SERIES_DEFINITIONS) {
+        if (definition.id === CAMPAIGN_NUMBERS_SERIES_ID || getCampaignSeries(definition.id)) {
+            report.live.push(definition.id);
+            continue;
+        }
+        if (await readStoredSeries(definition.id)) {
+            report.alreadyStored.push(definition.id);
+            continue;
+        }
+        if (dryRun) {
+            report.copied.push(definition.id);
+            continue;
+        }
+        try {
+            await saveStoredSeries(definition.id, {
+                name: definition.name ?? definition.id,
+                ground: definition.ground ?? 'tarmac',
+                stages: definition.stages ?? [],
+            }, { username, origin: 'migrated', now });
+            report.copied.push(definition.id);
+        } catch (error) {
+            report.failed.push({ id: definition.id, error: error instanceof Error ? error.message : String(error) });
+        }
+    }
+    return report;
+}

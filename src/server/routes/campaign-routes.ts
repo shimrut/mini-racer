@@ -13,7 +13,23 @@ export type CampaignRouteDependencies = {
     getServerCampaignSnapshot(input: Record<string, unknown>): Promise<ServiceResult>;
     submitServerCampaignRun(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignPbGhost(input: Record<string, unknown>): Promise<ServiceResult>;
+    // The published Creator series, and the placed stored tracks among these keys.
+    describeStoredSeries?(): readonly { stages: readonly { trackKey: string }[] }[];
+    describeStoredTracks?(trackKeys: string[]): unknown[];
 };
+
+// The Campaign answer carries the published Creator series and their stored
+// tracks, so the game can show them without a second request.
+function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): ServiceResult {
+    const storedSeries = dependencies.describeStoredSeries?.() ?? [];
+    if (!storedSeries.length || !result.body || typeof result.body !== 'object') return result;
+    const trackKeys = storedSeries.flatMap((series) => series.stages.map((stage) => stage.trackKey));
+    const storedTracks = dependencies.describeStoredTracks?.(trackKeys) ?? [];
+    return {
+        ...result,
+        body: { ...result.body, storedSeries, ...(storedTracks.length ? { storedTracks } : {}) },
+    };
+}
 
 function parseOptionalInteger(value: unknown): number | undefined {
     if (value == null || value === '') return undefined;
@@ -32,12 +48,12 @@ export function registerCampaignRoutes(
     app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
             const { playerId, guestToken, seriesId } = req.query ?? {};
-            send(res, await dependencies.getServerCampaignBootstrap({
+            send(res, withStoredSeries(await dependencies.getServerCampaignBootstrap({
                 playerId,
                 guestToken,
                 seriesId,
                 redditUsername: dependencies.getRequestUsername(),
-            }));
+            }), dependencies));
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign:', error);
             res.status(500).json({ error: 'Campaign bootstrap failed' });

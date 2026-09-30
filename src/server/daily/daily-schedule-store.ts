@@ -91,6 +91,8 @@ async function assertSchedulableTrack(trackKey: string): Promise<void> {
 export type SaveDailyScheduleOptions = {
     username: string;
     baseRevision?: unknown;
+    // The Campaign series that uses a track, if any. Such a track cannot be a Daily.
+    findSeriesUsingTrack?: (trackKey: string) => Promise<string | null>;
     // The track of the latest Daily. The next Daily comes after it, so the
     // list must keep it.
     currentTrackKey?: string | null;
@@ -99,7 +101,7 @@ export type SaveDailyScheduleOptions = {
 
 export async function saveDailySchedule(
     keysInput: unknown,
-    { username, baseRevision = 0, currentTrackKey = null, now = new Date() }: SaveDailyScheduleOptions,
+    { username, baseRevision = 0, currentTrackKey = null, findSeriesUsingTrack, now = new Date() }: SaveDailyScheduleOptions,
 ): Promise<DailySchedule> {
     if (!Array.isArray(keysInput) || keysInput.length === 0) {
         throw new TrackInputError('The Daily list needs at least one track.');
@@ -112,6 +114,14 @@ export async function saveDailySchedule(
         throw new TrackInputError('A track can be in the Daily list only once.');
     }
     for (const trackKey of keys) await assertSchedulableTrack(trackKey);
+    if (findSeriesUsingTrack) {
+        const previous = new Set((await readDailySchedule()).keys);
+        for (const trackKey of keys) {
+            if (previous.has(trackKey)) continue;
+            const seriesId = await findSeriesUsingTrack(trackKey);
+            if (seriesId) throw new TrackInputError(`${trackKey} is a stage of the Campaign series ${seriesId}.`);
+        }
+    }
     if (currentTrackKey && !keys.includes(currentTrackKey)) {
         throw new TrackInputError('Keep the track of the latest Daily in the list. The next Daily comes after it.');
     }

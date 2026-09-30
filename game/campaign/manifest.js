@@ -6,6 +6,7 @@ import {
 } from '../race/race-spec.js';
 import seriesData from './series.json' with { type: 'json' };
 import { CAMPAIGN_SERIES_MIN_STAGES, isCampaignSeriesLive } from './series-rules.js';
+import { getStoredSeriesDefinitions } from './stored-series.js';
 
 export { CAMPAIGN_SERIES_MIN_STAGES };
 
@@ -63,38 +64,111 @@ function buildSeries(definition) {
     });
 }
 
-// Every series in the data file, also the hidden ones. The series screen shows
-// the hidden ones on a live ground as "Coming soon".
-export const CAMPAIGN_ALL_SERIES = Object.freeze(
+// Every series in the data file, also the hidden ones.
+const APP_SERIES = Object.freeze(
     (Array.isArray(seriesData?.series) ? seriesData.series : []).map(buildSeries),
 );
 
-if (new Set(CAMPAIGN_ALL_SERIES.map((series) => series.id)).size !== CAMPAIGN_ALL_SERIES.length) {
+if (new Set(APP_SERIES.map((series) => series.id)).size !== APP_SERIES.length) {
     throw new Error('Campaign series names must be unique.');
 }
 
-// The series that players can see.
-export const CAMPAIGN_SERIES = Object.freeze(CAMPAIGN_ALL_SERIES.filter((series) => series.live));
+if (!APP_SERIES.some((series) => series.id === CAMPAIGN_NUMBERS_SERIES_ID && series.live)) {
+    throw new Error('The Numbers Campaign series must stay live.');
+}
 
 // Players choose a series only when more than one is live. With one, the
 // Campaign opens its stages, with no series screen and no series choice.
-export const CAMPAIGN_HAS_SERIES_CHOICE = CAMPAIGN_SERIES.length > 1;
+// This is the answer for the app series alone; campaignHasSeriesChoice()
+// also counts the published series from the Creator.
+export const CAMPAIGN_HAS_SERIES_CHOICE = APP_SERIES.filter((series) => series.live).length > 1;
 
-const SERIES_BY_ID = new Map(CAMPAIGN_SERIES.map((series) => [series.id, series]));
+// The app series with the published stored series. A stored series replaces
+// the app series with the same name, but never Numbers. New stored series
+// come after the app series. The lists are built again only after the stored
+// list changes.
+let builtFromDefinitions = null;
+let views = null;
 
-export const CAMPAIGN_LIVE_STAGES = Object.freeze(CAMPAIGN_SERIES.flatMap((series) => series.stages));
+function buildStoredSeries(definitions) {
+    return definitions.flatMap((definition) => {
+        if (definition?.id === CAMPAIGN_NUMBERS_SERIES_ID) return [];
+        try {
+            return [buildSeries(definition)];
+        } catch (error) {
+            console.error(`Stored Campaign series ${definition?.id} is not valid:`, error);
+            return [];
+        }
+    });
+}
 
-const STAGE_BY_RACE_ID = new Map(CAMPAIGN_LIVE_STAGES.map((stage) => [stage.raceId, stage]));
+function currentViews() {
+    const definitions = getStoredSeriesDefinitions();
+    if (views && definitions === builtFromDefinitions) return views;
+    const stored = buildStoredSeries(definitions);
+    const storedById = new Map(stored.map((series) => [series.id, series]));
+    const appIds = new Set(APP_SERIES.map((series) => series.id));
+    const all = Object.freeze([
+        ...APP_SERIES.map((series) => storedById.get(series.id) ?? series),
+        ...stored.filter((series) => !appIds.has(series.id)),
+    ]);
+    const live = Object.freeze(all.filter((series) => series.live));
+    const liveStages = Object.freeze(live.flatMap((series) => series.stages));
+    builtFromDefinitions = definitions;
+    views = {
+        all,
+        live,
+        liveStages,
+        seriesById: new Map(live.map((series) => [series.id, series])),
+        stageByRaceId: new Map(liveStages.map((stage) => [stage.raceId, stage])),
+    };
+    return views;
+}
 
-if (!SERIES_BY_ID.has(CAMPAIGN_NUMBERS_SERIES_ID)) {
-    throw new Error('The Numbers Campaign series must stay live.');
+// An array that always shows the current list, so the code that reads the
+// Campaign lists sees the published stored series too.
+function liveList(read) {
+    return new Proxy([], {
+        get(_target, property) {
+            const list = read();
+            const value = Reflect.get(list, property, list);
+            return typeof value === 'function' && property !== 'constructor' ? value.bind(list) : value;
+        },
+        has(_target, property) {
+            return Reflect.has(read(), property);
+        },
+        ownKeys() {
+            return Reflect.ownKeys(read());
+        },
+        getOwnPropertyDescriptor(_target, property) {
+            const list = read();
+            if (property === 'length') {
+                return { value: list.length, writable: true, enumerable: false, configurable: false };
+            }
+            const descriptor = Reflect.getOwnPropertyDescriptor(list, property);
+            return descriptor ? { ...descriptor, configurable: true } : undefined;
+        },
+    });
+}
+
+// Every series, also the hidden ones. The series screen shows the hidden ones
+// on a live ground as "Coming soon".
+export const CAMPAIGN_ALL_SERIES = liveList(() => currentViews().all);
+
+// The series that players can see.
+export const CAMPAIGN_SERIES = liveList(() => currentViews().live);
+
+export const CAMPAIGN_LIVE_STAGES = liveList(() => currentViews().liveStages);
+
+export function campaignHasSeriesChoice() {
+    return currentViews().live.length > 1;
 }
 
 // The Numbers series, under the name that the code used before there were series.
 export const CAMPAIGN_ID = CAMPAIGN_NUMBERS_SERIES_ID;
 
 export function getCampaignSeries(seriesId) {
-    return typeof seriesId === 'string' ? SERIES_BY_ID.get(seriesId) ?? null : null;
+    return typeof seriesId === 'string' ? currentViews().seriesById.get(seriesId) ?? null : null;
 }
 
 export function isCampaignSeriesId(value) {
@@ -106,7 +180,7 @@ export function getCampaignSeriesStages(seriesId) {
 }
 
 export function getCampaignStage(raceId) {
-    return typeof raceId === 'string' ? STAGE_BY_RACE_ID.get(raceId) ?? null : null;
+    return typeof raceId === 'string' ? currentViews().stageByRaceId.get(raceId) ?? null : null;
 }
 
 export function getCampaignStageMedalCount(medal) {
