@@ -1,3 +1,5 @@
+import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
+
 export const TRACK_CATALOG = {
     circuit: { name: "Classic Circuit" },
     sunlitTemple: { name: "Sunlit Temple" },
@@ -298,10 +300,17 @@ export const TRACK_SCHEDULE_KEYS = [
 
 export const DEFAULT_TRACK_KEY = 'circuit';
 
-export function hasTrack(trackKey) {
+// A built-in track in the app. Stored tracks are not in this list.
+export function isBuiltInTrack(trackKey) {
     return Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey);
 }
 
+export function hasTrack(trackKey) {
+    return isStoredTrack(trackKey) || isBuiltInTrack(trackKey);
+}
+
 export function getTrackName(trackKey, fallback = 'Unknown Track') {
-    return hasTrack(trackKey) ? TRACK_CATALOG[trackKey].name : fallback;
+    const stored = getStoredTrack(trackKey);
+    if (stored) return stored.name || fallback;
+    return isBuiltInTrack(trackKey) ? TRACK_CATALOG[trackKey].name : fallback;
 }

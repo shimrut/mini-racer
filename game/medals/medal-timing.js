@@ -1,4 +1,5 @@
 import _medalTimesRaw from './medal-times.json' with { type: 'json' };
+import { getStoredTrack } from '../track/stored-tracks.js';
 
 export const STANDARD_MEDAL_TIER_RANK = Object.freeze({ bronze: 0, silver: 1, gold: 2, author: 3 });
 
@@ -6,33 +7,47 @@ export function isStandardMedalTier(v) {
     return typeof v === 'string' && Object.hasOwn(STANDARD_MEDAL_TIER_RANK, v);
 }
 
+// Returns one medal row in the form the game uses, or null.
+export function normalizeMedalRow(row) {
+    if (!row || typeof row !== 'object') return null;
+    const r = row;
+    const gold = Number(r.gold);
+    if (!Number.isFinite(gold)) return null;
+    let silver = Number(r.silver);
+    let bronze = Number(r.bronze);
+    if (!Number.isFinite(silver)) silver = gold + 0.01;
+    if (!Number.isFinite(bronze)) bronze = silver + 0.01;
+    if (gold > silver) silver = gold + 0.01;
+    if (silver > bronze) bronze = silver + 0.01;
+    const authRaw = r.author;
+    const author =
+        authRaw != null && Number.isFinite(Number(authRaw)) && Number(authRaw) > 0
+            ? Number(authRaw)
+            : null;
+    return { gold, silver, bronze, author };
+}
+
 function normalizeMedalTimes(raw) {
     const out = {};
     for (const [key, row] of Object.entries(raw)) {
-        if (!row || typeof row !== 'object') continue;
-        const r = row;
-        const gold = Number(r.gold);
-        if (!Number.isFinite(gold)) continue;
-        let silver = Number(r.silver);
-        let bronze = Number(r.bronze);
-        if (!Number.isFinite(silver)) silver = gold + 0.01;
-        if (!Number.isFinite(bronze)) bronze = silver + 0.01;
-        if (gold > silver) silver = gold + 0.01;
-        if (silver > bronze) bronze = silver + 0.01;
-        const authRaw = r.author;
-        const author =
-            authRaw != null && Number.isFinite(Number(authRaw)) && Number(authRaw) > 0
-                ? Number(authRaw)
-                : null;
-        out[key] = { gold, silver, bronze, author };
+        const normalized = normalizeMedalRow(row);
+        if (normalized) out[key] = normalized;
     }
     return Object.freeze(out);
 }
 
 const MEDAL_TIMES = normalizeMedalTimes(_medalTimesRaw);
 
+// A stored track keeps its own medal row, also when a built-in track has
+// the same key.
+function getMedalRow(trackKey) {
+    const stored = getStoredTrack(trackKey);
+    if (stored) return stored.medalRow ?? null;
+    return MEDAL_TIMES[trackKey] ?? null;
+}
+
 export function getTrackMedalThresholds(trackKey) {
-    const row = MEDAL_TIMES[trackKey];
+    const row = getMedalRow(trackKey);
     if (!row || !Number.isFinite(row.gold)) return null;
     return { gold: row.gold, silver: row.silver, bronze: row.bronze };
 }
@@ -40,7 +55,7 @@ export function getTrackMedalThresholds(trackKey) {
 export function getAuthorMedalSeconds(trackKey) {
     const t = getTrackMedalThresholds(trackKey);
     if (!t) return null;
-    const raw = MEDAL_TIMES[trackKey]?.author;
+    const raw = getMedalRow(trackKey)?.author;
     if (raw == null || !Number.isFinite(raw) || raw <= 0 || raw >= t.gold) return null;
     return raw;
 }

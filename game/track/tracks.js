@@ -161,7 +161,8 @@ import babylonRace from './definitions/babylon-race.js';
 import centralDistrict from './definitions/central-district.js';
 import smallSteps from './definitions/small-steps.js';
 import lapinLoop from './definitions/lapin-loop.js';
-import { TRACK_CATALOG, getTrackName } from './catalog.js';
+import { TRACK_CATALOG } from './catalog.js';
+import { getStoredTrack } from './stored-tracks.js';
 
 const TRACK_GEOMETRY = {
     circuit,
@@ -329,10 +330,23 @@ const TRACK_GEOMETRY = {
     lapinLoop,
 };
 
-// Compatibility registry for existing gameplay and server consumers.
-export const TRACKS = Object.fromEntries(
+const BUILT_IN_TRACKS = Object.fromEntries(
     Object.keys(TRACK_CATALOG).map((trackKey) => [
         trackKey,
-        { name: getTrackName(trackKey), ...TRACK_GEOMETRY[trackKey] },
+        { name: TRACK_CATALOG[trackKey].name, ...TRACK_GEOMETRY[trackKey] },
     ]),
 );
+
+// Compatibility registry for existing gameplay and server consumers. A
+// stored track with the same key wins over the built-in one. A list of the
+// registry gives the built-in tracks only.
+export const TRACKS = new Proxy(BUILT_IN_TRACKS, {
+    get(target, trackKey, receiver) {
+        const stored = typeof trackKey === 'string' ? getStoredTrack(trackKey) : null;
+        return stored?.track ?? Reflect.get(target, trackKey, receiver);
+    },
+    has(target, trackKey) {
+        return (typeof trackKey === 'string' && Boolean(getStoredTrack(trackKey)?.track))
+            || Reflect.has(target, trackKey);
+    },
+});

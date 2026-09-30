@@ -1,9 +1,16 @@
 import { TRACK_CATALOG, getTrackName } from './catalog.js';
+import { getStoredTrack } from './stored-tracks.js';
 
 const DEFINITION_MODULES = import.meta.glob('./definitions/*.js');
 const loadedTracks = new Map();
 const pendingLoads = new Map();
 export const CLIENT_TRACK_LOAD_TIMEOUT_MS = 20_000;
+// Asks the server for a stored track that the game does not have yet.
+let storedTrackLoader = null;
+
+export function setStoredTrackLoader(loader) {
+    storedTrackLoader = typeof loader === 'function' ? loader : null;
+}
 
 export function communityTrackKey(mapId) {
     return `community:${mapId}`;
@@ -57,14 +64,32 @@ function normalizeTrack(trackKey, value) {
 }
 
 export function getLoadedClientTrack(trackKey) {
-    return loadedTracks.get(trackKey) || null;
+    return getStoredTrack(trackKey)?.track || loadedTracks.get(trackKey) || null;
+}
+
+function loadStoredClientTrack(trackKey) {
+    const pending = pendingLoads.get(trackKey);
+    if (pending) return pending;
+    const promise = waitForClientTrackDefinition(storedTrackLoader(trackKey), trackKey)
+        .then(() => getStoredTrack(trackKey)?.track || null)
+        .finally(() => {
+            if (pendingLoads.get(trackKey) === promise) pendingLoads.delete(trackKey);
+        });
+    pendingLoads.set(trackKey, promise);
+    return promise;
 }
 
 export async function loadClientTrack(trackKey) {
     if (typeof trackKey === 'string' && trackKey.startsWith('community:')) {
         return loadedTracks.get(trackKey) || null;
     }
-    if (!Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey)) return null;
+    const stored = getStoredTrack(trackKey);
+    if (stored?.track) return stored.track;
+    if (!Object.prototype.hasOwnProperty.call(TRACK_CATALOG, trackKey)) {
+        return typeof trackKey === 'string' && trackKey && storedTrackLoader
+            ? loadStoredClientTrack(trackKey)
+            : null;
+    }
     const existing = loadedTracks.get(trackKey);
     if (existing) return existing;
     const pending = pendingLoads.get(trackKey);
