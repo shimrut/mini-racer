@@ -21,6 +21,7 @@ import { setText } from '../ui/dom.js';
 import { CAMPAIGN_HAS_SERIES_CHOICE } from '../campaign/manifest.js';
 import { CampaignSeriesPicker } from './campaign-series-picker.js';
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
+import { COMMUNITY_VISIBLE } from '../community/visibility.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'community', 'challenge'];
 const TOGGLE_MODES = ['daily', 'campaign'];
@@ -191,8 +192,9 @@ export class LobbyUi {
             ?.addEventListener('click', () => this.onSelectDaily?.());
         document.getElementById('lobby-home-campaign-btn')
             ?.addEventListener('click', () => this.onSelectCampaign?.());
-        document.getElementById('lobby-home-community-btn')
-            ?.addEventListener('click', () => this.onSelectCommunity?.());
+        const communityButton = document.getElementById('lobby-home-community-btn');
+        if (communityButton) communityButton.hidden = !COMMUNITY_VISIBLE;
+        communityButton?.addEventListener('click', () => this.onSelectCommunity?.());
         document.getElementById('community-load-more-btn')
             ?.addEventListener('click', () => this.onLoadMoreCommunity?.());
         document.getElementById('community-retry-btn')

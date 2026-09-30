@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { communityEngineMethods } from '../game/community/engine-methods.js';
+import { COMMUNITY_VISIBLE } from '../game/community/visibility.js';
 import { getCommunityMaps } from '../game/community/service.js';
 import { modeRouterEngineMethods } from '../game/modes/engine-methods.js';
 import {
@@ -22,6 +24,22 @@ beforeEach(() => {
     vi.restoreAllMocks();
 });
 afterEach(() => vi.unstubAllGlobals());
+
+describe('Community visibility', () => {
+    it('keeps Community hidden from players for now', () => {
+        const html = readFileSync(new URL('../pages/game.html', import.meta.url), 'utf8');
+        const button = html.match(/<button id="lobby-home-community-btn"[^>]*>/)?.[0] ?? '';
+        expect(COMMUNITY_VISIBLE).toBe(false);
+        expect(button).toMatch(/\bhidden\b/);
+    });
+
+    it('does not open the Community lobby while it is hidden', () => {
+        const engine = { lobbyUi: { showCommunity: vi.fn() }, reset: vi.fn() };
+        communityEngineMethods.showCommunityLobby.call(engine);
+        expect(engine.lobbyUi.showCommunity).not.toHaveBeenCalled();
+        expect(engine.activeRaceMode).toBeUndefined();
+    });
+});
 
 describe('Community race isolation', () => {
     it('uses an opaque cursor for the next published-map page', async () => {

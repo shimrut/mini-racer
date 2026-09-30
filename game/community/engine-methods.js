@@ -1,6 +1,7 @@
 import { getCommunityMap, getCommunityMaps } from './service.js';
 import { registerCommunityTrack } from '../track/client-registry.js';
 import { formatRaceClock } from '../shared/race-time-text.js';
+import { COMMUNITY_VISIBLE } from './visibility.js';
 
 function newCommunityRun(map, trackKey) {
     return {
@@ -16,6 +17,7 @@ function newCommunityRun(map, trackKey) {
 
 export const communityEngineMethods = {
     showCommunityLobby() {
+        if (!COMMUNITY_VISIBLE) return;
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
         }
