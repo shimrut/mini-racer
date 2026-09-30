@@ -3447,17 +3447,27 @@ class MapmakerApp {
         this.creatorLoading = true;
         const writeGeneration = this.creatorWriteGeneration;
         const panelGeneration = this.creatorPanels.writeGeneration;
+        // The page files are step 1 of the loader: this code runs only after them.
+        const loadSteps = 5;
+        let stepsDone = 1;
+        let loadFailed = false;
+        const step = (value) => {
+            stepsDone += 1;
+            // A request that ends after another one failed keeps the error on screen.
+            if (!this.creatorLoaded && !loadFailed) this.showCreatorLoader('Loading the Creator…', { stepsDone, loadSteps });
+            return value;
+        };
         if (!this.creatorLoaded) {
             this.setCreatorSaveStatus('Loading tracks…', 'saving');
-            this.showCreatorLoader('Loading the Creator…');
+            this.showCreatorLoader('Loading the Creator…', { stepsDone, loadSteps });
         }
         try {
             // Every tab loads here, so switching tabs never waits for the server.
             const [{ tracks }, daily, seriesView, copyView] = await Promise.all([
-                creatorApi.listTracks(),
-                creatorApi.readDaily(),
-                creatorApi.readSeries(),
-                creatorApi.readMigration(),
+                creatorApi.listTracks().then(step),
+                creatorApi.readDaily().then(step),
+                creatorApi.readSeries().then(step),
+                creatorApi.readMigration().then(step),
             ]);
             if (writeGeneration !== this.creatorWriteGeneration) {
                 this.creatorRefreshPending = true;
@@ -3502,6 +3512,7 @@ class MapmakerApp {
         } catch (error) {
             this.setCreatorSaveStatus(`Could not load tracks: ${error.message}`, 'error');
             document.getElementById('creator-retry-btn').hidden = false;
+            loadFailed = true;
             if (!this.creatorLoaded) this.showCreatorLoader(`Could not load the Creator: ${error.message}`, { failed: true });
         } finally {
             this.creatorLoading = false;
@@ -3513,13 +3524,20 @@ class MapmakerApp {
     }
 
     // The page covers the Creator until every tab has loaded once.
-    showCreatorLoader(message, { failed = false } = {}) {
+    showCreatorLoader(message, { failed = false, stepsDone = null, loadSteps = null } = {}) {
         const loader = document.getElementById('creator-loader');
         if (!loader) return;
         loader.hidden = message === null;
         loader.dataset.state = failed ? 'error' : 'loading';
-        if (message !== null) document.getElementById('creator-loader-text').textContent = message;
         document.getElementById('creator-loader-retry').hidden = !failed;
+        if (message === null) return;
+        const text = document.getElementById('creator-loader-text');
+        text.textContent = stepsDone === null ? message : `${message} ${stepsDone} of ${loadSteps}`;
+        if (stepsDone === null) return;
+        const bar = document.getElementById('creator-loader-bar');
+        bar.setAttribute('aria-valuemax', String(loadSteps));
+        bar.setAttribute('aria-valuenow', String(stepsDone));
+        document.getElementById('creator-loader-fill').style.width = `${(stepsDone / loadSteps) * 100}%`;
     }
 
     openCreatorTrack(trackKey) {

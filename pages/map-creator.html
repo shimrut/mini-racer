@@ -8,8 +8,12 @@
     <link rel="stylesheet" href="map-creator.css">
 </head>
 <body class="mapmaker-body mapmaker-editor-body creator-mode" data-creator="true" data-creator-tab="tracks">
-    <div id="creator-loader" class="creator-loader" role="status" data-state="loading">
-        <p id="creator-loader-text">Loading the Creator…</p>
+    <div id="creator-loader" class="creator-loader" data-state="loading">
+        <p id="creator-loader-text" role="status">Loading the Creator…</p>
+        <div id="creator-loader-bar" class="creator-loader-bar" role="progressbar" aria-label="Loading the Creator"
+            aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">
+            <div id="creator-loader-fill" class="creator-loader-fill"></div>
+        </div>
         <button id="creator-loader-retry" type="button" hidden>Try again</button>
     </div>
     <header class="maker-header creator-header">

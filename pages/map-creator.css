@@ -254,27 +254,33 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     margin: 0;
 }
 
-.creator-loader[data-state="loading"]::before {
-    content: '';
-    width: 1.75rem;
-    height: 1.75rem;
-    border: 3px solid var(--maker-border-strong);
-    border-top-color: var(--maker-blue);
-    border-radius: 50%;
-    animation: creator-loader-spin 0.8s linear infinite;
+.creator-loader-bar {
+    width: min(20rem, 80vw);
+    height: 0.4rem;
+    border-radius: 999px;
+    background: var(--maker-border-strong);
+    overflow: hidden;
+}
+
+.creator-loader-fill {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--maker-blue);
+    transition: width 0.2s ease-out;
 }
 
 .creator-loader[data-state="error"] p {
     color: var(--maker-danger-text);
 }
 
-@keyframes creator-loader-spin {
-    to { transform: rotate(360deg); }
+.creator-loader[data-state="error"] .creator-loader-fill {
+    background: var(--maker-danger-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .creator-loader[data-state="loading"]::before {
-        animation-duration: 2.4s;
+    .creator-loader-fill {
+        transition: none;
     }
 }
 
