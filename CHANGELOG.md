@@ -1,3 +1,5 @@
+- Test Drive drives like the game. Tap the speed or press Escape to pause. On a phone, tap the left or right side of the screen to steer. The Mobile button shows only on a computer, where it previews that phone screen. Whole track and the arrow buttons are gone.
+
 - **Budapest Run** and **Bucharest Scramble** join the Daily rotation. **Mantis Bend** was redrawn, and its medal times are faster.
 
 - The Mapmaker button is now **Test Drive**. The track list can be filtered by Daily, Campaign, Not used or Cloud, and by ground.

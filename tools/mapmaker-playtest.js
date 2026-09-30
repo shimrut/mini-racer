@@ -15,6 +15,7 @@ import {
     getLookAheadLerpFactor,
 } from '../game/race/race-camera.js';
 import { RaceHud } from '../game/race/ui-hud.js';
+import { InteractionsUi } from '../game/race/ui-interactions.js';
 import { CarSpriteLoader, getDrawnCar } from '../game/car/sprite.js';
 import { buildTrackCanvas, drawViewportPresentationBackground } from '../game/track/canvas.js';
 import { getTrackGround, getTrackGroundMaxSpeedKph } from '../game/track/grounds.js';
@@ -39,9 +40,9 @@ const ui = {
     title: document.getElementById('track-title'),
     feedback: document.getElementById('drive-feedback'),
     note: document.getElementById('stage-note'),
-    pause: document.getElementById('pause-button'),
-    view: document.getElementById('view-button'),
+    speedo: document.getElementById('speedometer'),
     stage: document.querySelector('.stage'),
+    frameToggle: document.getElementById('frame-toggle'),
     frameDesktop: document.getElementById('frame-desktop'),
     frameMobile: document.getElementById('frame-mobile'),
     flow: document.getElementById('flow-drive'),
@@ -56,14 +57,16 @@ if (MAPMAKER_ONLINE) document.querySelector('.drive-back').href = './';
 let draft = null;
 let geometry = null;
 let collision = null;
-let bounds = null;
 let trackCanvas = null;
 let trackCanvasOrigin = { x: 0, y: 0 };
 let trackPresentation = null;
 let state = null;
 let paused = false;
-let overview = false;
 let raceFrame = 'desktop';
+// Same cutoff as the game: a phone or a narrow window is already the phone view.
+const deviceMobileQuery = window.matchMedia(
+    '(max-width: 768px), (hover: none) and (pointer: coarse), (max-height: 600px) and (orientation: landscape)',
+);
 let wallContacts = 0;
 let contactSpots = [];
 let lapTime = null;
@@ -194,28 +197,55 @@ function resetRun() {
     flowSamples = [];
     flowSummary = null;
     feedback = '';
-    ui.pause.textContent = 'Pause';
+    syncPauseControl();
     render();
+}
+
+function deviceIsMobile() {
+    return deviceMobileQuery.matches;
+}
+
+function usesMobileDrive() {
+    return deviceIsMobile() || raceFrame === 'mobile';
+}
+
+function syncPauseControl() {
+    const canPause = Boolean(state) && state.status !== 'won';
+    ui.speedo.classList.toggle('speedometer--pause', canPause);
+    if (canPause) {
+        ui.speedo.setAttribute('role', 'button');
+        ui.speedo.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+    } else {
+        ui.speedo.removeAttribute('role');
+        ui.speedo.setAttribute('aria-label', 'Current speed');
+    }
 }
 
 function togglePause() {
     if (!state || state.status === 'won') return;
     paused = !paused;
-    ui.pause.textContent = paused ? 'Resume' : 'Pause';
-    render();
-}
-
-function toggleView() {
-    overview = !overview;
-    ui.view.textContent = overview ? 'Follow car' : 'Whole track';
+    if (paused) {
+        interactions.resetTouchControls();
+        heldButtons.left = false;
+        heldButtons.right = false;
+    }
+    syncPauseControl();
     render();
 }
 
 function setRaceFrame(frame) {
-    raceFrame = frame;
-    ui.stage.dataset.frame = frame === 'mobile' ? 'portrait' : 'desktop';
-    ui.frameDesktop.setAttribute('aria-pressed', String(frame === 'desktop'));
-    ui.frameMobile.setAttribute('aria-pressed', String(frame === 'mobile'));
+    raceFrame = frame === 'mobile' ? 'mobile' : 'desktop';
+    const mobile = usesMobileDrive();
+    document.body.classList.toggle('drive-device-mobile', deviceIsMobile());
+    ui.frameToggle.hidden = deviceIsMobile();
+    ui.stage.dataset.frame = mobile ? 'portrait' : 'desktop';
+    ui.frameDesktop.setAttribute('aria-pressed', String(!mobile));
+    ui.frameMobile.setAttribute('aria-pressed', String(mobile));
+    if (!mobile) {
+        interactions.resetTouchControls();
+        heldButtons.left = false;
+        heldButtons.right = false;
+    }
     requestAnimationFrame(() => render());
 }
 
@@ -277,21 +307,6 @@ function advanceTime(milliseconds) {
     for (let index = 0; index < steps; index += 1) tick();
     render(steps * STEP);
     return renderGameToText();
-}
-
-function getBounds() {
-    const points = [...geometry.outer, ...geometry.inner];
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const point of points) {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-    }
-    return { minX, minY, maxX, maxY };
 }
 
 function drawGate(gate, color, label, map) {
@@ -419,23 +434,16 @@ function render(dt = 0, alpha = 1) {
     if (!state) return;
     updateDisplayPose(alpha);
 
-    const fit = Math.min(
-        (width - 56) / Math.max(1, bounds.maxX - bounds.minX),
-        (height - 56) / Math.max(1, bounds.maxY - bounds.minY),
-    );
-    // Follow view: the race camera for the chosen screen, not the browser window.
-    const mobileCameraMode = raceFrame === 'mobile';
+    const mobileCameraMode = ui.stage.dataset.frame === 'portrait';
     getDesiredLookAhead(desiredLookAhead, state.velocity, state.cachedSpeed, width, height, mobileCameraMode);
     const lerpFactor = getLookAheadLerpFactor(dt, mobileCameraMode);
     lookAhead.x += (desiredLookAhead.x - lookAhead.x) * lerpFactor;
     lookAhead.y += (desiredLookAhead.y - lookAhead.y) * lerpFactor;
-    const zoom = overview ? fit : CONFIG.gridSize * getCameraZoom(mobileCameraMode);
-    const center = overview
-        ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
-        : {
-            x: displayPose.x + lookAhead.x / CONFIG.gridSize,
-            y: displayPose.y + lookAhead.y / CONFIG.gridSize,
-        };
+    const zoom = CONFIG.gridSize * getCameraZoom(mobileCameraMode);
+    const center = {
+        x: displayPose.x + lookAhead.x / CONFIG.gridSize,
+        y: displayPose.y + lookAhead.y / CONFIG.gridSize,
+    };
     const map = (point) => ({
         x: width / 2 + (point.x - center.x) * zoom,
         y: height / 2 + (point.y - center.y) * zoom,
@@ -488,7 +496,7 @@ function render(dt = 0, alpha = 1) {
     const wallLabel = `${wallContacts} wall${wallContacts === 1 ? '' : 's'}`;
     ui.feedback.textContent = feedback || (paused ? `Paused · ${gateLabel}` : `${gateLabel} · ${wallLabel}`);
     renderFlowSummary();
-    ui.pause.disabled = state.status === 'won';
+    syncPauseControl();
     ui.note.hidden = true;
 }
 
@@ -535,8 +543,7 @@ function renderGameToText() {
         lapTimeSec: lapTime,
         savedLapsSec: draftLaps,
         flow: flowSummary,
-        view: overview ? 'whole-track' : 'follow-car',
-        screen: raceFrame,
+        screen: deviceIsMobile() ? 'mobile' : raceFrame,
         feedback,
     });
 }
@@ -544,44 +551,46 @@ function renderGameToText() {
 window.render_game_to_text = renderGameToText;
 window.advanceTime = advanceTime;
 
+const interactions = new InteractionsUi();
+interactions.bindSteeringControls({
+    onLeftDown: () => { heldButtons.left = true; },
+    onLeftUp: () => { heldButtons.left = false; },
+    onRightDown: () => { heldButtons.right = true; },
+    onRightUp: () => { heldButtons.right = false; },
+});
+
 document.addEventListener('keydown', (event) => {
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(event.code)) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)) {
         event.preventDefault();
+    }
+    if (event.code === 'Escape') {
+        event.preventDefault();
+        if (!event.repeat) togglePause();
+        return;
     }
     heldKeys.add(event.code);
     if (event.repeat) return;
-    if (event.code === 'Space') togglePause();
     if (event.code === 'KeyR') resetRun();
-    if (event.code === 'KeyM') toggleView();
 });
 document.addEventListener('keyup', (event) => heldKeys.delete(event.code));
 window.addEventListener('blur', () => {
     heldKeys.clear();
+    interactions.resetTouchControls();
     heldButtons.left = false;
     heldButtons.right = false;
 });
-ui.pause.addEventListener('click', togglePause);
-ui.view.addEventListener('click', toggleView);
+ui.speedo.addEventListener('click', togglePause);
 ui.frameDesktop.addEventListener('click', () => setRaceFrame('desktop'));
 ui.frameMobile.addEventListener('click', () => setRaceFrame('mobile'));
 document.getElementById('reset-button').addEventListener('click', resetRun);
-for (const direction of ['left', 'right']) {
-    const button = document.getElementById(`steer-${direction}`);
-    button.addEventListener('pointerdown', (event) => {
-        button.setPointerCapture(event.pointerId);
-        heldButtons[direction] = true;
-    });
-    button.addEventListener('pointerup', () => { heldButtons[direction] = false; });
-    button.addEventListener('pointercancel', () => { heldButtons[direction] = false; });
-    button.addEventListener('lostpointercapture', () => { heldButtons[direction] = false; });
-}
+deviceMobileQuery.addEventListener('change', () => setRaceFrame(raceFrame));
+setRaceFrame(raceFrame);
 window.addEventListener('resize', render);
 
 try {
     draft = readDraft();
     ui.title.textContent = draft.track.name || draft.trackKey || 'Test Drive';
     geometry = buildTrackGeometry(draft.track);
-    bounds = getBounds();
     collision = buildCollisionRuntime(geometry);
     const presentation = resolveTrackPresentation(draft.trackKey, { ground: draft.track.ground });
     trackPresentation = presentation;

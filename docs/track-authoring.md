@@ -149,9 +149,13 @@ your left-right changes. The numbers describe your own lap, so a wall hit
 shows as a slow point.
 
 **Test Drive** is the race view. Time, best lap and speed are the race HUD.
-The bar shows the next gate and wall contacts, plus **Desktop**, **Mobile**,
-Pause, Reset and Whole track. **Desktop** fills the wide view with the desktop
-race camera. **Mobile** uses a tall phone screen and the phone race camera.
+The bar shows the next gate and wall contacts, and **Reset**. Tap the speed,
+or press Escape, to pause. On a computer the bar also has **Desktop** and
+**Mobile**. **Desktop** fills the wide view and steers with the arrow keys or
+A and D. **Mobile** uses a tall phone screen, the phone camera, and steering
+by holding the left or right half of that screen. A phone or tablet is already
+that view, so those two buttons stay hidden and you steer by tapping the left
+or right side of the screen.
 Test Drive keeps your
 10 best laps for each layout in the browser. A change to a wall, gate, start
 point, corner or ground starts a new list.

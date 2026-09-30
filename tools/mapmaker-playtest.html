@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="../styles/foundation.css">
     <link rel="stylesheet" href="../styles/race-hud-and-medals.css">
     <link rel="stylesheet" href="../styles/race-controls-and-feedback.css">
-    <link rel="stylesheet" href="mapmaker-playtest.css?v=6">
+    <link rel="stylesheet" href="mapmaker-playtest.css?v=7">
 </head>
 <body class="drive-body">
     <header class="drive-header">
@@ -16,13 +16,11 @@
         <h1 id="track-title">Test Drive</h1>
         <p id="drive-feedback" class="drive-status">Loading draft…</p>
         <div class="drive-actions">
-            <div class="frame-toggle" role="group" aria-label="Race screen">
+            <div id="frame-toggle" class="frame-toggle" role="group" aria-label="Race screen">
                 <button id="frame-desktop" type="button" aria-pressed="true">Desktop</button>
                 <button id="frame-mobile" type="button" aria-pressed="false">Mobile</button>
             </div>
-            <button id="pause-button" type="button">Pause</button>
             <button id="reset-button" type="button">Reset</button>
-            <button id="view-button" type="button">Whole track</button>
         </div>
     </header>
 
@@ -47,7 +45,7 @@
                     </div>
                 </div>
                 <div class="mobile-hud-bar">
-                    <div id="speedometer" class="speedometer" aria-live="off" aria-label="Current speed">
+                    <div id="speedometer" class="speedometer speedometer--pause" role="button" aria-live="off" aria-label="Pause">
                         <div class="speedometer-content">
                             <div id="speed-bar" class="speedometer-bar"></div>
                             <div class="speedometer-text">
@@ -64,13 +62,15 @@
                     <span id="flow-beat"></span>
                     <span id="flow-switch"></span>
                 </section>
-                <div class="steer-buttons" aria-label="Steering controls">
-                    <button id="steer-left" type="button" aria-label="Steer left">←</button>
-                    <button id="steer-right" type="button" aria-label="Steer right">→</button>
+                <div class="mobile-controls">
+                    <div class="control-group">
+                        <button id="btn-left" class="touch-btn" type="button" aria-label="Steer left"></button>
+                        <button id="btn-right" class="touch-btn" type="button" aria-label="Steer right"></button>
+                    </div>
                 </div>
             </section>
         </div>
     </main>
-    <script type="module" src="mapmaker-playtest.js?v=5"></script>
+    <script type="module" src="mapmaker-playtest.js?v=6"></script>
 </body>
 </html>
