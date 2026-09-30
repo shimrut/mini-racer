@@ -37,9 +37,15 @@ function buttonsByText(root, text) {
     return [...root.querySelectorAll('button')].filter((button) => button.textContent === text);
 }
 
+// The page dialog answers yes. Reddit's frame ignores window.confirm and
+// answers no, so a panel that still used it would stop.
+const confirm = vi.fn(async () => true);
+
 beforeEach(() => {
     setupDom();
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    confirm.mockClear();
+    confirm.mockImplementation(async () => true);
+    vi.stubGlobal('confirm', vi.fn(() => false));
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -55,7 +61,7 @@ describe('Creator Daily list', () => {
         });
         vi.stubGlobal('fetch', fetchMock);
         const setStatus = vi.fn();
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
         await panels.loadDaily();
 
         const root = document.getElementById('creator-daily-view');
@@ -78,7 +84,7 @@ describe('Creator Daily list', () => {
 
     it('keeps the latest Daily in the list', async () => {
         vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(dailyView)));
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadDaily();
         const removeButtons = buttonsByText(document.getElementById('creator-daily-view'), '✕');
         expect(removeButtons.map((button) => button.disabled)).toEqual([false, true, false]);
@@ -90,7 +96,7 @@ describe('Creator Daily list', () => {
             ? pending.promise : jsonResponse(dailyView));
         vi.stubGlobal('fetch', fetchMock);
         const setStatus = vi.fn();
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
         await panels.loadDaily();
         panels.moveDaily(2, 1);
         const sent = [...panels.dailyKeys];
@@ -117,7 +123,7 @@ describe('Creator Daily list', () => {
         const pending = deferred();
         const fetchMock = vi.fn(async () => jsonResponse(dailyView));
         vi.stubGlobal('fetch', fetchMock);
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadDaily();
         fetchMock.mockImplementation(() => pending.promise);
         const loading = panels.loadDaily();
@@ -159,7 +165,7 @@ describe('Creator Campaign Planner', () => {
             return jsonResponse(seriesView);
         });
         vi.stubGlobal('fetch', fetchMock);
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
 
         const root = document.getElementById('creator-series-view');
@@ -181,7 +187,7 @@ describe('Creator Campaign Planner', () => {
         const fetchMock = vi.fn(async (_url, options) => options?.method === 'PUT'
             ? pending.promise : jsonResponse(structuredClone(seriesView)));
         vi.stubGlobal('fetch', fetchMock);
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
         panels.seriesDraft.name = 'Sent name';
         panels.seriesDirty = true;
@@ -202,11 +208,11 @@ describe('Creator Campaign Planner', () => {
         const pending = deferred();
         vi.stubGlobal('fetch', vi.fn(async (_url, options) => options?.method === 'PUT'
             ? pending.promise : jsonResponse(structuredClone(seriesView))));
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
         panels.seriesDirty = true;
         const saving = panels.saveSeries();
-        panels.startNewSeries();
+        await panels.startNewSeries();
         panels.seriesDraft.name = 'Another series';
         pending.resolve(jsonResponse({ series: { ...seriesView.series[0], revision: 6 } }));
         await saving;
@@ -220,7 +226,7 @@ describe('Creator Campaign Planner', () => {
         const pending = deferred();
         const fetchMock = vi.fn(async () => jsonResponse(structuredClone(seriesView)));
         vi.stubGlobal('fetch', fetchMock);
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
         fetchMock.mockImplementation(() => pending.promise);
         const loading = panels.loadSeries();
@@ -242,11 +248,12 @@ describe('Creator Campaign Planner', () => {
         view.tracks.push({ key: 'unfinishedLoop', name: 'Unfinished', ground: 'tarmac', ready: false });
         vi.stubGlobal('fetch', vi.fn(async (_url, options) => options?.method === 'POST'
             ? pending.promise : jsonResponse(view)));
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
         await panels.loadSeries('night-v1');
         const root = document.getElementById('creator-series-view');
         expect([...root.querySelector('.creator-adder select').options].map((option) => option.value)).not.toContain('unfinishedLoop');
         const publishing = panels.publishSeries();
+        await vi.waitFor(() => expect(panels.busy).toBe(true));
         expect([...root.querySelectorAll('input, button, select')].every((control) => control.disabled)).toBe(true);
         panels.startNewSeries();
         expect(panels.selectedSeriesId).toBe('night-v1');
@@ -264,13 +271,64 @@ describe('Creator copy screen', () => {
             : jsonResponse({ report: null, preview })));
         vi.stubGlobal('fetch', fetchMock);
         const onTracksChanged = vi.fn();
-        const panels = new CreatorPanels({ onOpenTrack: vi.fn(), onTracksChanged, setStatus: vi.fn() });
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged, setStatus: vi.fn() });
         await panels.loadCopy();
         const root = document.getElementById('creator-copy-view');
         expect(root.textContent).toContain('1 unplayed tracks to copy.');
         expect(root.textContent).toContain('1 hidden series to copy as drafts.');
         await panels.runCopy();
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Copy' }));
+        expect(window.confirm).not.toHaveBeenCalled();
         expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
         expect(onTracksChanged).toHaveBeenCalled();
+    });
+
+    it('sends nothing when the question is cancelled', async () => {
+        const preview = { copied: ['babylonRace'], played: 90, dailyList: 'would-copy' };
+        const fetchMock = vi.fn(async () => jsonResponse({ report: null, preview }));
+        vi.stubGlobal('fetch', fetchMock);
+        confirm.mockImplementation(async () => false);
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadCopy();
+        await panels.runCopy();
+        expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+        expect(panels.busy).toBe(false);
+    });
+
+    it('shows the copy running, then its error, on the Copy screen', async () => {
+        const preview = { copied: ['babylonRace'], played: 90, dailyList: 'would-copy' };
+        const copy = deferred();
+        vi.stubGlobal('fetch', vi.fn(async (url, options) => (options?.method === 'POST'
+            ? copy.promise
+            : jsonResponse({ report: null, preview }))));
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadCopy();
+        const root = document.getElementById('creator-copy-view');
+        const running = panels.runCopy();
+        await vi.waitFor(() => expect(root.textContent).toContain('Copying the unplayed tracks…'));
+        copy.resolve(jsonResponse({ error: 'Tracks are being updated. Try again.' }, 503));
+        await running;
+        expect(root.textContent).toContain('Could not copy: Tracks are being updated. Try again.');
+        expect(buttonsByText(root, 'Copy now')[0].disabled).toBe(false);
+    });
+});
+
+describe('Creator Campaign questions', () => {
+    it('asks with the page dialog before a series goes live', async () => {
+        const seriesView = {
+            series: [{ id: 'night-v1', name: 'Night', ground: 'tarmac', stages: [], status: 'draft', publishedStageCount: 0, revision: 2 }],
+            appSeries: [],
+            tracks: [],
+        };
+        const fetchMock = vi.fn(async (url, options) => (options?.method === 'POST'
+            ? jsonResponse({ series: { ...seriesView.series[0], status: 'published', revision: 3 } })
+            : jsonResponse(seriesView)));
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        await panels.publishSeries();
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: 'Make live' }));
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true);
     });
 });

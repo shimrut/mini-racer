@@ -154,13 +154,13 @@
         <div id="track-picker-list" class="track-cards"></div>
     </dialog>
 
-    <dialog id="remove-track-dialog" class="maker-dialog" aria-labelledby="remove-track-dialog-title">
+    <dialog id="confirm-dialog" class="maker-dialog" aria-labelledby="confirm-dialog-title">
         <form method="dialog">
-            <h2 id="remove-track-dialog-title">Delete track?</h2>
-            <p id="remove-track-dialog-message"></p>
+            <h2 id="confirm-dialog-title">Delete track?</h2>
+            <p id="confirm-dialog-message"></p>
             <div class="maker-dialog-actions">
                 <button type="submit" value="cancel">Cancel</button>
-                <button type="submit" value="remove" class="danger-btn">Delete</button>
+                <button id="confirm-dialog-button" type="submit" value="confirm" class="danger-btn">Delete</button>
             </div>
         </form>
     </dialog>

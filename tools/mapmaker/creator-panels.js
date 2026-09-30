@@ -54,10 +54,12 @@ function moveItem(list, from, to) {
 }
 
 export class CreatorPanels {
-    constructor({ onOpenTrack, onTracksChanged, setStatus }) {
+    // `confirm` opens the page's own dialog. Reddit ignores window.confirm.
+    constructor({ onOpenTrack, onTracksChanged, setStatus, confirm }) {
         this.onOpenTrack = onOpenTrack;
         this.onTracksChanged = onTracksChanged;
         this.setStatus = setStatus;
+        this.confirm = confirm;
         this.dailyRoot = document.getElementById('creator-daily-view');
         this.seriesRoot = document.getElementById('creator-series-view');
         this.copyRoot = document.getElementById('creator-copy-view');
@@ -76,6 +78,16 @@ export class CreatorPanels {
         this.writeGeneration = 0;
         this.dailySaveError = null;
         this.seriesSaveError = null;
+        this.copyError = null;
+    }
+
+    confirmDiscardSeries() {
+        return this.confirm({
+            title: 'Discard changes?',
+            message: 'Discard the unsaved changes to this series?',
+            confirmLabel: 'Discard',
+            danger: true,
+        });
     }
 
     hasUnsavedChanges() {
@@ -246,7 +258,7 @@ export class CreatorPanels {
                 this.renderSeries();
                 return;
             }
-            this.selectSeries(selectId, { force: true });
+            await this.selectSeries(selectId, { force: true });
         } catch (error) {
             this.seriesRoot.replaceChildren(
                 element('p', { className: 'creator-error', text: `Could not load the Campaign: ${error.message}` }),
@@ -257,9 +269,10 @@ export class CreatorPanels {
         }
     }
 
-    selectSeries(seriesId, { force = false } = {}) {
+    async selectSeries(seriesId, { force = false } = {}) {
         if (this.seriesDestructive) return;
-        if (!force && this.seriesDirty && !window.confirm('Discard the unsaved changes to this series?')) return;
+        if (!force && this.seriesDirty && !await this.confirmDiscardSeries()) return;
+        if (this.seriesDestructive) return;
         const stored = this.seriesView.series.find((series) => series.id === seriesId) ?? null;
         this.selectedSeriesId = stored ? stored.id : null;
         this.seriesDraft = stored ? structuredClone(stored) : null;
@@ -267,9 +280,10 @@ export class CreatorPanels {
         this.renderSeries();
     }
 
-    startNewSeries() {
+    async startNewSeries() {
         if (this.seriesDestructive) return;
-        if (this.seriesDirty && !window.confirm('Discard the unsaved changes to this series?')) return;
+        if (this.seriesDirty && !await this.confirmDiscardSeries()) return;
+        if (this.seriesDestructive) return;
         this.selectedSeriesId = null;
         this.seriesDraft = {
             id: '',
@@ -535,7 +549,12 @@ export class CreatorPanels {
     async publishSeries() {
         if (this.busy) return;
         const draft = this.seriesDraft;
-        if (!window.confirm(`Make ${draft.name} live? Players see it at once, and its stages cannot change after this.`)) return;
+        if (!await this.confirm({
+            title: 'Make the series live?',
+            message: `Make ${draft.name} live? Players see it at once, and its stages cannot change after this.`,
+            confirmLabel: 'Make live',
+        })) return;
+        if (this.busy || this.seriesDraft !== draft) return;
         this.busy = true;
         this.seriesDestructive = true;
         this.seriesSaveError = null;
@@ -561,7 +580,13 @@ export class CreatorPanels {
     async deleteSeries() {
         if (this.busy) return;
         const draft = this.seriesDraft;
-        if (!window.confirm(`Delete the draft ${draft.name}?`)) return;
+        if (!await this.confirm({
+            title: 'Delete the draft?',
+            message: `Delete the draft ${draft.name}? You cannot undo this.`,
+            confirmLabel: 'Delete',
+            danger: true,
+        })) return;
+        if (this.busy || this.seriesDraft !== draft) return;
         this.busy = true;
         this.seriesDestructive = true;
         this.seriesSaveError = null;
@@ -617,7 +642,8 @@ export class CreatorPanels {
             }),
             element('ul', { className: 'creator-copy-lines' }, lines.map((line) => element('li', { text: line }))),
             button('Copy now', () => this.runCopy(), { className: 'primary-btn', disabled: this.busy || nothingToCopy }),
-        ];
+            this.copyError ? element('p', { className: 'creator-error', text: this.copyError }) : null,
+        ].filter(Boolean);
         if (report) {
             children.push(element('p', {
                 className: 'field-hint',
@@ -634,15 +660,24 @@ export class CreatorPanels {
 
     async runCopy() {
         if (this.busy) return;
-        if (!window.confirm('Copy the unplayed tracks to Redis now?')) return;
+        if (!await this.confirm({
+            title: 'Copy to Redis?',
+            message: 'Copy the unplayed tracks to Redis now?',
+            confirmLabel: 'Copy',
+        })) return;
+        if (this.busy) return;
         this.busy = true;
+        this.copyError = null;
         this.writeGeneration += 1;
+        // The result appears on this screen: the status line is on the Tracks screen.
+        this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Copying the unplayed tracks…' }));
         try {
             const { report } = await creatorApi.runMigration();
             this.setStatus(`Copied ${report.copied.length} tracks.`);
             this.onTracksChanged();
         } catch (error) {
-            this.setStatus(`Could not copy: ${error.message}`, true);
+            this.copyError = `Could not copy: ${error.message}`;
+            this.setStatus(this.copyError, true);
         } finally {
             this.busy = false;
             this.writeGeneration += 1;

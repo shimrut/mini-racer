@@ -319,8 +319,10 @@ class MapmakerApp {
         this.checkpointCount = document.getElementById('checkpoint-count');
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.deleteCheckpointBtn = document.getElementById('delete-checkpoint-btn');
-        this.removeTrackDialog = document.getElementById('remove-track-dialog');
-        this.removeTrackDialogMessage = document.getElementById('remove-track-dialog-message');
+        this.confirmDialog = document.getElementById('confirm-dialog');
+        this.confirmDialogTitle = document.getElementById('confirm-dialog-title');
+        this.confirmDialogMessage = document.getElementById('confirm-dialog-message');
+        this.confirmDialogButton = document.getElementById('confirm-dialog-button');
         this.driveDraftBtn = document.getElementById('drive-draft-btn');
         this.restoreDraftsDialog = document.getElementById('restore-drafts-dialog');
         this.restoreDraftsDialogMessage = document.getElementById('restore-drafts-dialog-message');
@@ -450,6 +452,7 @@ class MapmakerApp {
                 onOpenTrack: (trackKey) => this.openCreatorTrack(trackKey),
                 onTracksChanged: () => void this.loadCreatorTracks({ keepSelection: true }),
                 setStatus: (message, isError) => this.setStatus(message, isError),
+                confirm: (options) => this.confirmAction(options),
             });
             this.bindCreatorTabs();
             void this.loadCreatorTracks();
@@ -1496,15 +1499,26 @@ class MapmakerApp {
         this.trackNameInput.select();
     }
 
-    confirmTrackRemoval(message) {
-        this.removeTrackDialogMessage.textContent = message;
-        this.removeTrackDialog.returnValue = '';
-        this.removeTrackDialog.showModal();
+    // Reddit shows the Creator in a frame that ignores window.confirm, so
+    // every question uses this page dialog.
+    confirmAction({ title, message, confirmLabel, danger = false }) {
+        this.confirmDialogTitle.textContent = title;
+        this.confirmDialogMessage.textContent = message;
+        this.confirmDialogButton.textContent = confirmLabel;
+        this.confirmDialogButton.className = danger ? 'danger-btn' : 'primary-btn';
+        this.confirmDialog.returnValue = '';
+        this.confirmDialog.showModal();
         return new Promise((resolve) => {
-            this.removeTrackDialog.addEventListener('close', () => {
-                resolve(this.removeTrackDialog.returnValue === 'remove');
+            this.confirmDialog.addEventListener('close', () => {
+                resolve(this.confirmDialog.returnValue === 'confirm');
             }, { once: true });
         });
+    }
+
+    confirmTrackRemoval(message) {
+        return this.confirmAction(this.creatorMode
+            ? { title: 'Delete track?', message, confirmLabel: 'Delete', danger: true }
+            : { title: 'Remove track?', message, confirmLabel: 'Remove', danger: true });
     }
 
     async removeTrack() {
