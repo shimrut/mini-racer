@@ -38,9 +38,12 @@ export function carUnlockHashKey(playerId: string): string {
     return `miniracer:car-unlocks:v1:${playerFieldHash(playerId)}`;
 }
 
-function promotionKey(playerId: string): string {
+// Set when a guest's transfer is chosen. It names the account the guest went to.
+export function guestPromotionKey(playerId: string): string {
     return `miniracer:car-unlocks:promotion:v1:${playerFieldHash(playerId)}`;
 }
+
+const promotionKey = guestPromotionKey;
 
 function owedRewardKey(playerId: string): string {
     return `miniracer:car-unlocks:owed:v1:${playerFieldHash(playerId)}`;

@@ -293,6 +293,73 @@ describe('Campaign with more than one live series', () => {
         expect(numbers.body.carUnlocks.progress.campaignAuthor).toBe(1);
     });
 
+    it('keeps a saved row on a stage the request does not know, and leaves it out of the answer', async () => {
+        mockValidateDailyGpReplayDetailed.mockReturnValue(oneLapRun(1000));
+        const playerId = 'reddit:racefan';
+        // A stage published after this request took its list: the list has 00 to 09.
+        const newerStageRow = {
+            raceId: 'test-v1-10',
+            trackKey: 'babylonRace',
+            lapCount: 1,
+            rulesRevision: 1,
+            bestTimeMs: 2000,
+            medal: 'gold',
+            checkpointTimesSec: null,
+            updatedAt: '2026-09-30T10:00:00.000Z',
+        };
+        strings.set(progressKeyFor('test-v1', playerId), JSON.stringify({
+            campaignId: 'test-v1',
+            startedAt: '2026-09-01T00:00:00.000Z',
+            resultsByRaceId: {
+                'test-v1-10': newerStageRow,
+                // A known stage on old rules is dropped, as before.
+                'test-v1-01': { ...newerStageRow, raceId: 'test-v1-01', trackKey: 'sunlitTemple', rulesRevision: 99 },
+                // A row of another series whose name starts with this one.
+                'test-v1-x-00': { ...newerStageRow, raceId: 'test-v1-x-00' },
+            },
+            updatedAt: '2026-09-30T10:00:00.000Z',
+        }));
+        const { submitServerCampaignRun } = await import('../src/server/campaign/campaign-store.ts');
+
+        const result = await submitServerCampaignRun({
+            raceId: 'test-v1-00',
+            trackKey: 'circuit',
+            replay: { inputs: [] },
+            redditUsername: 'RaceFan',
+        });
+
+        expect(result.status).toBe(200);
+        expect(Object.keys(result.body.progress.resultsByRaceId)).toEqual(['test-v1-00']);
+        expect(result.body.progress.unlockedRaceIds).toEqual(['test-v1-00', 'test-v1-01']);
+        const saved = JSON.parse(strings.get(progressKeyFor('test-v1', playerId))).resultsByRaceId;
+        expect(saved['test-v1-10']).toEqual(newerStageRow);
+        expect(saved).toHaveProperty('test-v1-00');
+        expect(saved).not.toHaveProperty('test-v1-01');
+        expect(saved).not.toHaveProperty('test-v1-x-00');
+    });
+
+    it('shows a board result during a transfer of the account, and writes no progress', async () => {
+        const playerId = 'reddit:racefan';
+        const { guestProgressSelectionAccountPendingKey } = await import('../src/server/player/guest-retirement.ts');
+        strings.set(guestProgressSelectionAccountPendingKey(playerId), 'guest:transferring');
+        hashes.set('campaign:test-v1:leaderboard:test-v1-00:entries', new Map([[playerId, JSON.stringify({
+            playerId,
+            displayName: 'RaceFan',
+            bestTimeMs: 4000,
+            trackKey: 'circuit',
+            completedLaps: 1,
+            validationMethod: 'strict-replay',
+            updatedAt: '2026-09-30T10:00:00.000Z',
+        })]]));
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
+
+        const result = await getServerCampaignBootstrap({ redditUsername: 'RaceFan', seriesId: 'test-v1' });
+
+        expect(result.status).toBe(200);
+        expect(result.body.progress.resultsByRaceId).toHaveProperty('test-v1-00');
+        expect(strings.has(progressKeyFor('test-v1', playerId))).toBe(false);
+    });
+
     it('refuses a stage whose series medals are not enough, whatever the other series holds', async () => {
         const playerId = 'reddit:racefan';
         strings.set(progressKeyFor('numbered-v1', playerId), JSON.stringify({

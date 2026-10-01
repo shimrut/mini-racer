@@ -56,6 +56,7 @@ import {
 import { redisCompressed } from '@devvit/redis';
 import {
     getCarUnlockSnapshot,
+    guestPromotionKey,
     readGuestPromotionTarget,
     recordCompletedRace,
 } from '../player/car-unlock-store.js';
@@ -77,7 +78,12 @@ import {
     GuestProgressSelectionRetryableError,
 } from '../guest-transfer/guest-progress-selection-error.js';
 import { recordAnalyticsRaceBestEffort } from '../moderator/analytics-store.js';
-import { isPlayerProgressSelectionPending, isProgressTransferPending } from '../player/guest-retirement.js';
+import {
+    guestProgressSelectionAccountPendingKey,
+    guestProgressSelectionPendingKey,
+    isPlayerProgressSelectionPending,
+    isProgressTransferPending,
+} from '../player/guest-retirement.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
@@ -279,6 +285,44 @@ async function readProgress(playerId: string, seriesId: string): Promise<Campaig
     return parseCampaignProgress(await redis.get(progressKey(playerId, seriesId)), seriesId);
 }
 
+const STAGE_NUMBER_RE = /^\d{2,}$/;
+
+// Saved rows of this series whose stage the request's list does not know: a
+// stage published after the request took its list. They are not verified, so
+// they never count as progress, but a write keeps them as they are.
+function unknownStageRows(raw: string | null | undefined, seriesId: string): Record<string, unknown> {
+    if (!raw) return {};
+    let value: { campaignId?: unknown; resultsByRaceId?: unknown };
+    try {
+        value = JSON.parse(raw);
+    } catch (_error) {
+        return {};
+    }
+    if (value?.campaignId !== seriesId) return {};
+    const rows = value.resultsByRaceId;
+    if (!rows || typeof rows !== 'object' || Array.isArray(rows)) return {};
+    const kept: Record<string, unknown> = {};
+    const prefix = `${seriesId}-`;
+    for (const [raceId, row] of Object.entries(rows)) {
+        // A series name can start with another series name ("night" and
+        // "night-v1"), so the stage number must be all that follows.
+        if (!raceId.startsWith(prefix) || !STAGE_NUMBER_RE.test(raceId.slice(prefix.length))) continue;
+        if (!row || typeof row !== 'object' || (row as { raceId?: unknown }).raceId !== raceId) continue;
+        if (getCampaignStage(raceId)) continue;
+        kept[raceId] = row;
+    }
+    return kept;
+}
+
+// One read for a write: the verified progress, and the rows to keep unchanged.
+async function readProgressForWrite(playerId: string, seriesId: string): Promise<{
+    progress: CampaignProgress;
+    unknownRows: Record<string, unknown>;
+}> {
+    const raw = await redis.get(progressKey(playerId, seriesId));
+    return { progress: parseCampaignProgress(raw, seriesId), unknownRows: unknownStageRows(raw, seriesId) };
+}
+
 // The records of every live series, in series order.
 async function readAllProgress(playerId: string): Promise<CampaignProgress[]> {
     return Promise.all(CAMPAIGN_SERIES.map((series) => readProgress(playerId, series.id)));
@@ -294,17 +338,47 @@ function mergeSeriesResults(
 
 class CampaignProgressBusyError extends GuestProgressSelectionRetryableError {}
 
+// A transfer owns the player's Campaign rows from its marks until it ends.
+export class CampaignProgressTransferPendingError extends Error {
+    constructor() {
+        super('A progress transfer owns this Campaign progress.');
+        this.name = 'CampaignProgressTransferPendingError';
+    }
+}
+
+// The keys that show a transfer of this player: its marks, and for a guest
+// the account it went to.
+function transferStateKeys(playerId: string): string[] {
+    return isGuestPlayerId(playerId)
+        ? [guestProgressSelectionPendingKey(playerId), guestPromotionKey(playerId)]
+        : [guestProgressSelectionAccountPendingKey(playerId)];
+}
+
+async function assertNoProgressTransfer(playerId: string): Promise<void> {
+    const values = await Promise.all(transferStateKeys(playerId).map((key) => redis.get(key)));
+    if (values.some(Boolean)) throw new CampaignProgressTransferPendingError();
+}
+
 async function writeProgressWithOwnedLock(
     playerId: string,
     progress: CampaignProgress,
     lock: RedisLock,
     transactionRunner?: RedisLockTransactionRunner,
+    { unknownRows = {}, fenceTransfer = false }: {
+        unknownRows?: Record<string, unknown>;
+        // A race write stops if a transfer of the player started. The check
+        // holds until EXEC: a transfer that starts later fails the commit.
+        fenceTransfer?: boolean;
+    } = {},
 ): Promise<void> {
     const expiresAt = guestExpiresAt();
+    const record = Object.keys(unknownRows).length
+        ? { ...progress, resultsByRaceId: { ...unknownRows, ...progress.resultsByRaceId } }
+        : progress;
     const enqueue: RedisLockMutation = async (transaction) => {
         await transaction.set(
             progressKey(playerId, progress.campaignId),
-            JSON.stringify(progress),
+            JSON.stringify(record),
             isGuestPlayerId(playerId) ? { expiration: expiresAt } : undefined,
         );
         if (isGuestPlayerId(playerId)) {
@@ -317,7 +391,9 @@ async function writeProgressWithOwnedLock(
     if (transactionRunner) {
         await transactionRunner([lock], enqueue);
     } else {
-        const transaction = await beginOwnedRedisLockTransaction(lock, redis);
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis, fenceTransfer
+            ? { watchedKeys: transferStateKeys(playerId), check: () => assertNoProgressTransfer(playerId) }
+            : {});
         if (!transaction) throw new CampaignProgressBusyError('Campaign progress lock was lost.');
         await enqueue(transaction);
         if (!await commitOwnedRedisLockTransaction(transaction)) {
@@ -354,10 +430,10 @@ async function mutateProgress(
     );
     if (!lock) throw new CampaignProgressBusyError('Campaign progress update is already in progress.');
     try {
-        const current = await readProgress(playerId, seriesId);
+        const { progress: current, unknownRows } = await readProgressForWrite(playerId, seriesId);
         const next = mutate(current);
         if (next === current) return current;
-        await writeProgressWithOwnedLock(playerId, next, lock);
+        await writeProgressWithOwnedLock(playerId, next, lock, undefined, { unknownRows, fenceTransfer: true });
         return next;
     } finally {
         await releaseRedisLock(lock, redis).catch((error) => {
@@ -579,23 +655,34 @@ async function repairCampaignProgressFromLeaderboard(
     );
     if (!recoveredResults.length) return progress;
 
-    return mutateProgress(playerId, seriesId, (freshProgress) => {
-        const resultsByRaceId = { ...freshProgress.resultsByRaceId };
+    const withRecovered = (base: CampaignProgress): CampaignProgress => {
+        const resultsByRaceId = { ...base.resultsByRaceId };
         let changed = false;
         for (const result of recoveredResults) {
             if (resultsByRaceId[result.raceId]) continue;
             resultsByRaceId[result.raceId] = result;
             changed = true;
         }
-        if (!changed) return freshProgress;
+        if (!changed) return base;
         const nowIso = new Date().toISOString();
         return {
             campaignId: seriesId,
-            startedAt: freshProgress.startedAt || nowIso,
+            startedAt: base.startedAt || nowIso,
             resultsByRaceId,
             updatedAt: nowIso,
         } satisfies CampaignProgress;
-    });
+    };
+    try {
+        return await mutateProgress(playerId, seriesId, withRecovered);
+    } catch (error) {
+        // A held lock, a transfer of the player, or a transfer that started
+        // during the write: show the recovered results and write nothing.
+        // A later read repairs again.
+        if (error instanceof CampaignProgressBusyError || error instanceof CampaignProgressTransferPendingError) {
+            return withRecovered(progress);
+        }
+        throw error;
+    }
 }
 
 export async function repairCampaignStandingsFromEntries(
@@ -753,6 +840,7 @@ export async function startServerCampaignRace({
         if (error instanceof CampaignProgressBusyError) {
             return { status: 503, body: { error: 'Campaign progress is busy. Try again.' } };
         }
+        if (error instanceof CampaignProgressTransferPendingError) return progressTransferPendingReply();
         throw error;
     }
     return { status: 200, body: { race: stage, progress: publicProgress(startedProgress) } };
@@ -929,6 +1017,9 @@ export async function submitServerCampaignRun({
                     body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
                 };
             }
+            // The board row was written before the transfer marks, so the
+            // transfer copies it. The guest's progress is not written again.
+            if (error instanceof CampaignProgressTransferPendingError) return progressTransferPendingReply();
             throw error;
         }
 
@@ -1210,18 +1301,22 @@ export async function mergeGuestCampaignProgress({
         const redditProgressBySeries = new Map<string, CampaignProgress>();
         const mergedResultsBySeries = new Map<string, Record<string, CampaignBestResult>>();
         let hasGuestEvidence = false;
+        // The account's rows on stages this list does not know stay as they
+        // are. Unknown guest rows are not evidence to copy.
+        const redditUnknownRowsBySeries = new Map<string, Record<string, unknown>>();
         const seriesProgress = await Promise.all(CAMPAIGN_SERIES.map(async (series) => {
-            const [guestProgress, redditProgress] = await Promise.all([
+            const [guestProgress, redditRead] = await Promise.all([
                 guestSource
                     ? Promise.resolve(guestSource.progressBySeries.get(series.id) ?? emptyProgress(series.id))
                     : readProgress(guestPlayerId, series.id),
-                readProgress(redditPlayerId, series.id),
+                readProgressForWrite(redditPlayerId, series.id),
             ]);
-            return { series, guestProgress, redditProgress };
+            return { series, guestProgress, redditProgress: redditRead.progress, redditUnknownRows: redditRead.unknownRows };
         }));
-        for (const { series, guestProgress, redditProgress } of seriesProgress) {
+        for (const { series, guestProgress, redditProgress, redditUnknownRows } of seriesProgress) {
             guestProgressBySeries.set(series.id, guestProgress);
             redditProgressBySeries.set(series.id, redditProgress);
+            redditUnknownRowsBySeries.set(series.id, redditUnknownRows);
             mergedResultsBySeries.set(series.id, { ...redditProgress.resultsByRaceId });
             hasGuestEvidence ||= Boolean(
                 guestProgress.startedAt
@@ -1355,7 +1450,7 @@ export async function mergeGuestCampaignProgress({
                 startedAt: redditProgress.startedAt || guestProgress.startedAt || nowIso,
                 resultsByRaceId: mergedResults,
                 updatedAt: nowIso,
-            }, redditProgressLock, runMutation);
+            }, redditProgressLock, runMutation, { unknownRows: redditUnknownRowsBySeries.get(series.id) });
         }
 
         return { merged: mergedRaceIds.length > 0, mergedRaceIds };

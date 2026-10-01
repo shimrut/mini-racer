@@ -98,17 +98,25 @@ export async function isRedisLockOwned(
     return await client.get(lock.key) === lock.value;
 }
 
+// `watchedKeys` are watched with the lock. `check` runs after WATCH and before
+// MULTI, so a state it reads cannot change before EXEC without failing the
+// commit. When `check` throws, the transaction is given up.
 export async function beginOwnedRedisLockTransaction(
     lock: RedisLock,
     client: RedisClient = redis,
+    { watchedKeys = [], check }: {
+        watchedKeys?: readonly string[];
+        check?: () => Promise<void>;
+    } = {},
 ): Promise<TxClientLike | null> {
-    const transaction = await client.watch(lock.key);
+    const transaction = await client.watch(...new Set([lock.key, ...watchedKeys]));
     try {
         // Transaction-client reads queue; read the base client.
         if (!await isRedisLockOwned(lock, client)) {
             await safelyUnwatch(transaction);
             return null;
         }
+        if (check) await check();
         await transaction.multi();
         return transaction;
     } catch (error) {

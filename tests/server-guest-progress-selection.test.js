@@ -53,6 +53,7 @@ const { RACED_LIST_FILL_READY_KEY } = await import("../src/server/player/raced-l
 const { transferredSettings } = await import("../src/server/player/transfer-settings.ts");
 const { readPlayerProfile, upsertPlayerProfile } = await import("../src/server/competition/competition-identity.ts");
 const { repairCampaignStandingsFromEntries } = await import("../src/server/campaign/campaign-store.ts");
+const { getServerCampaignBootstrap, submitServerCampaignRun } = await import("../src/server/campaign/campaign-store.ts");
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -669,6 +670,219 @@ describe("guest transfer cost and recovery", () => {
     delete redis.set;
 
     expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)).bestTimeMs).toBe(30000);
+  });
+
+  function campaignProgressLockKey(playerId) {
+    return `campaign:numbered-v1:progress-lock:${dailyPbField(playerId)}`;
+  }
+
+  it("fails a race write that a transfer overtakes before its commit, so the transfer needs no review", async () => {
+    await seedSevenDayPlaylist();
+    const guestName = "overtaken-write";
+    const guestPlayerId = `guest:${guestName}`;
+    const redditPlayerId = "reddit:overtaken-write";
+    const [stage] = NUMBERS_STAGES;
+    await seedCampaignStage(stage, guestPlayerId);
+    const guestToken = await mintGuestPlayerToken(guestName);
+    const lockKey = campaignProgressLockKey(guestPlayerId);
+    let firstTransfer = null;
+    const realWatch = RedisTestDouble.prototype.watch;
+    redis.watch = async function overtakeBeforeCommit(...keys) {
+      const transaction = await realWatch.apply(this, keys);
+      if (keys.includes(lockKey) && !firstTransfer) {
+        const realExec = transaction.exec;
+        transaction.exec = async () => {
+          // The write passed its transfer check and holds its progress lock.
+          // The transfer sets its marks and records the guest data now.
+          firstTransfer = selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" })
+            .then(() => "completed", (error) => error);
+          await firstTransfer;
+          return realExec();
+        };
+      }
+      return transaction;
+    };
+
+    const started = await startServerCampaignRace({ raceId: stage.raceId, playerId: guestName, guestToken });
+    delete redis.watch;
+
+    // The merge could not take the progress lock that the write held.
+    expect(await firstTransfer).toMatchObject({ statusCode: 503, reason: "progress_selection_retryable" });
+    expect(started.status).toBe(503);
+    expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeFalsy();
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" }))
+      .resolves.toMatchObject({ status: "completed" });
+  });
+
+  it("refuses a late progress write after the transfer ended, and the account keeps the time", async () => {
+    await seedSevenDayPlaylist();
+    const guestName = "late-write";
+    const guestPlayerId = `guest:${guestName}`;
+    const redditPlayerId = "reddit:late-write";
+    const [stage] = NUMBERS_STAGES;
+    const guestToken = await mintGuestPlayerToken(guestName);
+    const competition = campaignCompetitionFor(stage, guestPlayerId);
+    const lockKey = campaignProgressLockKey(guestPlayerId);
+    let transfer = null;
+    const realSet = RedisTestDouble.prototype.set;
+    redis.set = async function transferBeforeProgressWrite(key, value, options) {
+      if (key === lockKey && !transfer) {
+        // The save wrote its board row and let go of its stage lock. The
+        // whole transfer runs before the save writes its progress.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        transfer = selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
+        await transfer;
+      }
+      return realSet.call(this, key, value, options);
+    };
+
+    const saved = await submitServerCampaignRun({
+      raceId: stage.raceId,
+      trackKey: stage.trackKey,
+      replay: { inputs: [] },
+      playerId: guestName,
+      guestToken,
+    }, {
+      verifiedRun: {
+        bestTimeSec: 30,
+        bestTimeMs: 30000,
+        completedLaps: stage.lapCount,
+        checkpointTimesSec: null,
+        lapCompletionTimesSec: null,
+        ghost: {
+          schemaVersion: 2,
+          sampleIntervalMs: 50,
+          finishTimeMs: 50,
+          origin: [0, 0, 0],
+          deltas: [1, 1, 1],
+        },
+        method: "finish",
+      },
+      judgedContract: {
+        trackKey: competition.trackKey,
+        lapCount: competition.lapCount,
+        rulesRevision: competition.rulesRevision,
+        objectiveType: competition.objectiveType,
+      },
+    });
+    delete redis.set;
+
+    await expect(transfer).resolves.toMatchObject({ status: "completed" });
+    expect(saved).toMatchObject({ status: 503, body: { reason: "progress_transfer_pending" } });
+    expect(await redis.get(campaignProgressKey(guestPlayerId))).toBeFalsy();
+    const accountBoard = campaignCompetitionFor(stage, redditPlayerId);
+    expect(JSON.parse(await redis.hGet(accountBoard.entryHashKey, redditPlayerId)).bestTimeMs).toBe(30000);
+    expect(JSON.parse(await redis.get(campaignProgressKey(redditPlayerId))).resultsByRaceId)
+      .toHaveProperty(stage.raceId);
+  });
+
+  it("keeps the account's own rows on stages the list does not know through a merge, and copies no unknown guest row", async () => {
+    await seedSevenDayPlaylist();
+    const guestPlayerId = "guest:unknown-rows";
+    const redditPlayerId = "reddit:unknown-rows";
+    const [stage] = NUMBERS_STAGES;
+    await seedCampaignStage(stage, guestPlayerId);
+    const unknownRow = (raceId) => ({
+      raceId,
+      trackKey: "numberZero",
+      lapCount: 1,
+      rulesRevision: 1,
+      bestTimeMs: 9000,
+      medal: "gold",
+      checkpointTimesSec: null,
+      updatedAt: "2026-09-30T10:00:00.000Z",
+    });
+    await redis.set(campaignProgressKey(redditPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T00:00:00.000Z",
+      resultsByRaceId: { "numbered-v1-98": unknownRow("numbered-v1-98") },
+      updatedAt: "2026-09-30T10:00:00.000Z",
+    }));
+    await redis.set(campaignProgressKey(guestPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-09-01T00:00:00.000Z",
+      resultsByRaceId: { "numbered-v1-99": unknownRow("numbered-v1-99") },
+      updatedAt: "2026-09-30T10:00:00.000Z",
+    }));
+
+    await expect(selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "merge" }))
+      .resolves.toMatchObject({ status: "completed" });
+
+    const accountRows = JSON.parse(await redis.get(campaignProgressKey(redditPlayerId))).resultsByRaceId;
+    expect(accountRows["numbered-v1-98"]).toEqual(unknownRow("numbered-v1-98"));
+    expect(accountRows).toHaveProperty(stage.raceId);
+    expect(accountRows).not.toHaveProperty("numbered-v1-99");
+  });
+
+  it("still loads the Campaign when a transfer starts between the repair's check and its commit", async () => {
+    const accountPlayerId = "reddit:repairracer";
+    const original = JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-07-27T09:00:00.000Z",
+      resultsByRaceId: {},
+      updatedAt: "2026-07-27T09:00:00.000Z",
+    });
+    await redis.set(campaignProgressKey(accountPlayerId), original);
+    const [stage] = NUMBERS_STAGES;
+    const board = campaignCompetitionFor(stage, accountPlayerId);
+    await redis.hSet(board.entryHashKey, {
+      [accountPlayerId]: JSON.stringify({
+        playerId: accountPlayerId,
+        displayName: "Repair racer",
+        bestTimeMs: 31234,
+        trackKey: stage.trackKey,
+        completedLaps: stage.lapCount,
+        validationMethod: "strict-replay",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    const pendingKey = guestProgressSelectionAccountPendingKey(accountPlayerId);
+    redis.beforeExec = (keys) => {
+      if (!keys.includes(pendingKey)) return;
+      redis.beforeExec = null;
+      redis.strings.set(pendingKey, "guest:starting-now");
+      redis._bump(pendingKey);
+    };
+
+    const loaded = await getServerCampaignBootstrap({ redditUsername: "RepairRacer" });
+
+    expect(loaded.status).toBe(200);
+    expect(loaded.body.progress.resultsByRaceId).toHaveProperty(stage.raceId);
+    expect(await redis.get(campaignProgressKey(accountPlayerId))).toBe(original);
+    expect(await redis.get(pendingKey)).toBe("guest:starting-now");
+  });
+
+  it("still counts the sign-in summary while a transfer of the account is pending", async () => {
+    const accountPlayerId = "reddit:summary-pending";
+    const [stage] = NUMBERS_STAGES;
+    const board = campaignCompetitionFor(stage, accountPlayerId);
+    await redis.hSet(board.entryHashKey, {
+      [accountPlayerId]: JSON.stringify({
+        playerId: accountPlayerId,
+        displayName: "Summary racer",
+        bestTimeMs: 31234,
+        trackKey: stage.trackKey,
+        completedLaps: stage.lapCount,
+        validationMethod: "strict-replay",
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+    await redis.set(campaignProgressKey(accountPlayerId), JSON.stringify({
+      campaignId: "numbered-v1",
+      startedAt: "2026-07-27T09:00:00.000Z",
+      resultsByRaceId: {},
+      updatedAt: "2026-07-27T09:00:00.000Z",
+    }));
+    await redis.set(guestProgressSelectionAccountPendingKey(accountPlayerId), "guest:summary-pending");
+    await recordCompletedRace("guest:summary-pending");
+
+    const selection = await getGuestProgressSelection({
+      guestPlayerId: "guest:summary-pending",
+      redditPlayerId: accountPlayerId,
+    });
+
+    expect(selection.accountSummary.campaignResults).toBe(1);
   });
 
   // A Daily day 30 days back: no longer playable, still stored for the archive.
