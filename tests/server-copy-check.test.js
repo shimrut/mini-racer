@@ -51,6 +51,8 @@ const { readDailySchedule } = await import('../src/server/daily/daily-schedule-s
 const { getTrackDefinitionIdentity } = await import('../game/track/definition-identity.js');
 const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
+const appMedalTimes = (await import('../game/medals/medal-times.json', { with: { type: 'json' } })).default;
+const smallSteps = (await import('../game/track/definitions/small-steps.js')).default;
 const seriesData = (await import('../game/campaign/series.json', { with: { type: 'json' } })).default;
 const { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } = await import('../src/server/daily/daily-gp-model.ts');
 const { BUILT_IN_TRACKS } = await import('../game/track/tracks.js');
@@ -246,5 +248,71 @@ describe('the copy undo', () => {
     it('waits while the Daily changes at midnight UTC', async () => {
         await expect(runCopyUndo('played-dailies', { username: 'Mod', now: new Date('2030-03-10T23:58:00.000Z') }))
             .rejects.toThrow('midnight UTC');
+    });
+});
+
+describe('copies that a moderator saved again', () => {
+    // An app track that nobody raced, with app medal times. A track in the
+    // Daily list cannot keep an unfinished drawing, so that test needs one
+    // outside the list.
+    function unracedKey({ outsideDailyList = false } = {}) {
+        const raced = new Set([...Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE),
+            ...seriesData.series.flatMap((entry) => (entry.stages ?? []).map((stage) => stage.trackKey))]);
+        return Object.keys(BUILT_IN_TRACKS).find((key) => !raced.has(key) && appMedalTimes[key]?.author
+            && !(outsideDailyList && TRACK_SCHEDULE_KEYS.includes(key)));
+    }
+
+    async function copyThenSave(key, extra) {
+        const copy = await tracks.saveStoredTrack(key, { track: BUILT_IN_TRACKS[key], medalRow: appMedalTimes[key] },
+            { username: 'Mod', origin: 'migrated', trusted: true, now: noon });
+        // A normal Creator save: the medal row goes through the authoring rules.
+        await tracks.saveStoredTrack(key, { track: copy.track, medalRow: copy.medalRow, ...extra },
+            { username: 'Mod', baseRevision: copy.revision, now: noon });
+    }
+
+    it('still finds a copy exact after a Creator save with the same medal times', async () => {
+        const key = unracedKey();
+        await copyThenSave(key, {});
+        const check = await runCopyCheck({ username: 'Mod', now: noon });
+        expect(check.tracks.exact).toContain(key);
+        expect(check.tracks.changed).not.toContain(key);
+        expect((await runCopyUndo('unplayed', { username: 'Mod', now: noon })).removed).toContain(key);
+    });
+
+    it('keeps a copy with an unfinished drawing, and lists it as changed', async () => {
+        const key = unracedKey({ outsideDailyList: true });
+        await copyThenSave(key, { draftLoop: [{ x: 1, y: 1 }, { x: 4, y: 1 }, { x: 4, y: 5 }] });
+        const check = await runCopyCheck({ username: 'Mod', now: noon });
+        expect(check.tracks.changed).toContain(key);
+        const report = await runCopyUndo('unplayed', { username: 'Mod', now: noon });
+        expect(report.removed).not.toContain(key);
+        expect((await tracks.readStoredTrack(key)).draftLoop).toHaveLength(3);
+    });
+});
+
+describe('a hidden app series that a moderator made live', () => {
+    it('is a series changed in the Creator, not a problem', async () => {
+        series.installStoredSeriesResolver();
+        tracks.installStoredTrackResolver();
+        for (const [key, name] of [['nightOne', 'Night One'], ['nightTwo', 'Night Two']]) {
+            await tracks.saveStoredTrack(key, { track: { ...smallSteps, name }, medalRow },
+                { username: 'Mod', now: noon });
+        }
+        await ensureStoredCatalogLoaded();
+        const drafts = await series.copyAppSeriesDrafts({ dryRun: false, username: 'Mod', now: noon });
+        const hidden = drafts.copied[0];
+        const draft = await series.readStoredSeries(hidden);
+        await series.saveStoredSeries(hidden, {
+            name: draft.name, ground: 'tarmac',
+            stages: [{ trackKey: 'nightOne', laps: 1, requiredMedals: 0 }, { trackKey: 'nightTwo', laps: 1, requiredMedals: 2 }],
+        }, { username: 'Mod', baseRevision: draft.revision, now: noon });
+        await series.publishStoredSeries(hidden, { username: 'Mod', baseRevision: draft.revision + 1, now: noon });
+        await ensureStoredCatalogLoaded();
+
+        const check = await runCopyCheck({ username: 'Mod', now: noon });
+        expect(check.series.problems).toEqual([]);
+        expect(check.series.changed).toContain(hidden);
+        const undo = await runCopyUndo('live-campaign', { username: 'Mod', dryRun: true, now: noon });
+        expect(undo.kept.map((entry) => entry.key)).not.toContain(hidden);
     });
 });

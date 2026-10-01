@@ -1,11 +1,12 @@
 import { redis, type TxClientLike } from '@devvit/redis';
 import { context } from '@devvit/web/server';
 import seriesData from '../../../game/campaign/series.json' with { type: 'json' };
-import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeries } from '../../../game/campaign/manifest.js';
+import { CAMPAIGN_NUMBERS_SERIES_ID } from '../../../game/campaign/manifest.js';
 import {
     CAMPAIGN_STAGE_MAX_LAPS,
     getCampaignSeriesMinStages,
     getRequiredMedalsError,
+    isCampaignSeriesLive,
 } from '../../../game/campaign/series-rules.js';
 import { setStoredSeriesResolver } from '../../../game/campaign/stored-series.js';
 import { hasTrack } from '../../../game/track/catalog.js';
@@ -501,8 +502,15 @@ export async function removeSeriesCopy(
             })));
 }
 
+// Live in the app itself. The Campaign lists also hold the series published
+// from Redis, so they cannot tell a live app series from a hidden app series
+// that a moderator made live in the Creator.
 export function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
-    return definition.id === CAMPAIGN_NUMBERS_SERIES_ID || Boolean(getCampaignSeries(definition.id));
+    return definition.id === CAMPAIGN_NUMBERS_SERIES_ID || isCampaignSeriesLive({
+        id: definition.id,
+        ground: definition.ground ?? 'tarmac',
+        stages: definition.stages ?? [],
+    });
 }
 
 // Copies each live app series as players race it now: published with all
@@ -579,7 +587,7 @@ export async function copyAppSeriesDrafts({
 }): Promise<{ copied: string[]; alreadyStored: string[]; live: string[]; failed: { id: string; error: string }[] }> {
     const report = { copied: [] as string[], alreadyStored: [] as string[], live: [] as string[], failed: [] as { id: string; error: string }[] };
     for (const definition of APP_SERIES_DEFINITIONS) {
-        if (definition.id === CAMPAIGN_NUMBERS_SERIES_ID || getCampaignSeries(definition.id)) {
+        if (isLiveAppSeries(definition)) {
             report.live.push(definition.id);
             continue;
         }

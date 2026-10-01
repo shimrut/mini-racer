@@ -32,11 +32,17 @@ export function appMedalRow(trackKey: string) {
     return normalizeGameMedalRow(APP_MEDAL_ROWS[trackKey]) ?? null;
 }
 
-export function matchesAppTrack(record: Pick<StoredTrackRecord, 'key' | 'track' | 'medalRow' | 'fingerprint'>): boolean {
+// An unfinished drawing is a moderator's work, so a copy with one is not
+// exactly the app track, even when its road is.
+export function matchesAppTrack(
+    record: Pick<StoredTrackRecord, 'key' | 'track' | 'medalRow' | 'fingerprint'> & Partial<Pick<StoredTrackRecord, 'draftLoop'>>,
+): boolean {
     const source = appTrack(record.key);
     return Boolean(source)
+        && !record.draftLoop?.length
         && JSON.stringify(sortedKeys(record.track)) === JSON.stringify(sortedKeys(source))
-        && JSON.stringify(record.medalRow ?? null) === JSON.stringify(appMedalRow(record.key))
+        // The app and the Creator write the medal times in another order.
+        && JSON.stringify(sortedKeys(record.medalRow ?? null)) === JSON.stringify(sortedKeys(appMedalRow(record.key)))
         && record.fingerprint === createTrackFingerprint(source!);
 }
 
