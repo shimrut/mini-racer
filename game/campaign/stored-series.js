@@ -8,6 +8,7 @@
 const EMPTY = Object.freeze([]);
 let localStoredSeries = EMPTY;
 let storedSeriesResolver = () => localStoredSeries;
+let storedSeriesListLoaded = false;
 
 // The same list object comes back until the list changes, so the manifest
 // builds the series again only after a change.
@@ -29,7 +30,18 @@ export function registerStoredSeries(definitions) {
     return localStoredSeries;
 }
 
+// The game knows every published series only after a Campaign answer arrived.
+// Before that, a stage of a Creator series is unknown, but it is not gone.
+export function markStoredSeriesLoaded() {
+    storedSeriesListLoaded = true;
+}
+
+export function isStoredSeriesListLoaded() {
+    return storedSeriesListLoaded;
+}
+
 export function clearStoredSeriesForTests() {
     localStoredSeries = EMPTY;
+    storedSeriesListLoaded = false;
     setStoredSeriesResolver(null);
 }

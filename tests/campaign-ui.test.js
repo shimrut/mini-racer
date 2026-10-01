@@ -34,10 +34,21 @@ import { RANKED_RUN_STALL_MESSAGE } from '../game/race/engine-methods.js';
 import { CAMPAIGN_NUMBERS_SERIES_ID, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import {
     clearCampaignVerification,
+    clearDailyChallengeVerification,
     enqueueCampaignVerification,
+    enqueueDailyChallengeVerification,
     getCampaignVerificationEntry,
+    getVerificationRetryDelayMs,
     markCampaignVerificationError,
+    markDailyChallengeVerificationPending,
 } from '../game/scoreboard/verification-queue.js';
+import { scoreboardEngineMethods } from '../game/scoreboard/engine-methods.js';
+import {
+    clearStoredSeriesForTests,
+    markStoredSeriesLoaded,
+    registerStoredSeries,
+} from '../game/campaign/stored-series.js';
+import { clearActivePlayerOwnerId, setActivePlayerOwnerId } from '../game/player/active-owner.js';
 import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { GarageUi } from '../game/settings/garage-ui.js';
@@ -815,6 +826,231 @@ describe('Campaign lobby and shared modal adapters', () => {
             verificationState: 'pending',
             submissionStage: 'retrying',
             statusText: 'Saving Campaign progress...',
+        });
+    });
+
+    it('keeps the time and replay of a stage the game does not know, and sends nothing', async () => {
+        const context = createCampaignFinishContext();
+        enqueueCampaignVerification({
+            raceId: 'night-v1-02',
+            trackKey: 'nightTwo',
+            bestTime: 9.5,
+            lapCount: 1,
+            rulesRevision: 1,
+            replay: { revision: 1, segments: [] },
+        });
+        const startedAt = Date.now();
+
+        await context.processCampaignVerificationEntry(getCampaignVerificationEntry('night-v1-02'));
+
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+        const kept = getCampaignVerificationEntry('night-v1-02');
+        expect(kept).toMatchObject({
+            verificationState: 'pending',
+            bestTime: 9.5,
+            trackKey: 'nightTwo',
+            replay: { revision: 1, segments: [] },
+        });
+        expect(Number(kept.nextAttemptAt)).toBeGreaterThanOrEqual(startedAt + getVerificationRetryDelayMs());
+    });
+
+    describe('waiting times and the Creator series list', () => {
+        const NIGHT_SERIES = {
+            id: 'night-v1',
+            name: 'Night Races',
+            ground: 'tarmac',
+            stages: [
+                { trackKey: 'babylonRace', laps: 1, requiredMedals: 0 },
+                { trackKey: 'smallSteps', laps: 2, requiredMedals: 1 },
+            ],
+        };
+        const UNAVAILABLE = { availability: 'unavailable', authoritative: false, ranked: false, progress: {} };
+        const AVAILABLE = { availability: 'available', authoritative: true, ranked: true, progress: {} };
+
+        beforeEach(() => {
+            vi.useFakeTimers();
+            const values = new Map();
+            vi.stubGlobal('window', {
+                localStorage: {
+                    getItem: (key) => values.get(key) ?? null,
+                    setItem: (key, value) => values.set(key, String(value)),
+                    removeItem: (key) => values.delete(key),
+                },
+                setTimeout: (...args) => setTimeout(...args),
+            });
+            setActivePlayerOwnerId('reddit:racer');
+            campaignServiceMocks.submitCampaignRun.mockResolvedValue({ ok: false, status: 503, body: {} });
+        });
+
+        afterEach(() => {
+            vi.useRealTimers();
+            clearActivePlayerOwnerId();
+            clearStoredSeriesForTests();
+        });
+
+        function queueNightRun() {
+            enqueueCampaignVerification({
+                raceId: 'night-v1-00',
+                trackKey: 'babylonRace',
+                bestTime: 9.5,
+                lapCount: 1,
+                rulesRevision: 1,
+                replay: { revision: 1, segments: [] },
+            });
+        }
+
+        // The real service registers the list and marks it known; the mock does the same.
+        async function listArrives() {
+            registerStoredSeries([NIGHT_SERIES]);
+            markStoredSeriesLoaded();
+            return AVAILABLE;
+        }
+
+        function createQueueEngine(loadSeriesList) {
+            const engine = createCampaignFinishContext({
+                processVerificationQueue: scoreboardEngineMethods.processVerificationQueue,
+                scheduleVerificationQueueProcessing: scoreboardEngineMethods.scheduleVerificationQueueProcessing,
+                requestCampaignSeriesList: scoreboardEngineMethods.requestCampaignSeriesList,
+                verificationQueueTimer: null,
+                isProcessingVerificationQueue: false,
+                playerProfileAuthoritative: true,
+                applyCampaignLobbyBootstrap: vi.fn(),
+                refreshCampaignVerificationOverlay: vi.fn(),
+            });
+            engine.invokeModeMethod = vi.fn((_mode, method, ...args) => engine[method](...args));
+            campaignServiceMocks.getCampaignBootstrap.mockImplementation(loadSeriesList);
+            return engine;
+        }
+
+        function nightSubmissions() {
+            return campaignServiceMocks.submitCampaignRun.mock.calls
+                .filter(([input]) => input?.raceId === 'night-v1-00');
+        }
+
+        it('keeps a Creator-series time when the queue runs before the list loads, then sends it once', async () => {
+            queueNightRun();
+            let release;
+            const gate = new Promise((resolve) => { release = resolve; });
+            const engine = createQueueEngine(async () => {
+                await gate;
+                return listArrives();
+            });
+
+            // On a reload, the player profile starts the queue before the Campaign list arrives.
+            await engine.processVerificationQueue();
+
+            expect(getCampaignVerificationEntry('night-v1-00')).toMatchObject({
+                bestTime: 9.5,
+                replay: { revision: 1, segments: [] },
+            });
+            expect(nightSubmissions()).toHaveLength(0);
+            expect(engine.invokeModeMethod).toHaveBeenCalledWith('campaign', 'ensureCampaignBootstrap');
+
+            release();
+            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
+
+            expect(nightSubmissions()).toHaveLength(1);
+        });
+
+        it('loads the list again after the retry wait when the first load fails, with no reconnect', async () => {
+            queueNightRun();
+            let loads = 0;
+            const engine = createQueueEngine(async () => {
+                loads += 1;
+                return loads === 1 ? UNAVAILABLE : listArrives();
+            });
+
+            await engine.processVerificationQueue();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(loads).toBe(1);
+            expect(getCampaignVerificationEntry('night-v1-00')).not.toBeNull();
+
+            await vi.advanceTimersByTimeAsync(getVerificationRetryDelayMs() - 1);
+            expect(loads).toBe(1);
+
+            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(loads).toBe(2);
+            expect(nightSubmissions()).toHaveLength(1);
+        });
+
+        it('loads the list again at once when the device reconnects', async () => {
+            queueNightRun();
+            let loads = 0;
+            const engine = createQueueEngine(async () => {
+                loads += 1;
+                return loads === 1 ? UNAVAILABLE : listArrives();
+            });
+
+            await engine.processVerificationQueue();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(loads).toBe(1);
+
+            // The engine's "online" handler.
+            engine.scheduleVerificationQueueProcessing(0);
+            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
+
+            expect(loads).toBe(2);
+            expect(nightSubmissions()).toHaveLength(1);
+        });
+
+        it('sends the time once when the list arrives while the queue is running', async () => {
+            queueNightRun();
+            enqueueDailyChallengeVerification({
+                challengeId: 'daily-slow',
+                bestTime: 30,
+                replay: { inputs: [] },
+                trackKey: 'circuit',
+            });
+            let releaseList;
+            const listGate = new Promise((resolve) => { releaseList = resolve; });
+            let releaseDaily;
+            const dailyGate = new Promise((resolve) => { releaseDaily = resolve; });
+            const engine = createQueueEngine(async () => {
+                await listGate;
+                return listArrives();
+            });
+            engine.processDailyChallengeVerificationEntry = vi.fn(async (entry) => {
+                await dailyGate;
+                clearDailyChallengeVerification(entry.challengeId);
+            });
+
+            engine.requestCampaignSeriesList();
+            const running = engine.processVerificationQueue();
+            releaseList();
+            await vi.advanceTimersByTimeAsync(1);
+            releaseDaily();
+            await running;
+            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
+
+            expect(nightSubmissions()).toHaveLength(1);
+        });
+
+        it('never sets a timer of 0 for a due time while the list is missing, and keeps the Daily time', () => {
+            queueNightRun();
+            const engine = createQueueEngine(async () => UNAVAILABLE);
+            engine.campaignSeriesListRetryAt = Date.now() + getVerificationRetryDelayMs();
+            const delays = [];
+            window.setTimeout = (handler, delay) => {
+                delays.push(delay);
+                return 1;
+            };
+
+            engine.scheduleVerificationQueueProcessing(null);
+            expect(delays).toEqual([getVerificationRetryDelayMs()]);
+
+            enqueueDailyChallengeVerification({
+                challengeId: 'daily-later',
+                bestTime: 30,
+                replay: { inputs: [] },
+                trackKey: 'circuit',
+            });
+            markDailyChallengeVerificationPending('daily-later', Date.now() + 5_000);
+            engine.scheduleVerificationQueueProcessing(null);
+            expect(delays.at(-1)).toBe(5_000);
         });
     });
 

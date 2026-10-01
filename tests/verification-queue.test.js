@@ -76,6 +76,19 @@ describe('verification queue', () => {
         delete globalThis.window;
     });
 
+    it('gives the next try of the asked buckets only', () => {
+        const now = Date.now();
+        enqueueDailyChallengeVerification({ challengeId: 'next-daily', bestTime: 20, replay: { inputs: [] } });
+        enqueueCampaignVerification({ raceId: 'numbered-v1-00', bestTime: 8, replay: { inputs: [] } });
+        markDailyChallengeVerificationPending('next-daily', now + 5_000);
+        markCampaignVerificationPending('numbered-v1-00', now + 1_000);
+
+        expect(getNextVerificationAttemptAt()).toBe(now + 1_000);
+        expect(getNextVerificationAttemptAt({ buckets: ['daily'] })).toBe(now + 5_000);
+        expect(getNextVerificationAttemptAt({ buckets: ['campaign'] })).toBe(now + 1_000);
+        expect(getNextVerificationAttemptAt({ buckets: [] })).toBeNull();
+    });
+
     it('exposes retry delay and safe empty states', () => {
         expect(getVerificationRetryDelayMs()).toBe(30_000);
         expect(getDailyChallengeVerificationEntry('')).toBe(null);

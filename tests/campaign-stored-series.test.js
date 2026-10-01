@@ -12,6 +12,8 @@ import {
 } from '../game/campaign/manifest.js';
 import {
     clearStoredSeriesForTests,
+    isStoredSeriesListLoaded,
+    markStoredSeriesLoaded,
     registerStoredSeries,
     setStoredSeriesResolver,
 } from '../game/campaign/stored-series.js';
@@ -62,6 +64,16 @@ describe('published Creator series in the Campaign', () => {
         const replaced = [...CAMPAIGN_ALL_SERIES].find((series) => series.id === hidden.id);
         expect(replaced.name).toBe('Changed');
         expect(CAMPAIGN_ALL_SERIES.length).toBeGreaterThan(1);
+    });
+
+    it('knows the list only after a Campaign answer, until the test reset', () => {
+        expect(isStoredSeriesListLoaded()).toBe(false);
+        registerStoredSeries([nightSeries]);
+        expect(isStoredSeriesListLoaded()).toBe(false);
+        markStoredSeriesLoaded();
+        expect(isStoredSeriesListLoaded()).toBe(true);
+        clearStoredSeriesForTests();
+        expect(isStoredSeriesListLoaded()).toBe(false);
     });
 
     it('reads the series of the current request on the server', () => {

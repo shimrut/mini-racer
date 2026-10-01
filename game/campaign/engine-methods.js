@@ -41,12 +41,14 @@ import {
     enqueueCampaignVerification,
     getCampaignVerificationEntry,
     getCampaignVerificationEntries,
+    getDueCampaignVerifications,
     getVerificationRetryDelayMs,
     isRetryableVerificationFailure,
     markCampaignTrackPbRetry,
     markCampaignVerificationError,
     markCampaignVerificationPending,
 } from '../scoreboard/verification-queue.js';
+import { isStoredSeriesListLoaded } from './stored-series.js';
 
 const CAMPAIGN_UNLOCK_CONFIRMATION_TIMEOUT_MS = 5_000;
 const CAMPAIGN_UNLOCK_CONFIRMATION_POLL_MS = 50;
@@ -517,6 +519,14 @@ export const campaignEngineMethods = {
         this._campaignBootstrapRequestId = requestId;
         const promise = getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) })
             .then((bootstrap) => {
+                // Times that waited for the series list can go now.
+                if (
+                    isStoredSeriesListLoaded()
+                    && this.playerProfileAuthoritative
+                    && getDueCampaignVerifications().length
+                ) {
+                    this.scheduleVerificationQueueProcessing?.(0);
+                }
                 if (requestId !== this._campaignBootstrapRequestId) {
                     return this.campaignBootstrap;
                 }
@@ -1235,9 +1245,23 @@ export const campaignEngineMethods = {
 
     async processCampaignVerificationEntry(entry) {
         const raceId = entry?.raceId;
-        const stage = getCampaignStage(raceId);
-        if (!raceId || !stage || !Number.isFinite(entry?.bestTime)) {
+        if (!raceId || !Number.isFinite(entry?.bestTime)) {
             if (raceId) clearCampaignVerification(raceId);
+            return;
+        }
+        const stage = getCampaignStage(raceId);
+        if (!stage) {
+            // A stage this game does not know is never dropped: its series
+            // may not have loaded, or it may belong to another community.
+            markCampaignVerificationPending(
+                raceId,
+                Date.now() + getVerificationRetryDelayMs(),
+                {
+                    submissionStage: entry.submissionStage,
+                    statusText: entry.statusText ?? null,
+                    preserveUpdatedAt: true,
+                },
+            );
             return;
         }
 

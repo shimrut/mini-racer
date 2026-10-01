@@ -756,10 +756,11 @@ export function getDueCampaignVerifications(now = Date.now()) {
   return getDue("campaign", now);
 }
 
-export function getNextVerificationAttemptAt() {
+export function getNextVerificationAttemptAt({ buckets = QUEUE_BUCKETS } = {}) {
   if (isBlockedByTransfer()) return null;
   const queueState = readQueueState();
-  const nextAttemptValues = QUEUE_BUCKETS
+  const nextAttemptValues = buckets
+    .filter((bucket) => QUEUE_BUCKETS.includes(bucket))
     .flatMap((bucket) => Object.values(queueState[bucket]))
     .filter(
       (entry) =>

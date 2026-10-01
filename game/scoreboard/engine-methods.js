@@ -23,6 +23,21 @@ import {
   submitDailyChallengeBestTime,
 } from "../daily-challenge/service.js";
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
+import { isStoredSeriesListLoaded } from "../campaign/stored-series.js";
+
+// Until the series list loads, a due Campaign time wakes the queue only to
+// load the list again, once in each retry wait. It never sets a timer of 0
+// that repeats.
+function nextVerificationQueueWakeAt(engine) {
+  if (isStoredSeriesListLoaded()) return getNextVerificationAttemptAt();
+  const dailyAt = getNextVerificationAttemptAt({ buckets: ["daily"] });
+  const campaignDueAt = getNextVerificationAttemptAt({ buckets: ["campaign"] });
+  const campaignAt = campaignDueAt === null
+    ? null
+    : Math.max(campaignDueAt, Number(engine.campaignSeriesListRetryAt) || 0);
+  const wakeTimes = [dailyAt, campaignAt].filter((value) => value !== null);
+  return wakeTimes.length ? Math.min(...wakeTimes) : null;
+}
 
 function showDailyVerificationState(engine, challengeId, snapshotFields) {
   engine.dailyChallengeUi.refreshDailyChallengeVerificationState(challengeId);
@@ -120,7 +135,7 @@ export const scoreboardEngineMethods = {
     const resolvedDelay =
       delayMs === null
         ? (() => {
-          const nextAttemptAt = getNextVerificationAttemptAt();
+          const nextAttemptAt = nextVerificationQueueWakeAt(this);
           return nextAttemptAt === null
             ? null
             : Math.max(0, nextAttemptAt - Date.now());
@@ -149,8 +164,16 @@ export const scoreboardEngineMethods = {
         await this.processDailyChallengeVerificationEntry(entry);
       }
       const dueCampaignEntries = getDueCampaignVerifications();
-      for (const entry of dueCampaignEntries) {
-        await this.processCampaignVerificationEntry(entry);
+      if (
+        dueCampaignEntries.length
+        && isStoredSeriesListLoaded()
+        && typeof this.processCampaignVerificationEntry === "function"
+      ) {
+        for (const entry of dueCampaignEntries) {
+          await this.processCampaignVerificationEntry(entry);
+        }
+      } else if (dueCampaignEntries.length) {
+        this.requestCampaignSeriesList();
       }
       if (this.campaignVerifiedBootstrap) {
         this.refreshCampaignVerificationOverlay?.();
@@ -158,6 +181,18 @@ export const scoreboardEngineMethods = {
     } finally {
       this.isProcessingVerificationQueue = false;
       this.scheduleVerificationQueueProcessing(null);
+    }
+  },
+
+  // Campaign times wait until the game knows every published series. The
+  // Campaign answer brings that list; it also loads the Campaign code.
+  requestCampaignSeriesList() {
+    this.campaignSeriesListRetryAt = Date.now() + getVerificationRetryDelayMs();
+    const loading = this.invokeModeMethod?.("campaign", "ensureCampaignBootstrap");
+    if (loading && typeof loading.catch === "function") {
+      loading.catch((error) => {
+        console.error("Error loading the Campaign series for waiting results:", error);
+      });
     }
   },
 

@@ -5,6 +5,8 @@ import {
     getCampaignBootstrap,
     submitCampaignRun,
 } from '../game/campaign/service.js';
+import { getCampaignStage } from '../game/campaign/manifest.js';
+import { clearStoredSeriesForTests, isStoredSeriesListLoaded } from '../game/campaign/stored-series.js';
 
 describe('campaign client progress', () => {
     let originalFetch;
@@ -157,6 +159,81 @@ describe('campaign client progress', () => {
             authoritative: false,
             ranked: true,
             signedIn: true,
+        });
+    });
+
+    describe('when the game knows the series list', () => {
+        afterEach(() => clearStoredSeriesForTests());
+
+        function answer(body) {
+            return { ok: true, status: 200, json: vi.fn().mockResolvedValue(body) };
+        }
+
+        it('knows it after a good answer that leaves out an empty list', async () => {
+            globalThis.fetch = vi.fn().mockResolvedValue(answer({
+                ranked: true,
+                storedTracks: [],
+                stages: [],
+                progress: { resultsByRaceId: {} },
+            }));
+
+            await getCampaignBootstrap();
+
+            expect(isStoredSeriesListLoaded()).toBe(true);
+        });
+
+        it('does not know it after a failed answer', async () => {
+            globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+
+            await getCampaignBootstrap();
+
+            expect(isStoredSeriesListLoaded()).toBe(false);
+        });
+
+        it('does not know it after an HTTP error', async () => {
+            globalThis.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 503,
+                json: vi.fn().mockResolvedValue({ error: 'busy' }),
+            });
+
+            await getCampaignBootstrap();
+
+            expect(isStoredSeriesListLoaded()).toBe(false);
+        });
+
+        it('knows it after a good answer for an unranked player', async () => {
+            globalThis.fetch = vi.fn().mockResolvedValue(answer({
+                ranked: false,
+                signedIn: false,
+                progress: { resultsByRaceId: {} },
+            }));
+
+            await getCampaignBootstrap();
+
+            expect(isStoredSeriesListLoaded()).toBe(true);
+        });
+
+        it('knows it when the list arrived but the stage tracks then failed to load', async () => {
+            globalThis.fetch = vi.fn()
+                .mockResolvedValueOnce(answer({
+                    ranked: true,
+                    campaignId: 'night-v1',
+                    storedSeries: [{
+                        id: 'night-v1',
+                        name: 'Night Races',
+                        ground: 'tarmac',
+                        stages: [{ trackKey: 'nightOnlyTrack', laps: 1, requiredMedals: 0 }],
+                    }],
+                    stages: [{ raceId: 'night-v1-00', trackKey: 'nightOnlyTrack' }],
+                    progress: { resultsByRaceId: {} },
+                }))
+                .mockResolvedValueOnce({ ok: false, status: 503, json: vi.fn() });
+
+            await expect(getCampaignBootstrap()).resolves.toMatchObject({ availability: 'unavailable' });
+
+            expect(isStoredSeriesListLoaded()).toBe(true);
+            expect(getCampaignStage('night-v1-00')).not.toBeNull();
         });
     });
 

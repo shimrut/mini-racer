@@ -1,6 +1,6 @@
 import { API_ROUTES } from '../scoreboard/api-client.js';
 import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
-import { registerStoredSeries } from './stored-series.js';
+import { markStoredSeriesLoaded, registerStoredSeries } from './stored-series.js';
 import {
     CAMPAIGN_ID,
     getCampaignSeriesStages,
@@ -133,6 +133,9 @@ export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
         const response = await requestJson(url.toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         if (Array.isArray(response.body.storedSeries)) registerStoredSeries(response.body.storedSeries);
+        // The answer leaves out an empty list, so any good answer brings the
+        // whole list. The stage tracks can still fail to load after this.
+        markStoredSeriesLoaded();
         const trackKeys = (Array.isArray(response.body.stages)
             ? response.body.stages
             : getCampaignSeriesStages(normalizeSeriesId(response.body.campaignId)))
