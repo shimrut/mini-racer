@@ -124,6 +124,32 @@ describe('stored track store', () => {
         expect(placed[0].medalRow).toMatchObject({ gold: 9.4, author: 9.1 });
     });
 
+    it('never answers with a deleted track after the key is made again', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
+        await ensureStoredCatalogLoaded();
+        const firstValue = hashes.get('dailygp:tracks:v1:index').get('nightCut');
+        expect(TRACKS.nightCut.name).toBe('Night Cut');
+
+        expect(await store.deleteStoredTrack('nightCut', { baseRevision: 1 })).toBe(true);
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        await store.saveStoredTrack('nightCut', { track: { ...shape, name: 'Day Cut' }, medalRow }, { username: 'ModOne' });
+        const secondValue = hashes.get('dailygp:tracks:v1:index').get('nightCut');
+
+        // Both records are revision 1, but their index values differ.
+        expect(firstValue.startsWith('1:')).toBe(true);
+        expect(secondValue.startsWith('1:')).toBe(true);
+        expect(secondValue).not.toBe(firstValue);
+        await ensureStoredCatalogLoaded();
+        expect(TRACKS.nightCut.name).toBe('Day Cut');
+    });
+
+    it('still reads an index value that holds only the revision', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
+        await store.lockStoredTrack('nightCut', 'daily');
+        hashes.get('dailygp:tracks:v1:index').set('nightCut', '2');
+        expect((await store.readPlacedStoredTracks(['nightCut'])).map((entry) => entry.key)).toEqual(['nightCut']);
+    });
+
     it('reads only the asked tracks, with one index read and one record read', async () => {
         await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
         await store.lockStoredTrack('nightCut', 'daily');

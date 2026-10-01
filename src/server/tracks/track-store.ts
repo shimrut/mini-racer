@@ -76,6 +76,24 @@ const REVISION_KEY = `${TRACK_KEY_PREFIX}:revision`;
 const WRITE_LOCK_TTL_MS = 10_000;
 const LOAD_BATCH_SIZE = 25;
 
+// The index keeps one value per track: its revision and the time the record
+// was made. A track that is deleted and made again starts at revision 1, but
+// with a new time, so its value never repeats and a cache of the old track
+// never answers for the new one. An older value holds only the revision.
+export function storedTrackIndexValue(record: Pick<StoredTrackRecord, 'revision' | 'createdAt'>): string {
+    return `${record.revision}:${record.createdAt}`;
+}
+
+export function recordMatchesIndexValue(
+    record: Pick<StoredTrackRecord, 'revision' | 'createdAt'>,
+    value: string | null | undefined,
+): boolean {
+    if (typeof value !== 'string' || !value) return false;
+    return value.includes(':')
+        ? value === storedTrackIndexValue(record)
+        : value === String(record.revision);
+}
+
 function recordKey(trackKey: string): string {
     return `${TRACK_KEY_PREFIX}:track:${trackKey}`;
 }
@@ -237,7 +255,7 @@ export async function readStoredTrackSnapshot(scope: string, revision: string): 
         // Each write changes the record, the list and the revision together.
         // The revision check after the reads catches a write between them, so
         // a mismatch here is a broken record, not a write in progress.
-        if (!record || String(record.revision) !== revisionsByKey.get(trackKey)) {
+        if (!record || !recordMatchesIndexValue(record, revisionsByKey.get(trackKey))) {
             console.error(`Stored track ${trackKey} does not match the track list.`);
             continue;
         }
@@ -320,7 +338,7 @@ function agreeingPlacedEntries(
         const raw = values[index];
         if (revision === null && raw === null) continue;
         const record = parseRecord(raw);
-        if (revision === null || record?.key !== trackKey || String(record.revision) !== revision) return null;
+        if (revision === null || record?.key !== trackKey || !recordMatchesIndexValue(record, revision)) return null;
         if (record.lockedAt) entries.push(toEntry(record));
     }
     return entries;
@@ -344,7 +362,7 @@ async function withTrackWriteLock<T>(trackKey: string, work: (lock: RedisLock) =
 
 export async function queueStoredTrackRecord(transaction: TxClientLike, record: StoredTrackRecord): Promise<void> {
     await transaction.set(recordKey(record.key), JSON.stringify(record));
-    await transaction.hSet(INDEX_KEY, { [record.key]: String(record.revision) });
+    await transaction.hSet(INDEX_KEY, { [record.key]: storedTrackIndexValue(record) });
     await transaction.incrBy(REVISION_KEY, 1);
 }
 
@@ -368,7 +386,7 @@ export async function readStoredTracksRevision(): Promise<number> {
 
 export async function matchesStoredTrack(record: StoredTrackRecord, expectedRevision: number): Promise<boolean> {
     return await redis.get(recordKey(record.key)) === JSON.stringify(record)
-        && await redis.hGet(INDEX_KEY, record.key) === String(record.revision)
+        && await redis.hGet(INDEX_KEY, record.key) === storedTrackIndexValue(record)
         && await readStoredTracksRevision() === expectedRevision;
 }
 
