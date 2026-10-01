@@ -17,7 +17,7 @@ import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { TRACK_GROUNDS, getStoredTrackGroundKey } from '../track/grounds.js';
-import { setText } from '../ui/dom.js';
+import { setButtonBlock, setText } from '../ui/dom.js';
 import { campaignHasSeriesChoice } from '../campaign/manifest.js';
 import { CampaignSeriesPicker } from './campaign-series-picker.js';
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
@@ -163,6 +163,10 @@ export class LobbyUi {
         this._campaignSelectedBillingLabel = null;
         this._dailyStartError = null;
         this._campaignStartError = null;
+        // null: no selected race. false: its track is not prepared yet, so
+        // Start stays disabled. The error state keeps Retry Start enabled.
+        this._dailyTrackReady = null;
+        this._campaignTrackReady = null;
         this._menuKeyboardState = createMenuKeyboardState();
         this._paneTransitionGeneration = 0;
         this._bound = false;
@@ -827,7 +831,26 @@ export class LobbyUi {
         node.textContent = message || '';
     }
 
+    // Start stays disabled until the selected race track is prepared.
+    setStartTrackReady(mode, ready) {
+        const value = typeof ready === 'boolean' ? ready : null;
+        if (mode === 'daily') {
+            this._dailyTrackReady = value;
+            this.renderDaily();
+            return;
+        }
+        if (mode === 'campaign') {
+            this._campaignTrackReady = value;
+            this.renderCampaign();
+        }
+    }
+
     renderDaily() {
+        setButtonBlock(
+            this.dailyPrimaryBtn,
+            'track',
+            this._dailyTrackReady === false && !this._dailyStartError,
+        );
         this.renderRaceStartMessage('daily-start-message', this._dailyStartError);
         setSwappingText(
             this.dailyPrimaryBtn?.querySelector('.main-menu__label'),
@@ -901,7 +924,8 @@ export class LobbyUi {
             ? true
             : (stage
                 ? !stage.unlocked
-                : !this.campaignState.stages?.some((entry) => entry.unlocked));
+                : !this.campaignState.stages?.some((entry) => entry.unlocked))
+                || (this._campaignTrackReady === false && !this._campaignStartError);
         setSwappingText(
             this.campaignPrimaryBtn.querySelector('.main-menu__label'),
             this.getCampaignPrimaryLabel(),

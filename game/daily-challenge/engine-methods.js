@@ -816,6 +816,7 @@ export const dailyChallengeEngineMethods = {
     }
     loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
     playlistRequestNeeded = loadedChallenges.length < 7;
+    this.confirmRaceTracks?.(loadedChallenges.map((challenge) => challenge?.trackKey));
     this.dailyChallengeUi.openPlaylistModal(
       loadedChallenges.length ? loadedChallenges : null,
       playlistActions,
@@ -875,6 +876,9 @@ export const dailyChallengeEngineMethods = {
       || null;
 
     let challenges = this.dailyCarouselChallenges();
+    // A list saved on the phone is not confirmed. One request confirms all of
+    // it before the cards load their tracks.
+    this.confirmRaceTracks?.(challenges.map((challenge) => challenge?.trackKey));
     this.paintDailyCarousel(challenges, {
       selectedChallengeId: preferredId,
       loading: true,
@@ -951,6 +955,16 @@ export const dailyChallengeEngineMethods = {
     this.selectedDailyChallengeId = challenge.id;
     this.lobbyUi?.setDailySelectedChallenge?.(challenge, card);
     this.setDailyChallengeLobbySummary(challenge);
+    this.syncDailyStartReadiness?.();
+  },
+
+  // Start stays disabled until the selected card's race track is prepared.
+  syncDailyStartReadiness() {
+    const challenge = this.dailyCarousel?.getSelectedChallenge?.();
+    const ready = challenge?.trackKey
+      ? Boolean(this.findPreparedRaceTrack?.(challenge.trackKey, challenge))
+      : null;
+    this.lobbyUi?.setStartTrackReady?.("daily", ready);
   },
 
   handleDailyCarouselSettled(card) {
@@ -958,7 +972,12 @@ export const dailyChallengeEngineMethods = {
     if (!challenge?.trackKey) return;
     if (this.status === "playing" || this.status === "starting") return;
     if (!this.startOverlay?.isStartOverlayVisible?.()) return;
-    this.prewarmDailyPlaylistTracks([challenge], { requireModal: false });
+    this.prepareSelectedRaceTrack?.("daily", {
+      trackKey: challenge.trackKey,
+      challenge,
+      isStillSelected: () => this.dailyCarousel?.getSelectedChallenge?.()?.id === challenge.id
+        && this.status !== "playing" && this.status !== "starting",
+    });
     void this.ensureDailyCarouselRank(challenge.id);
   },
 

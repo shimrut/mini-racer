@@ -313,28 +313,28 @@ describe('campaign carousel engine wiring', () => {
         expect(setCampaignSelectedStage).not.toHaveBeenCalled();
     });
 
-    it('never prewarms a locked stage', () => {
-        const prewarmDailyPlaylistTracks = vi.fn();
+    it('never prepares a locked stage, and prepares the stage it stopped on', () => {
+        const prepareSelectedRaceTrack = vi.fn();
         const engine = {
             status: 'ready',
             startOverlay: { isStartOverlayVisible: () => true },
-            prewarmDailyPlaylistTracks,
+            prepareSelectedRaceTrack,
         };
 
         campaignEngineMethods.handleCampaignCarouselSettled.call(engine, {
             locked: true,
-            challenge: { trackKey: 'circuit' },
+            challenge: { id: 'numbered-v1-01', trackKey: 'circuit' },
         });
-        expect(prewarmDailyPlaylistTracks).not.toHaveBeenCalled();
+        expect(prepareSelectedRaceTrack).not.toHaveBeenCalled();
 
         campaignEngineMethods.handleCampaignCarouselSettled.call(engine, {
             locked: false,
-            challenge: { trackKey: 'circuit' },
+            challenge: { id: 'numbered-v1-01', trackKey: 'circuit' },
         });
-        expect(prewarmDailyPlaylistTracks).toHaveBeenCalledWith(
-            [{ trackKey: 'circuit' }],
-            { requireModal: false },
-        );
+        expect(prepareSelectedRaceTrack).toHaveBeenCalledWith('campaign', expect.objectContaining({
+            trackKey: 'circuit',
+            challenge: expect.objectContaining({ trackKey: 'circuit', skin: 'default' }),
+        }));
     });
 });
 

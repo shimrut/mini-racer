@@ -34,3 +34,17 @@ export async function copyTextToClipboard(text) {
         focused?.focus?.();
     }
 }
+
+// Several screens set the state of one Start button. Each one blocks or frees
+// it with its own reason, and the button is enabled only when no reason is
+// left. So no screen can enable a Start that another screen still blocks.
+const buttonBlocks = new WeakMap();
+
+export function setButtonBlock(button, reason, blocked) {
+    if (!button) return;
+    const reasons = buttonBlocks.get(button) ?? new Set();
+    if (blocked) reasons.add(reason);
+    else reasons.delete(reason);
+    buttonBlocks.set(button, reasons);
+    button.disabled = reasons.size > 0;
+}

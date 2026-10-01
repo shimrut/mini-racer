@@ -3,6 +3,7 @@ import {
     createMenuKeyboardState,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
+import { setButtonBlock } from '../ui/dom.js';
 
 const RACE_START_EXIT_MS = 100;
 
@@ -127,7 +128,7 @@ export class StartOverlay {
         const startBtn = this.startBtn;
         if (startBtn) {
             startBtn.style.display = "inline-flex";
-            startBtn.disabled = !hasChallenge;
+            setButtonBlock(startBtn, "challenge", !hasChallenge);
 
             const labelSpan = startBtn.querySelector(".main-menu__label");
             if (labelSpan) {

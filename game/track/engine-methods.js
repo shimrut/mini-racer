@@ -15,11 +15,87 @@ import {
   isLocalEnvironment,
 } from "./environment.js";
 import { ensureStoredTracks } from './stored-track-service.js';
+import { createRacePreparation, PREPARATION_SLOTS } from './race-preparation.js';
 import { getPlayerProgressState } from "../player/progress-state.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 
 export const trackEngineMethods = {
+  getRacePreparation() {
+    if (!this._racePreparation) {
+      this._racePreparation = createRacePreparation({
+        getAssetOptions: () => ({ qualityLevel: this.qualityLevel, frameSkip: this.frameSkip }),
+        needsConfirmation: (trackKey, challenge) => !(
+          trackKey.startsWith('community:')
+          || isLocalEnvironment()
+          || challenge?.id === 'mock-daily-challenge-local'
+        ),
+      });
+      this._racePreparation.subscribe(() => this.syncRaceStartReadiness?.());
+    }
+    return this._racePreparation;
+  },
+
+  // Prepares a race target in a slot. The promise gives the record, or null
+  // when a newer target replaced it.
+  prepareRaceTrack(slot, target) {
+    return this.getRacePreparation().prepare(slot, target);
+  },
+
+  findPreparedRaceTrack(trackKey, challenge = null) {
+    return this._racePreparation?.findRecord(trackKey, challenge) ?? null;
+  },
+
+  // Confirms the layouts of a lobby's tracks in one request, before its cards
+  // load. Confirmed keys send nothing. Start never sends this request.
+  confirmRaceTracks(trackKeys = []) {
+    const keys = trackKeys.filter((trackKey) => typeof trackKey === 'string' && trackKey
+      && !trackKey.startsWith('community:'));
+    if (!keys.length || isLocalEnvironment()) return;
+    void ensureStoredTracks(keys, { requireConfirmation: true }).catch((error) => {
+      console.warn('The lobby tracks could not be confirmed:', error);
+    });
+  },
+
+  waitForQuietMoment() {
+    return new Promise((resolve) => {
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(resolve, { timeout: 500 });
+        return;
+      }
+      setTimeout(resolve, 32);
+    });
+  },
+
+  // Prepares the card that a lobby carousel stopped on. The server check
+  // starts at once. The build waits for a quiet moment, and a swipe to
+  // another card stops it.
+  prepareSelectedRaceTrack(mode, { trackKey, challenge = null, isStillSelected = () => true } = {}) {
+    if (typeof trackKey !== 'string' || !trackKey) return;
+    const token = (this._selectedPreparationToken || 0) + 1;
+    this._selectedPreparationToken = token;
+    const wanted = () => this._selectedPreparationToken === token && isStillSelected();
+    void this.prepareRaceTrack(PREPARATION_SLOTS.SELECTED, {
+      trackKey,
+      challenge,
+      beforeBuild: async () => {
+        if (!wanted()) return false;
+        await this.waitForQuietMoment();
+        return wanted();
+      },
+    }).catch((error) => {
+      if (!wanted()) return;
+      console.error('Could not prepare the selected race track:', error);
+      this.lobbyUi?.setRaceStartError?.(mode, 'Track failed to load. Tap Retry Start.');
+    });
+  },
+
+  // Each lobby enables Start only when its selected race track is prepared.
+  syncRaceStartReadiness() {
+    this.syncDailyStartReadiness?.();
+    this.syncCampaignStartReadiness?.();
+  },
+
   async ensureRankedTrackDefinition(trackKey) {
     if (this.activeRaceMode === 'community' || isLocalEnvironment()
       || this.activeDailyChallenge?.id === 'mock-daily-challenge-local') return;
@@ -126,10 +202,13 @@ export const trackEngineMethods = {
       preserveDailyChallengeOnReset = false,
       preserveRaceComparisonTarget = false,
       showStartOverlayOnReset = true,
+      prepared = null,
     } = {},
   ) {
     const requestId = ++this.trackLoadRequestId;
-    const nextTrack = await loadClientTrack(trackKey);
+    // A prepared record installs at once: no load, no build and no wait.
+    const record = prepared?.trackKey === trackKey ? prepared : null;
+    const nextTrack = record ? record.track : await loadClientTrack(trackKey);
     if (!nextTrack) throw new Error('The track layout could not be confirmed. Retry before racing.');
     if (requestId !== this.trackLoadRequestId) return;
     this.currentTrack = nextTrack;
@@ -149,7 +228,7 @@ export const trackEngineMethods = {
     }
 
 
-    const runtime = getTrackRuntimeAsset(trackKey, this.currentTrack, {
+    const runtime = record?.runtime ?? getTrackRuntimeAsset(trackKey, this.currentTrack, {
       qualityLevel: this.qualityLevel,
       frameSkip: this.frameSkip,
     });
@@ -157,7 +236,14 @@ export const trackEngineMethods = {
     this.activeGeometry.inner = runtime.inner;
     this.collisionSegments = runtime.collisionSegments;
     this.collisionHash = runtime.collisionHash;
-    await this.refreshTrackPresentation();
+    if (record) {
+      this.currentTrackPresentation = record.presentation;
+      this.trackCanvas = record.canvasAsset.canvas;
+      this.trackCanvasOrigin = record.canvasAsset.origin;
+      this.requestRender();
+    } else {
+      await this.refreshTrackPresentation();
+    }
     if (requestId !== this.trackLoadRequestId) return;
 
     this.bestLapTime = null;

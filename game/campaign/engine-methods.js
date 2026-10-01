@@ -675,6 +675,16 @@ export const campaignEngineMethods = {
         if (!stage?.id) return;
         this.selectedCampaignStageId = stage.id;
         this.lobbyUi?.setCampaignSelectedStage?.(stage);
+        this.syncCampaignStartReadiness?.();
+    },
+
+    // Start stays disabled until the selected stage's race track is prepared.
+    syncCampaignStartReadiness() {
+        const stage = this.campaignCarousel?.getSelectedChallenge?.();
+        const ready = stage?.trackKey && stage.unlocked
+            ? Boolean(this.findPreparedRaceTrack?.(stage.trackKey, toRaceChallenge(stage)))
+            : null;
+        this.lobbyUi?.setStartTrackReady?.('campaign', ready);
     },
 
     syncOpenCampaignTracks() {
@@ -713,8 +723,11 @@ export const campaignEngineMethods = {
         if (!stage?.trackKey || card?.locked) return;
         if (this.status === 'playing' || this.status === 'starting') return;
         if (!this.startOverlay?.isStartOverlayVisible?.()) return;
-        this.prewarmDailyPlaylistTracks?.([{ trackKey: stage.trackKey }], {
-            requireModal: false,
+        this.prepareSelectedRaceTrack?.('campaign', {
+            trackKey: stage.trackKey,
+            challenge: toRaceChallenge(stage),
+            isStillSelected: () => this.campaignCarousel?.getSelectedChallenge?.()?.id === stage.id
+                && this.status !== 'playing' && this.status !== 'starting',
         });
     },
 

@@ -23,7 +23,7 @@ import { formatCampaignStageLabel } from '../campaign/carousel-model.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
-import { scheduleAfterModalPaint } from '../ui/dom.js';
+import { scheduleAfterModalPaint, setButtonBlock } from '../ui/dom.js';
 
 function renderPlaylistMessage(list, text) {
     const empty = document.createElement('div');
@@ -158,9 +158,11 @@ export class DailyChallengeUi {
         }
 
         const hasChallenge = Boolean(this._dailyChallengeSummary?.available);
-        if (this.dailyChallengeStartBtn) {
-            this.dailyChallengeStartBtn.disabled = !hasChallenge || Boolean(this._dailyChallengeSummary?.loading);
-        }
+        setButtonBlock(
+            this.dailyChallengeStartBtn,
+            'summary',
+            !hasChallenge || Boolean(this._dailyChallengeSummary?.loading),
+        );
 
         this.onSummaryUpdated?.(this._dailyChallengeSummary);
     }
