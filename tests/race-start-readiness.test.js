@@ -79,7 +79,6 @@ describe('the engine and the selected lobby card', () => {
             ...dailyChallengeEngineMethods,
             status: 'ready',
             lobbyUi: { setStartTrackReady: vi.fn(), setRaceStartError: vi.fn() },
-            waitForQuietMoment: async () => {},
             ...overrides,
         };
     }
@@ -105,7 +104,7 @@ describe('the engine and the selected lobby card', () => {
             ...campaignEngineMethods,
             lobbyUi: { setStartTrackReady: vi.fn() },
             campaignCarousel: { getSelectedChallenge: () => ({ id: 's1', trackKey: 'circuit', unlocked: false }) },
-            isRaceTrackReady: vi.fn(() => true),
+            canStartRaceTrack: vi.fn(() => true),
         };
         racer.syncCampaignStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('campaign', null);
@@ -113,6 +112,30 @@ describe('the engine and the selected lobby card', () => {
         racer.campaignCarousel.getSelectedChallenge = () => ({ id: 's1', trackKey: 'circuit', unlocked: true });
         racer.syncCampaignStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('campaign', true);
+    });
+
+    it('enables Start on a card whose layout is checked, before its track is drawn', async () => {
+        vi.stubGlobal('window', {
+            location: { hostname: 'reddit.example', pathname: '/game.html' },
+            localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+        });
+        globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ tracks: [] }) }));
+        const { clearStoredTrackChecksForTests } = await import('../game/track/stored-track-service.js');
+        clearStoredTrackChecksForTests();
+        const challenge = { id: 'day-5', trackKey: 'smallSteps' };
+        const racer = engine({ dailyCarousel: { getSelectedChallenge: () => challenge } });
+
+        racer.syncDailyStartReadiness();
+        expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', false);
+
+        // One check for the whole list, when the lobby opens; nothing is drawn.
+        racer.confirmRaceTracks(['smallSteps', 'numberOne']);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(racer.findPreparedRaceTrack('smallSteps', challenge)).toBeNull();
+        expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', true);
+        delete globalThis.fetch;
+        vi.unstubAllGlobals();
     });
 
     it('prepares the card the carousel stopped on, in the selected slot', async () => {
@@ -213,7 +236,6 @@ describe('Campaign Next and the next stage track', () => {
                 setCombinedNextRaceReady: vi.fn(),
                 matchesModalScoreboardContext: vi.fn(() => true),
             },
-            waitForQuietMoment: async () => {},
             findPreparedRaceTrack: vi.fn(() => null),
             ...overrides,
         };

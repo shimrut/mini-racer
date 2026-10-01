@@ -684,6 +684,7 @@ export const campaignEngineMethods = {
                 || null,
             loading: !this._campaignBootstrapReady,
         });
+        this.syncCampaignStartReadiness?.();
     },
 
     handleCampaignCarouselSelect(stage) {
@@ -693,11 +694,11 @@ export const campaignEngineMethods = {
         this.syncCampaignStartReadiness?.();
     },
 
-    // Start stays disabled until the selected stage's race track is prepared.
+    // Start is enabled once the selected stage's track layout is checked.
     syncCampaignStartReadiness() {
         const stage = this.campaignCarousel?.getSelectedChallenge?.();
         const ready = stage?.trackKey && stage.unlocked
-            ? Boolean(this.isRaceTrackReady?.(stage.trackKey, toRaceChallenge(stage)))
+            ? Boolean(this.canStartRaceTrack?.(stage.trackKey, toRaceChallenge(stage)))
             : null;
         this.lobbyUi?.setStartTrackReady?.('campaign', ready);
     },
@@ -1132,14 +1133,13 @@ export const campaignEngineMethods = {
         const showsFinish = () => this.modal.matchesModalScoreboardContext?.({
             challengeId: finishedStage?.raceId,
         }) === true;
-        this.modal.setCombinedNextRaceReady?.(false);
+        // Next is enabled once the layout is checked; the track is drawn now,
+        // or when Next is pressed if it is not drawn yet.
+        this.modal.setCombinedNextRaceReady?.(this.canStartRaceTrack?.(stage.trackKey, challenge) === true);
         void this.prepareRaceTrack(PREPARATION_SLOTS.NEXT, {
             trackKey: stage.trackKey,
             challenge,
-            beforeBuild: async () => {
-                await this.waitForQuietMoment?.();
-                return showsFinish();
-            },
+            beforeBuild: () => showsFinish(),
         }).catch((error) => {
             console.error('Could not prepare the next Campaign stage:', error);
         }).finally(() => {

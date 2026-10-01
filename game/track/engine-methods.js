@@ -60,6 +60,14 @@ export const trackEngineMethods = {
       && (!this.raceTrackNeedsConfirmation(trackKey, challenge) || isTrackLayoutConfirmed(trackKey));
   },
 
+  // Start is enabled as soon as the track's layout is checked. A track that
+  // is not drawn yet is drawn when Start is pressed, while the lobby stays.
+  canStartRaceTrack(trackKey, challenge = null) {
+    return this.isRaceTrackReady(trackKey, challenge)
+      || !this.raceTrackNeedsConfirmation(trackKey, challenge)
+      || isTrackLayoutConfirmed(trackKey);
+  },
+
   // A race start never asks the server for a ready track. A track that is not
   // ready is prepared first, while the current screen stays, so no race
   // starts on an unconfirmed layout. Gives the record to install, or null for
@@ -79,24 +87,15 @@ export const trackEngineMethods = {
     const keys = trackKeys.filter((trackKey) => typeof trackKey === 'string' && trackKey
       && !trackKey.startsWith('community:'));
     if (!keys.length || isLocalEnvironment()) return;
-    void ensureStoredTracks(keys, { requireConfirmation: true }).catch((error) => {
-      console.warn('The lobby tracks could not be confirmed:', error);
-    });
+    void ensureStoredTracks(keys, { requireConfirmation: true })
+      .catch((error) => {
+        console.warn('The lobby tracks could not be confirmed:', error);
+      })
+      .finally(() => this.syncRaceStartReadiness?.());
   },
 
-  waitForQuietMoment() {
-    return new Promise((resolve) => {
-      if (typeof requestIdleCallback === 'function') {
-        requestIdleCallback(resolve, { timeout: 500 });
-        return;
-      }
-      setTimeout(resolve, 32);
-    });
-  },
-
-  // Prepares the card that a lobby carousel stopped on. The server check
-  // starts at once. The build waits for a quiet moment, and a swipe to
-  // another card stops it.
+  // Prepares the card that a lobby carousel stopped on, so that Start runs
+  // with no drawing. A swipe to another card stops the build.
   prepareSelectedRaceTrack(mode, { trackKey, challenge = null, isStillSelected = () => true } = {}) {
     if (typeof trackKey !== 'string' || !trackKey) return;
     const token = (this._selectedPreparationToken || 0) + 1;
@@ -105,11 +104,7 @@ export const trackEngineMethods = {
     void this.prepareRaceTrack(PREPARATION_SLOTS.SELECTED, {
       trackKey,
       challenge,
-      beforeBuild: async () => {
-        if (!wanted()) return false;
-        await this.waitForQuietMoment();
-        return wanted();
-      },
+      beforeBuild: () => wanted(),
     }).catch((error) => {
       if (!wanted()) return;
       console.error('Could not prepare the selected race track:', error);

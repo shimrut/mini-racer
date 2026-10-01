@@ -953,6 +953,7 @@ export const dailyChallengeEngineMethods = {
       { getSnapshot: (challengeId) => getCachedDailyChallengeSnapshot(challengeId) },
     );
     this.dailyCarousel.render(cards, { selectedChallengeId, loading });
+    this.syncDailyStartReadiness?.();
   },
 
   handleDailyCarouselSelect(challenge, card = null) {
@@ -968,11 +969,11 @@ export const dailyChallengeEngineMethods = {
     this.syncDailyStartReadiness?.();
   },
 
-  // Start stays disabled until the selected card's race track is prepared.
+  // Start is enabled once the selected card's track layout is checked.
   syncDailyStartReadiness() {
     const challenge = this.dailyCarousel?.getSelectedChallenge?.();
     const ready = challenge?.trackKey
-      ? Boolean(this.isRaceTrackReady?.(challenge.trackKey, challenge))
+      ? Boolean(this.canStartRaceTrack?.(challenge.trackKey, challenge))
       : null;
     this.lobbyUi?.setStartTrackReady?.("daily", ready);
   },
