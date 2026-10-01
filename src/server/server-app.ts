@@ -81,7 +81,6 @@ import {
     copyAppSeriesDrafts,
     copyLiveAppSeries,
     deleteStoredSeries,
-    ensureStoredSeriesLoaded,
     installStoredSeriesResolver,
     isTrackInStoredSeries,
     publishStoredSeries,
@@ -94,7 +93,6 @@ import { readCreatorSeriesView } from './campaign/series-view.js';
 import {
     deleteStoredTrack,
     describePlacedStoredTracks,
-    ensureStoredTracksLoaded,
     installStoredTrackResolver,
     listStoredTrackRecords,
     listStoredTracks,
@@ -102,6 +100,7 @@ import {
     readStoredTrack,
     saveStoredTrack,
 } from './tracks/track-store.js';
+import { ensureStoredCatalogLoaded } from './tracks/stored-catalog.js';
 import {
     ensureCommunityCreatorPostForSubreddit,
     resolveCreatorToolSubredditName,
@@ -316,6 +315,12 @@ function registerProductionRoutes(app: express.Application): void {
     });
 }
 
+// Routes that read no track and no series. Match the method and the exact path.
+const CATALOG_FREE_ROUTES = new Set([
+    'POST /api/analytics/race-start',
+    'POST /api/analytics/podium',
+]);
+
 export function createServerApp({
     registerRoutes = registerProductionRoutes,
 }: {
@@ -323,16 +328,23 @@ export function createServerApp({
 } = {}) {
     const app = express();
     app.use(express.json({ limit: '256kb' }));
-    app.use(async (_req, _res, next) => {
+    app.use(createTelemetryRouter());
+    // A request that cannot know which layout is live must not answer as if
+    // the app layout were live. Only routes that never read a track skip this.
+    app.use(async (req, res, next) => {
+        if (CATALOG_FREE_ROUTES.has(`${req.method} ${req.path}`)) {
+            next();
+            return;
+        }
         try {
-            await ensureStoredTracksLoaded();
-            await ensureStoredSeriesLoaded();
+            await ensureStoredCatalogLoaded();
         } catch (error) {
             console.error('Stored tracks could not load:', error);
+            res.status(503).json({ error: 'The tracks could not load. Try again.' });
+            return;
         }
         next();
     });
-    app.use(createTelemetryRouter());
     registerRoutes(app);
     return app;
 }
