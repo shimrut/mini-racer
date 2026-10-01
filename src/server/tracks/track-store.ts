@@ -142,6 +142,9 @@ export type StoredTrackSnapshot = {
 };
 
 export const STORED_TRACKS_REVISION_KEY = REVISION_KEY;
+// The list of saved tracks: one field per track key.
+export const STORED_TRACKS_INDEX_KEY = INDEX_KEY;
+export const storedTrackRecordKey = recordKey;
 
 const cacheByInstall = new Map<string, StoredTrackSnapshot>();
 

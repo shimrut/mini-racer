@@ -238,6 +238,40 @@ describe('server storage usage', () => {
         expect(group.bytes).toBeGreaterThan(0);
     });
 
+    function seedTracks(count, recordBytes) {
+        const trackKeys = Array.from({ length: count }, (_unused, index) => `track${String(index).padStart(3, '0')}`);
+        for (const trackKey of trackKeys) putString(`dailygp:tracks:v1:track:${trackKey}`, 'x'.repeat(recordBytes));
+        putHash('dailygp:tracks:v1:index', Object.fromEntries(trackKeys.map((trackKey) => [trackKey, '1'])));
+        putString('dailygp:tracks:v1:revision', String(count));
+    }
+
+    it('counts every saved track, with the track list', async () => {
+        seedTracks(3, 900);
+
+        const usage = await measure();
+        const tracks = groupById(usage, 'tracks');
+
+        expect(tracks).toMatchObject({ label: 'Tracks', keys: 5, rows: 7, estimated: false });
+        expect(tracks.bytes).toBe(seededBytes());
+        expect(usage.totalBytes).toBe(seededBytes());
+    });
+
+    it('measures a spread of the saved tracks and scales up to all of them', async () => {
+        seedTracks(150, 1200);
+
+        const usage = await measure();
+        const tracks = groupById(usage, 'tracks');
+
+        expect(tracks.keys).toBe(152);
+        expect(tracks.rows).toBe(301);
+        expect(tracks.estimated).toBe(true);
+        // Every record has the same size, so the scaled size is exact.
+        expect(tracks.bytes).toBe(seededBytes());
+        const measuredRecords = mockRedis.strLen.mock.calls
+            .filter(([key]) => String(key).startsWith('dailygp:tracks:v1:track:'));
+        expect(measuredRecords).toHaveLength(60);
+    });
+
     it('keeps reporting when Redis refuses a key', async () => {
         seedOneDayOfRacing();
         failingKeys.add(`dailygp:challenge-pbs:${CHALLENGE_ID}`);

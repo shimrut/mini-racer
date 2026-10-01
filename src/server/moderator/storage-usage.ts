@@ -37,11 +37,17 @@ import { LAUNCHER_POSTS_KEY } from '../posts/launcher-post-store.js';
 import { MOD_ANALYTICS_POSTS_KEY } from './moderator-analytics-post.js';
 import { challengeCollectionKey } from '../competition/pb-ghost-store.js';
 import { readContextSubredditName } from '../request/request-context.js';
+import {
+    STORED_TRACKS_INDEX_KEY,
+    STORED_TRACKS_REVISION_KEY,
+    storedTrackRecordKey,
+} from '../tracks/track-store.js';
 import { cacheSharedJson } from '../redis/shared-cache.js';
 
 const SAMPLED_KEYS_PER_GROUP = 5;
 const SAMPLED_ROWS_PER_KEY = 20;
 const SAMPLED_PLAYERS = 40;
+const SAMPLED_TRACKS = 60;
 const READ_CONCURRENCY = 8;
 const SORTED_SET_SCORE_BYTES = 8;
 const STORAGE_USAGE_CACHE_TTL_SECONDS = 5 * 60;
@@ -304,6 +310,40 @@ async function measurePlayerRecords(scope: string): Promise<StorageUsageGroup> {
     };
 }
 
+const TRACKS_GROUP = {
+    id: 'tracks',
+    label: 'Tracks',
+    detail: 'Every track saved in the Creator or copied from the app: shape, medal times and checks',
+} as const;
+
+// The track list names every saved track. A spread of the track records is
+// measured and scaled up to all of them; the list itself is measured as usual.
+async function measureTracks(): Promise<StorageUsageGroup> {
+    let trackKeys: string[] = [];
+    try {
+        trackKeys = await redis.hKeys(STORED_TRACKS_INDEX_KEY);
+    } catch (_error) {
+        trackKeys = [];
+    }
+    const sampled = pickSpread(trackKeys, SAMPLED_TRACKS);
+    const parts = await Promise.all([
+        measureKeyGroup({
+            ...TRACKS_GROUP,
+            strings: sampled.map((trackKey) => storedTrackRecordKey(trackKey)),
+            hashes: [],
+            sortedSets: [],
+            scale: sampled.length > 0 ? trackKeys.length / sampled.length : 1,
+        }),
+        measureKeyGroup({
+            ...TRACKS_GROUP,
+            strings: [STORED_TRACKS_REVISION_KEY],
+            hashes: [STORED_TRACKS_INDEX_KEY],
+            sortedSets: [],
+        }),
+    ]);
+    return mergeGroupParts(parts)[0];
+}
+
 async function readLedgerSample(ledgerKey: string): Promise<string[]> {
     try {
         return pickSpread(await redis.hKeys(ledgerKey), SAMPLED_PLAYERS);
@@ -442,6 +482,7 @@ function readSubredditName(subredditName?: unknown): string {
 //   They are short-lived, and no list names them.
 // - Locks, rate limits and share links. They are short-lived, and no list names them.
 // - Signed-out guest records. A guest is listed only after Campaign progress.
+// - The Creator's Campaign series, its Daily list, and the Copy tab reports.
 // Redis also adds its own overhead for each key and each row.
 async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> {
     const windowChallengeIds = analyticsRetentionWindow(now).dates.map((date) => createDailyChallengeId(date));
@@ -450,6 +491,7 @@ async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> 
         ...buildKeyGroups({ subredditName: subreddit, now, storedDailyChallengeIds })
             .map((group) => measureKeyGroup(group)),
         measurePlayerRecords(analyticsScope(subreddit)),
+        measureTracks(),
     ]));
 
     return {
