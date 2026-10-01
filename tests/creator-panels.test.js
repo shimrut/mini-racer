@@ -696,3 +696,187 @@ describe('Creator Campaign fields keep typed text', () => {
         expect(panels.seriesDraft.id).toBe('fresh-series-v1');
     });
 });
+
+describe('Creator Daily list and series conflicts', () => {
+    // The Daily list and series routes, with a revision check as the server has.
+    function panelServer() {
+        const server = {
+            daily: structuredClone(dailyView),
+            series: [{
+                id: 'day-v1', name: 'Day Races', ground: 'tarmac',
+                stages: [{ trackKey: 'nightLoop', laps: 1, requiredMedals: 0 }],
+                status: 'draft', publishedStageCount: 0, revision: 2, updatedBy: 'OtherMod',
+            }],
+            puts: [],
+            dropNextAnswer: false,
+        };
+        const seriesView = () => ({
+            series: structuredClone(server.series),
+            appSeries: [{ id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', stages: [], live: true }],
+            tracks: [
+                { key: 'nightLoop', name: 'Night Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: 'day-v1' },
+                { key: 'dayLoop', name: 'Day Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: null },
+            ],
+        });
+        vi.stubGlobal('fetch', vi.fn(async (url, options = {}) => {
+            const path = String(url);
+            if (options.method === 'PUT' && path === '/api/creator/daily') {
+                const body = JSON.parse(options.body);
+                server.puts.push({ path, body });
+                if (body.baseRevision !== server.daily.schedule.revision) {
+                    return jsonResponse({ error: 'The Daily list changed on another device.' }, 409);
+                }
+                server.daily = { ...server.daily, schedule: { ...server.daily.schedule, keys: body.keys,
+                    revision: server.daily.schedule.revision + 1 } };
+                if (server.dropNextAnswer) {
+                    server.dropNextAnswer = false;
+                    throw new TypeError('Failed to fetch');
+                }
+                return jsonResponse(structuredClone(server.daily));
+            }
+            if (options.method === 'PUT' && path.startsWith('/api/creator/series/')) {
+                const id = decodeURIComponent(path.split('/').pop());
+                const body = JSON.parse(options.body);
+                server.puts.push({ path, body });
+                const existing = server.series.find((entry) => entry.id === id);
+                if ((existing?.revision ?? 0) !== body.baseRevision) {
+                    return jsonResponse({ error: 'This series changed on another device.' }, 409);
+                }
+                const { baseRevision: _base, ...content } = body;
+                const saved = { ...(existing ?? { status: 'draft', publishedStageCount: 0 }), id, ...content,
+                    name: content.name.trim(), revision: (existing?.revision ?? 0) + 1, updatedBy: 'ModOne' };
+                server.series = [...server.series.filter((entry) => entry.id !== id), saved];
+                if (server.dropNextAnswer) {
+                    server.dropNextAnswer = false;
+                    throw new TypeError('Failed to fetch');
+                }
+                return jsonResponse({ series: structuredClone(saved) });
+            }
+            if (path.includes('/api/creator/daily')) return jsonResponse(structuredClone(server.daily));
+            if (path.includes('/api/creator/migration')) return jsonResponse({ report: null, preview: { copied: [] } });
+            if (server.holdNextSeriesRead) {
+                const hold = server.holdNextSeriesRead;
+                server.holdNextSeriesRead = null;
+                await hold.promise;
+            }
+            return jsonResponse(seriesView());
+        }));
+        return server;
+    }
+
+    function openPanels() {
+        const choose = vi.fn(async () => 'cancel');
+        const setStatus = vi.fn();
+        const panels = new CreatorPanels({ confirm, choose, setStatus, onOpenTrack: vi.fn(), onTracksChanged: vi.fn() });
+        return { panels, choose, setStatus };
+    }
+
+    it('sends a newer Daily list once when the server holds a list whose answer was lost', async () => {
+        const server = panelServer();
+        const { panels, choose } = openPanels();
+        await panels.loadDaily();
+        panels.dailyKeys = ['circuit', 'royalPlateau', 'sunlitTemple'];
+        panels.dailyDirty = true;
+        server.dropNextAnswer = true;
+        await panels.saveDaily();
+        expect(server.daily.schedule.revision).toBe(4);
+        panels.dailyKeys = ['circuit', 'sunlitTemple', 'royalPlateau', 'nightLoop'];
+        await panels.saveDaily();
+        expect(choose).not.toHaveBeenCalled();
+        expect(server.puts.map((put) => put.body.baseRevision)).toEqual([3, 3, 4]);
+        expect(server.daily.schedule.keys).toEqual(['circuit', 'sunlitTemple', 'royalPlateau', 'nightLoop']);
+        expect(panels.dailyDirty).toBe(false);
+    });
+
+    it('asks when another device saved the Daily list', async () => {
+        const server = panelServer();
+        const { panels, choose } = openPanels();
+        await panels.loadDaily();
+        server.daily.schedule = { ...server.daily.schedule, keys: ['circuit', 'sunlitTemple'], revision: 9 };
+        panels.dailyKeys = ['circuit', 'royalPlateau', 'sunlitTemple'];
+        panels.dailyDirty = true;
+        choose.mockResolvedValueOnce('mine');
+        await panels.saveDaily();
+        expect(server.puts.at(-1).body.baseRevision).toBe(9);
+        expect(server.daily.schedule.keys).toEqual(['circuit', 'royalPlateau', 'sunlitTemple']);
+
+        server.daily.schedule = { ...server.daily.schedule, keys: ['circuit'], revision: 20 };
+        panels.dailyKeys = ['circuit', 'nightLoop'];
+        panels.dailyDirty = true;
+        choose.mockResolvedValueOnce('theirs');
+        await panels.saveDaily();
+        expect(panels.dailyKeys).toEqual(['circuit']);
+        expect(panels.dailyDirty).toBe(false);
+
+        panels.dailyKeys = ['circuit', 'nightLoop'];
+        panels.dailyDirty = true;
+        server.daily.schedule = { ...server.daily.schedule, revision: 30 };
+        await panels.saveDaily();
+        expect(panels.dailyKeys).toEqual(['circuit', 'nightLoop']);
+        expect(panels.dailyDirty).toBe(true);
+    });
+
+    it('sends a newer series once when the server holds a save whose answer was lost', async () => {
+        const server = panelServer();
+        const { panels, choose } = openPanels();
+        await panels.loadSeries('day-v1');
+        panels.seriesDraft.name = 'Sent A';
+        panels.seriesDirty = true;
+        server.dropNextAnswer = true;
+        await panels.saveSeries();
+        expect(server.series[0].revision).toBe(3);
+        panels.seriesDraft.name = 'Edited B';
+        await panels.saveSeries();
+        expect(choose).not.toHaveBeenCalled();
+        expect(server.puts.map((put) => put.body.baseRevision)).toEqual([2, 2, 3]);
+        expect(server.series[0].name).toBe('Edited B');
+        expect(panels.seriesDirty).toBe(false);
+    });
+
+    it('offers Save mine for a live series only when the draft keeps its live stages', async () => {
+        const server = panelServer();
+        const { panels, choose } = openPanels();
+        await panels.loadSeries('day-v1');
+        // Another device made the first stage live.
+        server.series[0] = { ...server.series[0], status: 'published', publishedStageCount: 1, revision: 5 };
+        const draft = panels.seriesDraft;
+        draft.name = 'New Name';
+        draft.stages.push({ trackKey: 'dayLoop', laps: 2, requiredMedals: 2 });
+        panels.seriesDirty = true;
+        choose.mockResolvedValueOnce('mine');
+        await panels.saveSeries();
+        expect(choose.mock.calls[0][0].choices.map((choice) => choice.value)).toEqual(['mine', 'theirs']);
+        expect(server.puts.at(-1).body.baseRevision).toBe(5);
+        expect(server.series[0].name).toBe('New Name');
+
+        server.series[0] = { ...server.series[0], revision: 9 };
+        panels.seriesDraft.stages[0].laps = 3;
+        panels.seriesDirty = true;
+        choose.mockResolvedValueOnce('theirs');
+        await panels.saveSeries();
+        expect(choose.mock.calls[1][0].choices.map((choice) => choice.value)).toEqual(['theirs']);
+        expect(panels.seriesDraft.stages[0].laps).toBe(1);
+        expect(panels.seriesDirty).toBe(false);
+    });
+
+    it('stops when another series is open by the time the read ends', async () => {
+        const server = panelServer();
+        const { panels, choose } = openPanels();
+        await panels.loadSeries('day-v1');
+        server.series[0] = { ...server.series[0], revision: 7, name: 'Their Name' };
+        panels.seriesDraft.name = 'Mine';
+        panels.seriesDirty = true;
+        const read = deferred();
+        server.holdNextSeriesRead = read;
+        const saving = panels.saveSeries();
+        await vi.waitFor(() => expect(server.puts).toHaveLength(1));
+        await vi.waitFor(() => expect(panels.busy).toBe(false));
+        panels.seriesDirty = false;
+        await panels.startNewSeries();
+        read.resolve();
+        await saving;
+        expect(choose).not.toHaveBeenCalled();
+        expect(panels.seriesDraft.isNew).toBe(true);
+        expect(server.series[0].name).toBe('Their Name');
+    });
+});

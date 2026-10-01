@@ -374,7 +374,7 @@ export async function saveStoredTrack(
             const existing = await readStoredTrack(trackKey);
             const expected = Number(baseRevision ?? 0);
             if ((existing?.revision ?? 0) !== expected) {
-                throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
+                throw new TrackConflictError('This track changed on another device.');
             }
             if (existing?.lockedAt) {
                 throw new TrackInputError('This track is locked, because players have raced it.');
@@ -486,7 +486,7 @@ export async function deleteStoredTrack(
             const existing = await readStoredTrack(trackKey);
             if (!existing) return { result: false };
             if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-                throw new TrackConflictError('This track changed on another device. Open it again to see the new version.');
+                throw new TrackConflictError('This track changed on another device.');
             }
             if (existing.lockedAt) {
                 throw new TrackInputError('This track is locked, because players have raced it.');

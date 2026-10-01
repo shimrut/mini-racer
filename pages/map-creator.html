@@ -48,7 +48,13 @@
     <main class="maker-editor" data-creator-view="tracks">
         <section class="maker-stage">
             <canvas id="map-canvas"></canvas>
-            <p id="creator-lock-note" class="creator-lock-note" hidden>Players have raced this track, so it cannot change.</p>
+            <p id="creator-lock-note" class="creator-lock-note" hidden>
+                <span>Players have raced this track, so it cannot change.</span>
+                <span id="creator-lock-actions" class="creator-lock-actions" hidden>
+                    <button id="creator-keep-copy-btn" type="button">Keep as new track</button>
+                    <button id="creator-load-locked-btn" type="button">Load locked version</button>
+                </span>
+            </p>
             <div id="touch-tools" class="touch-tools" role="toolbar" aria-label="Edit">
                 <button type="button" data-action="undo">Undo</button>
                 <button type="button" data-action="redo">Redo</button>
@@ -166,6 +172,14 @@
                 <button type="submit" value="cancel">Cancel</button>
                 <button id="confirm-dialog-button" type="submit" value="confirm" class="danger-btn">Delete</button>
             </div>
+        </form>
+    </dialog>
+
+    <dialog id="choice-dialog" class="maker-dialog" aria-labelledby="choice-dialog-title">
+        <form method="dialog">
+            <h2 id="choice-dialog-title"></h2>
+            <p id="choice-dialog-message"></p>
+            <div id="choice-dialog-actions" class="maker-dialog-actions"></div>
         </form>
     </dialog>
 

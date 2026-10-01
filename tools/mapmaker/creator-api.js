@@ -25,6 +25,7 @@ export async function creatorRequest(path, { method = 'GET', body } = {}) {
 
 export const creatorApi = {
     listTracks: () => creatorRequest('/api/creator/tracks?full=1'),
+    readTrack: (trackKey) => creatorRequest(`/api/creator/tracks/${encodeURIComponent(trackKey)}`),
     saveTrack: (trackKey, body) => creatorRequest(`/api/creator/tracks/${encodeURIComponent(trackKey)}`, {
         method: 'PUT',
         body,

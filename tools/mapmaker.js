@@ -47,8 +47,10 @@ import { CreatorPanels } from './mapmaker/creator-panels.js';
 import {
     captureUnsavedCreatorWork,
     hasCreatorUnsavedWork,
+    keepLockedCreatorDraft,
+    loadLockedCreatorTrack,
     restoreUnsavedCreatorWork,
-    saveCreatorTrackSnapshot,
+    saveCreatorTrackWithRecovery,
 } from './mapmaker/creator-track-save.js';
 import {
     clearPendingMedalText,
@@ -325,6 +327,9 @@ class MapmakerApp {
         this.saveTrackBtn = document.getElementById('save-track-btn');
         this.creatorSaveStatus = document.getElementById('creator-save-status');
         this.creatorLockNote = document.getElementById('creator-lock-note');
+        this.creatorLockActions = document.getElementById('creator-lock-actions');
+        this.creatorKeepCopyBtn = document.getElementById('creator-keep-copy-btn');
+        this.creatorLoadLockedBtn = document.getElementById('creator-load-locked-btn');
         this.creatorDriveDialog = document.getElementById('creator-drive-dialog');
         this.creatorDriveFrame = document.getElementById('creator-drive-frame');
         this.newTrackBtn = document.getElementById('new-track-btn');
@@ -382,6 +387,8 @@ class MapmakerApp {
         this.medalRowByKey = new Map();
         // Typed medal text that is not in the medal row yet, by track and tier.
         this.pendingMedalText = new Map();
+        // Saves with no clear answer, by track key: the server may have them.
+        this.uncertainTracksByKey = new Map();
         this.autoRoadGuideByKey = new Map();
         this.recoveryTimer = null;
         this.skipBeforeUnload = false;
@@ -468,8 +475,10 @@ class MapmakerApp {
                 onTracksChanged: () => void this.loadCreatorTracks({ keepSelection: true }),
                 setStatus: (message, isError) => this.setStatus(message, isError),
                 confirm: (options) => this.confirmAction(options),
+                choose: (options) => this.chooseAction(options),
             });
             this.bindCreatorTabs();
+            this.bindCreatorLockActions();
             document.getElementById('creator-loader-retry')
                 ?.addEventListener('click', () => void this.loadCreatorTracks());
             void this.loadCreatorTracks();
@@ -3436,6 +3445,15 @@ class MapmakerApp {
         this.trackPickerBtn.disabled = Boolean(this.creatorDeletingKey);
         this.newTrackBtn.disabled = !this.creatorLoaded || Boolean(this.creatorDeletingKey);
         this.setCreatorEditable(editable);
+        // A locked track with unsaved changes: the work can go to a new
+        // track, or the locked version can replace it.
+        const lockedDraft = Boolean(this.creatorLoaded && record?.lockedAt && this.state.dirtyTrackKeys.has(key));
+        if (this.creatorLockActions) {
+            this.creatorLockActions.hidden = !lockedDraft;
+            this.creatorLockNote.classList.toggle('has-actions', lockedDraft);
+            this.creatorKeepCopyBtn.disabled = this.busy;
+            this.creatorLoadLockedBtn.disabled = this.busy;
+        }
         if (editable) {
             // These controls know when they must stay off.
             this.syncCornerRadiusControl();
@@ -3628,13 +3646,75 @@ class MapmakerApp {
             this.setStatus(`Cannot save ${name}: ${medalError}`, true);
             return false;
         }
-        const saved = await saveCreatorTrackSnapshot(this, key, geometrySignature);
+        const saved = await saveCreatorTrackWithRecovery(this, key, geometrySignature);
         if (saved) this.creatorPanels.refreshAll();
         if (this.creatorRefreshPending && !this.creatorLoading) {
             this.creatorRefreshPending = false;
             void this.loadCreatorTracks({ keepSelection: true });
         }
         return saved;
+    }
+
+    // Takes a track out of this editor only. The server is not asked.
+    discardCreatorTrack(key) {
+        const wasOpen = this.state.selectedTrackKey === key;
+        const keys = Object.keys(this.state.tracks);
+        const index = keys.indexOf(key);
+        let nextKey = keys[index + 1] || keys[index - 1];
+        delete this.state.tracks[key];
+        this.creatorRecords.delete(key);
+        this.editHistories.delete(key);
+        this.draftLoopsByKey.delete(key);
+        this.medalRowByKey.delete(key);
+        clearPendingMedalText(this.pendingMedalText, key);
+        this.uncertainTracksByKey.delete(key);
+        delete this.medalTimes[key];
+        this.state.originalTrackKeyByKey.delete(key);
+        this.state.dirtyTrackKeys.delete(key);
+        this.creatorSaveErrors.delete(key);
+        if (!wasOpen) {
+            this.syncCreatorTrackState();
+            if (this.trackPickerDialog.open) this.renderTrackPicker();
+            return;
+        }
+        this.state.draftLoop = [];
+        if (!nextKey) {
+            nextKey = 'newTrack';
+            this.state.tracks.newTrack = createBlankTrack();
+            this.editHistories.set(nextKey, createEditHistory(this.state.tracks.newTrack));
+        }
+        this.resetView();
+        this.loadTrack(nextKey);
+    }
+
+    isAppTrackKey(key) {
+        return Boolean(TRACKS[key]);
+    }
+
+    // A question with more than two answers. Escape and Cancel answer 'cancel'.
+    chooseAction({ title, message, choices }) {
+        const dialog = document.getElementById('choice-dialog');
+        if (!dialog) return Promise.resolve('cancel');
+        document.getElementById('choice-dialog-title').textContent = title;
+        document.getElementById('choice-dialog-message').textContent = message;
+        const cancel = document.createElement('button');
+        cancel.type = 'submit';
+        cancel.value = 'cancel';
+        cancel.textContent = 'Cancel';
+        const buttons = choices.map((choice) => {
+            const button = document.createElement('button');
+            button.type = 'submit';
+            button.value = choice.value;
+            button.textContent = choice.label;
+            button.className = choice.danger ? 'danger-btn' : 'primary-btn';
+            return button;
+        });
+        document.getElementById('choice-dialog-actions').replaceChildren(cancel, ...buttons);
+        dialog.returnValue = '';
+        dialog.showModal();
+        return new Promise((resolve) => {
+            dialog.addEventListener('close', () => resolve(dialog.returnValue || 'cancel'), { once: true });
+        });
     }
 
     async deleteCreatorTrack() {
@@ -3659,28 +3739,8 @@ class MapmakerApp {
                 await creatorApi.deleteTrack(key, record.revision);
                 this.creatorPanels.refreshAll();
             }
-            const keys = Object.keys(this.state.tracks);
-            const index = keys.indexOf(key);
-            let nextKey = keys[index + 1] || keys[index - 1];
-            delete this.state.tracks[key];
-            this.creatorRecords.delete(key);
-            this.editHistories.delete(key);
-            this.draftLoopsByKey.delete(key);
-            this.medalRowByKey.delete(key);
-            clearPendingMedalText(this.pendingMedalText, key);
-            delete this.medalTimes[key];
-            this.state.originalTrackKeyByKey.delete(key);
-            this.state.dirtyTrackKeys.delete(key);
-            this.creatorSaveErrors.delete(key);
-            this.state.draftLoop = [];
-            if (!nextKey) {
-                nextKey = 'newTrack';
-                this.state.tracks.newTrack = createBlankTrack();
-                this.editHistories.set(nextKey, createEditHistory(this.state.tracks.newTrack));
-            }
-            this.resetView();
             this.creatorDeletingKey = null;
-            this.loadTrack(nextKey);
+            this.discardCreatorTrack(key);
             this.setStatus(record ? `Deleted ${name}.` : `Discarded ${name}.`);
         } catch (error) {
             this.setStatus(`Could not delete ${name}: ${error.message}`, true);
@@ -3694,6 +3754,19 @@ class MapmakerApp {
                 void this.loadCreatorTracks({ keepSelection: true });
             }
         }
+    }
+
+    bindCreatorLockActions() {
+        this.creatorKeepCopyBtn?.addEventListener('click', () => {
+            if (this.busy) return;
+            void keepLockedCreatorDraft(this, this.state.selectedTrackKey, geometrySignature).then((saved) => {
+                if (saved) this.creatorPanels.refreshAll();
+            });
+        });
+        this.creatorLoadLockedBtn?.addEventListener('click', () => {
+            if (this.busy) return;
+            void loadLockedCreatorTrack(this, this.state.selectedTrackKey, geometrySignature);
+        });
     }
 
     bindCreatorTabs() {

@@ -51,6 +51,32 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     white-space: nowrap;
 }
 
+/* A locked track with unsaved changes: the note offers the two ways out. */
+.creator-lock-note.has-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    border-radius: 0.75rem;
+    white-space: normal;
+    text-align: center;
+}
+
+.creator-lock-actions:not([hidden]) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+/* Four answers fit on a phone. */
+#choice-dialog .maker-dialog-actions {
+    flex-wrap: wrap;
+}
+
 .maker-stage { position: relative; }
 
 /* The Daily, Campaign and Copy screens */

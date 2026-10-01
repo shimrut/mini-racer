@@ -8,6 +8,15 @@ import {
     getRequiredMedalsError,
 } from '../../game/campaign/series-rules.js';
 import { creatorApi } from './creator-api.js';
+import {
+    fitsLiveSeries,
+    isUncertain,
+    isUncertainFailure,
+    rememberUncertain,
+    sameDailyKeys,
+    sameSeriesContent,
+    seriesContent,
+} from './creator-conflicts.js';
 
 const SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
@@ -66,7 +75,7 @@ function seriesMedalsText(stage) {
 }
 
 // The series as the server stores it. The typed text is only for the field.
-function seriesContent(draft) {
+function seriesPayload(draft) {
     return {
         name: draft.name,
         ground: draft.ground,
@@ -77,17 +86,40 @@ function seriesContent(draft) {
 // The series as the moderator typed it. A newer edit that gives the same
 // number ("05" after "5") is still a newer edit.
 function seriesTypedContent(draft) {
-    return JSON.stringify({ ...seriesContent(draft), id: draft.id,
+    return JSON.stringify({ ...seriesPayload(draft), id: draft.id,
         typed: draft.stages.map((stage) => stage.requiredMedalsText ?? null) });
+}
+
+// The server has this version of the draft: the draft takes its record, and
+// keeps its identity and its stage objects, so the fields stay.
+function adoptSavedSeries(draft, series) {
+    const { stages, ...fields } = structuredClone(series);
+    Object.assign(draft, fields);
+    delete draft.isNew;
+    delete draft.idTouched;
+    const sameStages = stages.length === draft.stages.length
+        && stages.every((stage, index) => stage.trackKey === draft.stages[index].trackKey);
+    if (sameStages) {
+        stages.forEach((stage, index) => {
+            Object.assign(draft.stages[index], stage);
+            delete draft.stages[index].requiredMedalsText;
+        });
+    } else {
+        draft.stages = stages;
+    }
 }
 
 export class CreatorPanels {
     // `confirm` opens the page's own dialog. Reddit ignores window.confirm.
-    constructor({ onOpenTrack, onTracksChanged, setStatus, confirm }) {
+    // `choose` asks a question with more than two answers.
+    constructor({ onOpenTrack, onTracksChanged, setStatus, confirm, choose = async () => 'cancel' }) {
         this.onOpenTrack = onOpenTrack;
         this.onTracksChanged = onTracksChanged;
         this.setStatus = setStatus;
         this.confirm = confirm;
+        this.choose = choose;
+        // Saves with no clear answer: 'daily', or 'series:<id>'.
+        this.uncertainSaves = new Map();
         this.dailyRoot = document.getElementById('creator-daily-view');
         this.seriesRoot = document.getElementById('creator-series-view');
         this.copyRoot = document.getElementById('creator-copy-view');
@@ -301,7 +333,7 @@ export class CreatorPanels {
         this.renderDaily();
     }
 
-    async saveDaily() {
+    async saveDaily(attempt = 0) {
         if (this.busy) return;
         const keys = [...this.dailyKeys];
         const baseRevision = this.daily.schedule.revision;
@@ -309,8 +341,14 @@ export class CreatorPanels {
         this.busy = true;
         this.writeGeneration += 1;
         this.renderDaily();
+        let conflict = false;
         try {
-            this.daily = await creatorApi.saveDaily(keys, baseRevision);
+            const daily = await creatorApi.saveDaily(keys, baseRevision);
+            if (!Array.isArray(daily?.schedule?.keys) || !Number.isFinite(daily.schedule.revision)) {
+                throw new Error('The answer of the server could not be read.');
+            }
+            this.daily = daily;
+            this.uncertainSaves.delete('daily');
             if (JSON.stringify(this.dailyKeys) === JSON.stringify(keys)) {
                 this.dailyKeys = [...this.daily.schedule.keys];
             }
@@ -321,6 +359,8 @@ export class CreatorPanels {
             this.setStatus(this.dailyDirty
                 ? 'Saved the earlier Daily list. Newer changes are still unsaved.' : 'Saved the Daily list.');
         } catch (error) {
+            if (isUncertainFailure(error)) rememberUncertain(this.uncertainSaves, 'daily', JSON.stringify(keys));
+            conflict = error?.status === 409;
             this.dailySaveError = `Could not save the Daily list: ${error.message}`;
             this.setStatus(this.dailySaveError, true);
         } finally {
@@ -328,6 +368,58 @@ export class CreatorPanels {
             this.writeGeneration += 1;
             this.renderDaily();
             this.flushRefresh();
+        }
+        if (conflict) await this.recoverDailyConflict(baseRevision, attempt);
+    }
+
+    // Another revision of the Daily list is on the server. A save of this
+    // page whose answer was lost goes again once; anything else is a question.
+    async recoverDailyConflict(baseRevision, attempt) {
+        let server;
+        try {
+            server = await creatorApi.readDaily();
+        } catch (error) {
+            this.setStatus(`Could not read the saved Daily list: ${error.message}`, true);
+            return;
+        }
+        if (this.busy || server.schedule.revision === baseRevision) return;
+        const adopt = (keys) => {
+            this.daily = server;
+            this.dailyKeys = [...keys];
+            this.dailyDirty = !sameDailyKeys(this.dailyKeys, server.schedule.keys);
+            this.dailySaveError = null;
+            this.uncertainSaves.delete('daily');
+            this.renderDaily();
+        };
+        if (sameDailyKeys(server.schedule.keys, this.dailyKeys)) {
+            adopt(server.schedule.keys);
+            this.setStatus('Saved the Daily list.');
+            this.refresh('campaign', 'copy');
+            return;
+        }
+        if (attempt === 0 && isUncertain(this.uncertainSaves, 'daily', JSON.stringify(server.schedule.keys))) {
+            this.daily = server;
+            this.uncertainSaves.delete('daily');
+            await this.saveDaily(attempt + 1);
+            return;
+        }
+        const choice = await this.choose({
+            title: 'Saved on another device',
+            message: 'Another device saved a newer Daily list.',
+            choices: [
+                { value: 'mine', label: 'Save mine' },
+                { value: 'theirs', label: 'Load theirs', danger: true },
+            ],
+        });
+        if (this.busy) return;
+        if (choice === 'mine') {
+            this.daily = server;
+            await this.saveDaily(attempt + 1);
+        } else if (choice === 'theirs') {
+            adopt(server.schedule.keys);
+            this.setStatus('Loaded the saved Daily list.');
+        } else {
+            this.setStatus('The Daily list is not saved: another device saved it first.', true);
         }
     }
 
@@ -723,7 +815,7 @@ export class CreatorPanels {
         ]);
     }
 
-    async saveSeries() {
+    async saveSeries(attempt = 0) {
         if (this.busy) return;
         const draft = this.seriesDraft;
         if (!SERIES_ID_RE.test(draft.id)) {
@@ -731,7 +823,7 @@ export class CreatorPanels {
             return;
         }
         const seriesId = draft.id;
-        const snapshot = structuredClone(seriesContent(draft));
+        const snapshot = structuredClone(seriesPayload(draft));
         const typedAtStart = seriesTypedContent(draft);
         const baseRevision = draft.isNew ? 0 : draft.revision;
         this.seriesSavingDraft = draft;
@@ -739,8 +831,13 @@ export class CreatorPanels {
         this.busy = true;
         this.writeGeneration += 1;
         this.renderSeries();
+        let conflict = false;
         try {
             const { series } = await creatorApi.saveSeries(seriesId, { ...snapshot, baseRevision });
+            if (!series || series.id !== seriesId || !Number.isInteger(series.revision)) {
+                throw new Error('The answer of the server could not be read.');
+            }
+            this.uncertainSaves.delete(`series:${seriesId}`);
             this.seriesView.series = [
                 ...this.seriesView.series.filter((entry) => entry.id !== series.id), series,
             ];
@@ -756,21 +853,7 @@ export class CreatorPanels {
                 // The draft keeps its identity, so the field being typed in
                 // keeps its focus. Newer edits stay in it.
                 if (unchanged) {
-                    const { stages, ...fields } = structuredClone(series);
-                    Object.assign(draft, fields);
-                    delete draft.isNew;
-                    delete draft.idTouched;
-                    const sameStages = stages.length === draft.stages.length
-                        && stages.every((stage, index) => stage.trackKey === draft.stages[index].trackKey);
-                    if (sameStages) {
-                        // The stage fields keep their stage objects.
-                        stages.forEach((stage, index) => {
-                            Object.assign(draft.stages[index], stage);
-                            delete draft.stages[index].requiredMedalsText;
-                        });
-                    } else {
-                        draft.stages = stages;
-                    }
+                    adoptSavedSeries(draft, series);
                 } else {
                     Object.assign(draft, { id: series.id, isNew: false, revision: series.revision,
                         status: series.status, publishedStageCount: series.publishedStageCount });
@@ -780,6 +863,10 @@ export class CreatorPanels {
                     : `Saved the earlier changes to ${series.name}. Newer changes are still unsaved.`);
             } else this.setStatus(`Saved ${series.name}.`);
         } catch (error) {
+            if (isUncertainFailure(error)) {
+                rememberUncertain(this.uncertainSaves, `series:${seriesId}`, seriesContent(snapshot));
+            }
+            conflict = error?.status === 409;
             this.seriesSaveError = { draft, message: `Could not save the series: ${error.message}` };
             this.setStatus(this.seriesSaveError.message, true);
         } finally {
@@ -788,6 +875,98 @@ export class CreatorPanels {
             this.writeGeneration += 1;
             if (this.seriesView) this.renderSeries();
             this.flushRefresh();
+        }
+        if (conflict) await this.recoverSeriesConflict(draft, seriesId, baseRevision, attempt);
+    }
+
+    // Another revision of the series is on the server. Every step works on
+    // the draft that was saved, and stops when another draft is open.
+    async recoverSeriesConflict(draft, seriesId, baseRevision, attempt) {
+        const uncertainKey = `series:${seriesId}`;
+        let view;
+        try {
+            view = await creatorApi.readSeries();
+        } catch (error) {
+            this.setStatus(`Could not read the saved series: ${error.message}`, true);
+            return;
+        }
+        if (this.busy) return;
+        const server = view.series.find((entry) => entry.id === seriesId) ?? null;
+        if (server && server.revision === baseRevision) return;
+        this.seriesView = view;
+        if (this.seriesDraft !== draft) {
+            this.renderSeries();
+            return;
+        }
+        const typed = draft.stages.some((stage) => typeof stage.requiredMedalsText === 'string');
+        if (server && !typed && sameSeriesContent(server, draft)) {
+            adoptSavedSeries(draft, server);
+            this.selectedSeriesId = server.id;
+            this.seriesDirty = false;
+            this.seriesSaveError = null;
+            this.uncertainSaves.delete(uncertainKey);
+            this.renderSeries();
+            this.setStatus(`Saved ${server.name}.`);
+            return;
+        }
+        // A live series keeps its ground and its live stages.
+        const fits = !server || fitsLiveSeries(draft, server);
+        const takeRecord = () => Object.assign(draft, { id: server.id, isNew: false, revision: server.revision,
+            status: server.status, publishedStageCount: server.publishedStageCount });
+        if (server && fits && attempt === 0 && isUncertain(this.uncertainSaves, uncertainKey, seriesContent(server))) {
+            takeRecord();
+            this.uncertainSaves.delete(uncertainKey);
+            await this.saveSeries(attempt + 1);
+            return;
+        }
+        if (!server) {
+            const appSeries = view.appSeries.some((entry) => entry.id === seriesId);
+            const choice = await this.choose({
+                title: 'Deleted on another device',
+                message: appSeries
+                    ? `${draft.name} was deleted on another device. The app series is used again.`
+                    : `${draft.name} was deleted on another device.`,
+                choices: [
+                    ...(appSeries ? [] : [{ value: 'mine', label: 'Save mine' }]),
+                    { value: 'discard', label: 'Discard mine', danger: true },
+                ],
+            });
+            if (this.busy || this.seriesDraft !== draft) return;
+            if (choice === 'mine') {
+                Object.assign(draft, { isNew: true, idTouched: true, revision: 0, status: 'draft', publishedStageCount: 0 });
+                await this.saveSeries(attempt + 1);
+            } else if (choice === 'discard') {
+                this.uncertainSaves.delete(uncertainKey);
+                this.seriesDraft = null;
+                this.selectedSeriesId = null;
+                this.seriesDirty = false;
+                this.seriesSaveError = null;
+                this.renderSeries();
+                this.setStatus(`Discarded ${draft.name}.`);
+            }
+            return;
+        }
+        const by = server.updatedBy || 'Another moderator';
+        const choice = await this.choose({
+            title: 'Saved on another device',
+            message: fits ? `${by} saved ${server.name}.`
+                : `${by} made stages of ${server.name} live. Your changes to them cannot be saved.`,
+            choices: [
+                ...(fits ? [{ value: 'mine', label: 'Save mine' }] : []),
+                { value: 'theirs', label: 'Load theirs', danger: true },
+            ],
+        });
+        if (this.busy || this.seriesDraft !== draft) return;
+        if (choice === 'mine' && fits) {
+            takeRecord();
+            await this.saveSeries(attempt + 1);
+        } else if (choice === 'theirs') {
+            this.uncertainSaves.delete(uncertainKey);
+            this.seriesSaveError = null;
+            await this.selectSeries(seriesId, { force: true });
+            this.setStatus(`Loaded the saved version of ${server.name}.`);
+        } else {
+            this.setStatus(`${draft.name} is not saved: another device saved it first.`, true);
         }
     }
 

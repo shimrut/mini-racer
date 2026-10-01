@@ -108,7 +108,7 @@ export async function saveDailySchedule(
     return withTrackPlacementLock((lock) => commitTrackPlacement([lock], [SCHEDULE_KEY], async () => {
         const current = await readDailySchedule();
         if (current.revision !== Number(baseRevision ?? 0)) {
-            throw new TrackConflictError('The Daily list changed on another device. Open it again to see the new list.');
+            throw new TrackConflictError('The Daily list changed on another device.');
         }
         const previous = new Set(current.keys);
         for (const trackKey of keys) {

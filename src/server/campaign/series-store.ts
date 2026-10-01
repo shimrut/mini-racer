@@ -298,7 +298,7 @@ export async function saveStoredSeries(
         commitTrackPlacement([placementLock, seriesLock], [], async () => {
             const existing = await readStoredSeries(id);
             if ((existing?.revision ?? 0) !== Number(baseRevision ?? 0)) {
-                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+                throw new TrackConflictError('This series changed on another device.');
             }
             if (!existing && origin === 'creator' && APP_SERIES_IDS.has(id)) {
                 throw new TrackInputError('A series in the game already uses this key. Choose another key.');
@@ -360,7 +360,7 @@ export async function publishStoredSeries(
             const existing = await readStoredSeries(id);
             if (!existing) throw new TrackInputError('Save the series first.');
             if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+                throw new TrackConflictError('This series changed on another device.');
             }
             if (!isLiveGround(existing.ground)) {
                 throw new TrackInputError('Only a series on a live ground can go live. Other grounds need an app release.');
@@ -414,7 +414,7 @@ export async function deleteStoredSeries(
             const existing = await readStoredSeries(id);
             if (!existing) return { result: false };
             if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
-                throw new TrackConflictError('This series changed on another device. Open it again to see the new version.');
+                throw new TrackConflictError('This series changed on another device.');
             }
             if (existing.publishedStageCount > 0) {
                 throw new TrackInputError(`${existing.name} is live, so it cannot be deleted.`);
