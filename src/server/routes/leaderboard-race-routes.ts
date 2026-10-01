@@ -1,4 +1,5 @@
 import type { Application } from 'express';
+import { sendFailure } from './route-errors.js';
 
 type ServiceResult = {
     status: number;
@@ -25,7 +26,7 @@ export function registerLeaderboardRaceRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to prepare Mini Racer leaderboard opponent race:', error);
-            res.status(500).json({ error: 'Opponent race preparation failed' });
+            sendFailure(res, error, { error: 'Opponent race preparation failed' });
         }
     });
 }

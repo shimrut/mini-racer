@@ -1,6 +1,7 @@
 import type { Application } from 'express';
 import type { DailyGpPodiumAvatarPosition } from '../podium/daily-podium-avatar-backfill.js';
 import type { DailyPodiumReplayEnvelope } from '../podium/daily-podium-replay.js';
+import { sendFailure } from './route-errors.js';
 
 export type PodiumRouteDependencies = {
     readContextPostId(): string | null;
@@ -36,7 +37,7 @@ export function registerPodiumRoutes(
             });
         } catch (error) {
             console.error('Failed to resolve legacy Mini Racer podium avatars:', error);
-            res.status(500).json({ positions: [] });
+            sendFailure(res, error, { positions: [] });
         }
     });
 
@@ -63,7 +64,7 @@ export function registerPodiumRoutes(
             });
         } catch (error) {
             console.error('Failed to resolve Mini Racer podium replays:', error);
-            res.status(500).json({ trackKey: null, ghosts: [] });
+            sendFailure(res, error, { trackKey: null, ghosts: [] });
         }
     });
 }

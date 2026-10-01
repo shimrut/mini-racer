@@ -1,5 +1,5 @@
 import type { Application, Response } from 'express';
-import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
+import { sendFailure } from './route-errors.js';
 
 type ServiceResult = {
     status: number;
@@ -65,11 +65,7 @@ export function registerCampaignRoutes(
             }), dependencies));
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign:', error);
-            if (error instanceof TrackPlacementRetryError) {
-                res.status(503).json({ error: error.message });
-                return;
-            }
-            res.status(500).json({ error: 'Campaign bootstrap failed' });
+            sendFailure(res, error, { error: 'Campaign bootstrap failed' });
         }
     });
 
@@ -82,7 +78,7 @@ export function registerCampaignRoutes(
             send(res, result);
         } catch (error) {
             console.error('Failed to start Mini Racer Campaign race:', error);
-            res.status(500).json({ error: 'Campaign race start failed' });
+            sendFailure(res, error, { error: 'Campaign race start failed' });
         }
     });
 
@@ -99,7 +95,7 @@ export function registerCampaignRoutes(
             }));
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign standings:', error);
-            res.status(500).json({ error: 'Campaign standings failed' });
+            sendFailure(res, error, { error: 'Campaign standings failed' });
         }
     });
 
@@ -112,7 +108,7 @@ export function registerCampaignRoutes(
             }));
         } catch (error) {
             console.error('Failed to submit Mini Racer Campaign run:', error);
-            res.status(500).json({ accepted: false, error: 'Campaign submission failed' });
+            sendFailure(res, error, { accepted: false, error: 'Campaign submission failed' });
         }
     });
 
@@ -127,7 +123,7 @@ export function registerCampaignRoutes(
             }));
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign ghost:', error);
-            res.status(500).json({ error: 'Campaign ghost lookup failed' });
+            sendFailure(res, error, { error: 'Campaign ghost lookup failed' });
         }
     });
 }

@@ -1,4 +1,5 @@
 import type { Application } from 'express';
+import { sendFailure } from './route-errors.js';
 
 type ShareServiceResult = {
     status: number;
@@ -30,7 +31,7 @@ export function registerShareRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to preview Reddit Mini Racer result share:', error);
-            res.status(500).json({
+            sendFailure(res, error, {
                 status: 'share_failed',
                 error: 'Could not prepare this result for sharing.',
             });
@@ -46,7 +47,7 @@ export function registerShareRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to share Reddit Mini Racer result:', error);
-            res.status(500).json({
+            sendFailure(res, error, {
                 status: 'share_failed',
                 error: 'Could not share this result.',
             });

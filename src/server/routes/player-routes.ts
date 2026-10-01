@@ -1,5 +1,6 @@
 import type { Application, Response } from 'express';
 import { hasText } from '../shared/value-guards.js';
+import { sendFailure } from './route-errors.js';
 
 type PlayerPayload = {
     playerId: string | null;
@@ -45,7 +46,7 @@ export function registerPlayerRoutes(
             res.status(200).json(payload);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer player bootstrap:', error);
-            res.status(500).json({ error: 'Player bootstrap failed' });
+            sendFailure(res, error, { error: 'Player bootstrap failed' });
         }
     });
 
@@ -80,7 +81,7 @@ export function registerPlayerRoutes(
                 return;
             }
             console.error('Failed to select Reddit Mini Racer guest progress:', error);
-            res.status(500).json({ error: 'Guest progress selection failed' });
+            sendFailure(res, error, { error: 'Guest progress selection failed' });
         }
     });
 
@@ -100,7 +101,7 @@ export function registerPlayerRoutes(
             res.status(200).json(payload);
         } catch (error) {
             console.error('Failed to update Reddit Mini Racer player identity:', error);
-            res.status(500).json({ error: 'Player identity update failed' });
+            sendFailure(res, error, { error: 'Player identity update failed' });
         }
     });
 
@@ -124,7 +125,7 @@ export function registerPlayerRoutes(
             res.status(200).json(payload);
         } catch (error) {
             console.error('Failed to update Reddit Mini Racer player preferences:', error);
-            res.status(500).json({ error: 'Player preferences update failed' });
+            sendFailure(res, error, { error: 'Player preferences update failed' });
         }
     });
 }

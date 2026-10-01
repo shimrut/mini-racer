@@ -1,5 +1,6 @@
 import type { Application } from 'express';
 import { sendPlayerAuthorizationFailure } from './player-routes.js';
+import { sendFailure } from './route-errors.js';
 
 type TrackPbPayload = {
     playerId: string | null;
@@ -48,7 +49,7 @@ export function registerPbGhostRoutes(
             res.status(200).json({ trackPbs: payload.trackPbs ?? {} });
         } catch (error) {
             console.error('Failed to load Mini Racer track personal bests:', error);
-            res.status(500).json({ error: 'Track personal best lookup failed' });
+            sendFailure(res, error, { error: 'Track personal best lookup failed' });
         }
     });
 
@@ -76,7 +77,7 @@ export function registerPbGhostRoutes(
             });
         } catch (error) {
             console.error('Failed to load Mini Racer personal best ghost:', error);
-            res.status(500).json({ error: 'Personal best ghost lookup failed' });
+            sendFailure(res, error, { error: 'Personal best ghost lookup failed' });
         }
     });
 }

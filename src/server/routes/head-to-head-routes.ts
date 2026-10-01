@@ -1,9 +1,9 @@
 import type { Application } from 'express';
-import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import type {
     HeadToHeadRequestContext,
     HeadToHeadServiceResult,
 } from '../head-to-head/head-to-head-service.js';
+import { sendFailure } from './route-errors.js';
 
 export type HeadToHeadRouteDependencies = {
     getHeadToHeadRequestContext(): Promise<HeadToHeadRequestContext>
@@ -97,7 +97,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to preview Mini Racer head-to-head:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not prepare this challenge.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not prepare this challenge.' });
         }
     });
 
@@ -110,7 +110,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to create Mini Racer head-to-head:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not create this challenge.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not create this challenge.' });
         }
     });
 
@@ -129,11 +129,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(await withStoredTracks(result.body, dependencies));
         } catch (error) {
             console.error('Failed to load Mini Racer head-to-head:', error);
-            if (error instanceof TrackPlacementRetryError) {
-                res.status(503).json({ status: 'challenge_failed', error: error.message });
-                return;
-            }
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not load this challenge.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not load this challenge.' });
         }
     });
 
@@ -155,7 +151,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to submit Mini Racer head-to-head:', error);
-            res.status(500).json({ accepted: false, status: 'challenge_failed', error: 'Could not verify this challenge run.' });
+            sendFailure(res, error, { accepted: false, status: 'challenge_failed', error: 'Could not verify this challenge run.' });
         }
     });
 
@@ -171,7 +167,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to preview Mini Racer challenge brag:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not prepare this brag.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not prepare this brag.' });
         }
     });
 
@@ -184,7 +180,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to confirm Mini Racer challenge brag:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not post this brag.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not post this brag.' });
         }
     });
 
@@ -200,7 +196,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to preview Mini Racer challenge comment:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not prepare this comment.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not prepare this comment.' });
         }
     });
 
@@ -213,7 +209,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to confirm Mini Racer challenge comment:', error);
-            res.status(500).json({ status: 'challenge_failed', error: 'Could not post this comment.' });
+            sendFailure(res, error, { status: 'challenge_failed', error: 'Could not post this comment.' });
         }
     });
 
@@ -232,7 +228,7 @@ export function registerHeadToHeadRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to find another Mini Racer challenge:', error);
-            res.status(500).json({ status: 'none', error: 'Could not find another challenge.' });
+            sendFailure(res, error, { status: 'none', error: 'Could not find another challenge.' });
         }
     });
 }

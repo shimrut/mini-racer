@@ -1,6 +1,6 @@
 import type { Application } from 'express';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
-import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
+import { sendFailure } from './route-errors.js';
 
 type ServiceResult = {
     status: number;
@@ -69,7 +69,7 @@ export function registerCompetitionRoutes(
             res.status(200).json(snapshot);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer scoreboard snapshot:', error);
-            res.status(500).json({ error: 'Scoreboard snapshot failed' });
+            sendFailure(res, error, { error: 'Scoreboard snapshot failed' });
         }
     });
 
@@ -84,8 +84,8 @@ export function registerCompetitionRoutes(
             res.status(200).json(dependencies.describeStoredTracks ? { ...challenge, storedTracks } : challenge);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer active challenge:', error);
-            res.status(error instanceof TrackPlacementRetryError ? 503 : 500).json({
-                error: error instanceof TrackPlacementRetryError ? error.message : 'Active challenge lookup failed',
+            sendFailure(res, error, {
+                error: 'Active challenge lookup failed',
             });
         }
     });
@@ -100,8 +100,8 @@ export function registerCompetitionRoutes(
             res.status(200).json(dependencies.describeStoredTracks ? { challenges, storedTracks } : { challenges });
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer daily playlist:', error);
-            res.status(error instanceof TrackPlacementRetryError ? 503 : 500).json({
-                error: error instanceof TrackPlacementRetryError ? error.message : 'Daily playlist lookup failed',
+            sendFailure(res, error, {
+                error: 'Daily playlist lookup failed',
             });
         }
     });
@@ -120,7 +120,7 @@ export function registerCompetitionRoutes(
             res.status(200).json(snapshot);
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer snapshot:', error);
-            res.status(500).json({ error: 'Daily challenge snapshot failed' });
+            sendFailure(res, error, { error: 'Daily challenge snapshot failed' });
         }
     });
 
@@ -134,7 +134,7 @@ export function registerCompetitionRoutes(
             res.status(result.status).json(result.body);
         } catch (error) {
             console.error('Failed to submit Reddit Mini Racer run:', error);
-            res.status(500).json({ accepted: false, error: 'Daily challenge submit failed' });
+            sendFailure(res, error, { accepted: false, error: 'Daily challenge submit failed' });
         }
     });
 }
