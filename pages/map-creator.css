@@ -228,6 +228,13 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     margin: 0 0 0.75rem;
 }
 
+/* A copy and its undo, side by side. */
+.creator-copy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
 .creator-series-layout:not([hidden]) {
     display: grid;
     grid-template-columns: minmax(14rem, 18rem) 1fr;

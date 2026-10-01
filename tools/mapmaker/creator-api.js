@@ -57,4 +57,5 @@ export const creatorApi = {
     runPlayedDailyCopy: () => creatorRequest('/api/creator/migration/played-dailies', { method: 'POST' }),
     runLiveCampaignCopy: () => creatorRequest('/api/creator/migration/live-campaign', { method: 'POST' }),
     runCopyCheck: () => creatorRequest('/api/creator/migration/check', { method: 'POST' }),
+    runCopyUndo: (kind) => creatorRequest(`/api/creator/migration/undo/${encodeURIComponent(kind)}`, { method: 'POST' }),
 };

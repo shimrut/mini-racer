@@ -90,6 +90,11 @@ function seriesTypedContent(draft) {
         typed: draft.stages.map((stage) => stage.requiredMedalsText ?? null) });
 }
 
+// An undo has work when it would remove something or bring back the app list.
+function hasUndoWork(preview) {
+    return Boolean(preview?.removed?.length || preview?.removedSeries?.length || preview?.dailyList === 'would-restore');
+}
+
 // The server has this version of the draft: the draft takes its record, and
 // keeps its identity and its stage objects, so the fields stay.
 function adoptSavedSeries(draft, series) {
@@ -1068,13 +1073,32 @@ export class CreatorPanels {
 
     copySection(kind, { title, lines, note, label, empty, report, copiedText }) {
         const error = this.copyError?.kind === kind ? this.copyError.message : null;
+        const undoError = this.copyError?.kind === `undo:${kind}` ? this.copyError.message : null;
         const failed = report?.failed ?? [];
+        const undo = this.copyView?.undo?.[kind] ?? null;
+        const lastUndo = undo?.report ?? null;
         return element('section', { className: 'creator-copy-section' }, [
             element('h3', { text: title }),
             element('ul', { className: 'creator-copy-lines' }, lines.filter(Boolean).map((line) => element('li', { text: line }))),
             note ? element('p', { className: 'field-hint', text: note }) : null,
-            button(label, () => this.runCopy(kind), { className: 'primary-btn', disabled: this.busy || empty }),
+            element('div', { className: 'creator-copy-actions' }, [
+                button(label, () => this.runCopy(kind), { className: 'primary-btn', disabled: this.busy || empty }),
+                undo ? button('Undo copy', () => this.runUndo(kind), {
+                    className: 'danger-btn',
+                    disabled: this.busy || !hasUndoWork(undo.preview),
+                    title: 'Removes the Redis copies that are still exactly the app version.',
+                }) : null,
+            ]),
             error ? element('p', { className: 'creator-error', text: error }) : null,
+            undoError ? element('p', { className: 'creator-error', text: undoError }) : null,
+            lastUndo ? element('p', {
+                className: 'field-hint',
+                text: `Last undo: ${formatDate(lastUndo.ranAt)} by u/${lastUndo.ranBy}. Removed ${lastUndo.removed.length} tracks`
+                    + ` and ${lastUndo.removedSeries.length} series${lastUndo.kept.length ? `, kept ${lastUndo.kept.length}` : ''}.`,
+            }) : null,
+            lastUndo?.kept?.length ? element('ul', { className: 'creator-copy-lines' }, lastUndo.kept.map(({ key, reason }) => (
+                element('li', { className: 'field-hint', text: `${key}: ${reason}` })
+            ))) : null,
             report ? element('p', {
                 className: 'field-hint',
                 text: `Last copy: ${formatDate(report.ranAt)} by u/${report.ranBy}. ${copiedText(report)}${failed.length ? `, ${failed.length} failed` : ''}.`,
@@ -1192,6 +1216,43 @@ export class CreatorPanels {
             }),
             this.copyCheckSection(),
         );
+    }
+
+    // Removes from Redis what a copy wrote, when it is still exactly the app
+    // version. The app still has every track, so players race the same tracks.
+    async runUndo(kind) {
+        if (this.busy) return;
+        const preview = this.copyView?.undo?.[kind]?.preview ?? null;
+        const parts = [
+            preview?.removed?.length ? `${preview.removed.length} tracks` : null,
+            preview?.removedSeries?.length ? `${preview.removedSeries.length} series` : null,
+        ].filter(Boolean);
+        const list = preview?.dailyList === 'would-restore' ? ' The app Daily list comes back.' : '';
+        if (!await this.confirm({
+            title: 'Undo the copy?',
+            message: `Remove ${parts.join(' and ') || 'the copy'} from Redis?${list} Players race the same tracks from the app. Copies that changed since stay.`,
+            confirmLabel: 'Undo',
+            danger: true,
+        })) return;
+        if (this.busy) return;
+        this.busy = true;
+        this.copyError = null;
+        this.writeGeneration += 1;
+        this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: 'Undoing the copy…' }));
+        try {
+            const { report, checkError } = await creatorApi.runCopyUndo(kind);
+            this.setStatus(`Removed ${report.removed.length} tracks and ${report.removedSeries.length} series from Redis.`);
+            if (checkError) this.copyError = { kind: 'check', message: `The check after the undo failed: ${checkError}` };
+            this.refresh('daily', 'campaign');
+            this.onTracksChanged();
+        } catch (error) {
+            this.copyError = { kind: `undo:${kind}`, message: `Could not undo: ${error.message}` };
+            this.setStatus(this.copyError.message, true);
+        } finally {
+            this.busy = false;
+            this.writeGeneration += 1;
+            await this.loadCopy();
+        }
     }
 
     async runCopy(kind = 'unplayed') {

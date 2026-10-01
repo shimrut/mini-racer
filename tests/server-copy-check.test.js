@@ -45,6 +45,12 @@ const series = await import('../src/server/campaign/series-store.ts');
 const { buildLockedTrackCopy } = await import('../src/server/tracks/track-copy.ts');
 const { runPlayedDailyCopy, runLiveCampaignCopy } = await import('../src/server/tracks/track-migration.ts');
 const { runCopyCheck, readCopyCheck } = await import('../src/server/tracks/copy-check.ts');
+const { runCopyUndo, readCopyUndoReport } = await import('../src/server/tracks/copy-undo.ts');
+const { runTrackMigration } = await import('../src/server/tracks/track-migration.ts');
+const { readDailySchedule } = await import('../src/server/daily/daily-schedule-store.ts');
+const { getTrackDefinitionIdentity } = await import('../game/track/definition-identity.js');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
+const { TRACKS } = await import('../game/track/tracks.js');
 const seriesData = (await import('../game/campaign/series.json', { with: { type: 'json' } })).default;
 const { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } = await import('../src/server/daily/daily-gp-model.ts');
 const { BUILT_IN_TRACKS } = await import('../game/track/tracks.js');
@@ -145,5 +151,100 @@ describe('the copy check', () => {
         expect((await runCopyCheck({ username: 'Mod', now: noon })).dailyList).toBe('exact');
         schedule([...TRACK_SCHEDULE_KEYS].reverse());
         expect((await runCopyCheck({ username: 'Mod', now: noon })).dailyList).toBe('changed');
+    });
+});
+
+describe('the copy undo', () => {
+    const stageKeys = numbers.stages.map((stage) => stage.trackKey);
+
+    it('removes the locked copies of past Dailies, and keeps one that differs from the app', async () => {
+        addDaily('2030-02-01', 'smallSteps');
+        const copied = (await runPlayedDailyCopy({ username: 'Mod', now: noon })).copied;
+        tracks.installStoredTrackResolver();
+        await ensureStoredCatalogLoaded();
+        expect(tracks.resolveStoredTrackForRequest('smallSteps')).not.toBeNull();
+        const broken = copied.find((key) => key !== 'smallSteps');
+        const record = JSON.parse(strings.get(`dailygp:tracks:v1:track:${broken}`));
+        record.track.cornerRadius = (record.track.cornerRadius ?? 1) + 1;
+        strings.set(`dailygp:tracks:v1:track:${broken}`, JSON.stringify(record));
+
+        const preview = await runCopyUndo('played-dailies', { username: 'Mod', dryRun: true, now: noon });
+        expect(preview.removed).toEqual(copied.filter((key) => key !== broken).sort());
+        expect(await tracks.readStoredTrack('smallSteps')).not.toBeNull();
+
+        const report = await runCopyUndo('played-dailies', { username: 'Mod', now: noon });
+        expect(report.removed).toEqual(preview.removed);
+        expect(report.kept).toEqual([{ key: broken, reason: expect.stringContaining('differs') }]);
+        expect(await tracks.readStoredTrack('smallSteps')).toBeNull();
+        expect(await readCopyUndoReport('played-dailies')).toEqual(report);
+        expect(logs.mock.calls.map(([line]) => line))
+            .toContainEqual(expect.stringMatching(/^\[track-copy\] undo played-dailies by u\/Mod: removed /));
+
+        // The game reads the app track again, which races the same.
+        tracks.installStoredTrackResolver();
+        await ensureStoredCatalogLoaded();
+        expect(tracks.resolveStoredTrackForRequest('smallSteps')).toBeNull();
+        expect(getTrackDefinitionIdentity(TRACKS.smallSteps)).toBe(getTrackDefinitionIdentity(BUILT_IN_TRACKS.smallSteps));
+        const check = await runCopyCheck({ username: 'Mod', now: noon });
+        expect(check.tracks.notCopied).toContain('smallSteps');
+        expect(check.tracks.problems.map((problem) => problem.key)).toEqual([broken]);
+    });
+
+    it('removes a live series copy with its stage tracks, and keeps a series that changed since', async () => {
+        await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        const preview = await runCopyUndo('live-campaign', { username: 'Mod', dryRun: true, now: noon });
+        expect(preview.removedSeries).toEqual(['numbered-v1']);
+        expect(preview.removed).toEqual(stageKeys);
+
+        const key = 'dailygp:campaign:series:v1:series:numbered-v1';
+        const record = JSON.parse(strings.get(key));
+        strings.set(key, JSON.stringify({ ...record, name: 'Numbers Renamed', revision: 2 }));
+        const kept = await runCopyUndo('live-campaign', { username: 'Mod', now: noon });
+        expect(kept.removedSeries).toEqual([]);
+        expect(kept.kept).toEqual([{ key: 'numbered-v1', reason: expect.stringContaining('Changed') }]);
+        expect(await tracks.readStoredTrack(stageKeys[0])).not.toBeNull();
+
+        strings.set(key, JSON.stringify(record));
+        const report = await runCopyUndo('live-campaign', { username: 'Mod', now: noon });
+        expect(report).toMatchObject({ removedSeries: ['numbered-v1'], removed: stageKeys, kept: [] });
+        expect(await series.readStoredSeries('numbered-v1')).toBeNull();
+        for (const trackKey of stageKeys) expect(await tracks.readStoredTrack(trackKey), trackKey).toBeNull();
+    });
+
+    it('undoes the unplayed copy: the app Daily list, the hidden series, and the exact track copies', async () => {
+        const copy = await runTrackMigration({ username: 'Mod', now: noon,
+            hooks: { copySeries: (options) => series.copyAppSeriesDrafts(options) } });
+        expect(copy.failed).toEqual([]);
+        expect((await readDailySchedule()).source).toBe('stored');
+        const [changedKey, lockedKey] = copy.copied;
+        const changed = await tracks.readStoredTrack(changedKey);
+        await tracks.saveStoredTrack(changedKey, { track: { ...changed.track, name: 'Changed In Creator' }, medalRow },
+            { username: 'Mod', baseRevision: changed.revision, now: noon });
+        expect(await tracks.lockStoredTrack(lockedKey, 'daily', noon)).toBe(true);
+
+        const report = await runCopyUndo('unplayed', { username: 'Mod', now: noon });
+        expect(report.dailyList).toBe('restored');
+        expect((await readDailySchedule()).source).toBe('app');
+        expect(report.removedSeries).toEqual(copy.extra.series.copied);
+        expect(report.removed).toContain(lockedKey);
+        expect(report.removed).not.toContain(changedKey);
+        expect(report.kept).toEqual([{ key: changedKey, reason: expect.stringContaining('differs') }]);
+        expect(await tracks.readStoredTrack(lockedKey)).toBeNull();
+        expect(await tracks.readStoredTrack(changedKey)).not.toBeNull();
+        expect(report.removed.length).toBe(copy.copied.length - 1);
+    });
+
+    it('keeps a Daily list that changed since the copy', async () => {
+        strings.set('dailygp:daily:schedule:v1', JSON.stringify({
+            version: 1, keys: [...TRACK_SCHEDULE_KEYS].reverse(), revision: 2, updatedAt: noon.toISOString(), updatedBy: 'Mod' }));
+        const report = await runCopyUndo('unplayed', { username: 'Mod', now: noon });
+        expect(report.dailyList).toBe('kept');
+        expect(report.kept).toContainEqual({ key: 'dailyList', reason: expect.stringContaining('Changed') });
+        expect((await readDailySchedule()).source).toBe('stored');
+    });
+
+    it('waits while the Daily changes at midnight UTC', async () => {
+        await expect(runCopyUndo('played-dailies', { username: 'Mod', now: new Date('2030-03-10T23:58:00.000Z') }))
+            .rejects.toThrow('midnight UTC');
     });
 });

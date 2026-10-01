@@ -80,6 +80,22 @@ export async function isTrackInDailySchedule(trackKey: string): Promise<boolean>
     return (await readDailySchedule()).keys.includes(trackKey);
 }
 
+// Puts back the app Daily list. Only the undo of the first copy uses this,
+// and only while `canRestore` accepts the stored list.
+export async function restoreAppDailySchedule(
+    canRestore: (schedule: DailySchedule) => boolean,
+): Promise<'restored' | 'app' | 'kept'> {
+    return withTrackPlacementLock((lock) => commitTrackPlacement<'restored' | 'app' | 'kept'>(
+        [lock], [SCHEDULE_KEY], async () => {
+            const current = await readDailySchedule();
+            if (current.source === 'app') return { result: 'app' };
+            if (!canRestore(current)) return { result: 'kept' };
+            return { result: 'restored', reconcile: async () => !await redis.get(SCHEDULE_KEY),
+                mutate: async (transaction) => { await transaction.del(SCHEDULE_KEY); } };
+        },
+    ));
+}
+
 export type SaveDailyScheduleOptions = {
     username: string;
     baseRevision?: unknown;

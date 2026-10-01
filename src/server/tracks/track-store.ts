@@ -305,6 +305,16 @@ export async function queueStoredTrackRecord(transaction: TxClientLike, record: 
     await transaction.incrBy(REVISION_KEY, 1);
 }
 
+export async function queueStoredTrackRemoval(transaction: TxClientLike, trackKey: string): Promise<void> {
+    await transaction.del(recordKey(trackKey));
+    await transaction.hDel(INDEX_KEY, [trackKey]);
+    await transaction.incrBy(REVISION_KEY, 1);
+}
+
+export async function isStoredTrackRemoved(trackKey: string): Promise<boolean> {
+    return !await redis.get(recordKey(trackKey)) && !await redis.hGet(INDEX_KEY, trackKey);
+}
+
 export function freezeStoredTrack(record: StoredTrackRecord, reason: StoredTrackLockReason, now: Date): StoredTrackRecord {
     return record.lockedAt ? record : { ...record, revision: record.revision + 1, lockedAt: now.toISOString(), lockReason: reason };
 }
@@ -496,12 +506,29 @@ export async function deleteStoredTrack(
                 throw new TrackInputError('Take this track out of the Daily list and the Campaign series first.');
             }
             const cacheRevision = await readStoredTracksRevision() + 1;
-            return { result: true, reconcile: async () => !await redis.get(recordKey(trackKey))
-                && !await redis.hGet(INDEX_KEY, trackKey) && await readStoredTracksRevision() === cacheRevision,
-                mutate: async (transaction) => {
-                await transaction.del(recordKey(trackKey));
-                await transaction.hDel(INDEX_KEY, [trackKey]);
-                await transaction.incrBy(REVISION_KEY, 1);
-            } };
+            return { result: true, reconcile: async () => await isStoredTrackRemoved(trackKey)
+                && await readStoredTracksRevision() === cacheRevision,
+                mutate: (transaction) => queueStoredTrackRemoval(transaction, trackKey) };
+        })));
+}
+
+// Removes a copy of an app track when `canRemove` accepts it. The game then
+// reads the app track. Only the undo of a copy uses this. It is the one way
+// a locked track goes, so the undo accepts only a copy that is exactly the
+// app track: players race the same track as before.
+export async function removeTrackCopy(
+    trackKey: string,
+    canRemove: (record: StoredTrackRecord) => boolean,
+): Promise<'removed' | 'missing' | 'kept'> {
+    assertTrackKey(trackKey);
+    return withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
+        commitTrackPlacement<'removed' | 'missing' | 'kept'>([placementLock, trackLock], [], async () => {
+            const existing = await readStoredTrack(trackKey);
+            if (!existing) return { result: 'missing' };
+            if (existing.origin !== 'migrated' || !canRemove(existing)) return { result: 'kept' };
+            const cacheRevision = await readStoredTracksRevision() + 1;
+            return { result: 'removed', reconcile: async () => await isStoredTrackRemoved(trackKey)
+                && await readStoredTracksRevision() === cacheRevision,
+                mutate: (transaction) => queueStoredTrackRemoval(transaction, trackKey) };
         })));
 }

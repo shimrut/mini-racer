@@ -119,6 +119,37 @@ Saved times, leaderboards, PB ghosts, podiums and Head to Head posts find a
 track by its key. The server already reads a stored track first. An exact
 copy therefore changes nothing for players.
 
+## Check and undo of the copies
+
+The Copy tab has a **Check copies** button, and each copy runs the check
+when it ends. The check reads Redis again and compares each copy of an app
+track and app series with the app:
+- **Exact:** the copy races like the app version.
+- **Changed in the Creator:** an unplayed copy that a moderator changed
+  before anyone raced it. This is allowed.
+- **Problem:** players raced the app version, but the copy differs from it.
+
+The check also compares the Daily list with the app list, and lists the
+raced tracks and live series that have no copy yet. The last check shows on
+the Copy tab. The server logs one `[track-copy]` line for each check, and
+one for each problem.
+
+Each copy has an **Undo copy** button. While the app still has its tracks,
+an undo removes only the Redis copies that are still exactly the app
+version, so players race the same tracks from the app. Saved times, ghosts
+and leaderboards stay valid.
+- **Unplayed:** the app Daily list comes back if nobody changed the list,
+  and the hidden series drafts and the exact track copies go. This includes
+  a copy that a Daily locked since.
+- **Played Dailies:** the locked copies go.
+- **Live Campaign:** each series copy goes with its stage tracks, in one
+  transaction.
+
+A copy that changed since stays, and the undo report says why. Undo is the
+only way a locked track leaves Redis, and only as an exact copy. After the
+removal release, an undo keeps every copy, because no app version is left
+to compare with.
+
 ## Removal release (later)
 
 After the three copies, every track is in Redis, and every new Daily uses

@@ -918,3 +918,59 @@ describe('Creator copy check', () => {
         expect(root.querySelectorAll('.creator-error')).toHaveLength(0);
     });
 });
+
+describe('Creator copy undo', () => {
+    const view = (preview, report = null) => ({
+        report: null,
+        preview: { copied: [] },
+        playedDailies: { report: null, preview: { copied: [] } },
+        liveCampaign: { report: null, preview: { copied: [] } },
+        undo: {
+            unplayed: { preview: { removed: [], removedSeries: [], kept: [], dailyList: 'app' }, report: null },
+            'played-dailies': { preview, report },
+            'live-campaign': { preview: { removed: [], removedSeries: [], kept: [], dailyList: null }, report: null },
+        },
+    });
+
+    it('asks, removes what the copy wrote, and shows what it kept and why', async () => {
+        const preview = { removed: ['smallSteps', 'albertGardens'], removedSeries: [], kept: [], dailyList: null };
+        const report = { ranAt: '2026-10-01T12:00:00.000Z', ranBy: 'RaceMod', removed: ['smallSteps'], removedSeries: [],
+            kept: [{ key: 'albertGardens', reason: 'Changed since the copy, so it stays.' }], dailyList: null };
+        let current = view(preview);
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'POST') {
+                current = view({ removed: [], removedSeries: [], kept: [], dailyList: null }, report);
+                return jsonResponse({ report, check: {} });
+            }
+            return jsonResponse(current);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const setStatus = vi.fn();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
+        await panels.loadCopy();
+        const root = document.getElementById('creator-copy-view');
+        const undoButtons = buttonsByText(root, 'Undo copy');
+        expect(undoButtons.map((button) => button.disabled)).toEqual([true, false, true]);
+
+        await panels.runUndo('played-dailies');
+        expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Undo the copy?', danger: true, message: expect.stringContaining('Remove 2 tracks from Redis?') }));
+        expect(fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')[0])
+            .toBe('/api/creator/migration/undo/played-dailies');
+        expect(setStatus).toHaveBeenCalledWith('Removed 1 tracks and 0 series from Redis.');
+        const sections = [...root.querySelectorAll('.creator-copy-section')];
+        expect(sections[1].textContent).toContain('Last undo:');
+        expect(sections[1].textContent).toContain('albertGardens: Changed since the copy, so it stays.');
+        expect(buttonsByText(root, 'Undo copy')[1].disabled).toBe(true);
+    });
+
+    it('sends nothing when the question is cancelled', async () => {
+        const fetchMock = vi.fn(async () => jsonResponse(view({ removed: ['smallSteps'], removedSeries: [], kept: [], dailyList: null })));
+        vi.stubGlobal('fetch', fetchMock);
+        confirm.mockImplementation(async () => false);
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadCopy();
+        await panels.runUndo('played-dailies');
+        expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    });
+});

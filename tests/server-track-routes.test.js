@@ -195,6 +195,25 @@ describe('track routes', () => {
         expect(await campaign.json()).toEqual({ report: { dryRun: false, copied: ['numbered-v1'] }, checkError: 'redis: timeout' });
     });
 
+    it('shows what each undo would remove, and runs only a known undo', async () => {
+        const dependencies = deps({
+            runCopyCheck: vi.fn(async () => ({ ok: true })),
+            readCopyCheck: vi.fn(async () => null),
+            runCopyUndo: vi.fn(async (kind, options) => ({ kind, dryRun: Boolean(options.dryRun), removed: ['smallSteps'] })),
+            readCopyUndoReport: vi.fn(async () => null),
+        });
+        const base = await startApp(dependencies);
+        const view = await (await fetch(`${base}/api/creator/migration`)).json();
+        expect(view.undo['played-dailies']).toEqual({
+            preview: { kind: 'played-dailies', dryRun: true, removed: ['smallSteps'] }, report: null });
+        expect(Object.keys(view.undo)).toEqual(['unplayed', 'played-dailies', 'live-campaign']);
+        const undo = await (await fetch(`${base}/api/creator/migration/undo/live-campaign`, { method: 'POST' })).json();
+        expect(undo).toEqual({ report: { kind: 'live-campaign', dryRun: false, removed: ['smallSteps'] }, check: { ok: true } });
+        expect(dependencies.runCopyUndo).toHaveBeenLastCalledWith('live-campaign', { username: 'RaceMod' });
+        const unknown = await fetch(`${base}/api/creator/migration/undo/everything`, { method: 'POST' });
+        expect(unknown.status).toBe(400);
+    });
+
     it('gives players placed tracks without a moderator check, 50 keys at most', async () => {
         const dependencies = deps();
         const base = await startApp(dependencies);

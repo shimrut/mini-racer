@@ -102,6 +102,7 @@ import {
 } from './tracks/track-store.js';
 import { ensureStoredCatalogLoaded } from './tracks/stored-catalog.js';
 import { readCopyCheck, runCopyCheck } from './tracks/copy-check.js';
+import { readCopyUndoReport, runCopyUndo } from './tracks/copy-undo.js';
 import {
     ensureCommunityCreatorPostForSubreddit,
     resolveCreatorToolSubredditName,
@@ -185,6 +186,8 @@ function registerProductionRoutes(app: express.Application): void {
         readLockedCopyReport,
         runCopyCheck: (options) => runCopyCheck(options),
         readCopyCheck,
+        runCopyUndo: (kind, options) => runCopyUndo(kind, options),
+        readCopyUndoReport,
     });
     registerCreatorSeriesRoutes(app, {
         resolveCreatorToolSubredditName,

@@ -4,6 +4,8 @@ import { TrackConflictError } from '../tracks/track-store.js';
 import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 
 const MAX_PLAYER_TRACK_KEYS = 50;
+const COPY_KINDS = ['unplayed', 'played-dailies', 'live-campaign'] as const;
+type CopyKind = typeof COPY_KINDS[number];
 
 export type TrackRouteDependencies = {
     resolveCreatorToolSubredditName(): string | null;
@@ -31,6 +33,9 @@ export type TrackRouteDependencies = {
     // Compares every copy in Redis with the app again, and keeps the result.
     runCopyCheck?(options: { username: string }): Promise<unknown>;
     readCopyCheck?(): Promise<unknown>;
+    // Removes what a copy wrote, when it is still exactly the app version.
+    runCopyUndo?(kind: CopyKind, options: { username: string; dryRun?: boolean }): Promise<unknown>;
+    readCopyUndoReport?(kind: CopyKind): Promise<unknown>;
     saveDailySchedule(
         keys: unknown,
         options: { username: string; baseRevision?: unknown; currentTrackKey?: string | null },
@@ -151,7 +156,9 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.get('/api/creator/migration', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            const [report, preview, playedReport, playedPreview, campaignReport, campaignPreview, check] = await Promise.all([
+            const runUndo = dependencies.runCopyUndo;
+            const readUndo = dependencies.readCopyUndoReport;
+            const [report, preview, playedReport, playedPreview, campaignReport, campaignPreview, check, undo] = await Promise.all([
                 dependencies.readMigrationReport(),
                 dependencies.runTrackMigration({ username, dryRun: true }),
                 dependencies.readLockedCopyReport('played-dailies'),
@@ -159,6 +166,10 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
                 dependencies.readLockedCopyReport('live-campaign'),
                 dependencies.runLiveCampaignCopy({ username, dryRun: true }),
                 dependencies.readCopyCheck?.() ?? null,
+                runUndo && readUndo ? Promise.all(COPY_KINDS.map(async (kind) => [kind, {
+                    preview: await runUndo(kind, { username, dryRun: true }),
+                    report: await readUndo(kind),
+                }])).then(Object.fromEntries) : null,
             ]);
             res.json({
                 report,
@@ -166,6 +177,7 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
                 playedDailies: { report: playedReport, preview: playedPreview },
                 liveCampaign: { report: campaignReport, preview: campaignPreview },
                 ...(dependencies.readCopyCheck ? { check } : {}),
+                ...(undo ? { undo } : {}),
             });
         } catch (error) {
             errorResponse(res, error);
@@ -197,6 +209,17 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
         try {
             const username = await creatorUsername(dependencies);
             res.json(await withCopyCheck(username, await dependencies.runLiveCampaignCopy({ username })));
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.post('/api/creator/migration/undo/:kind', async (req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            const kind = COPY_KINDS.find((entry) => entry === req.params.kind);
+            if (!kind || !dependencies.runCopyUndo) throw new TrackInputError('There is no such copy to undo.');
+            res.json(await withCopyCheck(username, await dependencies.runCopyUndo(kind, { username })));
         } catch (error) {
             errorResponse(res, error);
         }

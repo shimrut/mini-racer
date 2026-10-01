@@ -14,6 +14,7 @@ import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { TrackInputError } from '../tracks/track-shape.js';
 import {
     TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTrack,
+    queueStoredTrackRemoval, isStoredTrackRemoved,
     readStoredTrackKeys, readStoredTracksRevision, type StoredTrackRecord,
 } from '../tracks/track-store.js';
 import { buildLockedTrackCopy } from '../tracks/track-copy.js';
@@ -456,6 +457,48 @@ async function commitLiveSeriesCopy(
                 },
             };
         })));
+}
+
+// Removes a copy of an app series, and the stage tracks that came with it,
+// in one transaction. Only the undo of a copy uses this; the checks decide
+// what may go, so a series or track that changed since the copy stays.
+export async function removeSeriesCopy(
+    seriesId: string,
+    { canRemoveSeries, canRemoveTrack }: {
+        canRemoveSeries: (record: StoredSeriesRecord) => boolean;
+        canRemoveTrack: (record: StoredTrackRecord) => boolean;
+    },
+): Promise<{ result: 'removed' | 'missing' | 'kept'; tracks: string[] }> {
+    return withTrackPlacementLock((placementLock) => withSeriesWriteLock(seriesId, (seriesLock) =>
+        commitTrackPlacement<{ result: 'removed' | 'missing' | 'kept'; tracks: string[] }>(
+            [placementLock, seriesLock], [], async () => {
+                const existing = await readStoredSeries(seriesId);
+                if (!existing) return { result: { result: 'missing', tracks: [] } };
+                if (existing.origin !== 'migrated' || !canRemoveSeries(existing)) {
+                    return { result: { result: 'kept', tracks: [] } };
+                }
+                const tracks: string[] = [];
+                for (const stage of existing.stages) {
+                    const track = await readStoredTrack(stage.trackKey);
+                    if (track?.origin === 'migrated' && canRemoveTrack(track)) tracks.push(track.key);
+                }
+                const trackCacheRevision = await readStoredTracksRevision() + tracks.length;
+                const seriesCacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+                return {
+                    result: { result: 'removed', tracks },
+                    reconcile: async () => !await redis.get(recordKey(seriesId))
+                        && !await redis.hGet(INDEX_KEY, seriesId)
+                        && Number(await redis.get(REVISION_KEY) ?? 0) === seriesCacheRevision
+                        && (await Promise.all(tracks.map(isStoredTrackRemoved))).every(Boolean)
+                        && await readStoredTracksRevision() === trackCacheRevision,
+                    mutate: async (transaction) => {
+                        for (const trackKey of tracks) await queueStoredTrackRemoval(transaction, trackKey);
+                        await transaction.del(recordKey(seriesId));
+                        await transaction.hDel(INDEX_KEY, [seriesId]);
+                        await transaction.incrBy(REVISION_KEY, 1);
+                    },
+                };
+            })));
 }
 
 export function isLiveAppSeries(definition: AppSeriesDefinition): boolean {

@@ -100,9 +100,10 @@ export async function readLockedCopyReport(kind: LockedCopyKind): Promise<Locked
     return readReport<LockedCopyReport>(LOCKED_COPY_REPORT_KEYS[kind]);
 }
 
-// Every copy waits around midnight UTC, runs one at a time, and keeps the
-// report of its last real run. A trial run (dryRun) writes nothing.
-async function runCopy<T>(
+// Every copy and every undo waits around midnight UTC, runs one at a time,
+// and keeps the report of its last real run. A trial run (dryRun) writes
+// nothing.
+export async function runCopy<T>(
     { dryRun, now, reportKey }: { dryRun: boolean; now: Date; reportKey: string },
     work: () => Promise<T>,
 ): Promise<T> {
