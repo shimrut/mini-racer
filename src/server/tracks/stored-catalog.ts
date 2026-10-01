@@ -11,6 +11,7 @@ import {
     publishStoredSeriesSnapshot,
     readStoredSeriesCacheRevision,
     readStoredSeriesSnapshot,
+    repinStoredSeries,
 } from '../campaign/series-store.js';
 import { TrackPlacementRetryError } from './track-placement-lock.js';
 
@@ -76,4 +77,11 @@ export async function ensureStoredCatalogLoaded(): Promise<void> {
         }
     }
     throw new StoredCatalogUnavailableError(lastError);
+}
+
+// Loads the catalog again, and makes it the series list of this request
+// from now on. A transfer uses it after it blocks saving.
+export async function reloadPinnedCatalog(): Promise<void> {
+    await ensureStoredCatalogLoaded();
+    repinStoredSeries();
 }

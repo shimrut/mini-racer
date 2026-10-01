@@ -8,7 +8,7 @@ import {
 } from '../../../game/track/catalog.js';
 import { readDailySchedulePool } from './daily-schedule-store.js';
 import { queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
-import { ensureStoredCatalogLoaded } from '../tracks/stored-catalog.js';
+import { ensureStoredCatalogLoaded, reloadPinnedCatalog } from '../tracks/stored-catalog.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { withTrackPlacementLock, commitTrackPlacement, TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import { TRACKS } from '../../../game/track/tracks.js';
@@ -2340,6 +2340,15 @@ export async function selectGuestProgress({
         if (record.phase === 'preparing') {
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
+        }
+        // A save that passed its mark check took its series list before the
+        // marks. So a list loaded now knows every stage that either player
+        // can hold a row on. The rest of this request keeps that list.
+        try {
+            await reloadPinnedCatalog();
+        } catch (error) {
+            console.error('Guest progress transfer could not load the series list:', error);
+            throw new GuestProgressSelectionRetryableError('The tracks could not load. Try again.');
         }
         // After the marks no new race can start, so the raced lists hold every
         // board either player can have a row on. Without complete lists, the
