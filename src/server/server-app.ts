@@ -101,6 +101,7 @@ import {
     saveStoredTrack,
 } from './tracks/track-store.js';
 import { ensureStoredCatalogLoaded } from './tracks/stored-catalog.js';
+import { readCopyCheck, runCopyCheck } from './tracks/copy-check.js';
 import {
     ensureCommunityCreatorPostForSubreddit,
     resolveCreatorToolSubredditName,
@@ -182,6 +183,8 @@ function registerProductionRoutes(app: express.Application): void {
             copyLiveSeries: (copyOptions) => copyLiveAppSeries(copyOptions),
         }),
         readLockedCopyReport,
+        runCopyCheck: (options) => runCopyCheck(options),
+        readCopyCheck,
     });
     registerCreatorSeriesRoutes(app, {
         resolveCreatorToolSubredditName,

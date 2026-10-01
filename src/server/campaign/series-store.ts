@@ -458,7 +458,7 @@ async function commitLiveSeriesCopy(
         })));
 }
 
-function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
+export function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
     return definition.id === CAMPAIGN_NUMBERS_SERIES_ID || Boolean(getCampaignSeries(definition.id));
 }
 

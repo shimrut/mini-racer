@@ -880,3 +880,41 @@ describe('Creator Daily list and series conflicts', () => {
         expect(server.series[0].name).toBe('Their Name');
     });
 });
+
+describe('Creator copy check', () => {
+    const check = {
+        checkedAt: '2026-10-01T10:00:00.000Z',
+        checkedBy: 'RaceMod',
+        tracks: { exact: ['smallSteps', 'numberOne'], locked: 2, changed: ['nightRun'], notCopied: [],
+            problems: [{ key: 'albertGardens', problem: 'Players raced the app track, but the Redis copy differs from it.' }] },
+        series: { exact: ['numbered-v1'], changed: [], problems: [], notCopied: [] },
+        dailyList: 'exact',
+    };
+
+    it('shows the last check with its problems, and checks again on request', async () => {
+        const calls = [];
+        vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+            calls.push([String(url), options?.method ?? 'GET']);
+            if (String(url) === '/api/creator/migration/check') {
+                return jsonResponse({ check: { ...check, tracks: { ...check.tracks, problems: [] } } });
+            }
+            return jsonResponse({ report: null, preview: { copied: [] }, check });
+        }));
+        const setStatus = vi.fn();
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus });
+        await panels.loadCopy();
+        const root = document.getElementById('creator-copy-view');
+        expect(root.textContent).toContain('2 exact track copies, 2 of them locked.');
+        expect(root.textContent).toContain('nightRun');
+        expect(root.textContent).toContain('Daily list: an exact copy.');
+        expect([...root.querySelectorAll('.creator-error')].map((node) => node.textContent))
+            .toEqual(['albertGardens: Players raced the app track, but the Redis copy differs from it.']);
+        expect(root.textContent).toContain('[track-copy]');
+
+        buttonsByText(root, 'Check copies')[0].click();
+        await vi.waitFor(() => expect(setStatus).toHaveBeenCalledWith('The check found no problems.', false));
+        expect(calls).toContainEqual(['/api/creator/migration/check', 'POST']);
+        expect(root.textContent).toContain('No problems.');
+        expect(root.querySelectorAll('.creator-error')).toHaveLength(0);
+    });
+});

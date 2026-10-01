@@ -1085,6 +1085,61 @@ export class CreatorPanels {
         ]);
     }
 
+    // The last check of the copies: what is exact, what a moderator changed,
+    // and what differs from the app track that players raced.
+    copyCheckSection() {
+        const check = this.copyView?.check ?? null;
+        const error = this.copyError?.kind === 'check' ? this.copyError.message : null;
+        const problems = check ? [...check.tracks.problems, ...check.series.problems] : [];
+        const dailyList = { app: 'the app list', exact: 'an exact copy', changed: 'changed in the Creator' };
+        const lines = check ? [
+            `${check.tracks.exact.length} exact track copies, ${check.tracks.locked} of them locked.`,
+            check.tracks.changed.length
+                ? `${check.tracks.changed.length} tracks changed in the Creator before anyone raced them: ${check.tracks.changed.join(', ')}.`
+                : null,
+            `${check.series.exact.length} exact series copies${check.series.changed.length
+                ? `, ${check.series.changed.length} changed in the Creator` : ''}.`,
+            `Daily list: ${dailyList[check.dailyList] ?? check.dailyList}.`,
+            check.tracks.notCopied.length ? `${check.tracks.notCopied.length} raced tracks have no copy yet.` : null,
+            check.series.notCopied.length ? `${check.series.notCopied.length} live series have no copy yet.` : null,
+            problems.length ? `${problems.length} problems:` : 'No problems.',
+        ] : ['No check yet.'];
+        return element('section', { className: 'creator-copy-section' }, [
+            element('h3', { text: 'Check the copies' }),
+            element('ul', { className: 'creator-copy-lines' }, lines.filter(Boolean).map((line) => element('li', { text: line }))),
+            problems.length ? element('ul', { className: 'creator-copy-lines' }, problems.map(({ key, problem }) => (
+                element('li', { className: 'creator-error', text: `${key}: ${problem}` })
+            ))) : null,
+            button('Check copies', () => this.runCopyCheck(), { disabled: this.busy }),
+            error ? element('p', { className: 'creator-error', text: error }) : null,
+            check ? element('p', {
+                className: 'field-hint',
+                text: `Last check: ${formatDate(check.checkedAt)} by u/${check.checkedBy}. The server logs show each check with [track-copy].`,
+            }) : null,
+        ]);
+    }
+
+    async runCopyCheck() {
+        if (this.busy) return;
+        this.busy = true;
+        this.copyError = null;
+        this.writeGeneration += 1;
+        this.renderCopy();
+        try {
+            const { check } = await creatorApi.runCopyCheck();
+            this.copyView = { ...this.copyView, check };
+            const problems = check.tracks.problems.length + check.series.problems.length;
+            this.setStatus(problems ? `The check found ${problems} problems.` : 'The check found no problems.', problems > 0);
+        } catch (error) {
+            this.copyError = { kind: 'check', message: `Could not check the copies: ${error.message}` };
+            this.setStatus(this.copyError.message, true);
+        } finally {
+            this.busy = false;
+            this.writeGeneration += 1;
+            this.renderCopy();
+        }
+    }
+
     renderCopy() {
         const { report, preview, playedDailies = {}, liveCampaign = {} } = this.copyView ?? {};
         const seriesPreview = preview?.extra?.series;
@@ -1135,6 +1190,7 @@ export class CreatorPanels {
                 report: liveCampaign.report,
                 copiedText: (last) => `${last.copied.length} series and ${last.tracks?.length ?? 0} tracks copied`,
             }),
+            this.copyCheckSection(),
         );
     }
 
@@ -1165,8 +1221,9 @@ export class CreatorPanels {
         // The result appears on this screen: the status line is on the Tracks screen.
         this.copyRoot.replaceChildren(element('p', { className: 'field-hint', text: copy.running }));
         try {
-            const { report } = await copy.run();
+            const { report, checkError } = await copy.run();
             this.setStatus(`Copied ${report.copied.length} ${kind === 'live-campaign' ? 'series' : 'tracks'}.`);
+            if (checkError) this.copyError = { kind: 'check', message: `The check after the copy failed: ${checkError}` };
             this.refresh('daily', 'campaign');
             this.onTracksChanged();
         } catch (error) {

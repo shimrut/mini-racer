@@ -174,6 +174,27 @@ describe('track routes', () => {
         expect(dependencies.runLiveCampaignCopy).toHaveBeenLastCalledWith({ username: 'RaceMod' });
     });
 
+    it('checks the copies on request and after each copy, and keeps a copy whose check fails', async () => {
+        const check = { tracks: { problems: [] }, series: { problems: [] } };
+        const dependencies = deps({
+            runCopyCheck: vi.fn(async () => check),
+            readCopyCheck: vi.fn(async () => check),
+        });
+        const base = await startApp(dependencies);
+        expect((await (await fetch(`${base}/api/creator/migration`)).json()).check).toEqual(check);
+        expect(await (await fetch(`${base}/api/creator/migration/check`, { method: 'POST' })).json()).toEqual({ check });
+        expect(dependencies.runCopyCheck).toHaveBeenLastCalledWith({ username: 'RaceMod' });
+        const played = await (await fetch(`${base}/api/creator/migration/played-dailies`, { method: 'POST' })).json();
+        expect(played).toEqual({ report: { dryRun: false, copied: ['albertGardens'] }, check });
+
+        dependencies.runCopyCheck.mockRejectedValueOnce(new Error('redis: timeout'));
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const campaign = await fetch(`${base}/api/creator/migration/live-campaign`, { method: 'POST' });
+        log.mockRestore();
+        expect(campaign.status).toBe(200);
+        expect(await campaign.json()).toEqual({ report: { dryRun: false, copied: ['numbered-v1'] }, checkError: 'redis: timeout' });
+    });
+
     it('gives players placed tracks without a moderator check, 50 keys at most', async () => {
         const dependencies = deps();
         const base = await startApp(dependencies);

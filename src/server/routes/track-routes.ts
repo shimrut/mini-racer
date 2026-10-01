@@ -28,6 +28,9 @@ export type TrackRouteDependencies = {
     runPlayedDailyCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     runLiveCampaignCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     readLockedCopyReport(kind: 'played-dailies' | 'live-campaign'): Promise<unknown>;
+    // Compares every copy in Redis with the app again, and keeps the result.
+    runCopyCheck?(options: { username: string }): Promise<unknown>;
+    readCopyCheck?(): Promise<unknown>;
     saveDailySchedule(
         keys: unknown,
         options: { username: string; baseRevision?: unknown; currentTrackKey?: string | null },
@@ -148,29 +151,43 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.get('/api/creator/migration', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            const [report, preview, playedReport, playedPreview, campaignReport, campaignPreview] = await Promise.all([
+            const [report, preview, playedReport, playedPreview, campaignReport, campaignPreview, check] = await Promise.all([
                 dependencies.readMigrationReport(),
                 dependencies.runTrackMigration({ username, dryRun: true }),
                 dependencies.readLockedCopyReport('played-dailies'),
                 dependencies.runPlayedDailyCopy({ username, dryRun: true }),
                 dependencies.readLockedCopyReport('live-campaign'),
                 dependencies.runLiveCampaignCopy({ username, dryRun: true }),
+                dependencies.readCopyCheck?.() ?? null,
             ]);
             res.json({
                 report,
                 preview,
                 playedDailies: { report: playedReport, preview: playedPreview },
                 liveCampaign: { report: campaignReport, preview: campaignPreview },
+                ...(dependencies.readCopyCheck ? { check } : {}),
             });
         } catch (error) {
             errorResponse(res, error);
         }
     });
 
+    // Each copy checks every copy again when it ends. A failed check does not
+    // undo the copy: the answer shows the copy report and the check error.
+    async function withCopyCheck(username: string, report: unknown) {
+        if (!dependencies.runCopyCheck) return { report };
+        try {
+            return { report, check: await dependencies.runCopyCheck({ username }) };
+        } catch (error) {
+            console.error('The copy check failed:', error);
+            return { report, checkError: error instanceof Error ? error.message : 'The check failed.' };
+        }
+    }
+
     app.post('/api/creator/migration/played-dailies', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            res.json({ report: await dependencies.runPlayedDailyCopy({ username }) });
+            res.json(await withCopyCheck(username, await dependencies.runPlayedDailyCopy({ username })));
         } catch (error) {
             errorResponse(res, error);
         }
@@ -179,7 +196,17 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.post('/api/creator/migration/live-campaign', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            res.json({ report: await dependencies.runLiveCampaignCopy({ username }) });
+            res.json(await withCopyCheck(username, await dependencies.runLiveCampaignCopy({ username })));
+        } catch (error) {
+            errorResponse(res, error);
+        }
+    });
+
+    app.post('/api/creator/migration/check', async (_req, res) => {
+        try {
+            const username = await creatorUsername(dependencies);
+            if (!dependencies.runCopyCheck) throw new TrackInputError('The copy check is not available.');
+            res.json({ check: await dependencies.runCopyCheck({ username }) });
         } catch (error) {
             errorResponse(res, error);
         }
@@ -188,7 +215,7 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.post('/api/creator/migration', async (_req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            res.json({ report: await dependencies.runTrackMigration({ username }) });
+            res.json(await withCopyCheck(username, await dependencies.runTrackMigration({ username })));
         } catch (error) {
             errorResponse(res, error);
         }
