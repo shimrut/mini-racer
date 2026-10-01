@@ -1529,6 +1529,8 @@ describe('Head to Head lobby and finish', () => {
             loadPlayerProgress: false,
             preserveDailyChallengeContext: true,
             showStartOverlayOnReset: false,
+            keepScreen: true,
+            prepared: null,
         });
         expect(context.startSequence).toHaveBeenCalledTimes(1);
     });

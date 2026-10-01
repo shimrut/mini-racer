@@ -1,6 +1,10 @@
 import { getTrackName } from '../track/catalog.js';
 import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
-import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
+import {
+    getStaleRunTrackReason,
+    hasCurrentTrackDefinition,
+    revealInstalledRace,
+} from '../track/race-definition.js';
 import { PREPARATION_SLOTS, plainRaceChallenge } from '../track/race-preparation.js';
 import {
     confirmHeadToHeadComment,
@@ -344,6 +348,11 @@ export const headToHeadEngineMethods = {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
+                    keepScreen: true,
+                    prepared: this.findPreparedRaceTrack?.(
+                        stage.trackKey,
+                        plainRaceChallenge(stage.trackKey),
+                    ) ?? null,
                 });
             }
             if (challenge.frozenGhost) {
@@ -371,6 +380,7 @@ export const headToHeadEngineMethods = {
             this.activeRaceMode = 'challenge';
             void this.journeys?.startAttempt?.({ mode: 'challenge', reason: 'initial_start' });
             this.recordHeadToHeadStart?.();
+            await revealInstalledRace(this);
             this.startSequence();
         } catch (error) {
             console.error('Could not start Head to Head race:', error);
