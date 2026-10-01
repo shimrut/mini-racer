@@ -1,4 +1,4 @@
-// Post URLs; empty keeps a button disabled.
+// Paste the post URLs these buttons open; an empty value keeps a button disabled.
 window.LP_LINKS = {
     daily: '',
     campaign: '',

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Racer — Today's Track</title>
+    <meta name="description" content="Play today's Mini Racer track on Reddit.">
+    <meta name="robots" content="noindex, follow">
+    <link rel="canonical" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/">
+    <meta http-equiv="refresh" content="0; url=https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/">
+    <script src="config.js"></script>
+</head>
+<body>
+    <p>Opening today's track… <a id="today-link" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/">Race today on Reddit</a></p>
+    <script>
+        (function () {
+            var fallback = 'https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/';
+            var links = window.LP_LINKS || {};
+            var target = (typeof links.daily === 'string' && links.daily.trim()) ? links.daily.trim() : fallback;
+            var el = document.getElementById('today-link');
+            if (el) el.href = target;
+            window.location.replace(target);
+        }());
+    </script>
+</body>
+</html>

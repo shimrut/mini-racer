@@ -5,69 +5,154 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Racer</title>
-    <meta name="description" content="Mini Racer — pick Daily or Campaign and go race.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+    <meta name="description" content="A new track every day. 126 hand-built circuits, 16 Campaign stages, ghost races.">
+    <link rel="canonical" href="https://miniracer.club/">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="theme-color" content="#020617">
+    <meta name="color-scheme" content="dark">
+
+    <link rel="icon" href="favicon.png" type="image/png" sizes="any">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="preload" href="fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/jetbrainsmono.woff2" as="font" type="font/woff2" crossorigin>
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Mini Racer">
+    <meta property="og:title" content="Mini Racer">
+    <meta property="og:description" content="A new track every day.">
+    <meta property="og:url" content="https://miniracer.club/">
+    <meta property="og:image" content="https://miniracer.club/track.png">
+    <meta property="og:image:width" content="2880">
+    <meta property="og:image:height" content="1620">
+    <meta property="og:locale" content="en_US">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Mini Racer">
+    <meta name="twitter:description" content="A new track every day.">
+    <meta name="twitter:image" content="https://miniracer.club/track.png">
+
     <link rel="stylesheet" href="styles.css">
     <script src="config.js"></script>
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": "https://miniracer.club/#website",
+                "url": "https://miniracer.club/",
+                "name": "Mini Racer",
+                "description": "A new track every day.",
+                "inLanguage": "en",
+                "about": { "@id": "https://miniracer.club/#game" }
+            },
+            {
+                "@type": "VideoGame",
+                "@id": "https://miniracer.club/#game",
+                "name": "Mini Racer",
+                "url": "https://miniracer.club/",
+                "description": "A top-down racing game. You steer, the throttle is automatic. A new track every day; the last seven stay open. Campaign runs 16 stages with Bronze, Silver, Gold and Author times. Head to Head races a saved run as a ghost. 126 hand-built circuits.",
+                "image": "https://miniracer.club/track.png",
+                "inLanguage": "en",
+                "genre": ["Racing", "Time trial"],
+                "applicationCategory": "GameApplication",
+                "gamePlatform": ["Web browser", "iOS", "Android"],
+                "operatingSystem": "Any",
+                "playMode": ["SinglePlayer", "MultiPlayer"],
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "availability": "https://schema.org/InStock"
+                },
+                "sameAs": ["https://www.reddit.com/r/MiniRacerGame/"]
+            }
+        ]
+    }
+    </script>
 </head>
 
 <body>
-    <main class="shell is-ready" aria-labelledby="lp-title">
+    <div class="shell">
+        <!-- Full-Bleed Background Track and Atmosphere Veil -->
         <img
             class="track"
             src="track.png"
-            alt=""
+            alt="Mini Racer Campaign Track 1"
             width="2880"
             height="1620"
             decoding="async"
             fetchpriority="high"
         >
-        <div class="veil" aria-hidden="true"></div>
-
-        <div class="panel">
-            <header class="brand">
-                <h1 id="lp-title" class="title">
-                    <span class="title__mini">Mini</span>
-                    <span class="title__racer">Racer</span>
-                </h1>
-            </header>
-
-            <nav class="modes" aria-label="Race modes">
-                <a id="lp-daily" class="mode" href="#" target="_blank" rel="noopener noreferrer">
-                    <span class="mode__label">Daily</span>
-                </a>
-                <a id="lp-campaign" class="mode" href="#" target="_blank" rel="noopener noreferrer">
-                    <span class="mode__label">Campaign</span>
-                </a>
-                <a id="lp-community" class="mode" href="#" target="_blank" rel="noopener noreferrer">
-                    <span class="mode__label">Join Community</span>
-                </a>
+        <!-- Navigation Bar -->
+        <header class="header">
+            <nav class="navbar" aria-label="Main navigation">
+                <div class="nav-links">
+                    <a id="lp-nav-daily" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/" target="_blank" rel="noopener noreferrer">DAILY</a>
+                    <a id="lp-nav-campaign" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtk99/mini_racer_campaign/" target="_blank" rel="noopener noreferrer">CAMPAIGN</a>
+                    <a id="lp-nav-community" href="https://www.reddit.com/r/MiniRacerGame/" target="_blank" rel="noopener noreferrer">THE CLUB</a>
+                </div>
             </nav>
-        </div>
-    </main>
+        </header>
+
+        <!-- Main Hero Stage Overlay -->
+        <main class="hero-stage">
+            <!-- Left: Stacked Headline -->
+            <div class="hero-left">
+                <h1 class="stacked-title">
+                    <span class="white">MINI</span>
+                    <span class="red">RACER</span>
+                </h1>
+                <div class="callout-stack">
+                    <span>small tracks.</span>
+                    <span>big competition.</span>
+                </div>
+            </div>
+
+            <!-- Spacer: keeps center open for the full-bleed background track -->
+            <div class="hero-spacer" aria-hidden="true"></div>
+
+            <!-- Right: About Copy & CTA -->
+            <div class="hero-right">
+                <div class="facts">
+                    <p>Mini Racer is a minimalist top-down racing game for Reddit. New tracks every day, 16 campaign stages, head-to-head challenges and more.</p>
+                    <p>Set your best time, climb the leaderboards, and compete with racers from around the world in this easy to play but hard to master arcade game.</p>
+                </div>
+                <div class="play-action-wrap">
+                    <a id="lp-play-main" class="btn-play-main" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/" target="_blank" rel="noopener noreferrer">
+                        RACE NOW
+                    </a>
+                </div>
+            </div>
+        </main>
+    </div>
 
     <script>
         (function () {
             var links = window.LP_LINKS || {};
 
-            function bind(id, url) {
+            function set(id, url) {
                 var el = document.getElementById(id);
                 if (!el) return;
                 var href = typeof url === 'string' ? url.trim() : '';
-                if (!href) {
-                    el.setAttribute('aria-disabled', 'true');
-                    el.removeAttribute('href');
-                    return;
+                // Never strip the author's href: an empty config value
+                // leaves the link exactly as written in the markup.
+                if (href) {
+                    el.href = href;
+                    el.removeAttribute('aria-disabled');
                 }
-                el.href = href;
-                el.removeAttribute('aria-disabled');
             }
 
-            bind('lp-daily', links.daily);
-            bind('lp-campaign', links.campaign);
-            bind('lp-community', links.community);
+            var defaultPlay = links.daily || links.campaign || links.community;
+            if (defaultPlay) {
+                set('lp-play-top', defaultPlay);
+                set('lp-play-main', defaultPlay);
+            }
+
+            if (links.daily) set('lp-nav-daily', links.daily);
+            if (links.campaign) set('lp-nav-campaign', links.campaign);
+            if (links.community) set('lp-nav-community', links.community);
         }());
     </script>
 </body>

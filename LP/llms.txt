@@ -1,39 +1,34 @@
 # Mini Racer
 
-> A new track every day, one car, one clock. Mini Racer is a free top-down racing game that runs inside
-> a Reddit post — nothing to install, no account needed to race.
+> A daily time trial. Same track for everyone, new one at midnight UTC.
 
 Site: https://miniracer.club/
 Community: https://www.reddit.com/r/MiniRacerGame/
 
-## How it plays
+## Driving
 
-You only steer — A and D, the arrow keys, or hold either side of the screen. The throttle never lets up,
-so the whole game is your line. Walls scrape you; they don't end your lap. A lap runs well under a
-minute.
+The throttle is automatic. You hold left or right — A and D, the arrow keys, or either side of the
+screen. Walls slow you down; they do not end the lap. Most laps run under a minute.
 
 ## Modes
 
-- Daily: everyone gets the same track, flipping at midnight UTC. Seven days stay open behind it, each
-  keeping its own leaderboard.
-- Campaign: 16 stages that never expire, ending on Half Life. Every stage pays a Bronze, Silver, Gold
-  or Author medal, and those medals unlock the next one.
-- Head to Head: someone posts a verified run frozen into a ghost, and you race it.
+- Daily: everyone races the same track. It changes at midnight UTC and the last seven days stay open,
+  each with its own board.
+- Campaign: 16 stages that do not expire, ending on Half Life. Each stage carries Bronze, Silver, Gold
+  and Author target times; beating one takes that medal, and medals unlock the next stage. Half Life's
+  Author time is 11.27 seconds.
+- Head to Head: race someone's saved run as a ghost until you beat it.
 
-## Ghosts and times
+## Times
 
-Your best lap drives beside you every time you go again, and you can chase anyone on the leaderboard the
-same way. The server re-drives your steering before a lap reaches the board and ranks it to the
-millisecond, so bad and fake laps don't stick.
+The server replays your steering before a time counts, and ranks it to the millisecond. Your best lap
+comes back as a ghost, and you can chase anyone else's the same way.
 
-## The rest
+## Content
 
-Free, with no purchases. It runs in the Reddit post itself — desktop browser or the Reddit app on iOS
-and Android — built on Devvit, Reddit's developer platform. Guests race everything; signing in to Reddit
-carries your progress and lets you post times and challenges. 98 hand-built tracks. The 22 cars and 8
-trails only change how you look.
+126 hand-built circuits. 23 cars and 8 trails, which change how you look and nothing else. Built on
+Devvit, Reddit's developer platform.
 
 ## Pages
 
-- [Home](https://miniracer.club/): play links for Daily and Campaign, plus the community.
-- [About Mini Racer](https://miniracer.club/about.html): how it plays, the modes, ghosts, verified times.
+- [Home](https://miniracer.club/): the game summary, the modes, and play links.
