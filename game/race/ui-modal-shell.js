@@ -642,6 +642,14 @@ export class ModalShell {
 
     _challengeShareButtons(result, shareText) {
         const buttons = [];
+        if (typeof result?.postId === 'string' && result.postId.startsWith('t3_')) {
+            const send = document.createElement('button');
+            send.type = 'button';
+            send.className = 'result-share-panel__button result-share-panel__button--primary';
+            send.textContent = 'Send Challenge';
+            send.onclick = () => this._sendChallenge(result.postId, shareText);
+            buttons.push(send);
+        }
         if (typeof result?.postUrl === 'string' && result.postUrl) {
             const copy = document.createElement('button');
             copy.type = 'button';
@@ -650,14 +658,6 @@ export class ModalShell {
             copy.setAttribute('aria-label', 'Copy challenge link');
             copy.onclick = () => this._copyChallengeLink(copy, result.postUrl);
             buttons.push(copy);
-        }
-        if (typeof result?.postId === 'string' && result.postId.startsWith('t3_')) {
-            const send = document.createElement('button');
-            send.type = 'button';
-            send.className = 'result-share-panel__button result-share-panel__button--primary';
-            send.textContent = 'Send Challenge';
-            send.onclick = () => this._sendChallenge(result.postId, shareText);
-            buttons.push(send);
         }
         return buttons;
     }
@@ -860,7 +860,7 @@ export class ModalShell {
 
         const cancel = document.createElement('button');
         cancel.type = 'button';
-        cancel.className = 'result-share-panel__button';
+        cancel.className = 'result-share-panel__button result-share-panel__button--dismiss';
         cancel.textContent = 'Cancel';
         cancel.onclick = () => {
             if (triggerButton) triggerButton.disabled = false;
@@ -972,7 +972,7 @@ export class ModalShell {
         actions.className = 'result-share-panel__actions';
         const done = document.createElement('button');
         done.type = 'button';
-        done.className = 'result-share-panel__button';
+        done.className = 'result-share-panel__button result-share-panel__button--dismiss';
         done.textContent = 'Done';
         done.onclick = () => this._closeSharePanel();
         const shareButtons = isChallengeCreate ? this._challengeShareButtons(result, shareText) : [];
@@ -1033,7 +1033,7 @@ export class ModalShell {
         actions.className = 'result-share-panel__actions';
         const cancel = document.createElement('button');
         cancel.type = 'button';
-        cancel.className = 'result-share-panel__button';
+        cancel.className = 'result-share-panel__button result-share-panel__button--dismiss';
         cancel.textContent = 'Cancel';
         cancel.onclick = () => {
             triggerButton.disabled = false;
@@ -1053,13 +1053,13 @@ export class ModalShell {
             kind: 'head-to-head',
             source: 'daily',
         }, triggerButton, hostView);
-        actions.append(comment, challenge, cancel);
+        actions.append(challenge, comment, cancel);
         panel.append(title, description, actions);
         hostView.appendChild(scrim);
         triggerButton.disabled = true;
         this.clearFinishMenuKeyboardCue();
-        resetMenuKeyboardState(this._shareMenuKeyboardState, [comment, challenge, cancel], {
-            preferredIndex: 0,
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [challenge, comment, cancel], {
+            preferredIndex: 1,
             container: actions,
             focusPreferred: true,
         });
@@ -1184,6 +1184,7 @@ export class ModalShell {
             const actions = document.createElement('div');
             actions.className = 'result-share-panel__actions';
             const cancelReady = cancel.cloneNode(true);
+            cancelReady.classList.add('result-share-panel__button--dismiss');
             cancelReady.onclick = () => {
                 triggerButton.disabled = false;
                 this._closeSharePanel();
@@ -1248,10 +1249,10 @@ export class ModalShell {
                     disclosure.classList.add('is-error');
                 }
             };
-            actions.append(cancelReady, confirm);
+            actions.append(confirm, cancelReady);
             panel.append(title, disclosure, copy, actions);
-            resetMenuKeyboardState(this._shareMenuKeyboardState, [cancelReady, confirm], {
-                preferredIndex: 1,
+            resetMenuKeyboardState(this._shareMenuKeyboardState, [confirm, cancelReady], {
+                preferredIndex: 0,
                 container: actions,
                 focusPreferred: true,
             });
@@ -2649,7 +2650,7 @@ export class ModalShell {
         actions.className = 'result-share-panel__actions';
         const cancel = document.createElement('button');
         cancel.type = 'button';
-        cancel.className = 'result-share-panel__button';
+        cancel.className = 'result-share-panel__button result-share-panel__button--dismiss';
         cancel.textContent = 'Cancel';
         cancel.onclick = () => this._closeSharePanel();
 
@@ -2688,13 +2689,13 @@ export class ModalShell {
             }
         };
 
-        actions.append(cancel, confirm);
+        actions.append(confirm, cancel);
         panel.append(title, context, target, actions);
         scrim.appendChild(panel);
         this.modalRunsView.appendChild(scrim);
         this.clearFinishMenuKeyboardCue();
-        resetMenuKeyboardState(this._shareMenuKeyboardState, [cancel, confirm], {
-            preferredIndex: 1,
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [confirm, cancel], {
+            preferredIndex: 0,
             container: actions,
             focusPreferred: true,
         });

@@ -230,18 +230,23 @@
 }
 
 .result-share-panel__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
 }
 
+/* Each button fills the card width, one under the other, as on the finish
+   screen. A new label ("Posting…", "Copied") does not change the size. */
 .result-share-panel__button {
-    flex: 1 1 auto;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 3.1rem;
+    width: 100%;
+    height: 3.25rem;
     padding: 0 1.1rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     border: none;
     border-radius: var(--radius-full);
     background: rgba(51, 65, 85, 0.8);
@@ -276,6 +281,26 @@
 
 .result-share-panel__button--primary:hover {
     background: var(--accent-bright);
+}
+
+.result-share-panel__button--dismiss {
+    background: transparent;
+    color: var(--text-dim);
+}
+
+.result-share-panel__button--dismiss:hover {
+    background: rgba(51, 65, 85, 0.45);
+    color: var(--text-color);
+}
+
+/* With no other action, Done keeps the fill. */
+.result-share-panel__button--dismiss:only-child {
+    background: rgba(51, 65, 85, 0.8);
+    color: var(--text-color);
+}
+
+.result-share-panel__button--dismiss:only-child:hover {
+    background: #475569;
 }
 
 .result-share-panel__button:disabled {

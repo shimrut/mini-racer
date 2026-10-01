@@ -1251,14 +1251,16 @@ describe('ui modal runs helpers', () => {
         expect(panel?.textContent).toContain('#2 · 00:09.100');
         expect(dom.window.document.activeElement?.textContent).toBe('Race Ghost');
 
-        const buttons = panel.querySelectorAll('button');
-        buttons[0].click();
+        const button = (label) => [...dom.window.document.querySelectorAll('.leaderboard-race-panel button')]
+            .find((item) => item.textContent === label);
+        expect([...panel.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['Race Ghost', 'Cancel']);
+        button('Cancel').click();
         expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
         expect(dom.window.document.activeElement).toBe(triggerRow);
         expect(onRaceOpponent).not.toHaveBeenCalled();
 
         _showLeaderboardOpponentConfirmation.call(shell, entry, triggerRow);
-        dom.window.document.querySelectorAll('.leaderboard-race-panel button')[1].click();
+        button('Race Ghost').click();
         expect(onRaceOpponent).toHaveBeenCalledWith(entry);
         expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
 
@@ -1485,18 +1487,18 @@ describe('Daily finish share chooser', () => {
         const panel = dom.window.document.querySelector('.result-share-panel');
         const buttons = [...panel.querySelectorAll('button')];
         expect(buttons.map((button) => button.textContent)).toEqual([
-            'Comment Time',
             'Issue Challenge',
+            'Comment Time',
             'Cancel',
         ]);
         expect(shell.combinedPlaylistBtn.disabled).toBe(true);
 
-        buttons[0].click();
+        buttons[1].click();
         expect(startShare).toHaveBeenCalledWith(request, shell.combinedPlaylistBtn, shell.modalCombinedView);
 
         startShare.mockClear();
         shell._startShareChooser(request, shell.combinedPlaylistBtn, shell.modalCombinedView);
-        [...dom.window.document.querySelectorAll('.result-share-panel button')][1].click();
+        [...dom.window.document.querySelectorAll('.result-share-panel button')][0].click();
         expect(startShare).toHaveBeenCalledWith({
             ...request,
             kind: 'head-to-head',
@@ -1663,7 +1665,7 @@ describe('Daily finish share chooser', () => {
             expect(panel.querySelector('.result-share-panel__title').textContent).toBe(expectedTitle);
             expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(expectedCopy);
             expect([...panel.querySelectorAll('.result-share-panel__button')].map((button) => button.textContent))
-                .toEqual(['Copy Link', 'Send Challenge', 'Done']);
+                .toEqual(['Send Challenge', 'Copy Link', 'Done']);
         } finally {
             global.document = originalDocument;
         }
