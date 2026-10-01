@@ -697,7 +697,7 @@ export const campaignEngineMethods = {
     syncCampaignStartReadiness() {
         const stage = this.campaignCarousel?.getSelectedChallenge?.();
         const ready = stage?.trackKey && stage.unlocked
-            ? Boolean(this.findPreparedRaceTrack?.(stage.trackKey, toRaceChallenge(stage)))
+            ? Boolean(this.isRaceTrackReady?.(stage.trackKey, toRaceChallenge(stage)))
             : null;
         this.lobbyUi?.setStartTrackReady?.('campaign', ready);
     },
@@ -822,7 +822,12 @@ export const campaignEngineMethods = {
             this.activeRaceMode = 'campaign';
             this.activeCampaignStage = stage;
             this.activeHeadToHead = null;
-            await this.ensureRankedTrackDefinition?.(stage.trackKey);
+            const raceChallenge = toRaceChallenge(stage);
+            const prepared = await this.readyRaceTrack?.(
+                confirmUnlockFor ? PREPARATION_SLOTS.NEXT : PREPARATION_SLOTS.SELECTED,
+                stage.trackKey,
+                raceChallenge,
+            );
             if (replacesCurrentRun && stage.trackKey === this.currentTrackKey) {
                 this.reset(false, {
                     preserveRaceComparisonTarget,
@@ -831,7 +836,6 @@ export const campaignEngineMethods = {
                 });
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
-            const raceChallenge = toRaceChallenge(stage);
             if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
@@ -839,7 +843,7 @@ export const campaignEngineMethods = {
                     preserveRaceComparisonTarget,
                     showStartOverlayOnReset: false,
                     keepScreen: true,
-                    prepared: this.findPreparedRaceTrack?.(stage.trackKey, raceChallenge) ?? null,
+                    prepared: prepared ?? null,
                 });
             }
             this.applyDailyChallenge(raceChallenge);

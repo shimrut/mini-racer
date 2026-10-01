@@ -51,6 +51,7 @@ import {
   reloadChangedRaceTrack,
   revealInstalledRace,
 } from "../track/race-definition.js";
+import { PREPARATION_SLOTS } from "../track/race-preparation.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -745,7 +746,9 @@ export const dailyChallengeEngineMethods = {
       this.lastPlayedDailyChallenge = challenge;
       this.selectedDailyChallengeId = challenge.id;
       this.activeDailyChallenge = challenge;
-      await this.ensureRankedTrackDefinition?.(challenge.trackKey);
+      const prepared = challenge.trackKey
+        ? await this.readyRaceTrack?.(PREPARATION_SLOTS.SELECTED, challenge.trackKey, challenge)
+        : null;
       if (
         challenge.trackKey
         && !hasCurrentTrackDefinition(this, challenge.trackKey)
@@ -756,7 +759,7 @@ export const dailyChallengeEngineMethods = {
           preserveRaceComparisonTarget: options.preserveRaceComparisonTarget === true,
           showStartOverlayOnReset: false,
           keepScreen: true,
-          prepared: this.findPreparedRaceTrack?.(challenge.trackKey, challenge) ?? null,
+          prepared: prepared ?? null,
         });
       }
 
@@ -969,7 +972,7 @@ export const dailyChallengeEngineMethods = {
   syncDailyStartReadiness() {
     const challenge = this.dailyCarousel?.getSelectedChallenge?.();
     const ready = challenge?.trackKey
-      ? Boolean(this.findPreparedRaceTrack?.(challenge.trackKey, challenge))
+      ? Boolean(this.isRaceTrackReady?.(challenge.trackKey, challenge))
       : null;
     this.lobbyUi?.setStartTrackReady?.("daily", ready);
   },

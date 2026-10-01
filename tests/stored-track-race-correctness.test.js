@@ -237,9 +237,9 @@ describe('same-key assets and fixed active attempts', () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const engine = {
+            ...trackEngineMethods,
             status: 'ready', currentTrackKey: 'circuit', trackCanvas: {},
             startSequence: vi.fn(), loadTrack: vi.fn(), applyDailyChallenge: vi.fn(),
-            ensureRankedTrackDefinition: trackEngineMethods.ensureRankedTrackDefinition,
             lobbyUi: { setRaceStartError: vi.fn() },
         };
         await dailyChallengeEngineMethods.handleStartDailyChallenge.call(engine, { id: 'cached-card', trackKey: 'circuit' });

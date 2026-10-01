@@ -148,6 +148,11 @@ export async function ensureStoredTracks(trackKeys = [], { includeBuiltIn = fals
     }
 }
 
+// True when the server confirmed this key's layout in this session.
+export function isTrackLayoutConfirmed(trackKey) {
+    return confirmedKeys.has(trackKey);
+}
+
 export function clearStoredTrackChecksForTests() {
     checkedAtByKey.clear();
     confirmedKeys.clear();

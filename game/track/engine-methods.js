@@ -14,22 +14,28 @@ import {
   readCanvasDevicePixelRatio,
   isLocalEnvironment,
 } from "./environment.js";
-import { ensureStoredTracks } from './stored-track-service.js';
+import { ensureStoredTracks, isTrackLayoutConfirmed } from './stored-track-service.js';
 import { createRacePreparation, PREPARATION_SLOTS } from './race-preparation.js';
+import { hasCurrentTrackDefinition } from './race-definition.js';
 import { getPlayerProgressState } from "../player/progress-state.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 
 export const trackEngineMethods = {
+  // Community maps, local play and the mock Daily have no server layout.
+  raceTrackNeedsConfirmation(trackKey, challenge = null) {
+    return !(
+      String(trackKey).startsWith('community:')
+      || isLocalEnvironment()
+      || challenge?.id === 'mock-daily-challenge-local'
+    );
+  },
+
   getRacePreparation() {
     if (!this._racePreparation) {
       this._racePreparation = createRacePreparation({
         getAssetOptions: () => ({ qualityLevel: this.qualityLevel, frameSkip: this.frameSkip }),
-        needsConfirmation: (trackKey, challenge) => !(
-          trackKey.startsWith('community:')
-          || isLocalEnvironment()
-          || challenge?.id === 'mock-daily-challenge-local'
-        ),
+        needsConfirmation: (trackKey, challenge) => this.raceTrackNeedsConfirmation(trackKey, challenge),
       });
       this._racePreparation.subscribe(() => this.syncRaceStartReadiness?.());
     }
@@ -44,6 +50,27 @@ export const trackEngineMethods = {
 
   findPreparedRaceTrack(trackKey, challenge = null) {
     return this._racePreparation?.findRecord(trackKey, challenge) ?? null;
+  },
+
+  // A race can start at once with a prepared record, or with the installed
+  // track while it is current and its layout is confirmed.
+  isRaceTrackReady(trackKey, challenge = null) {
+    if (this.findPreparedRaceTrack(trackKey, challenge)) return true;
+    return hasCurrentTrackDefinition(this, trackKey)
+      && (!this.raceTrackNeedsConfirmation(trackKey, challenge) || isTrackLayoutConfirmed(trackKey));
+  },
+
+  // A race start never asks the server for a ready track. A track that is not
+  // ready is prepared first, while the current screen stays, so no race
+  // starts on an unconfirmed layout. Gives the record to install, or null for
+  // the installed track.
+  async readyRaceTrack(slot, trackKey, challenge = null) {
+    const record = this.findPreparedRaceTrack(trackKey, challenge);
+    if (record) return record;
+    if (this.isRaceTrackReady(trackKey, challenge)) return null;
+    const prepared = await this.prepareRaceTrack(slot, { trackKey, challenge });
+    if (!prepared) throw new Error('Another race replaced this one before its track was ready.');
+    return prepared;
   },
 
   // Confirms the layouts of a lobby's tracks in one request, before its cards
@@ -94,12 +121,6 @@ export const trackEngineMethods = {
   syncRaceStartReadiness() {
     this.syncDailyStartReadiness?.();
     this.syncCampaignStartReadiness?.();
-  },
-
-  async ensureRankedTrackDefinition(trackKey) {
-    if (this.activeRaceMode === 'community' || isLocalEnvironment()
-      || this.activeDailyChallenge?.id === 'mock-daily-challenge-local') return;
-    await ensureStoredTracks([trackKey], { requireConfirmation: true });
   },
 
   getTrackPresentation(

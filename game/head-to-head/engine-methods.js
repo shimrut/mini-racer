@@ -342,17 +342,18 @@ export const headToHeadEngineMethods = {
             this.activeRaceMode = 'challenge';
             this.clearRaceComparisonTarget?.();
             this.pbGhost.clearTrack();
-            await this.ensureRankedTrackDefinition?.(stage.trackKey);
+            const prepared = await this.readyRaceTrack?.(
+                PREPARATION_SLOTS.CHALLENGE,
+                stage.trackKey,
+                plainRaceChallenge(stage.trackKey),
+            );
             if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
                     keepScreen: true,
-                    prepared: this.findPreparedRaceTrack?.(
-                        stage.trackKey,
-                        plainRaceChallenge(stage.trackKey),
-                    ) ?? null,
+                    prepared: prepared ?? null,
                 });
             }
             if (challenge.frozenGhost) {

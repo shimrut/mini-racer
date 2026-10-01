@@ -105,7 +105,7 @@ describe('the engine and the selected lobby card', () => {
             ...campaignEngineMethods,
             lobbyUi: { setStartTrackReady: vi.fn() },
             campaignCarousel: { getSelectedChallenge: () => ({ id: 's1', trackKey: 'circuit', unlocked: false }) },
-            findPreparedRaceTrack: vi.fn(() => ({ trackKey: 'circuit' })),
+            isRaceTrackReady: vi.fn(() => true),
         };
         racer.syncCampaignStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('campaign', null);
