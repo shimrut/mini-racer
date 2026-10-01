@@ -252,3 +252,65 @@ describe('Campaign Next and the next stage track', () => {
         expect(racer.modal.setCombinedNextRaceReady).not.toHaveBeenCalled();
     });
 });
+
+describe('the screen stays until the new track is drawn', () => {
+    async function resetEngine() {
+        const { raceEngineMethods } = await import('../game/race/engine-methods.js');
+        const calls = [];
+        const engine = {
+            ...raceEngineMethods,
+            pendingStartFrame: null,
+            currentTrack: { startPos: { x: 1, y: 2 }, startAngle: 0 },
+            activeRunId: 0,
+            skidMarks: { clear() {} },
+            routeTrace: { clear() {} },
+            runHistory: { clear() {} },
+            particles: [],
+            camera: { x: 0, y: 0 },
+            zoom: 1,
+            viewportWidth: 100,
+            viewportHeight: 100,
+            clearTimers() {},
+            clearSteeringInput() {},
+            clearDailyChallengeRun() {},
+            clearRaceComparisonTarget() {},
+            requestRender() {},
+            resize: () => calls.push('resize'),
+            modal: { closeModal: () => calls.push('closeModal') },
+            hud: { setPauseVisible() {}, resetCountdown() {}, resetHud() {} },
+            startOverlay: {
+                hideStartOverlay: () => calls.push('hideStartOverlay'),
+                showStartOverlay: () => calls.push('showStartOverlay'),
+            },
+        };
+        return { engine, calls };
+    }
+
+    it('keeps the lobby and the finish screen when a race start resets', async () => {
+        const { engine, calls } = await resetEngine();
+        engine.reset(false, { showStartOverlay: false, keepScreen: true });
+        expect(calls).not.toContain('closeModal');
+        expect(calls).not.toContain('hideStartOverlay');
+        expect(calls).not.toContain('showStartOverlay');
+
+        engine.reset(false, { showStartOverlay: false });
+        expect(calls).toContain('closeModal');
+        expect(calls).toContain('hideStartOverlay');
+    });
+
+    it('draws the new track before the finish screen closes and the lobby fades', async () => {
+        const { revealInstalledRace } = await import('../game/track/race-definition.js');
+        const calls = [];
+        await revealInstalledRace({
+            resize: ({ render }) => calls.push(`draw:${render}`),
+            modal: { closeModal: () => calls.push('closeModal') },
+            startOverlay: {
+                beginRaceStartTransition: () => {
+                    calls.push('lobbyFade');
+                    return Promise.resolve();
+                },
+            },
+        });
+        expect(calls).toEqual(['draw:true', 'closeModal', 'lobbyFade']);
+    });
+});

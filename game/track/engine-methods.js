@@ -203,6 +203,7 @@ export const trackEngineMethods = {
       preserveRaceComparisonTarget = false,
       showStartOverlayOnReset = true,
       prepared = null,
+      keepScreen = false,
     } = {},
   ) {
     const requestId = ++this.trackLoadRequestId;
@@ -258,6 +259,7 @@ export const trackEngineMethods = {
         preserveDailyChallenge: preserveDailyChallengeOnReset,
         preserveRaceComparisonTarget,
         showStartOverlay: showStartOverlayOnReset,
+        keepScreen,
       });
       if (
         document.activeElement &&
@@ -283,7 +285,11 @@ export const trackEngineMethods = {
       this.hud.setBestTime(null);
     }
 
-    this.reset(false, { preserveRaceComparisonTarget, preserveDailyChallenge: preserveDailyChallengeOnReset });
+    this.reset(false, {
+      preserveRaceComparisonTarget,
+      preserveDailyChallenge: preserveDailyChallengeOnReset,
+      keepScreen,
+    });
     if (
       document.activeElement &&
       typeof document.activeElement.blur === "function"

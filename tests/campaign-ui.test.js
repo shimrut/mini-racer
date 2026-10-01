@@ -3068,6 +3068,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(reset).toHaveBeenCalledWith(false, {
             preserveRaceComparisonTarget: true,
             showStartOverlay: false,
+            keepScreen: true,
         });
         expect(context.loadTrack).not.toHaveBeenCalled();
         expect(context.startSequence).toHaveBeenCalledTimes(1);
@@ -3089,6 +3090,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             preserveDailyChallengeContext: true,
             preserveRaceComparisonTarget: false,
             showStartOverlayOnReset: false,
+            keepScreen: true,
+            prepared: null,
         });
         expect(context.startSequence).toHaveBeenCalledTimes(1);
     });

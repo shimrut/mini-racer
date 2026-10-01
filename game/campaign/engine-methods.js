@@ -5,7 +5,11 @@ import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
-import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
+import {
+    getStaleRunTrackReason,
+    hasCurrentTrackDefinition,
+    revealInstalledRace,
+} from '../track/race-definition.js';
 import { PREPARATION_SLOTS } from '../track/race-preparation.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
@@ -802,9 +806,6 @@ export const campaignEngineMethods = {
                 }
             }
 
-            const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
-            if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
-
             const startRequest = startServerCampaignRace(stage.raceId).catch((error) => {
                 console.warn('Could not stamp the Campaign race start:', error);
                 return null;
@@ -826,22 +827,26 @@ export const campaignEngineMethods = {
                 this.reset(false, {
                     preserveRaceComparisonTarget,
                     showStartOverlay: false,
+                    keepScreen: true,
                 });
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
+            const raceChallenge = toRaceChallenge(stage);
             if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     preserveRaceComparisonTarget,
                     showStartOverlayOnReset: false,
+                    keepScreen: true,
+                    prepared: this.findPreparedRaceTrack?.(stage.trackKey, raceChallenge) ?? null,
                 });
             }
-            this.applyDailyChallenge(toRaceChallenge(stage));
+            this.applyDailyChallenge(raceChallenge);
             this.activeRaceMode = 'campaign';
             if (cachedPersonalBest) this.applyCampaignPersonalBest(stage, cachedPersonalBest);
             void this.journeys?.startAttempt?.({ mode: 'campaign', reason: 'initial_start' });
-            await raceStartTransition;
+            await revealInstalledRace(this);
             this.startSequence();
 
             if (startRequest) void this.confirmCampaignRaceStart(stage, startRequest);
@@ -1138,11 +1143,11 @@ export const campaignEngineMethods = {
         });
     },
 
+    // The finish screen stays until the next stage's track is drawn.
     async startCampaignNextStage(stage) {
         if (!stage || this.startButtonPending) return;
         const confirmUnlockFor = this.activeCampaignStage?.raceId ?? null;
         this.selectedCampaignStageId = stage.raceId;
-        this.reset(false, { showStartOverlay: false });
         this.activeRaceMode = 'campaign';
         await this.startCampaignStage(stage, { confirmUnlockFor });
     },

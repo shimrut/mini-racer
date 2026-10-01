@@ -1005,6 +1005,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       preserveDailyChallengeContext: true,
       preserveRaceComparisonTarget: false,
       showStartOverlayOnReset: false,
+      keepScreen: true,
+      prepared: null,
     });
     expect(engine.startSequence).toHaveBeenCalledTimes(1);
   });
@@ -1177,6 +1179,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
     expect(engine.startOverlay.hideStartOverlay).toHaveBeenCalled();
     expect(engine.reset).toHaveBeenCalledWith(false, {
       showStartOverlay: false,
+      keepScreen: true,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();
@@ -1219,6 +1222,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       preserveDailyChallengeContext: true,
       preserveRaceComparisonTarget: false,
       showStartOverlayOnReset: false,
+      keepScreen: true,
+      prepared: null,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();

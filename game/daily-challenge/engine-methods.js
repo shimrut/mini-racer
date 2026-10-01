@@ -44,7 +44,13 @@ import {
 import { getTrackCanvasAsset } from "../track/assets.js";
 import { DEFAULT_TRACK_KEY } from "../track/catalog.js";
 import { getLoadedClientTrack, loadClientTrack } from "../track/client-registry.js";
-import { getStaleRunTrackReason, hasChangedTrackDefinition, hasCurrentTrackDefinition, reloadChangedRaceTrack } from "../track/race-definition.js";
+import {
+  getStaleRunTrackReason,
+  hasChangedTrackDefinition,
+  hasCurrentTrackDefinition,
+  reloadChangedRaceTrack,
+  revealInstalledRace,
+} from "../track/race-definition.js";
 import {
   createDailyChallengePresentationEvent,
   resolveTrackPresentation,
@@ -722,8 +728,6 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
-    const raceStartTransition = this.startOverlay?.beginRaceStartTransition?.();
-    if (!raceStartTransition) this.startOverlay?.hideStartOverlay?.();
     claimPbGhostSelection(this, challenge.id);
     this.startButtonPending = true;
     const replaceActiveJourney = replacesCurrentRun
@@ -735,6 +739,7 @@ export const dailyChallengeEngineMethods = {
             ? { preserveRaceComparisonTarget: true }
             : {}),
           showStartOverlay: false,
+          keepScreen: true,
         });
       }
       this.lastPlayedDailyChallenge = challenge;
@@ -750,6 +755,8 @@ export const dailyChallengeEngineMethods = {
           preserveDailyChallengeContext: true,
           preserveRaceComparisonTarget: options.preserveRaceComparisonTarget === true,
           showStartOverlayOnReset: false,
+          keepScreen: true,
+          prepared: this.findPreparedRaceTrack?.(challenge.trackKey, challenge) ?? null,
         });
       }
 
@@ -785,7 +792,7 @@ export const dailyChallengeEngineMethods = {
         reason: resolveJourneyStartReason({ replacesCurrentRun }),
         replaceActive: replaceActiveJourney,
       });
-      await raceStartTransition;
+      await revealInstalledRace(this);
       this.startSequence();
     } catch (error) {
       console.error("Could not start Daily race:", error);

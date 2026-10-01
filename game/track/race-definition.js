@@ -23,6 +23,17 @@ export function getStaleRunTrackReason(engine) {
         : null;
 }
 
+// Shows a race whose track is installed. The new track is drawn first. Then
+// the finish screen closes and the lobby fades out, so the previous track
+// never shows.
+export async function revealInstalledRace(engine) {
+    engine.resize?.({ render: true });
+    engine.modal?.closeModal?.();
+    const transition = engine.startOverlay?.beginRaceStartTransition?.();
+    if (!transition) engine.startOverlay?.hideStartOverlay?.();
+    await transition;
+}
+
 // Explicit Retry/Restart adopts a new definition. Collision resets continue to
 // use the fixed definition and runtime of the current attempt.
 export async function reloadChangedRaceTrack(engine, options = {}) {

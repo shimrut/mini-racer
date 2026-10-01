@@ -357,6 +357,7 @@ describe('leaderboard race comparison target', () => {
       preserveDailyChallenge: false,
       preserveRaceComparisonTarget: true,
       showStartOverlay: false,
+      keepScreen: false,
     });
     expect(engine.raceComparisonTarget).not.toBe(null);
     expect(pbGhost.beginRun()).toBe(true);
@@ -394,6 +395,8 @@ describe('leaderboard race comparison target', () => {
       preserveDailyChallengeContext: true,
       preserveRaceComparisonTarget: true,
       showStartOverlayOnReset: false,
+      keepScreen: true,
+      prepared: null,
     });
     expect(engine.prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
     expect(engine.pbGhost.clearTrack).not.toHaveBeenCalled();

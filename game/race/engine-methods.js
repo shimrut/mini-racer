@@ -905,6 +905,9 @@ export const raceEngineMethods = {
       preserveDailyChallenge = false,
       preserveRaceComparisonTarget = preserveDailyChallenge,
       showStartOverlay = !autoStart,
+      // A race start keeps the lobby or the finish screen until the new track
+      // is drawn, so the previous track never shows.
+      keepScreen = false,
     } = {},
   ) {
     this.pbGhostSizeCapture?.cancelRun?.();
@@ -959,7 +962,7 @@ export const raceEngineMethods = {
     } else {
       this.clearDailyChallengeRun();
     }
-    this.modal.closeModal();
+    if (!keepScreen) this.modal.closeModal();
     this.hud.setPauseVisible(false);
 
     this.hud.resetCountdown();
@@ -971,10 +974,12 @@ export const raceEngineMethods = {
     this._lookAheadX = 0;
     this._lookAheadY = 0;
 
-    if (!showStartOverlay) {
-      this.startOverlay.hideStartOverlay();
-    } else {
+    if (keepScreen) {
+      // The race start reveals the new track itself.
+    } else if (showStartOverlay) {
       this.startOverlay.showStartOverlay(this.hasAnyData, this.isReturningPlayer);
+    } else {
+      this.startOverlay.hideStartOverlay();
     }
 
     this.resize({ render: false });
