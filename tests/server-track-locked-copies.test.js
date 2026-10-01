@@ -41,6 +41,7 @@ vi.mock('@devvit/redis', () => ({ redis, redisCompressed: redis }));
 vi.mock('@devvit/web/server', () => ({ redis, context: { subredditId: 't5_copies' } }));
 
 const tracks = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { buildLockedTrackCopy, matchesAppTrack } = await import('../src/server/tracks/track-copy.ts');
 const { runPlayedDailyCopy, runLiveCampaignCopy, readLockedCopyReport } = await import('../src/server/tracks/track-migration.ts');
 const series = await import('../src/server/campaign/series-store.ts');
@@ -142,7 +143,7 @@ describe('copy of played Dailies', () => {
 
         // Players read the locked copy, and it races and scores like the app track.
         expect(await tracks.readPlacedStoredTracks(['smallSteps'])).toHaveLength(1);
-        await tracks.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         expect(getTrackDefinitionIdentity(TRACKS.smallSteps)).toBe(identityBefore);
         expect(getRaceMedalThresholds('smallSteps', 1)).toEqual(medalsBefore);
         await expect(tracks.saveStoredTrack('smallSteps', { track: BUILT_IN_TRACKS.smallSteps }, {
@@ -189,7 +190,7 @@ describe('copy of the live Campaign', () => {
         expect((await readLockedCopyReport('live-campaign')).copied).toEqual(['numbered-v1']);
 
         // The game still races Numbers from the app, and the Creator does not offer the copy.
-        await series.ensureStoredSeriesLoaded();
+        await ensureStoredCatalogLoaded();
         expect(getCampaignSeries('numbered-v1').stages.map((stage) => stage.trackKey)).toEqual(stageKeys);
         expect(campaignHasSeriesChoice()).toBe(false);
         const view = await readCreatorSeriesView();

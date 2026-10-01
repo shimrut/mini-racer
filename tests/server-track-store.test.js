@@ -41,6 +41,7 @@ vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
 const store = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { TrackInputError } = await import('../src/server/tracks/track-shape.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
 const { getTrackMedalThresholds } = await import('../game/medals/medal-timing.js');
@@ -143,7 +144,7 @@ describe('stored track cache for the game lookup', () => {
     it('fills the lookup for the current subreddit only', async () => {
         await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
         expect(TRACKS.nightCut).toBeUndefined();
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         expect(TRACKS.nightCut.name).toBe('Night Cut');
         expect(getTrackMedalThresholds('nightCut')).toEqual({ gold: 9.4, silver: 9.7, bronze: 10.1 });
 
@@ -151,33 +152,34 @@ describe('stored track cache for the game lookup', () => {
         expect(TRACKS.nightCut).toBeUndefined();
     });
 
-    it('reads one value when nothing changed, and only the changed track after a save', async () => {
+    it('reads only the revisions when nothing changed, and only the changed track after a save', async () => {
+        const revisionKeys = ['dailygp:tracks:v1:revision', 'dailygp:campaign:series:v1:revision'];
         await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
         await store.saveStoredTrack('dayCut', { track: { ...shape, name: 'Day Cut' } }, { username: 'ModOne' });
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         mockRedis.mGet.mockClear();
         mockRedis.hGetAll.mockClear();
 
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         expect(mockRedis.hGetAll).not.toHaveBeenCalled();
-        expect(mockRedis.mGet).not.toHaveBeenCalled();
+        expect(mockRedis.mGet.mock.calls).toEqual([[revisionKeys]]);
 
         await store.saveStoredTrack('dayCut', { track: { ...shape, name: 'Day Cut II' } }, {
             username: 'ModOne',
             baseRevision: 1,
         });
-        await store.ensureStoredTracksLoaded();
-        expect(mockRedis.mGet).toHaveBeenCalledTimes(1);
-        expect(mockRedis.mGet.mock.calls[0][0]).toEqual(['dailygp:tracks:v1:track:dayCut']);
+        mockRedis.mGet.mockClear();
+        await ensureStoredCatalogLoaded();
+        expect(mockRedis.mGet.mock.calls).toEqual([[revisionKeys], [['dailygp:tracks:v1:track:dayCut']], [revisionKeys]]);
         expect(TRACKS.dayCut.name).toBe('Day Cut II');
         expect(TRACKS.nightCut.name).toBe('Night Cut');
     });
 
     it('drops a deleted track from the lookup', async () => {
         await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         await store.deleteStoredTrack('nightCut');
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         expect(TRACKS.nightCut).toBeUndefined();
     });
 });

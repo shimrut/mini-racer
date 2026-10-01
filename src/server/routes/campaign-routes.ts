@@ -1,4 +1,5 @@
 import type { Application, Response } from 'express';
+import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 
 type ServiceResult = {
     status: number;
@@ -16,11 +17,14 @@ export type CampaignRouteDependencies = {
     // The published Creator series, and the placed stored tracks among these keys.
     describeStoredSeries?(): readonly { stages: readonly { trackKey: string }[] }[];
     describeStoredTracks?(trackKeys: string[]): unknown[];
+    // Loads the stored tracks and series again, after the answer is built.
+    confirmStoredCatalog?(): Promise<void>;
 };
 
 // The Campaign answer carries the published Creator series and their stored
 // tracks, so the game can show them without a second request.
-function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): ServiceResult {
+async function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): Promise<ServiceResult> {
+    await dependencies.confirmStoredCatalog?.();
     const storedSeries = dependencies.describeStoredSeries?.() ?? [];
     if (!result.body || typeof result.body !== 'object') return result;
     const stages = (result.body as { stages?: { trackKey?: unknown }[] }).stages;
@@ -53,7 +57,7 @@ export function registerCampaignRoutes(
     app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
             const { playerId, guestToken, seriesId } = req.query ?? {};
-            send(res, withStoredSeries(await dependencies.getServerCampaignBootstrap({
+            send(res, await withStoredSeries(await dependencies.getServerCampaignBootstrap({
                 playerId,
                 guestToken,
                 seriesId,
@@ -61,6 +65,10 @@ export function registerCampaignRoutes(
             }), dependencies));
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign:', error);
+            if (error instanceof TrackPlacementRetryError) {
+                res.status(503).json({ error: error.message });
+                return;
+            }
             res.status(500).json({ error: 'Campaign bootstrap failed' });
         }
     });

@@ -42,6 +42,7 @@ vi.mock('@devvit/redis', () => ({ redis, redisCompressed: redis }));
 vi.mock('@devvit/web/server', () => ({ redis, context: { subredditId: 't5_placement' } }));
 
 const tracks = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const schedule = await import('../src/server/daily/daily-schedule-store.ts');
 const series = await import('../src/server/campaign/series-store.ts');
 const daily = await import('../src/server/daily/daily-gp-store.ts');
@@ -62,7 +63,7 @@ beforeEach(async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-02-15T12:00:00.000Z'));
     await tracks.saveStoredTrack(trackKey, { track: shape, medalRow }, { username: 'Mod' });
-    await tracks.ensureStoredTracksLoaded();
+    await ensureStoredCatalogLoaded();
 });
 afterEach(() => vi.useRealTimers());
 

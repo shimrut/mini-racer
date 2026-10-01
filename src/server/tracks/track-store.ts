@@ -134,15 +134,18 @@ export function summarizeStoredTrack(record: StoredTrackRecord): StoredTrackSumm
 
 // ---- The per-install cache that the game's track lookup reads ----
 
-type InstallCache = {
+// The stored tracks at one revision of the track list.
+export type StoredTrackSnapshot = {
     revision: string;
     revisionsByKey: Map<string, string>;
     entries: Map<string, StoredTrackEntry>;
 };
 
-const cacheByInstall = new Map<string, InstallCache>();
+export const STORED_TRACKS_REVISION_KEY = REVISION_KEY;
 
-function readInstallScope(): string | null {
+const cacheByInstall = new Map<string, StoredTrackSnapshot>();
+
+export function readStoredTrackInstallScope(): string | null {
     try {
         const id = (context as { subredditId?: unknown }).subredditId;
         if (typeof id === 'string' && id) return id;
@@ -155,14 +158,14 @@ function readInstallScope(): string | null {
 }
 
 export function resolveStoredTrackForRequest(trackKey: string): StoredTrackEntry | null {
-    const scope = readInstallScope();
+    const scope = readStoredTrackInstallScope();
     return scope ? cacheByInstall.get(scope)?.entries.get(trackKey) ?? null : null;
 }
 
 // The placed stored tracks among these keys, from this request's cache. An
 // answer that names a track carries them, so the game needs no second request.
 export function describePlacedStoredTracks(trackKeys: string[]): StoredTrackEntry[] {
-    const scope = readInstallScope();
+    const scope = readStoredTrackInstallScope();
     const entries = scope ? cacheByInstall.get(scope)?.entries : null;
     if (!entries?.size) return [];
     return [...new Set(trackKeys)].flatMap((trackKey) => {
@@ -180,6 +183,9 @@ async function readRecords(trackKeys: string[]): Promise<Map<string, StoredTrack
     for (let index = 0; index < trackKeys.length; index += LOAD_BATCH_SIZE) {
         const batch = trackKeys.slice(index, index + LOAD_BATCH_SIZE);
         const values = await redis.mGet(batch.map(recordKey));
+        if (!Array.isArray(values) || values.length !== batch.length) {
+            throw new Error('The stored tracks could not be read.');
+        }
         batch.forEach((trackKey, offset) => {
             const record = parseRecord(values[offset]);
             if (record?.key === trackKey) records.set(trackKey, record);
@@ -188,16 +194,18 @@ async function readRecords(trackKeys: string[]): Promise<Map<string, StoredTrack
     return records;
 }
 
-// Brings this install's stored tracks up to date before a request looks up a
-// track. It reads one value when nothing changed, and only the changed tracks
-// when a moderator saved something.
-export async function ensureStoredTracksLoaded(): Promise<void> {
-    const scope = readInstallScope();
-    if (!scope) return;
-    const revision = (await redis.get(REVISION_KEY)) ?? '0';
+export function readStoredTrackCacheRevision(scope: string): string | null {
+    return cacheByInstall.get(scope)?.revision ?? null;
+}
+
+// Reads the stored tracks for this revision. It reads only the tracks that
+// changed since the cache. It does not publish them: the stored catalog
+// publishes a snapshot only when the revision did not change during the reads.
+export async function readStoredTrackSnapshot(scope: string, revision: string): Promise<StoredTrackSnapshot> {
+    if (revision === '0') return { revision, revisionsByKey: new Map(), entries: new Map() };
+    const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
+    if (typeof index !== 'object') throw new Error('The stored track list could not be read.');
     const cached = cacheByInstall.get(scope);
-    if (cached?.revision === revision) return;
-    const index = revision === '0' ? {} : (await redis.hGetAll(INDEX_KEY)) ?? {};
     const revisionsByKey = new Map(Object.entries(index));
     const entries = new Map<string, StoredTrackEntry>();
     const changed: string[] = [];
@@ -209,10 +217,27 @@ export async function ensureStoredTracksLoaded(): Promise<void> {
             changed.push(trackKey);
         }
     }
-    for (const [trackKey, record] of await readRecords(changed)) {
+    const records = await readRecords(changed);
+    for (const trackKey of changed) {
+        const record = records.get(trackKey);
+        // Each write changes the record, the list and the revision together.
+        // The revision check after the reads catches a write between them, so
+        // a mismatch here is a broken record, not a write in progress.
+        if (!record || String(record.revision) !== revisionsByKey.get(trackKey)) {
+            console.error(`Stored track ${trackKey} does not match the track list.`);
+            continue;
+        }
         entries.set(trackKey, toEntry(record));
     }
-    cacheByInstall.set(scope, { revision, revisionsByKey, entries });
+    return { revision, revisionsByKey, entries };
+}
+
+// Only a newer snapshot replaces the cache. An equal one adds nothing.
+export function publishStoredTrackSnapshot(scope: string, snapshot: StoredTrackSnapshot): boolean {
+    const current = cacheByInstall.get(scope);
+    if (current && Number(current.revision) >= Number(snapshot.revision)) return false;
+    cacheByInstall.set(scope, snapshot);
+    return true;
 }
 
 export function clearStoredTrackCacheForTests(): void {

@@ -7,7 +7,8 @@ import {
     hasTrack,
 } from '../../../game/track/catalog.js';
 import { readDailySchedulePool } from './daily-schedule-store.js';
-import { queueStoredTrackRecord, freezeStoredTrack, ensureStoredTracksLoaded, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import { queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import { ensureStoredCatalogLoaded } from '../tracks/stored-catalog.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { withTrackPlacementLock, commitTrackPlacement, TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import { TRACKS } from '../../../game/track/tracks.js';
@@ -789,9 +790,11 @@ async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: numbe
                 } };
         },
     ));
-    await ensureStoredTracksLoaded();
     await stampDailyCompetitionExpiry(result);
     await maintainChallengeHistory();
+    // The placement is committed. If the catalog cannot load now, the retry
+    // finds the stored Daily, and its answer confirms the catalog again.
+    await ensureStoredCatalogLoaded();
     return result;
 }
 

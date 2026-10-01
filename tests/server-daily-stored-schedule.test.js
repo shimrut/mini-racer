@@ -49,6 +49,7 @@ vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
 const store = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { saveDailySchedule } = await import('../src/server/daily/daily-schedule-store.ts');
 const { getServerDailyGpChallenge } = await import('../src/server/daily/daily-gp-store.ts');
 const { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } = await import('../src/server/daily/daily-gp-model.ts');
@@ -67,7 +68,7 @@ describe('Daily from the stored list', () => {
             track: { ...smallSteps, name: 'Night Cut' },
             medalRow: { author: 9.1, gold: 9.4, silver: 9.7, bronze: 10.1 },
         }, { username: 'ModOne' });
-        await store.ensureStoredTracksLoaded();
+        await ensureStoredCatalogLoaded();
         await saveDailySchedule(['circuit', 'nightCut'], { username: 'ModOne' });
         await known.hSet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, {
             'daily-gp-2026-07-10': JSON.stringify({

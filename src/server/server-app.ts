@@ -246,9 +246,11 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
         describeStoredSeries: resolveStoredSeriesForRequest,
         describeStoredTracks: describePlacedStoredTracks,
+        confirmStoredCatalog: ensureStoredCatalogLoaded,
     });
     registerHeadToHeadRoutes(app, {
         describeStoredTracks: describePlacedStoredTracks,
+        confirmStoredCatalog: ensureStoredCatalogLoaded,
         getHeadToHeadRequestContext: () => ({
             username: getRequestUsername(),
             userId: getRequestUserId(),
@@ -284,6 +286,7 @@ function registerProductionRoutes(app: express.Application): void {
         submitServerDailyGpRun: (input) => submitServerDailyGpRun(input),
         isDailyGpChallengePlayable,
         describeStoredTracks: describePlacedStoredTracks,
+        confirmStoredCatalog: ensureStoredCatalogLoaded,
     });
     registerShareRoutes(app, {
         getDailyGpShareRequestContext,

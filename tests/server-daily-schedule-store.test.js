@@ -39,6 +39,7 @@ vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext })
 
 const schedule = await import('../src/server/daily/daily-schedule-store.ts');
 const store = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { TRACK_SCHEDULE_KEYS } = await import('../game/track/catalog.js');
 
 const medalRow = { author: 9.1, gold: 9.4, silver: 9.7, bronze: 10.1 };
@@ -54,7 +55,7 @@ async function saveTrack(key, extra = {}) {
     await store.saveStoredTrack(key, { track: { ...roughCut, name: 'Night Cut', ground: 'tarmac' }, medalRow, ...extra }, {
         username: 'ModOne',
     });
-    await store.ensureStoredTracksLoaded();
+    await ensureStoredCatalogLoaded();
 }
 
 describe('stored Daily list', () => {

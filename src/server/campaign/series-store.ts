@@ -134,28 +134,45 @@ export function installStoredSeriesResolver(): void {
 
 async function readAllRecords(): Promise<StoredSeriesRecord[]> {
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
+    if (typeof index !== 'object') throw new Error('The stored series list could not be read.');
     const ids = Object.keys(index);
     if (!ids.length) return [];
     const values = await redis.mGet(ids.map(recordKey));
+    if (!Array.isArray(values) || values.length !== ids.length) {
+        throw new Error('The stored series could not be read.');
+    }
     return ids.flatMap((id, offset) => {
         const record = parseRecord(values[offset]);
         return record?.id === id ? [record] : [];
     });
 }
 
-// Brings this install's published series up to date before a request reads
-// the Campaign. It reads one value when nothing changed.
-export async function ensureStoredSeriesLoaded(): Promise<void> {
-    const scope = readInstallScope();
-    if (!scope) return;
-    const revision = (await redis.get(REVISION_KEY)) ?? '0';
-    if (cacheByInstall.get(scope)?.revision === revision) return;
+// The published series at one revision of the series list.
+export type StoredSeriesSnapshot = InstallCache;
+
+export const STORED_SERIES_REVISION_KEY = REVISION_KEY;
+
+export function readStoredSeriesCacheRevision(scope: string): string | null {
+    return cacheByInstall.get(scope)?.revision ?? null;
+}
+
+// Reads the published series for this revision. The stored catalog publishes
+// the snapshot only when the revision did not change during the reads.
+export async function readStoredSeriesSnapshot(revision: string): Promise<StoredSeriesSnapshot> {
     const records = revision === '0' ? [] : await readAllRecords();
     const published = Object.freeze(records
         .filter((record) => record.status === 'published' && record.publishedStageCount > 0)
         .sort((a, b) => Date.parse(a.publishedAt ?? '') - Date.parse(b.publishedAt ?? ''))
         .map((record) => Object.freeze(toSeriesDefinition(record))));
-    cacheByInstall.set(scope, { revision, published });
+    return { revision, published };
+}
+
+// Only a newer snapshot replaces the cache. An equal one adds nothing.
+export function publishStoredSeriesSnapshot(scope: string, snapshot: StoredSeriesSnapshot): boolean {
+    const current = cacheByInstall.get(scope);
+    if (current && Number(current.revision) >= Number(snapshot.revision)) return false;
+    cacheByInstall.set(scope, snapshot);
+    return true;
 }
 
 export function clearStoredSeriesCacheForTests(): void {

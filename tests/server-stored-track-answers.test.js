@@ -147,4 +147,59 @@ describe('answers that carry stored tracks', () => {
         expect(describeTracks).toHaveBeenCalledWith(['numberOne']);
         expect(response.body.storedTracks).toEqual([]);
     });
+
+    it('confirms the catalog before the Campaign and Head to Head answers name their tracks', async () => {
+        const order = [];
+        const confirmStoredCatalog = vi.fn(async () => { order.push('confirm'); });
+        const describeTracks = vi.fn((keys) => { order.push('describe'); return describeStoredTracks(keys); });
+        const campaign = responseRecorder();
+        await routeHandlers(registerCampaignRoutes, {
+            getRequestUsername: () => null,
+            getServerCampaignBootstrap: async () => ({ status: 200,
+                body: { campaignId: 'numbered-v1', stages: [{ trackKey: 'nightLoop' }] } }),
+            describeStoredSeries: () => { order.push('series'); return []; },
+            describeStoredTracks: describeTracks,
+            confirmStoredCatalog,
+        }).get['/api/campaign/bootstrap']({ query: {} }, campaign);
+        expect(order).toEqual(['confirm', 'series', 'describe']);
+        expect(campaign.body.storedTracks).toEqual([stored]);
+
+        order.length = 0;
+        const headToHead = responseRecorder();
+        await routeHandlers(registerHeadToHeadRoutes, {
+            describeStoredTracks: describeTracks,
+            confirmStoredCatalog,
+            getHeadToHeadRequestContext: () => ({ username: null }),
+            readContextPostData: () => null,
+            getHeadToHead: async () => ({ status: 200, body: { challenge: { trackKey: 'nightLoop' } } }),
+        }).get['/api/head-to-head']({ query: {} }, headToHead);
+        expect(order).toEqual(['confirm', 'describe']);
+        expect(headToHead.body.storedTracks).toEqual([stored]);
+    });
+
+    it('answers 503 when the Campaign or Head to Head confirmation fails', async () => {
+        const confirmStoredCatalog = async () => { throw new TrackPlacementRetryError('The tracks could not load. Try again.'); };
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            const campaign = responseRecorder();
+            await routeHandlers(registerCampaignRoutes, {
+                getRequestUsername: () => null,
+                getServerCampaignBootstrap: async () => ({ status: 200, body: { campaignId: 'numbered-v1' } }),
+                describeStoredTracks,
+                confirmStoredCatalog,
+            }).get['/api/campaign/bootstrap']({ query: {} }, campaign);
+            expect(campaign.statusCode).toBe(503);
+            expect(campaign.body).toEqual({ error: 'The tracks could not load. Try again.' });
+
+            const headToHead = responseRecorder();
+            await routeHandlers(registerHeadToHeadRoutes, {
+                describeStoredTracks,
+                confirmStoredCatalog,
+                getHeadToHeadRequestContext: () => ({ username: null }),
+                readContextPostData: () => null,
+                getHeadToHead: async () => ({ status: 200, body: { challenge: { trackKey: 'nightLoop' } } }),
+            }).get['/api/head-to-head']({ query: {} }, headToHead);
+            expect(headToHead.statusCode).toBe(503);
+        } finally { log.mockRestore(); }
+    });
 });

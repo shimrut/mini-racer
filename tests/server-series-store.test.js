@@ -45,6 +45,7 @@ vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext })
 
 const series = await import('../src/server/campaign/series-store.ts');
 const tracks = await import('../src/server/tracks/track-store.ts');
+const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { getCampaignSeries, CAMPAIGN_ALL_SERIES } = await import('../game/campaign/manifest.js');
 const { setStoredSeriesResolver } = await import('../game/campaign/stored-series.js');
 const { setStoredTrackResolver } = await import('../game/track/stored-tracks.js');
@@ -56,8 +57,7 @@ async function saveTrack(key, name) {
 }
 
 async function reload() {
-    await tracks.ensureStoredTracksLoaded();
-    await series.ensureStoredSeriesLoaded();
+    await ensureStoredCatalogLoaded();
 }
 
 const draft = {
