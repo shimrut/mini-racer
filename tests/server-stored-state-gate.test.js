@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ensureStoredCatalogLoaded = vi.fn(async () => {});
+const mockContext = vi.hoisted(() => ({ subredditId: 't5_gate' }));
+
+vi.mock('@devvit/web/server', async (importOriginal) => ({
+    ...(await importOriginal()),
+    context: mockContext,
+}));
 
 vi.mock('../src/server/tracks/stored-catalog.ts', () => ({
     ensureStoredCatalogLoaded,
@@ -10,6 +16,8 @@ vi.mock('../src/server/tracks/stored-catalog.ts', () => ({
 const { createServerApp } = await import('../src/server/server-app.ts');
 const { registerAnalyticsRoutes } = await import('../src/server/routes/analytics-routes.ts');
 const { registerCampaignRoutes } = await import('../src/server/routes/campaign-routes.ts');
+const seriesStore = await import('../src/server/campaign/series-store.ts');
+const { CAMPAIGN_SERIES } = await import('../game/campaign/manifest.js');
 
 const openServers = new Set();
 
@@ -109,5 +117,62 @@ describe('the stored catalog gate', () => {
         expect((await fetch(`${baseUrl}/api/analytics/race-start`)).status).toBe(503);
         expect((await fetch(`${baseUrl}/api/some/new-route`)).status).toBe(503);
         expect(dependencies.analytics.getServerAnalyticsSummary).not.toHaveBeenCalled();
+    });
+});
+
+describe('one series list for each request', () => {
+    function oneStageSeries(id, trackKey) {
+        return Object.freeze({ id, name: id, ground: 'tarmac', stages: [{ trackKey, laps: 1, requiredMedals: 0 }] });
+    }
+
+    afterEach(() => seriesStore.clearStoredSeriesCacheForTests());
+
+    it('gives a route the list it started with, while a later request gets the newer list', async () => {
+        const night = oneStageSeries('night-v1', 'babylonRace');
+        const dawn = oneStageSeries('dawn-v1', 'smallSteps');
+        seriesStore.clearStoredSeriesCacheForTests();
+        seriesStore.publishStoredSeriesSnapshot('t5_gate', { revision: '1', published: Object.freeze([night]) });
+        const ids = () => CAMPAIGN_SERIES.map((series) => series.id);
+        let reachedGate;
+        const reached = new Promise((resolve) => { reachedGate = resolve; });
+        let releaseGate;
+        const gate = new Promise((resolve) => { releaseGate = resolve; });
+        const app = createServerApp({
+            registerRoutes: (instance) => {
+                instance.get('/api/test/series', async (req, res) => {
+                    const before = ids();
+                    if (req.query.wait) {
+                        reachedGate();
+                        await gate;
+                    }
+                    res.json({ before, after: ids() });
+                });
+            },
+        });
+        const server = app.listen(0, '127.0.0.1');
+        openServers.add(server);
+        await new Promise((resolve, reject) => {
+            server.once('listening', resolve);
+            server.once('error', reject);
+        });
+        const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+        const first = fetch(`${baseUrl}/api/test/series?wait=1`).then((response) => response.json());
+        await reached;
+        // Another request refreshed the cache with a newly published series.
+        seriesStore.publishStoredSeriesSnapshot('t5_gate', { revision: '2', published: Object.freeze([night, dawn]) });
+        const second = await (await fetch(`${baseUrl}/api/test/series`)).json();
+        releaseGate();
+
+        expect(await first).toEqual({
+            before: ['numbered-v1', 'night-v1'],
+            after: ['numbered-v1', 'night-v1'],
+        });
+        expect(second).toEqual({
+            before: ['numbered-v1', 'night-v1', 'dawn-v1'],
+            after: ['numbered-v1', 'night-v1', 'dawn-v1'],
+        });
+        // Code outside a request reads the cache.
+        expect(ids()).toEqual(['numbered-v1', 'night-v1', 'dawn-v1']);
     });
 });

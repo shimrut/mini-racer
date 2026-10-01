@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { redis, type TxClientLike } from '@devvit/redis';
 import { context } from '@devvit/web/server';
 import seriesData from '../../../game/campaign/series.json' with { type: 'json' };
@@ -125,9 +126,31 @@ function readInstallScope(): string | null {
     }
 }
 
-export function resolveStoredSeriesForRequest(): readonly StoredSeriesDefinition[] {
+function cachedPublishedSeries(): readonly StoredSeriesDefinition[] {
     const scope = readInstallScope();
     return scope ? cacheByInstall.get(scope)?.published ?? EMPTY : EMPTY;
+}
+
+// Each request reads one fixed copy of the published series, taken when it
+// starts. Another request can refresh the cache meanwhile; this request
+// keeps its own list, so its reads of the series always agree.
+type PinnedSeries = { published: readonly StoredSeriesDefinition[] };
+const pinnedSeries = new AsyncLocalStorage<PinnedSeries>();
+
+export function resolveStoredSeriesForRequest(): readonly StoredSeriesDefinition[] {
+    return pinnedSeries.getStore()?.published ?? cachedPublishedSeries();
+}
+
+// Every call makes its own holder, so two requests never share one.
+export function runWithPinnedStoredSeries<T>(run: () => T): T {
+    return pinnedSeries.run({ published: cachedPublishedSeries() }, run);
+}
+
+// Takes the current cache as this request's list from now on. It changes
+// only this request's holder. Outside a request it does nothing.
+export function repinStoredSeries(): void {
+    const pinned = pinnedSeries.getStore();
+    if (pinned) pinned.published = cachedPublishedSeries();
 }
 
 export function installStoredSeriesResolver(): void {

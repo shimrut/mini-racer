@@ -85,10 +85,10 @@ export const CAMPAIGN_HAS_SERIES_CHOICE = APP_SERIES.filter((series) => series.l
 
 // The app series with the published stored series. A stored series replaces
 // the app series with the same name, but never Numbers. New stored series
-// come after the app series. The lists are built again only after the stored
-// list changes.
-let builtFromDefinitions = null;
-let views = null;
+// come after the app series. Each stored list is built once: on the server,
+// requests that run at the same time can read different lists, and each one
+// keeps the same stages until it ends.
+const viewsByDefinitions = new WeakMap();
 
 function buildStoredSeries(definitions) {
     return definitions.flatMap((definition) => {
@@ -104,7 +104,8 @@ function buildStoredSeries(definitions) {
 
 function currentViews() {
     const definitions = getStoredSeriesDefinitions();
-    if (views && definitions === builtFromDefinitions) return views;
+    const built = viewsByDefinitions.get(definitions);
+    if (built) return built;
     const stored = buildStoredSeries(definitions);
     const storedById = new Map(stored.map((series) => [series.id, series]));
     const appIds = new Set(APP_SERIES.map((series) => series.id));
@@ -114,14 +115,14 @@ function currentViews() {
     ]);
     const live = Object.freeze(all.filter((series) => series.live));
     const liveStages = Object.freeze(live.flatMap((series) => series.stages));
-    builtFromDefinitions = definitions;
-    views = {
+    const views = {
         all,
         live,
         liveStages,
         seriesById: new Map(live.map((series) => [series.id, series])),
         stageByRaceId: new Map(liveStages.map((stage) => [stage.raceId, stage])),
     };
+    viewsByDefinitions.set(definitions, views);
     return views;
 }
 

@@ -86,6 +86,7 @@ import {
     publishStoredSeries,
     readStoredSeries,
     resolveStoredSeriesForRequest,
+    runWithPinnedStoredSeries,
     saveStoredSeries,
 } from './campaign/series-store.js';
 import { findSeriesUsingTrack } from './campaign/series-usage.js';
@@ -352,7 +353,8 @@ export function createServerApp({
             res.status(503).json({ error: 'The tracks could not load. Try again.' });
             return;
         }
-        next();
+        // The route reads one fixed series list from here to its end.
+        runWithPinnedStoredSeries(next);
     });
     registerRoutes(app);
     return app;
