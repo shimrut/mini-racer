@@ -23,6 +23,7 @@ const mockRedis = {
         return next;
     }),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? new Map())),
+    hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
     hSet: vi.fn(async (key, fields) => {
         const hash = hashes.get(key) ?? new Map();
         Object.entries(fields).forEach(([field, value]) => hash.set(field, value));
@@ -43,6 +44,7 @@ vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext })
 const store = await import('../src/server/tracks/track-store.ts');
 const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
 const { TrackInputError } = await import('../src/server/tracks/track-shape.ts');
+const { TrackPlacementRetryError } = await import('../src/server/tracks/track-placement-lock.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
 const { getTrackMedalThresholds } = await import('../game/medals/medal-timing.js');
 const { setStoredTrackResolver } = await import('../game/track/stored-tracks.js');
@@ -120,6 +122,53 @@ describe('stored track store', () => {
         const placed = await store.readPlacedStoredTracks(['nightCut', 'missingTrack']);
         expect(placed.map((entry) => entry.key)).toEqual(['nightCut']);
         expect(placed[0].medalRow).toMatchObject({ gold: 9.4, author: 9.1 });
+    });
+
+    it('reads only the asked tracks, with one index read and one record read', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
+        await store.lockStoredTrack('nightCut', 'daily');
+        vi.clearAllMocks();
+
+        const placed = await store.readPlacedStoredTracks(['nightCut', 'roughCut']);
+
+        expect(placed.map((entry) => entry.key)).toEqual(['nightCut']);
+        expect(mockRedis.hMGet).toHaveBeenCalledTimes(1);
+        expect(mockRedis.mGet).toHaveBeenCalledTimes(1);
+        expect(mockRedis.hGetAll).not.toHaveBeenCalled();
+    });
+
+    it('answers retry, never absent, when the index and a record disagree', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
+        await store.lockStoredTrack('nightCut', 'daily');
+        // A record without its index field: a placement between the reads, or a broken list.
+        hashes.get('dailygp:tracks:v1:index').delete('nightCut');
+        await expect(store.readPlacedStoredTracks(['nightCut']))
+            .rejects.toBeInstanceOf(TrackPlacementRetryError);
+
+        // An index field with a damaged record.
+        hashes.get('dailygp:tracks:v1:index').set('nightCut', '2');
+        strings.set('dailygp:tracks:v1:track:nightCut', '{broken');
+        await expect(store.readPlacedStoredTracks(['nightCut']))
+            .rejects.toBeInstanceOf(TrackPlacementRetryError);
+        expect(mockRedis.hMGet).toHaveBeenCalledTimes(4);
+    });
+
+    it('reads again when a placement lands between the two reads', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
+        await store.lockStoredTrack('nightCut', 'daily');
+        const index = hashes.get('dailygp:tracks:v1:index');
+        const revision = index.get('nightCut');
+        index.delete('nightCut');
+        // The first index read misses the new field; the record is already there.
+        mockRedis.hMGet.mockImplementationOnce(async (key, fields) => {
+            const values = fields.map(() => null);
+            index.set('nightCut', revision);
+            return values;
+        });
+
+        const placed = await store.readPlacedStoredTracks(['nightCut']);
+
+        expect(placed.map((entry) => entry.key)).toEqual(['nightCut']);
     });
 
     it('deletes an unlocked track that no list uses', async () => {

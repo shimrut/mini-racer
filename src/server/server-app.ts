@@ -325,10 +325,13 @@ function registerProductionRoutes(app: express.Application): void {
     });
 }
 
-// Routes that read no track and no series. Match the method and the exact path.
+// Routes that need no catalog load: they read no track and no series, or they
+// read their own tracks. Match the method and the exact path.
 const CATALOG_FREE_ROUTES = new Set([
     'POST /api/analytics/race-start',
     'POST /api/analytics/podium',
+    // Reads its own index fields and records, and checks that they agree.
+    'GET /api/tracks/stored',
 ]);
 
 export function createServerApp({

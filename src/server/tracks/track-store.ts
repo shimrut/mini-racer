@@ -18,7 +18,7 @@ import {
 } from './track-shape.js';
 
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/redis-lock.js';
-import { withTrackPlacementLock, commitTrackPlacement } from './track-placement-lock.js';
+import { TrackPlacementRetryError, withTrackPlacementLock, commitTrackPlacement } from './track-placement-lock.js';
 import { getTrackCompletenessError } from './track-readiness.js';
 import { isTrackInDailySchedule } from '../daily/daily-schedule-store.js';
 import { findSeriesUsingTrack, readSeriesGround } from '../campaign/series-usage.js';
@@ -181,19 +181,30 @@ export function installStoredTrackResolver(): void {
     setStoredTrackResolver(resolveStoredTrackForRequest);
 }
 
-async function readRecords(trackKeys: string[]): Promise<Map<string, StoredTrackRecord>> {
-    const records = new Map<string, StoredTrackRecord>();
+// The raw record of each key, in the order of the keys. The batches go out
+// at the same time.
+async function readRecordValues(trackKeys: string[]): Promise<(string | null)[]> {
+    const batches: string[][] = [];
     for (let index = 0; index < trackKeys.length; index += LOAD_BATCH_SIZE) {
-        const batch = trackKeys.slice(index, index + LOAD_BATCH_SIZE);
-        const values = await redis.mGet(batch.map(recordKey));
-        if (!Array.isArray(values) || values.length !== batch.length) {
+        batches.push(trackKeys.slice(index, index + LOAD_BATCH_SIZE));
+    }
+    const values = await Promise.all(batches.map(async (batch) => {
+        const batchValues = await redis.mGet(batch.map(recordKey));
+        if (!Array.isArray(batchValues) || batchValues.length !== batch.length) {
             throw new Error('The stored tracks could not be read.');
         }
-        batch.forEach((trackKey, offset) => {
-            const record = parseRecord(values[offset]);
-            if (record?.key === trackKey) records.set(trackKey, record);
-        });
-    }
+        return batchValues;
+    }));
+    return values.flat().map((value) => value ?? null);
+}
+
+async function readRecords(trackKeys: string[]): Promise<Map<string, StoredTrackRecord>> {
+    const records = new Map<string, StoredTrackRecord>();
+    const values = await readRecordValues(trackKeys);
+    trackKeys.forEach((trackKey, index) => {
+        const record = parseRecord(values[index]);
+        if (record?.key === trackKey) records.set(trackKey, record);
+    });
     return records;
 }
 
@@ -277,13 +288,42 @@ export async function listStoredTracks(): Promise<StoredTrackSummary[]> {
 
 // Players see a stored track only after it is placed: a Daily or a published
 // series locks it. A track that is still being made stays private.
+// The placed stored tracks among these keys. The index and the records are
+// read at the same time, so the two reads must agree. A key is absent, and
+// the app track is valid, only when it has no index field and no record.
+// A field without a matching record, or a record without a field, is a write
+// between the reads or a broken record. The reads run once more, and then the
+// answer is "retry", never "absent".
 export async function readPlacedStoredTracks(trackKeys: string[]): Promise<StoredTrackEntry[]> {
     const keys = [...new Set(trackKeys.filter((trackKey) => TRACK_KEY_RE.test(trackKey)))];
-    const records = await readRecords(keys);
-    return keys.flatMap((trackKey) => {
-        const record = records.get(trackKey);
-        return record?.lockedAt ? [toEntry(record)] : [];
-    });
+    if (!keys.length) return [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const [revisions, values] = await Promise.all([
+            redis.hMGet(INDEX_KEY, keys),
+            readRecordValues(keys),
+        ]);
+        const entries = agreeingPlacedEntries(keys, revisions, values);
+        if (entries) return entries;
+    }
+    throw new TrackPlacementRetryError('The tracks could not load. Try again.');
+}
+
+function agreeingPlacedEntries(
+    keys: string[],
+    revisions: (string | null | undefined)[] | null | undefined,
+    values: (string | null)[],
+): StoredTrackEntry[] | null {
+    if (!Array.isArray(revisions) || revisions.length !== keys.length) return null;
+    const entries: StoredTrackEntry[] = [];
+    for (const [index, trackKey] of keys.entries()) {
+        const revision = revisions[index] ?? null;
+        const raw = values[index];
+        if (revision === null && raw === null) continue;
+        const record = parseRecord(raw);
+        if (revision === null || record?.key !== trackKey || String(record.revision) !== revision) return null;
+        if (record.lockedAt) entries.push(toEntry(record));
+    }
+    return entries;
 }
 
 // ---- Writes ----

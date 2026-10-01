@@ -13,6 +13,7 @@ const known = {
     del: vi.fn(async (...keys) => { keys.flat().forEach((key) => strings.delete(key)); }),
     mGet: vi.fn(async (keys) => keys.map((key) => strings.get(key) ?? null)),
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field) ?? null),
+    hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? new Map())),
     hSet: vi.fn(async (key, fields) => {
         const hash = hashes.get(key) ?? new Map();

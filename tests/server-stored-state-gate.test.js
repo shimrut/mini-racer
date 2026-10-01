@@ -16,7 +16,9 @@ vi.mock('../src/server/tracks/stored-catalog.ts', () => ({
 const { createServerApp } = await import('../src/server/server-app.ts');
 const { registerAnalyticsRoutes } = await import('../src/server/routes/analytics-routes.ts');
 const { registerCampaignRoutes } = await import('../src/server/routes/campaign-routes.ts');
+const { registerTrackRoutes } = await import('../src/server/routes/track-routes.ts');
 const seriesStore = await import('../src/server/campaign/series-store.ts');
+const { TrackPlacementRetryError } = await import('../src/server/tracks/track-placement-lock.ts');
 const { CAMPAIGN_SERIES } = await import('../game/campaign/manifest.js');
 
 const openServers = new Set();
@@ -54,6 +56,9 @@ function services() {
             recordRaceStart: vi.fn(async () => {}),
             recordPodiumEvent: vi.fn(async () => {}),
         },
+        tracks: {
+            readPlacedStoredTracks: vi.fn(async () => []),
+        },
     };
 }
 
@@ -62,6 +67,7 @@ async function startApp(dependencies) {
         registerRoutes: (instance) => {
             registerCampaignRoutes(instance, dependencies.campaign);
             registerAnalyticsRoutes(instance, dependencies.analytics);
+            registerTrackRoutes(instance, dependencies.tracks);
         },
     });
     const server = app.listen(0, '127.0.0.1');
@@ -106,6 +112,23 @@ describe('the stored catalog gate', () => {
         const telemetry = await post(`${baseUrl}/api/telemetry/journey/app-ready`, {});
         expect(telemetry.status).not.toBe(503);
         expect(ensureStoredCatalogLoaded).not.toHaveBeenCalled();
+    });
+
+    it('lets the stored tracks request read its own tracks without the catalog', async () => {
+        ensureStoredCatalogLoaded.mockRejectedValue(new Error('redis: timeout'));
+        const dependencies = services();
+        const baseUrl = await startApp(dependencies);
+        const response = await fetch(`${baseUrl}/api/tracks/stored?keys=nightCut,roughCut`);
+        expect(response.status).toBe(200);
+        expect(dependencies.tracks.readPlacedStoredTracks).toHaveBeenCalledWith(['nightCut', 'roughCut']);
+        expect(ensureStoredCatalogLoaded).not.toHaveBeenCalled();
+    });
+
+    it('answers retry when the stored tracks disagree', async () => {
+        const dependencies = services();
+        dependencies.tracks.readPlacedStoredTracks.mockRejectedValue(new TrackPlacementRetryError('The tracks could not load. Try again.'));
+        const baseUrl = await startApp(dependencies);
+        expect((await fetch(`${baseUrl}/api/tracks/stored?keys=nightCut`)).status).toBe(503);
     });
 
     it('keeps the analytics summaries, other methods and unknown routes behind the gate', async () => {
