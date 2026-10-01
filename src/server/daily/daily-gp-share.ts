@@ -30,6 +30,7 @@ import {
 } from '../redis/redis-lock.js';
 import { normalizeName } from '../shared/value-guards.js';
 import { checkFixedWindowRateLimit } from '../request/rate-limit.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 export { normalizeName as normalizeShareName };
 
@@ -483,6 +484,7 @@ export async function previewDailyGpShare(
     if (!post) {
         return { status: 404, body: { status: 'post_unavailable', error: 'The post for this race day is unavailable.' } };
     }
+    await loadStoredTracks([result.challenge.trackKey]);
     const lapCount = result.challenge.objectiveParams.lapCount;
     const medal = getMedalForRaceTime(
         result.challenge.trackKey,

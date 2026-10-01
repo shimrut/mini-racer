@@ -17,14 +17,16 @@ export type CampaignRouteDependencies = {
     // The published Creator series, and the placed stored tracks among these keys.
     describeStoredSeries?(): readonly { stages: readonly { trackKey: string }[] }[];
     describeStoredTracks?(trackKeys: string[]): unknown[];
-    // Loads the stored tracks and series again, after the answer is built.
-    confirmStoredCatalog?(): Promise<void>;
+    // Reads the catalog again after the answer is built, then loads the
+    // tracks that the answer names.
+    refreshStoredCatalog?(): Promise<void>;
+    loadStoredTracks?(trackKeys: string[]): Promise<void>;
 };
 
 // The Campaign answer carries the published Creator series and their stored
 // tracks, so the game can show them without a second request.
 async function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): Promise<ServiceResult> {
-    await dependencies.confirmStoredCatalog?.();
+    await dependencies.refreshStoredCatalog?.();
     const storedSeries = dependencies.describeStoredSeries?.() ?? [];
     if (!result.body || typeof result.body !== 'object') return result;
     const stages = (result.body as { stages?: { trackKey?: unknown }[] }).stages;
@@ -32,6 +34,7 @@ async function withStoredSeries(result: ServiceResult, dependencies: CampaignRou
         ...storedSeries.flatMap((series) => series.stages.map((stage) => stage.trackKey)),
         ...(Array.isArray(stages) ? stages.flatMap((stage) => typeof stage?.trackKey === 'string' ? [stage.trackKey] : []) : []),
     ])];
+    await dependencies.loadStoredTracks?.(trackKeys);
     const storedTracks = dependencies.describeStoredTracks?.(trackKeys) ?? [];
     return {
         ...result,

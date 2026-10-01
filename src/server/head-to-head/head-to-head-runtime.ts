@@ -2,6 +2,7 @@ import { getCampaignStage, isCampaignStageUnlocked } from '../../../game/campaig
 import { getMedalForRaceTime } from '../../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../../game/race/race-spec.js';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 import {
     getCampaignProgressForSelection,
     repairCampaignStandingsFromEntries,
@@ -49,6 +50,7 @@ export async function resolveHeadToHeadSource(
                 id: { sourceKind: 'daily' as const, sourceId: daily.id, origin: { mode: 'daily' as const, challengeId: daily.id } },
             }
             : null;
+    if (race) await loadStoredTracks([race.competition.trackKey]);
     const track = race ? TRACKS[race.competition.trackKey] : null;
     if (!race || !track || input.replay == null) return null;
     const { competition } = race;
@@ -164,6 +166,7 @@ export async function recordHeadToHeadBest(
     replay: unknown,
     context: HeadToHeadBestContext = {},
 ): Promise<HeadToHeadBestUpdate | null> {
+    await loadStoredTracks([challenge.trackKey]);
     const origin = getHeadToHeadOrigin(challenge);
     if (!origin || replay == null) return null;
     const identity = {
@@ -261,6 +264,7 @@ export async function readHeadToHeadViewerBest(
     playerId: string | null,
 ): Promise<HeadToHeadViewerBest | null> {
     if (!playerId) return null;
+    await loadStoredTracks([challenge.trackKey]);
     const origin = getHeadToHeadOrigin(challenge);
     let progressBestTimeMs: number | null = null;
     if (origin?.mode === 'campaign') {

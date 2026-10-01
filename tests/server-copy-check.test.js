@@ -49,7 +49,7 @@ const { runCopyUndo, readCopyUndoReport } = await import('../src/server/tracks/c
 const { runTrackMigration } = await import('../src/server/tracks/track-migration.ts');
 const { readDailySchedule } = await import('../src/server/daily/daily-schedule-store.ts');
 const { getTrackDefinitionIdentity } = await import('../game/track/definition-identity.js');
-const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
+const { ensureStoredCatalogLoaded, loadStoredTracks } = await import('../src/server/tracks/stored-catalog.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
 const appMedalTimes = (await import('../game/medals/medal-times.json', { with: { type: 'json' } })).default;
 const smallSteps = (await import('../game/track/definitions/small-steps.js')).default;
@@ -164,6 +164,7 @@ describe('the copy undo', () => {
         const copied = (await runPlayedDailyCopy({ username: 'Mod', now: noon })).copied;
         tracks.installStoredTrackResolver();
         await ensureStoredCatalogLoaded();
+        await loadStoredTracks(['smallSteps']);
         expect(tracks.resolveStoredTrackForRequest('smallSteps')).not.toBeNull();
         const broken = copied.find((key) => key !== 'smallSteps');
         const record = JSON.parse(strings.get(`dailygp:tracks:v1:track:${broken}`));

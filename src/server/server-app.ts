@@ -96,12 +96,13 @@ import {
     describePlacedStoredTracks,
     installStoredTrackResolver,
     listStoredTrackRecords,
+    runWithPinnedStoredTracks,
     listStoredTracks,
     readPlacedStoredTracks,
     readStoredTrack,
     saveStoredTrack,
 } from './tracks/track-store.js';
-import { ensureStoredCatalogLoaded } from './tracks/stored-catalog.js';
+import { ensureStoredCatalogLoaded, loadStoredTracks, reloadPinnedCatalog } from './tracks/stored-catalog.js';
 import { readCopyCheck, runCopyCheck } from './tracks/copy-check.js';
 import { readCopyUndoReport, runCopyUndo } from './tracks/copy-undo.js';
 import {
@@ -253,11 +254,13 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
         describeStoredSeries: resolveStoredSeriesForRequest,
         describeStoredTracks: describePlacedStoredTracks,
-        confirmStoredCatalog: ensureStoredCatalogLoaded,
+        refreshStoredCatalog: reloadPinnedCatalog,
+        loadStoredTracks,
     });
     registerHeadToHeadRoutes(app, {
         describeStoredTracks: describePlacedStoredTracks,
-        confirmStoredCatalog: ensureStoredCatalogLoaded,
+        refreshStoredCatalog: reloadPinnedCatalog,
+        loadStoredTracks,
         getHeadToHeadRequestContext: () => ({
             username: getRequestUsername(),
             userId: getRequestUserId(),
@@ -293,7 +296,8 @@ function registerProductionRoutes(app: express.Application): void {
         submitServerDailyGpRun: (input) => submitServerDailyGpRun(input),
         isDailyGpChallengePlayable,
         describeStoredTracks: describePlacedStoredTracks,
-        confirmStoredCatalog: ensureStoredCatalogLoaded,
+        refreshStoredCatalog: reloadPinnedCatalog,
+        loadStoredTracks,
     });
     registerShareRoutes(app, {
         getDailyGpShareRequestContext,
@@ -356,8 +360,9 @@ export function createServerApp({
             res.status(503).json({ error: 'The tracks could not load. Try again.' });
             return;
         }
-        // The route reads one fixed series list from here to its end.
-        runWithPinnedStoredSeries(next);
+        // The route reads one fixed track list and series list from here to
+        // its end.
+        runWithPinnedStoredSeries(() => runWithPinnedStoredTracks(next));
     });
     registerRoutes(app);
     return app;

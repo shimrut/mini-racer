@@ -156,7 +156,7 @@ export function generateTracksRegistrySource(catalogKeys) {
             `import ${trackKey} from './definitions/${getTrackModuleFilename(trackKey)}';`
         )),
         "import { TRACK_CATALOG } from './catalog.js';",
-        "import { getStoredTrack } from './stored-tracks.js';",
+        "import { getStoredTrack, isStoredTrack } from './stored-tracks.js';",
         '',
         'const TRACK_GEOMETRY = {',
         ...catalogKeys.map((trackKey) => `    ${trackKey},`),
@@ -179,7 +179,7 @@ export function generateTracksRegistrySource(catalogKeys) {
         '        return stored?.track ?? Reflect.get(target, trackKey, receiver);',
         '    },',
         '    has(target, trackKey) {',
-        "        return (typeof trackKey === 'string' && Boolean(getStoredTrack(trackKey)?.track))",
+        "        return (typeof trackKey === 'string' && isStoredTrack(trackKey))",
         '            || Reflect.has(target, trackKey);',
         '    },',
         '});',

@@ -10,6 +10,7 @@ import { readPlayerProfileMap } from './competition-identity.js';
 import { getPlayerTrackPbRecord, getPlayerTrackPbRecords } from './pb-ghost-store.js';
 import { resolveLeaderboardDisplayName } from '../../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 const OPPONENT_WINDOW_SIZE = 10;
 const OPPONENT_WINDOW_LIMIT = 6;
@@ -87,6 +88,7 @@ export async function prepareCompetitionOpponentRace({
     race: unknown;
     selection?: unknown;
 }) {
+    await loadStoredTracks([competition.trackKey]);
     if (!playerId) {
         return {
             status: 401,

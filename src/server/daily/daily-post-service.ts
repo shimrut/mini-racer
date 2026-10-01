@@ -24,6 +24,7 @@ import {
 } from '../request/request-context.js';
 import { resolveMiniRacerPostFlairId } from '../posts/post-flair-service.js';
 import { resolveDailyShareImageUrl } from '../posts/share-image.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 export type DailyPostResult = {
     created: boolean;
@@ -47,6 +48,8 @@ async function submitDailyMiniRacerPost(
     challenge: DailyGpChallenge,
     appSlug: string,
 ) {
+    // The title and the text read the track's name and medal times.
+    await loadStoredTracks([challenge.trackKey]);
     const shareImageUrl = resolveDailyShareImageUrl(challenge.trackKey);
     const flairId = await resolveMiniRacerPostFlairId(subredditName, 'daily-race');
     const post = await reddit.submitCustomPost({

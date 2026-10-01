@@ -16,9 +16,11 @@ export type CompetitionRouteDependencies = {
     getServerDailyGpSnapshot(input: Record<string, unknown>): Promise<unknown>;
     submitServerDailyGpRun(input: Record<string, unknown>): Promise<ServiceResult>;
     isDailyGpChallengePlayable(challenge: DailyGpChallenge): boolean;
-    // Loads the stored tracks again, after the answer knows which challenge
-    // it names: another server can place that Daily after this request began.
-    confirmStoredCatalog?(): Promise<void>;
+    // Reads the catalog again after the answer knows which challenge it names,
+    // since another server can place that Daily after this request began,
+    // then loads the tracks that it names.
+    refreshStoredCatalog?(): Promise<void>;
+    loadStoredTracks?(trackKeys: string[]): Promise<void>;
     // The placed stored tracks among these keys, so the game can load them.
     describeStoredTracks?(trackKeys: string[]): unknown[];
 };
@@ -79,7 +81,8 @@ export function registerCompetitionRoutes(
             const challenge = postBound && dependencies.isDailyGpChallengePlayable(postBound)
                 ? postBound
                 : await dependencies.getServerDailyGpChallenge();
-            await dependencies.confirmStoredCatalog?.();
+            await dependencies.refreshStoredCatalog?.();
+            await dependencies.loadStoredTracks?.([challenge.trackKey]);
             const storedTracks = dependencies.describeStoredTracks?.([challenge.trackKey]) ?? [];
             res.status(200).json(dependencies.describeStoredTracks ? { ...challenge, storedTracks } : challenge);
         } catch (error) {
@@ -93,10 +96,10 @@ export function registerCompetitionRoutes(
     app.get('/api/daily/playlist', async (_req, res) => {
         try {
             const challenges = await dependencies.getServerDailyGpPlaylist();
-            await dependencies.confirmStoredCatalog?.();
-            const storedTracks = dependencies.describeStoredTracks?.(
-                challenges.map((challenge) => challenge.trackKey),
-            ) ?? [];
+            const trackKeys = challenges.map((challenge) => challenge.trackKey);
+            await dependencies.refreshStoredCatalog?.();
+            await dependencies.loadStoredTracks?.(trackKeys);
+            const storedTracks = dependencies.describeStoredTracks?.(trackKeys) ?? [];
             res.status(200).json(dependencies.describeStoredTracks ? { challenges, storedTracks } : { challenges });
         } catch (error) {
             console.error('Failed to load Reddit Mini Racer daily playlist:', error);

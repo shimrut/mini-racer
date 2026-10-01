@@ -8,7 +8,7 @@ import {
 } from '../../../game/track/catalog.js';
 import { readDailySchedulePool } from './daily-schedule-store.js';
 import { queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
-import { ensureStoredCatalogLoaded, reloadPinnedCatalog } from '../tracks/stored-catalog.js';
+import { loadStoredTracks, reloadPinnedCatalog } from '../tracks/stored-catalog.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { withTrackPlacementLock, commitTrackPlacement, TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import { TRACKS } from '../../../game/track/tracks.js';
@@ -701,6 +701,12 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
     }
 }
 
+// Loads the stored tracks that these Dailies race, in one read, before the
+// request reads their layout, name or medal times.
+async function loadChallengeTracks(challenges: readonly (DailyGpChallenge | null | undefined)[]): Promise<void> {
+    await loadStoredTracks(challenges.map((challenge) => challenge?.trackKey));
+}
+
 async function readStoredDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
     const raw = await redis.hGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challengeId);
     return parseStoredChallenge(raw);
@@ -794,7 +800,8 @@ async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: numbe
     await maintainChallengeHistory();
     // The placement is committed. If the catalog cannot load now, the retry
     // finds the stored Daily, and its answer confirms the catalog again.
-    await ensureStoredCatalogLoaded();
+    await reloadPinnedCatalog();
+    await loadChallengeTracks([result]);
     return result;
 }
 
@@ -805,6 +812,7 @@ async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise
 async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
     const stored = await readStoredDailyGpChallenge(challengeId);
     if (stored) {
+        await loadChallengeTracks([stored]);
         return stored;
     }
 
@@ -813,7 +821,9 @@ async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Prom
         return null;
     }
 
-    return writeStoredDailyGpChallenge(backfilled);
+    const written = await writeStoredDailyGpChallenge(backfilled);
+    await loadChallengeTracks([written]);
+    return written;
 }
 
 // Every stored Daily, oldest first. The history keeps each day for 50 years.
@@ -846,6 +856,8 @@ function isScheduleTrackLive(trackKey: string): boolean {
 
 async function pickNextTrackKeyForToday(todayStartsAt: Date): Promise<string> {
     const pool = await readDailySchedulePool();
+    // About once a day: the pick reads the ground of every scheduled track.
+    await loadStoredTracks([...pool, DEFAULT_TRACK_KEY]);
     if (pool.length === 0) {
         return DEFAULT_TRACK_KEY;
     }
@@ -904,9 +916,12 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
         return stored;
     }
 
+    await loadStoredTracks([DEFAULT_TRACK_KEY]);
     const challenge = buildDailyGpChallengeForDayIndexWithTrack(dayIndex, DEFAULT_TRACK_KEY);
 
-    return commitDailyChallenge(challenge, dayIndex);
+    const committed = await commitDailyChallenge(challenge, dayIndex);
+    await loadChallengeTracks([committed]);
+    return committed;
 }
 
 export async function persistServerDailyGpChallenge(challenge: DailyGpChallenge): Promise<DailyGpChallenge> {
@@ -1058,6 +1073,7 @@ async function resolveGuestTransferDailyChallenges(challengeIds?: string[]): Pro
         parseStoredChallenge(storedRaw[index])
             ?? getServerDailyGpChallengeById(challengeId, { persistFallback: false })
     )));
+    await loadChallengeTracks(challenges);
     if (challenges.some((challenge) => !challenge || !TRACKS[challenge.trackKey])) {
         throw guestProgressRecoveryRequiredError();
     }
@@ -1267,6 +1283,7 @@ export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyG
         }
     }
 
+    await loadChallengeTracks(challenges);
     return challenges;
 }
 
@@ -1501,6 +1518,7 @@ async function countDailyProgressResults(
     playerId: string,
     playlist: DailyGpChallenge[],
 ): Promise<number> {
+    await loadChallengeTracks(playlist);
     const perChallenge = await Promise.all(playlist.map(async (challenge) => {
         const track = TRACKS[challenge.trackKey];
         if (!track) return false;
@@ -2709,6 +2727,7 @@ export async function getServerDailyGpSnapshot({
     if (!challenge) {
         return createEmptyDailySnapshot(await getServerDailyGpChallenge());
     }
+    await loadChallengeTracks([challenge]);
 
     const identity = await resolveAuthorizedPlayerIdentity({
         playerId,

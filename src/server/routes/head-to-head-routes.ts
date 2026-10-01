@@ -10,8 +10,9 @@ export type HeadToHeadRouteDependencies = {
         | HeadToHeadRequestContext;
     // The placed stored tracks among these keys, so the game can load them.
     describeStoredTracks?(trackKeys: string[]): unknown[];
-    // Loads the stored tracks again, after the answer names its track.
-    confirmStoredCatalog?(): Promise<void>;
+    // Reads the catalog again after the answer names its track, then loads it.
+    refreshStoredCatalog?(): Promise<void>;
+    loadStoredTracks?(trackKeys: string[]): Promise<void>;
     readContextPostData(): Record<string, unknown> | null;
     previewHeadToHead(
         input: Record<string, unknown>,
@@ -79,7 +80,10 @@ async function withStoredTracks(body: unknown, dependencies: HeadToHeadRouteDepe
     if (!body || typeof body !== 'object' || !dependencies.describeStoredTracks) return body;
     const challenge = (body as { challenge?: { trackKey?: unknown } }).challenge;
     const trackKey = typeof challenge?.trackKey === 'string' ? challenge.trackKey : '';
-    if (trackKey) await dependencies.confirmStoredCatalog?.();
+    if (trackKey) {
+        await dependencies.refreshStoredCatalog?.();
+        await dependencies.loadStoredTracks?.([trackKey]);
+    }
     const storedTracks = trackKey ? dependencies.describeStoredTracks([trackKey]) : [];
     return trackKey ? { ...body, storedTracks } : body;
 }

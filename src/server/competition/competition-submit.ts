@@ -22,6 +22,7 @@ import { isProgressTransferPending } from '../player/guest-retirement.js';
 import { listRacedBoard } from '../player/raced-list.js';
 import { checkFixedWindowRateLimit, type RateLimitResult } from '../request/rate-limit.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 export const SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
 export const SUBMISSION_RATE_LIMIT_MAX_REQUESTS = 12;
@@ -149,6 +150,7 @@ export async function submitCompetitionRun(
     },
     reuse: RankedSubmitReuseOptions = {},
 ) {
+    await loadStoredTracks([competition.trackKey]);
     let releaseLock: Promise<unknown> = Promise.resolve();
 
     if (isMismatchedSubmissionOwner(playerId, submissionOwnerId)) {

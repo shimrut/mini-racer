@@ -9,6 +9,7 @@ import {
     type HeadToHeadRecord,
 } from './head-to-head-model.js';
 import { decodeHeadToHeadReplay } from './head-to-head-replay.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 import { isRecord, isRedditPostId } from '../shared/value-guards.js';
 
 export type HeadToHeadPostContext = {
@@ -252,6 +253,8 @@ export async function resolveHeadToHeadRecordResult(
             post,
             context.postId,
         );
+        // The request reads this challenge's track next.
+        if (record) await loadStoredTracks([record.trackKey]);
         return record
             ? { ok: true, record }
             : { ok: false, reason: 'post_identity_invalid' as const };

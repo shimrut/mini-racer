@@ -2,6 +2,8 @@ import { reddit } from '@devvit/web/server';
 import { redis } from '@devvit/redis';
 import { getMedalForRaceTime } from '../../../game/medals/medal-timing.js';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { hasTrack } from '../../../game/track/catalog.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 import {
     HEAD_TO_HEAD_POST_TYPE,
     isHeadToHeadMedal,
@@ -145,7 +147,7 @@ function parseCard(raw: string | null): HeadToHeadCatalogCard | null {
             || typeof parsed.challengerUsername !== 'string'
             || !parsed.challengerUsername
             || typeof parsed.trackKey !== 'string'
-            || !TRACKS[parsed.trackKey]
+            || !hasTrack(parsed.trackKey)
             || (parsed.lapCount !== 1 && parsed.lapCount !== 2 && parsed.lapCount !== 3)
             || !Number.isSafeInteger(parsed.targetTimeMs)
             || Number(parsed.targetTimeMs) <= 0
@@ -255,6 +257,8 @@ export async function upsertHeadToHeadCatalogCard(
     if (!parsed) return false;
     const cardsKey = headToHeadCatalogCardsKey(parsed.subredditName);
     const existing = parseCard(await redis.hGet(cardsKey, parsed.challengeId));
+    // The medal band reads the medal times of both cards.
+    await loadStoredTracks([parsed.trackKey, existing?.trackKey]);
     const samePost = existing?.postId === parsed.postId;
     const stored = samePost && !options?.refreshEngagement
         ? { ...parsed, commentCount: existing.commentCount, upvoteCount: existing.upvoteCount }
@@ -369,6 +373,7 @@ export async function pickNextHeadToHeadChallenge({
     if (!trackKey || (lapCount !== 1 && lapCount !== 2 && lapCount !== 3) || !Number.isSafeInteger(targetTimeMs)) {
         return null;
     }
+    await loadStoredTracks([trackKey]);
     const band = engagementBand({
         trackKey,
         lapCount,
@@ -506,6 +511,8 @@ export async function sweepHeadToHeadCatalog(
                     skipped += 1;
                     continue;
                 }
+                const postTrackKey = (postData as Record<string, unknown>).trackKey;
+                await loadStoredTracks([typeof postTrackKey === 'string' ? postTrackKey : null]);
                 const card = catalogCardFromPostData(post, postData as Record<string, unknown>);
                 if (!card) {
                     skipped += 1;

@@ -15,6 +15,7 @@ import { normalizeCheckpointTimesSec } from '../../../game/shared/checkpoint-tim
 import { resolveLeaderboardDisplayName } from '../../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { cacheSharedJson } from '../redis/shared-cache.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 const SHARED_STANDINGS_PAGE_TTL_SECONDS = 10;
 
@@ -445,6 +446,7 @@ export async function readSnapshot({
     offset: number;
     loadedProfile?: LoadedPlayerProfile;
 }): Promise<SnapshotPayload> {
+    await loadStoredTracks([competition.trackKey]);
     const sharedPage = await readSharedStandingsPage(competition, offset, limit);
     const { leaderboardEntryCount } = sharedPage;
     const totalCount = leaderboardEntryCount;

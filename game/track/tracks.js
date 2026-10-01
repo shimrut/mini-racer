@@ -162,7 +162,7 @@ import centralDistrict from './definitions/central-district.js';
 import smallSteps from './definitions/small-steps.js';
 import lapinLoop from './definitions/lapin-loop.js';
 import { TRACK_CATALOG } from './catalog.js';
-import { getStoredTrack } from './stored-tracks.js';
+import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
 
 const TRACK_GEOMETRY = {
     circuit,
@@ -347,7 +347,7 @@ export const TRACKS = new Proxy(BUILT_IN_TRACKS, {
         return stored?.track ?? Reflect.get(target, trackKey, receiver);
     },
     has(target, trackKey) {
-        return (typeof trackKey === 'string' && Boolean(getStoredTrack(trackKey)?.track))
+        return (typeof trackKey === 'string' && isStoredTrack(trackKey))
             || Reflect.has(target, trackKey);
     },
 });

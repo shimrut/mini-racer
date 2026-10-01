@@ -42,7 +42,7 @@ vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
 
 const store = await import('../src/server/tracks/track-store.ts');
-const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
+const { ensureStoredCatalogLoaded, loadStoredTracks } = await import('../src/server/tracks/stored-catalog.ts');
 const { TrackInputError } = await import('../src/server/tracks/track-shape.ts');
 const { TrackPlacementRetryError } = await import('../src/server/tracks/track-placement-lock.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
@@ -127,6 +127,7 @@ describe('stored track store', () => {
     it('never answers with a deleted track after the key is made again', async () => {
         await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
         await ensureStoredCatalogLoaded();
+        await loadStoredTracks(['nightCut']);
         const firstValue = hashes.get('dailygp:tracks:v1:index').get('nightCut');
         expect(TRACKS.nightCut.name).toBe('Night Cut');
 
@@ -140,6 +141,9 @@ describe('stored track store', () => {
         expect(secondValue.startsWith('1:')).toBe(true);
         expect(secondValue).not.toBe(firstValue);
         await ensureStoredCatalogLoaded();
+        // The old track is still in the cache, under its old index value.
+        expect(() => TRACKS.nightCut).toThrow(store.StoredTrackNotLoadedError);
+        await loadStoredTracks(['nightCut']);
         expect(TRACKS.nightCut.name).toBe('Day Cut');
     });
 
@@ -216,10 +220,15 @@ describe('stored track store', () => {
 });
 
 describe('stored track cache for the game lookup', () => {
-    it('fills the lookup for the current subreddit only', async () => {
+    it('fills the lookup for the current subreddit only, with the tracks a request loads', async () => {
         await store.saveStoredTrack('nightCut', { track: shape, medalRow }, { username: 'ModOne' });
         expect(TRACKS.nightCut).toBeUndefined();
         await ensureStoredCatalogLoaded();
+        // Listed, but not loaded: the lookup refuses, and never gives the app layout.
+        expect('nightCut' in TRACKS).toBe(true);
+        expect(() => TRACKS.nightCut).toThrow(store.StoredTrackNotLoadedError);
+        expect(() => store.describePlacedStoredTracks(['nightCut'])).toThrow(store.StoredTrackNotLoadedError);
+        await loadStoredTracks(['nightCut']);
         expect(TRACKS.nightCut.name).toBe('Night Cut');
         expect(getTrackMedalThresholds('nightCut')).toEqual({ gold: 9.4, silver: 9.7, bronze: 10.1 });
 
@@ -227,15 +236,18 @@ describe('stored track cache for the game lookup', () => {
         expect(TRACKS.nightCut).toBeUndefined();
     });
 
-    it('reads only the revisions when nothing changed, and only the changed track after a save', async () => {
+    it('reads only the revisions when nothing changed, and only the named tracks', async () => {
         const revisionKeys = ['dailygp:tracks:v1:revision', 'dailygp:campaign:series:v1:revision'];
         await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
         await store.saveStoredTrack('dayCut', { track: { ...shape, name: 'Day Cut' } }, { username: 'ModOne' });
         await ensureStoredCatalogLoaded();
+        await loadStoredTracks(['nightCut', 'dayCut']);
         mockRedis.mGet.mockClear();
         mockRedis.hGetAll.mockClear();
 
+        // A warm server: one read of the revisions, and no track read.
         await ensureStoredCatalogLoaded();
+        await loadStoredTracks(['nightCut', 'dayCut']);
         expect(mockRedis.hGetAll).not.toHaveBeenCalled();
         expect(mockRedis.mGet.mock.calls).toEqual([[revisionKeys]]);
 
@@ -244,10 +256,61 @@ describe('stored track cache for the game lookup', () => {
             baseRevision: 1,
         });
         mockRedis.mGet.mockClear();
+        mockRedis.hGetAll.mockClear();
+        // After a save: the list once, and no track until a request names it.
         await ensureStoredCatalogLoaded();
-        expect(mockRedis.mGet.mock.calls).toEqual([[revisionKeys], [['dailygp:tracks:v1:track:dayCut']], [revisionKeys]]);
+        expect(mockRedis.hGetAll.mock.calls).toEqual([['dailygp:tracks:v1:index']]);
+        expect(mockRedis.mGet.mock.calls).toEqual([[revisionKeys], [revisionKeys]]);
+        await loadStoredTracks(['dayCut']);
+        expect(mockRedis.mGet.mock.calls.at(-1)).toEqual([['dailygp:tracks:v1:track:dayCut']]);
         expect(TRACKS.dayCut.name).toBe('Day Cut II');
         expect(TRACKS.nightCut.name).toBe('Night Cut');
+    });
+
+    it('loads 100 stored tracks only when a request names them', async () => {
+        for (let index = 0; index < 100; index += 1) {
+            await store.saveStoredTrack(`track${index}`, { track: { ...shape, name: `Track ${index}` } }, { username: 'ModOne' });
+        }
+        mockRedis.mGet.mockClear();
+        await ensureStoredCatalogLoaded();
+        await loadStoredTracks(['track42']);
+        const trackReads = mockRedis.mGet.mock.calls.filter(([keys]) => keys.some((key) => key.includes(':track:')));
+        expect(trackReads).toEqual([[['dailygp:tracks:v1:track:track42']]]);
+        expect(TRACKS.track42.name).toBe('Track 42');
+    });
+
+    it('reads the list again and retries when a record changed after the list was read', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
+        await ensureStoredCatalogLoaded();
+        // A save lands after this server read the list.
+        await store.saveStoredTrack('nightCut', { track: { ...shape, name: 'Night Cut II' } }, { username: 'ModOne', baseRevision: 1 });
+        await loadStoredTracks(['nightCut']);
+        expect(TRACKS.nightCut.name).toBe('Night Cut II');
+    });
+
+    it('keeps each request on its own pinned list while another request reads a newer one', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
+        await ensureStoredCatalogLoaded();
+        await store.runWithPinnedStoredTracks(async () => {
+            await loadStoredTracks(['nightCut']);
+            // Another request publishes a newer list after a save.
+            await store.saveStoredTrack('nightCut', { track: { ...shape, name: 'Night Cut II' } }, { username: 'ModOne', baseRevision: 1 });
+            await store.runWithPinnedStoredTracks(async () => {
+                await ensureStoredCatalogLoaded();
+                store.repinStoredTracks();
+                await loadStoredTracks(['nightCut']);
+                expect(TRACKS.nightCut.name).toBe('Night Cut II');
+            });
+            // This request still reads the track of its own list.
+            expect(TRACKS.nightCut.name).toBe('Night Cut');
+        });
+    });
+
+    it('answers retry when a listed record stays broken', async () => {
+        await store.saveStoredTrack('nightCut', { track: shape }, { username: 'ModOne' });
+        await ensureStoredCatalogLoaded();
+        strings.set('dailygp:tracks:v1:track:nightCut', '{broken');
+        await expect(loadStoredTracks(['nightCut'])).rejects.toBeInstanceOf(TrackPlacementRetryError);
     });
 
     it('drops a deleted track from the lookup', async () => {

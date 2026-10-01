@@ -11,7 +11,7 @@ const trackRecordKey = (key) => `dailygp:tracks:v1:track:${key}`;
 const strings = new Map();
 const hashes = new Map();
 const mockContext = { subredditId: 't5_one' };
-const faults = { mGet: 0, bumpOnTrackRead: false };
+const faults = { mGet: 0, bumpOnIndexRead: false };
 const holds = [];
 
 function deferred() {
@@ -55,11 +55,7 @@ const known = {
             faults.mGet -= 1;
             throw new Error('redis: mGet timed out');
         }
-        const values = await held('mGet', [keys], () => readMany(keys));
-        if (faults.bumpOnTrackRead && keys.some((key) => key.startsWith('dailygp:tracks:v1:track:'))) {
-            strings.set(TRACK_REVISION_KEY, String(Number(strings.get(TRACK_REVISION_KEY) ?? 0) + 1));
-        }
-        return values;
+        return held('mGet', [keys], () => readMany(keys));
     }),
     incrBy: async (key, value) => {
         const next = Number(strings.get(key) ?? 0) + value;
@@ -67,7 +63,13 @@ const known = {
         return next;
     },
     hGet: async (key, field) => hashes.get(key)?.get(field) ?? null,
-    hGetAll: async (key) => held('hGetAll', [key], () => Object.fromEntries(hashes.get(key) ?? new Map())),
+    hGetAll: async (key) => {
+        const values = await held('hGetAll', [key], () => Object.fromEntries(hashes.get(key) ?? new Map()));
+        if (faults.bumpOnIndexRead && key === TRACK_INDEX_KEY) {
+            strings.set(TRACK_REVISION_KEY, String(Number(strings.get(TRACK_REVISION_KEY) ?? 0) + 1));
+        }
+        return values;
+    },
     hSet: async (key, fields) => {
         const hash = hashes.get(key) ?? new Map();
         Object.entries(fields).forEach(([field, value]) => hash.set(field, value));
@@ -118,7 +120,7 @@ beforeEach(() => {
     hashes.clear();
     holds.length = 0;
     faults.mGet = 0;
-    faults.bumpOnTrackRead = false;
+    faults.bumpOnIndexRead = false;
     known.mGet.mockClear();
     mockContext.subredditId = 't5_one';
     coldCache();
@@ -128,9 +130,12 @@ beforeEach(() => {
 });
 
 describe('the stored catalog', () => {
-    it('loads the stored tracks and the published series', async () => {
+    it('loads the track list and the series, and a request loads the tracks it names', async () => {
         await saveTrack('nightOne', 'Night One');
         await catalog.ensureStoredCatalogLoaded();
+        expect('nightOne' in TRACKS).toBe(true);
+        expect(known.mGet.mock.calls.some(([keys]) => keys.includes(trackRecordKey('nightOne')))).toBe(false);
+        await catalog.loadStoredTracks(['nightOne']);
         expect(TRACKS.nightOne.name).toBe('Night One');
     });
 
@@ -156,11 +161,11 @@ describe('the stored catalog', () => {
         ['the older load finishes first', false],
     ])('never publishes an older picture from equal starting revisions: %s', async (_label, newerFirst) => {
         // The review's case: two loads start at revision 1. One captures the
-        // old record; the other reads after a save and a Daily lock.
+        // old list; the other reads after a save and a Daily lock.
         await tracks.saveStoredTrack('smallSteps', { track: { ...smallSteps, name: 'Small Steps' }, medalRow }, {
             username: 'ModOne', origin: 'migrated', trusted: true,
         });
-        const slowRecords = hold('mGet', (keys) => keys.includes(trackRecordKey('smallSteps')), { captureFirst: true });
+        const slowRecords = hold('hGetAll', (key) => key === TRACK_INDEX_KEY, { captureFirst: true });
         const loadA = catalog.ensureStoredCatalogLoaded();
         await slowRecords.reached;
         const slowIndex = hold('hGetAll', (key) => key === TRACK_INDEX_KEY);
@@ -184,6 +189,7 @@ describe('the stored catalog', () => {
             await loadB;
         }
 
+        await catalog.loadStoredTracks(['smallSteps']);
         expect(placed(['smallSteps'])).toEqual(['smallSteps']);
         expect(TRACKS.smallSteps.name).toBe('Small Steps Edit');
         expect(TRACKS.smallSteps.cornerRadius).toBe(3);
@@ -191,12 +197,13 @@ describe('the stored catalog', () => {
 
     it('reads again when a save lands during the reads', async () => {
         await saveTrack('nightOne', 'Night One');
-        const slowRecords = hold('mGet', (keys) => keys.includes(trackRecordKey('nightOne')), { captureFirst: true });
+        const slowRecords = hold('hGetAll', (key) => key === TRACK_INDEX_KEY, { captureFirst: true });
         const load = catalog.ensureStoredCatalogLoaded();
         await slowRecords.reached;
         await saveTrack('nightTwo', 'Night Two');
         slowRecords.release();
         await load;
+        await catalog.loadStoredTracks(['nightOne', 'nightTwo']);
         expect(TRACKS.nightOne.name).toBe('Night One');
         expect(TRACKS.nightTwo.name).toBe('Night Two');
     });
@@ -224,6 +231,7 @@ describe('the stored catalog', () => {
         slowSeries.release();
         await load;
         expect(publishedSeriesIds()).toContain('night-v1');
+        await catalog.loadStoredTracks(['nightOne', 'nightTwo']);
         expect(placed(['nightOne', 'nightTwo'])).toEqual(['nightOne', 'nightTwo']);
     });
 
@@ -238,6 +246,7 @@ describe('the stored catalog', () => {
         await catalog.ensureStoredCatalogLoaded();
         lateFinish.release();
         await older;
+        await catalog.loadStoredTracks(['nightTwo']);
         expect(TRACKS.nightTwo.name).toBe('Night Two');
         expect(tracks.readStoredTrackCacheRevision('t5_one')).toBe('2');
     });
@@ -246,14 +255,16 @@ describe('the stored catalog', () => {
         await saveTrack('nightOne', 'Night One');
         faults.mGet = 1;
         await catalog.ensureStoredCatalogLoaded();
+        await catalog.loadStoredTracks(['nightOne']);
         expect(TRACKS.nightOne.name).toBe('Night One');
     });
 
     it('fails after three unstable reads, and keeps the earlier cache', async () => {
         await saveTrack('nightOne', 'Night One');
         await catalog.ensureStoredCatalogLoaded();
+        await catalog.loadStoredTracks(['nightOne']);
         await saveTrack('nightTwo', 'Night Two');
-        faults.bumpOnTrackRead = true;
+        faults.bumpOnIndexRead = true;
         await expect(catalog.ensureStoredCatalogLoaded()).rejects.toBeInstanceOf(catalog.StoredCatalogUnavailableError);
         expect(TRACKS.nightOne.name).toBe('Night One');
         expect(TRACKS.nightTwo).toBeUndefined();
@@ -262,6 +273,7 @@ describe('the stored catalog', () => {
     it('fails after three failed reads on a warm process, and keeps the earlier cache', async () => {
         await saveTrack('nightOne', 'Night One');
         await catalog.ensureStoredCatalogLoaded();
+        await catalog.loadStoredTracks(['nightOne']);
         await saveTrack('nightTwo', 'Night Two');
         faults.mGet = 10;
         await expect(catalog.ensureStoredCatalogLoaded()).rejects.toBeInstanceOf(catalog.StoredCatalogUnavailableError);
@@ -303,7 +315,8 @@ describe('Daily answers confirm the catalog after they know their track', () => 
             getServerDailyGpSnapshot: vi.fn(),
             submitServerDailyGpRun: vi.fn(),
             isDailyGpChallengePlayable: () => true,
-            confirmStoredCatalog: catalog.ensureStoredCatalogLoaded,
+            refreshStoredCatalog: catalog.reloadPinnedCatalog,
+            loadStoredTracks: catalog.loadStoredTracks,
             describeStoredTracks: tracks.describePlacedStoredTracks,
         });
         return handlers;
@@ -313,6 +326,7 @@ describe('Daily answers confirm the catalog after they know their track', () => 
         await saveTrack('nightOne', 'Night One');
         // This server's request began before the Daily was placed.
         await catalog.ensureStoredCatalogLoaded();
+        await catalog.loadStoredTracks(['nightOne']);
         expect(await tracks.lockStoredTrack('nightOne', 'daily')).toBe(true);
         expect(placed(['nightOne'])).toEqual([]);
     }

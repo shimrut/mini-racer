@@ -42,7 +42,7 @@ vi.mock('@devvit/redis', () => ({ redis, redisCompressed: redis }));
 vi.mock('@devvit/web/server', () => ({ redis, context: { subredditId: 't5_placement' } }));
 
 const tracks = await import('../src/server/tracks/track-store.ts');
-const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
+const { ensureStoredCatalogLoaded, loadStoredTracks } = await import('../src/server/tracks/stored-catalog.ts');
 const schedule = await import('../src/server/daily/daily-schedule-store.ts');
 const series = await import('../src/server/campaign/series-store.ts');
 const daily = await import('../src/server/daily/daily-gp-store.ts');
@@ -193,6 +193,7 @@ it('returns the committed winner to a Daily request that loses the midnight race
 });
 
 it('selects the lap contract from the fresh medal row that it freezes', async () => {
+    await loadStoredTracks([trackKey]);
     let date = new Date('2030-02-15T12:00:00.000Z');
     while (buildDailyGpChallengeForDayIndexWithTrack(getUtcDayIndex(date), trackKey).objectiveParams.lapCount !== 2) {
         date = new Date(date.getTime() + 86_400_000);

@@ -13,6 +13,7 @@ import {
 } from '../../../game/campaign/manifest.js';
 import { getMedalForRaceTime } from '../../../game/medals/medal-timing.js';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 import {
     CAMPAIGN_GUEST_EXPIRY_KEY,
     CAMPAIGN_GUEST_TTL_SECONDS,
@@ -633,6 +634,12 @@ async function readCampaignStandingsByRaceId(playerId: string | null, seriesId: 
     return Object.fromEntries(entries);
 }
 
+// Loads the stored tracks of these stages, in one read, before the request
+// reads their layout or medal times.
+async function loadStageTracks(stages: readonly { trackKey: string }[]): Promise<void> {
+    await loadStoredTracks(stages.map((stage) => stage.trackKey));
+}
+
 async function repairCampaignProgressFromLeaderboard(
     playerId: string,
     progress: CampaignProgress,
@@ -642,6 +649,7 @@ async function repairCampaignProgressFromLeaderboard(
         (stage) => !progress.resultsByRaceId[stage.raceId],
     );
     if (!missingStages.length) return progress;
+    await loadStageTracks(missingStages);
 
     const recovered = await Promise.all(missingStages.map(async (stage) => {
         const entry = await readEntryByPlayerId(
@@ -748,6 +756,7 @@ export async function getServerCampaignBootstrap({
     // Stage details (standings, ranks, repairs) cost 4 to 5 reads for each
     // stage, so the bootstrap reads them for one series only.
     const series = getCampaignSeries(requestedSeriesId) ?? getCampaignSeries(CAMPAIGN_NUMBERS_SERIES_ID)!;
+    await loadStageTracks(getCampaignSeriesStages(series.id));
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     const canonicalPlayerId = identity.canonicalPlayerId;
     let guestPromotionPending = identity.guestStatus === 'guest_promotion_pending';
@@ -824,6 +833,7 @@ export async function startServerCampaignRace({
     await cleanupExpiredCampaignGuestsBestEffort();
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
+    await loadStageTracks([stage]);
     const progress = await readProgress(identity.canonicalPlayerId, stage.seriesId);
     if (!isCampaignStageUnlocked(stage.raceId, progress.resultsByRaceId)) {
         return { status: 403, body: { error: 'Campaign race is locked.' } };
@@ -881,6 +891,7 @@ export async function getServerCampaignSnapshot({
 } = {}) {
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
+    await loadStageTracks([stage]);
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     await cleanupExpiredCampaignGuestsBestEffort();
     const snapshot = await readSnapshot({
@@ -907,6 +918,7 @@ export async function prepareServerCampaignLeaderboardRace({
 }) {
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.', reason: 'race_not_found' } };
+    await loadStageTracks([stage]);
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     await cleanupExpiredCampaignGuestsBestEffort();
     if (identity.canonicalPlayerId) {
@@ -958,6 +970,7 @@ export async function submitServerCampaignRun({
     }
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { accepted: false, error: 'Campaign race not found.' } };
+    await loadStageTracks([stage]);
 
     const canonicalPlayerId = identity.canonicalPlayerId;
     const progress = await readProgress(canonicalPlayerId, stage.seriesId);
@@ -1080,6 +1093,7 @@ export async function getServerCampaignPbGhost({
     await cleanupExpiredCampaignGuestsBestEffort();
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
+    await loadStageTracks([stage]);
     const personalBest = await getPlayerTrackPbRecord({
         playerId: identity.canonicalPlayerId,
         competition: competitionFor(stage),
@@ -1269,6 +1283,7 @@ export async function mergeGuestCampaignProgress({
         await confirmMergeOwnership();
 
         const stages = transferStages(raceIds);
+        await loadStageTracks(stages);
         const guestSource = classifySource
             ? await captureClassifiedGuestCampaignSource(guestPlayerId, stages)
             : null;

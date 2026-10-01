@@ -11,6 +11,7 @@ import { getTrackDefinitionIdentity } from './definition-identity.js';
 
 const localStoredTracks = new Map();
 let storedTrackResolver = (trackKey) => localStoredTracks.get(trackKey) ?? null;
+let storedTrackExists = null;
 
 export function getStoredTrack(trackKey) {
     if (typeof trackKey !== 'string' || !trackKey) return null;
@@ -18,15 +19,18 @@ export function getStoredTrack(trackKey) {
 }
 
 export function isStoredTrack(trackKey) {
-    return getStoredTrack(trackKey) !== null;
+    if (typeof trackKey !== 'string' || !trackKey) return false;
+    return storedTrackExists ? storedTrackExists(trackKey) : getStoredTrack(trackKey) !== null;
 }
 
 // The server gives each subreddit its own stored tracks, so it replaces the
-// lookup for the current request. The game keeps the local list.
-export function setStoredTrackResolver(resolver) {
+// lookup for the current request. The game keeps the local list. `exists`
+// answers whether a key is stored without loading the track.
+export function setStoredTrackResolver(resolver, { exists = null } = {}) {
     storedTrackResolver = typeof resolver === 'function'
         ? resolver
         : (trackKey) => localStoredTracks.get(trackKey) ?? null;
+    storedTrackExists = typeof resolver === 'function' && typeof exists === 'function' ? exists : null;
 }
 
 export function registerStoredTrack(entry) {

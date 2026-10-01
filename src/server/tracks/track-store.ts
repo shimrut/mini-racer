@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { redis, type TxClientLike } from '@devvit/redis';
 import { context } from '@devvit/web/server';
 import { validateTrackQuality } from '../../../game/track/authoring/track-quality.js';
@@ -151,20 +152,38 @@ export function summarizeStoredTrack(record: StoredTrackRecord): StoredTrackSumm
 }
 
 // ---- The per-install cache that the game's track lookup reads ----
+//
+// A request loads only the tracks that it names. For each install the server
+// keeps the track list (key -> index value), read again only when the list's
+// revision changes, and the tracks that requests loaded, keyed by key and
+// index value. Each request pins one list. Its lookups read that list and the
+// loaded tracks. A listed track that the request did not load is an error that
+// answers "retry": the lookup never falls back to the app layout.
 
-// The stored tracks at one revision of the track list.
-export type StoredTrackSnapshot = {
+export type StoredTrackIndex = {
     revision: string;
-    revisionsByKey: Map<string, string>;
-    entries: Map<string, StoredTrackEntry>;
+    values: ReadonlyMap<string, string>;
 };
+
+export class StoredTrackNotLoadedError extends TrackPlacementRetryError {
+    readonly trackKey: string;
+
+    constructor(trackKey: string) {
+        super('The tracks could not load. Try again.');
+        this.name = 'StoredTrackNotLoadedError';
+        this.trackKey = trackKey;
+    }
+}
 
 export const STORED_TRACKS_REVISION_KEY = REVISION_KEY;
 // The list of saved tracks: one field per track key.
 export const STORED_TRACKS_INDEX_KEY = INDEX_KEY;
 export const storedTrackRecordKey = recordKey;
 
-const cacheByInstall = new Map<string, StoredTrackSnapshot>();
+const MAX_LOADED_TRACKS_PER_INSTALL = 500;
+const indexByInstall = new Map<string, StoredTrackIndex>();
+const loadedByInstall = new Map<string, Map<string, StoredTrackEntry>>();
+const pinnedIndex = new AsyncLocalStorage<{ index: StoredTrackIndex | null }>();
 
 export function readStoredTrackInstallScope(): string | null {
     try {
@@ -178,25 +197,75 @@ export function readStoredTrackInstallScope(): string | null {
     }
 }
 
-export function resolveStoredTrackForRequest(trackKey: string): StoredTrackEntry | null {
-    const scope = readStoredTrackInstallScope();
-    return scope ? cacheByInstall.get(scope)?.entries.get(trackKey) ?? null : null;
+function loadedKey(trackKey: string, indexValue: string): string {
+    return `${trackKey}\n${indexValue}`;
 }
 
-// The placed stored tracks among these keys, from this request's cache. An
-// answer that names a track carries them, so the game needs no second request.
-export function describePlacedStoredTracks(trackKeys: string[]): StoredTrackEntry[] {
+function loadedTracks(scope: string): Map<string, StoredTrackEntry> {
+    let loaded = loadedByInstall.get(scope);
+    if (!loaded) {
+        loaded = new Map();
+        loadedByInstall.set(scope, loaded);
+    }
+    return loaded;
+}
+
+function keepLoadedTrack(scope: string, trackKey: string, indexValue: string, entry: StoredTrackEntry): void {
+    const loaded = loadedTracks(scope);
+    const key = loadedKey(trackKey, indexValue);
+    loaded.delete(key);
+    loaded.set(key, entry);
+    if (loaded.size > MAX_LOADED_TRACKS_PER_INSTALL) {
+        loaded.delete(loaded.keys().next().value as string);
+    }
+}
+
+// The track list that this request reads: its pinned list, or else the
+// install's newest list.
+export function currentStoredTrackIndex(scope = readStoredTrackInstallScope()): StoredTrackIndex | null {
+    if (!scope) return null;
+    return pinnedIndex.getStore()?.index ?? indexByInstall.get(scope) ?? null;
+}
+
+// Every call makes its own holder, so two requests never share one.
+export function runWithPinnedStoredTracks<T>(run: () => T): T {
     const scope = readStoredTrackInstallScope();
-    const entries = scope ? cacheByInstall.get(scope)?.entries : null;
-    if (!entries?.size) return [];
+    return pinnedIndex.run({ index: scope ? indexByInstall.get(scope) ?? null : null }, run);
+}
+
+// Takes the install's newest list as this request's list from now on.
+export function repinStoredTracks(): void {
+    const pinned = pinnedIndex.getStore();
+    const scope = readStoredTrackInstallScope();
+    if (pinned && scope) pinned.index = indexByInstall.get(scope) ?? null;
+}
+
+export function resolveStoredTrackForRequest(trackKey: string): StoredTrackEntry | null {
+    const scope = readStoredTrackInstallScope();
+    const indexValue = currentStoredTrackIndex(scope)?.values.get(trackKey);
+    if (!scope || indexValue === undefined) return null;
+    const entry = loadedByInstall.get(scope)?.get(loadedKey(trackKey, indexValue));
+    if (!entry) throw new StoredTrackNotLoadedError(trackKey);
+    return entry;
+}
+
+// A track's place in the list needs no load.
+export function storedTrackExistsForRequest(trackKey: string): boolean {
+    return currentStoredTrackIndex()?.values.has(trackKey) === true;
+}
+
+// The placed stored tracks among these keys. The request must have loaded
+// them: a listed track that is not loaded is never described as absent.
+export function describePlacedStoredTracks(trackKeys: string[]): StoredTrackEntry[] {
     return [...new Set(trackKeys)].flatMap((trackKey) => {
-        const entry = typeof trackKey === 'string' ? entries.get(trackKey) : null;
+        if (typeof trackKey !== 'string') return [];
+        const entry = resolveStoredTrackForRequest(trackKey);
         return entry?.placed ? [entry] : [];
     });
 }
 
 export function installStoredTrackResolver(): void {
-    setStoredTrackResolver(resolveStoredTrackForRequest);
+    setStoredTrackResolver(resolveStoredTrackForRequest, { exists: storedTrackExistsForRequest });
 }
 
 // The raw record of each key, in the order of the keys. The batches go out
@@ -227,53 +296,61 @@ async function readRecords(trackKeys: string[]): Promise<Map<string, StoredTrack
 }
 
 export function readStoredTrackCacheRevision(scope: string): string | null {
-    return cacheByInstall.get(scope)?.revision ?? null;
+    return indexByInstall.get(scope)?.revision ?? null;
 }
 
-// Reads the stored tracks for this revision. It reads only the tracks that
-// changed since the cache. It does not publish them: the stored catalog
-// publishes a snapshot only when the revision did not change during the reads.
-export async function readStoredTrackSnapshot(scope: string, revision: string): Promise<StoredTrackSnapshot> {
-    if (revision === '0') return { revision, revisionsByKey: new Map(), entries: new Map() };
+// Reads the track list for this revision. It does not publish it: the stored
+// catalog publishes a list only when the revision did not change during the
+// reads.
+export async function readStoredTrackIndex(revision: string): Promise<StoredTrackIndex> {
+    if (revision === '0') return { revision, values: new Map() };
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
     if (typeof index !== 'object') throw new Error('The stored track list could not be read.');
-    const cached = cacheByInstall.get(scope);
-    const revisionsByKey = new Map(Object.entries(index));
-    const entries = new Map<string, StoredTrackEntry>();
-    const changed: string[] = [];
-    for (const [trackKey, trackRevision] of revisionsByKey) {
-        const previous = cached?.entries.get(trackKey);
-        if (previous && cached?.revisionsByKey.get(trackKey) === trackRevision) {
-            entries.set(trackKey, previous);
-        } else {
-            changed.push(trackKey);
-        }
-    }
-    const records = await readRecords(changed);
-    for (const trackKey of changed) {
-        const record = records.get(trackKey);
-        // Each write changes the record, the list and the revision together.
-        // The revision check after the reads catches a write between them, so
-        // a mismatch here is a broken record, not a write in progress.
-        if (!record || !recordMatchesIndexValue(record, revisionsByKey.get(trackKey))) {
-            console.error(`Stored track ${trackKey} does not match the track list.`);
-            continue;
-        }
-        entries.set(trackKey, toEntry(record));
-    }
-    return { revision, revisionsByKey, entries };
+    return { revision, values: new Map(Object.entries(index)) };
 }
 
-// Only a newer snapshot replaces the cache. An equal one adds nothing.
-export function publishStoredTrackSnapshot(scope: string, snapshot: StoredTrackSnapshot): boolean {
-    const current = cacheByInstall.get(scope);
-    if (current && Number(current.revision) >= Number(snapshot.revision)) return false;
-    cacheByInstall.set(scope, snapshot);
+// Only a newer list replaces the cache. An equal one adds nothing.
+export function publishStoredTrackIndex(scope: string, index: StoredTrackIndex): boolean {
+    const current = indexByInstall.get(scope);
+    if (current && Number(current.revision) >= Number(index.revision)) return false;
+    indexByInstall.set(scope, index);
     return true;
 }
 
+// Loads the listed tracks among these keys that this request's list names and
+// the cache does not hold yet, in one read. False when a record does not match
+// the list: a write landed after the list was read.
+export async function loadStoredTrackEntries(trackKeys: string[]): Promise<boolean> {
+    const scope = readStoredTrackInstallScope();
+    const index = currentStoredTrackIndex(scope);
+    if (!scope || !index) return true;
+    const loaded = loadedTracks(scope);
+    const missing = [...new Set(trackKeys)].filter((trackKey) => {
+        const indexValue = typeof trackKey === 'string' ? index.values.get(trackKey) : undefined;
+        return indexValue !== undefined && !loaded.has(loadedKey(trackKey, indexValue));
+    });
+    if (!missing.length) return true;
+    const values = await readRecordValues(missing);
+    let matched = true;
+    missing.forEach((trackKey, offset) => {
+        const indexValue = index.values.get(trackKey) as string;
+        const record = parseRecord(values[offset]);
+        if (record?.key === trackKey && recordMatchesIndexValue(record, indexValue)) {
+            keepLoadedTrack(scope, trackKey, indexValue, toEntry(record));
+        } else {
+            matched = false;
+        }
+    });
+    return matched;
+}
+
+export function listedStoredTrackKeys(): string[] {
+    return [...(currentStoredTrackIndex()?.values.keys() ?? [])];
+}
+
 export function clearStoredTrackCacheForTests(): void {
-    cacheByInstall.clear();
+    indexByInstall.clear();
+    loadedByInstall.clear();
 }
 
 // ---- Reads ----

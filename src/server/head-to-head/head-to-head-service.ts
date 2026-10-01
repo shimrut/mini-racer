@@ -60,6 +60,7 @@ import { formatHeadToHeadTime } from '../shared/format-race-time.js';
 import { isRecord, normalizeName } from '../shared/value-guards.js';
 import { checkFixedWindowRateLimit, type RateLimitResult } from '../request/rate-limit.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
+import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 const PREVIEW_TTL_SECONDS = 10 * 60;
 export const HEAD_TO_HEAD_SUBMISSION_RATE_LIMIT_WINDOW_SECONDS = 60;
@@ -592,6 +593,7 @@ export function createHeadToHeadService(
         if (!isValidSource(source)) {
             return { status: 404, body: { status: 'result_unavailable', error: 'No verified result is available for this challenge.' } };
         }
+        await loadStoredTracks([source.trackKey]);
         const challengeId = createId();
         const createdAt = now().toISOString();
         const title = formatHeadToHeadTitle(source.bestTimeMs, source.trackKey);
@@ -680,6 +682,7 @@ export function createHeadToHeadService(
                 },
             };
         }
+        await loadStoredTracks([source.trackKey]);
         const preparedRecord: PreviewRecord = { ...prepared, source };
         const sourceId = sourceRaceId(source);
         const lock = await acquireHeadToHeadCreationLock(
