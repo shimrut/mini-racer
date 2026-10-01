@@ -1,6 +1,7 @@
 import { getTrackName } from '../track/catalog.js';
 import { ensureStoredTracks, registerStoredTracksFromPayload } from '../track/stored-track-service.js';
 import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
+import { PREPARATION_SLOTS, plainRaceChallenge } from '../track/race-preparation.js';
 import {
     confirmHeadToHeadComment,
     getHeadToHead,
@@ -217,11 +218,18 @@ export const headToHeadEngineMethods = {
             try {
                 onTrackPhase?.();
                 registerStoredTracksFromPayload(response.body?.storedTracks, { confirmedTrackKeys: [challenge.trackKey] });
-                await ensureStoredTracks([challenge.trackKey], { requireConfirmation: true });
+                // The challenge's track is ready before the lobby shows Start.
+                const prepared = typeof this.prepareRaceTrack === 'function'
+                    ? await this.prepareRaceTrack(PREPARATION_SLOTS.CHALLENGE, {
+                        trackKey: challenge.trackKey,
+                        challenge: plainRaceChallenge(challenge.trackKey),
+                    })
+                    : await ensureStoredTracks([challenge.trackKey], { requireConfirmation: true });
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
+                    prepared: prepared ?? null,
                 });
                 if (this.activeHeadToHead?.frozenGhost) {
                     onGhostPhase?.();

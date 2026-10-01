@@ -709,6 +709,7 @@ export class ModalShell {
 
     _syncCombinedNextRace(nextRace = null) {
         this._combinedNextRace = nextRace;
+        this._combinedNextRaceReady = true;
         const button = this.combinedNextBtn;
         if (!button) return;
         const actions = this.modalCombinedView?.querySelector?.('.combined-actions');
@@ -731,14 +732,26 @@ export class ModalShell {
         const label = nextRace.label || 'Next';
         this._setShareButtonLabel(button, label);
         button.setAttribute('aria-label', nextRace.ariaLabel || label);
+        this._combinedNextRaceEnabled = enabled;
         button.disabled = !enabled;
         this._bindClickAction(button, enabled ? () => nextRace.action() : null);
+    }
+
+    // Next stays disabled until the next stage's track is prepared. It keeps
+    // its place as the main action meanwhile.
+    setCombinedNextRaceReady(ready) {
+        this._combinedNextRaceReady = Boolean(ready);
+        const button = this.combinedNextBtn;
+        if (!button || button.hidden) return false;
+        button.disabled = !this._combinedNextRaceEnabled || !this._combinedNextRaceReady;
+        return true;
     }
 
     setCombinedNextRaceEnabled(enabled) {
         const button = this.combinedNextBtn;
         if (!button || button.hidden) return false;
-        button.disabled = !enabled;
+        this._combinedNextRaceEnabled = Boolean(enabled);
+        button.disabled = !enabled || this._combinedNextRaceReady === false;
         button.classList?.toggle?.('combined-action-btn--primary', Boolean(enabled));
         this.combinedRestartBtn?.classList?.toggle?.(
             'combined-action-btn--primary',

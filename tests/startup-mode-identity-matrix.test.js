@@ -24,6 +24,10 @@ function createRacer(mode, identity, calls) {
         calls.push('challenge-contract');
         return { challengeId: 'h2h-1' };
     });
+    racer.prepareRaceTrack = vi.fn(async (slot, target) => {
+        calls.push(`prepare:${slot}:${target.trackKey}`);
+        return { trackKey: target.trackKey };
+    });
     racer.loadTrack = vi.fn(async (trackKey) => calls.push(`track:${trackKey}`));
     racer.syncCarSpriteAsset = vi.fn(async () => calls.push('car'));
     racer.loadInitialPersonalBestGhostAsset = vi.fn(async () => calls.push('pb-ghost'));
@@ -50,13 +54,17 @@ describe('direct-mode startup identity matrix', () => {
 
             if (mode === 'daily') {
                 expect(calls).toContain('daily-contract');
-                expect(calls).toContain('track:daily-track');
+                expect(calls.indexOf('prepare:daily:daily-track')).toBeLessThan(calls.indexOf('track:daily-track'));
+                expect(racer.loadTrack).toHaveBeenCalledWith('daily-track', expect.objectContaining({
+                    prepared: { trackKey: 'daily-track' },
+                }));
                 expect(calls).toContain('pb-ghost');
                 expect(calls).not.toContain('campaign-contract');
                 expect(calls).not.toContain('challenge-contract');
             } else if (mode === 'campaign') {
                 expect(calls.indexOf(`profile:${identity}`))
                     .toBeLessThan(calls.indexOf('campaign-contract'));
+                expect(calls).toContain('prepare:campaign:campaign-track');
                 expect(calls).toContain('track:campaign-track');
                 expect(calls).not.toContain('daily-contract');
                 expect(calls).not.toContain('challenge-contract');
@@ -82,6 +90,7 @@ describe('direct-mode startup identity matrix', () => {
             'car',
             'profile:signed-in',
             'campaign-contract',
+            'prepare:campaign:campaign-track',
             'track:campaign-track',
         ]);
     });
@@ -91,6 +100,52 @@ describe('direct-mode startup identity matrix', () => {
         racer.syncCarSpriteAsset = vi.fn(() => new Promise(() => {}));
 
         await racer.loadStartupGraphics('daily');
+    });
+
+    it('prepares both the Daily and the Campaign stage before Home shows', async () => {
+        const calls = [];
+        const racer = createRacer('home', 'signed-in', calls);
+        racer.installModeRuntime = vi.fn(async () => null);
+        racer.resolveDefaultCampaignStage = vi.fn(async () => {
+            calls.push('campaign-stage');
+            return { raceId: 'numbered-v1-0', trackKey: 'campaign-track' };
+        });
+
+        await racer.loadStartupGraphics('home');
+
+        expect(calls).toContain('prepare:daily:daily-track');
+        expect(calls).toContain('prepare:campaign:campaign-track');
+        // The Daily is the track on screen; the Campaign stage stays prepared.
+        expect(racer.loadTrack).toHaveBeenCalledTimes(1);
+        expect(racer.loadTrack).toHaveBeenCalledWith('daily-track', expect.objectContaining({
+            prepared: { trackKey: 'daily-track' },
+        }));
+    });
+
+    it('keeps Home loading when its Campaign is unavailable', async () => {
+        const calls = [];
+        const racer = createRacer('home', 'signed-in', calls);
+        racer.installModeRuntime = vi.fn(async () => null);
+        racer.resolveDefaultCampaignStage = vi.fn(async () => {
+            throw new Error('Campaign progress is not authoritative.');
+        });
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        await racer.loadStartupGraphics('home');
+
+        expect(calls).toContain('prepare:daily:daily-track');
+        expect(calls).not.toContain('prepare:campaign:campaign-track');
+        expect(racer.loadTrack).toHaveBeenCalledWith('daily-track', expect.any(Object));
+    });
+
+    it('fails the loader when a required track cannot be prepared', async () => {
+        const racer = createRacer('daily', 'signed-in', []);
+        racer.prepareRaceTrack = vi.fn(async () => {
+            throw new Error('The track layout could not be confirmed. Retry before racing.');
+        });
+
+        await expect(racer.loadStartupGraphics('daily')).rejects.toThrow('Retry before racing');
+        expect(racer.loadTrack).not.toHaveBeenCalled();
     });
 
     it('does not hold Daily race data on a ghost that has not arrived', async () => {

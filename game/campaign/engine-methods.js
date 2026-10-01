@@ -6,6 +6,7 @@ import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { getStaleRunTrackReason, hasCurrentTrackDefinition } from '../track/race-definition.js';
+import { PREPARATION_SLOTS } from '../track/race-preparation.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
 import { objectiveTypeForLapCount } from '../race/race-spec.js';
@@ -201,6 +202,16 @@ function getCampaignNextStageTarget(engine, stage) {
         trackName: getTrackName(nextStage.trackKey, nextStage.trackKey),
         requirementLabel: lobbyStage?.unlockRequirementLabel || null,
     };
+}
+
+async function resolveDefaultCampaignStage(engine) {
+    const bootstrap = await engine.ensureCampaignBootstrap({ forceRefresh: true });
+    if (bootstrap?.authoritative === false || bootstrap?.availability === 'unavailable') {
+        throw new Error('Campaign progress is not authoritative.');
+    }
+    const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
+    const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState)?.id);
+    return stage?.trackKey && stage?.raceId ? stage : null;
 }
 
 function getDefaultCampaignLobbyStage(lobbyState) {
@@ -551,17 +562,17 @@ export const campaignEngineMethods = {
         return promise;
     },
 
+    // The stage that the Campaign lobby selects when it opens.
+    resolveDefaultCampaignStage() {
+        return resolveDefaultCampaignStage(this);
+    },
+
     async prepareInitialCampaignLaunch({
         prepareTrack = true,
         loadPersonalBest = true,
     } = {}) {
-        const bootstrap = await this.ensureCampaignBootstrap({ forceRefresh: true });
-        if (bootstrap?.authoritative === false || bootstrap?.availability === 'unavailable') {
-            throw new Error('Campaign progress is not authoritative.');
-        }
-        const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-        const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState)?.id);
-        if (!stage?.trackKey || !stage?.raceId) return null;
+        const stage = await resolveDefaultCampaignStage(this);
+        if (!stage) return null;
 
         this.activeRaceMode = 'campaign';
         this.activeCampaignStage = stage;
@@ -1096,6 +1107,35 @@ export const campaignEngineMethods = {
             this.modal.modalMsg.style.display = '';
             this.modal.modalMsg.textContent = message || trackLine;
         }
+        this.prepareCampaignNextTrack?.(stage, nextTarget);
+    },
+
+    // Next stays disabled until the next stage's track is prepared. A failed
+    // preparation enables Next again, and its press prepares once more.
+    prepareCampaignNextTrack(finishedStage, nextTarget) {
+        const stage = nextTarget?.unlocked ? nextTarget.stage : null;
+        if (!stage?.trackKey || typeof this.prepareRaceTrack !== 'function') return;
+        const challenge = toRaceChallenge(stage);
+        if (this.findPreparedRaceTrack?.(stage.trackKey, challenge)) {
+            this.modal.setCombinedNextRaceReady?.(true);
+            return;
+        }
+        const showsFinish = () => this.modal.matchesModalScoreboardContext?.({
+            challengeId: finishedStage?.raceId,
+        }) === true;
+        this.modal.setCombinedNextRaceReady?.(false);
+        void this.prepareRaceTrack(PREPARATION_SLOTS.NEXT, {
+            trackKey: stage.trackKey,
+            challenge,
+            beforeBuild: async () => {
+                await this.waitForQuietMoment?.();
+                return showsFinish();
+            },
+        }).catch((error) => {
+            console.error('Could not prepare the next Campaign stage:', error);
+        }).finally(() => {
+            if (showsFinish()) this.modal.setCombinedNextRaceReady?.(true);
+        });
     },
 
     async startCampaignNextStage(stage) {
@@ -1362,9 +1402,9 @@ export const campaignEngineMethods = {
                 this.refreshCampaignVerificationOverlay?.();
             }
             if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
-                this.modal.setCombinedNextRaceEnabled?.(
-                    getCampaignNextStageTarget(this, stage)?.unlocked === true,
-                );
+                const nextTarget = getCampaignNextStageTarget(this, stage);
+                this.modal.setCombinedNextRaceEnabled?.(nextTarget?.unlocked === true);
+                this.prepareCampaignNextTrack?.(stage, nextTarget);
             }
             await this.refreshCampaignAfterAcceptedRun(stage, ghostRecovery);
             void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
@@ -1393,9 +1433,9 @@ export const campaignEngineMethods = {
         this.refreshCampaignVerificationOverlay?.();
         if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
             this.modal.setCombinedWinMedal?.(null);
-            this.modal.setCombinedNextRaceEnabled?.(
-                getCampaignNextStageTarget(this, stage)?.unlocked === true,
-            );
+            const nextTarget = getCampaignNextStageTarget(this, stage);
+            this.modal.setCombinedNextRaceEnabled?.(nextTarget?.unlocked === true);
+            this.prepareCampaignNextTrack?.(stage, nextTarget);
         }
         this.updateCampaignFinishSnapshot(
             raceId,

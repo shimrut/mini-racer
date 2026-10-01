@@ -45,6 +45,7 @@ import { LobbyUi } from "./lobby/ui.js";
 import { resolveGameLaunchTarget } from "./modes/launch-target.js";
 import { readPlayerTrailStrokeStyle } from "./car/player-trail.js";
 import { trackEngineMethods } from "./track/engine-methods.js";
+import { PREPARATION_SLOTS, plainRaceChallenge } from "./track/race-preparation.js";
 import { raceEngineMethods } from "./race/engine-methods.js";
 import { scoreboardEngineMethods } from "./scoreboard/engine-methods.js";
 import { opponentRaceEngineMethods } from "./scoreboard/opponent-race-engine-methods.js";
@@ -773,18 +774,87 @@ export class RealTimeRacer {
         );
         return this.initialChallengeLobbyPromise;
       }
+      if (mode === "home") return this.loadHomeRaceContracts();
       return null;
     });
     return this.initialContractPromise;
   }
 
-  async resolveInitialTrackKey(mode) {
-    if (mode === "home") return DEFAULT_TRACK_KEY;
-    if (mode === "challenge") return null;
+  // Home offers both lobbies, so it needs the current Daily and the Campaign
+  // lobby's stage. A Daily or a Campaign that cannot load is left out here;
+  // its own lobby shows that state.
+  async loadHomeRaceContracts() {
+    const [daily, campaignStage] = await Promise.all([
+      Promise.resolve(this.installModeRuntime("daily"))
+        .then(() => this.loadDailyChallengeCritical?.({
+          prepareTrack: false,
+          loadPersonalBest: false,
+        }) ?? null)
+        .catch((error) => {
+          console.warn("The Daily could not load for Home:", error);
+          return null;
+        }),
+      Promise.resolve(this.installModeRuntime("campaign"))
+        .then(() => this.loadStartupPlayer())
+        .then(() => this.resolveDefaultCampaignStage?.() ?? null)
+        .catch((error) => {
+          console.warn("The Campaign could not load for Home:", error);
+          return null;
+        }),
+    ]);
+    return { daily, campaignStage };
+  }
+
+  // The races that each entry point prepares before its loader closes. The
+  // first one becomes the track on screen.
+  async resolveInitialRaceTargets(mode) {
+    if (mode === "challenge") return [];
     const contract = await this.ensureInitialContract(mode);
-    const trackKey = mode === "daily" ? contract?.trackKey : contract?.stage?.trackKey;
-    if (!trackKey) throw new Error(`The ${mode} launch has no playable track.`);
-    return trackKey;
+    if (mode === "daily") {
+      if (!contract?.trackKey) throw new Error("The daily launch has no playable track.");
+      return [{ slot: PREPARATION_SLOTS.DAILY, trackKey: contract.trackKey, challenge: contract }];
+    }
+    if (mode === "campaign") {
+      const stage = contract?.stage;
+      if (!stage?.trackKey) throw new Error("The campaign launch has no playable track.");
+      return [{
+        slot: PREPARATION_SLOTS.CAMPAIGN,
+        trackKey: stage.trackKey,
+        challenge: plainRaceChallenge(stage.trackKey),
+      }];
+    }
+    const targets = [];
+    if (contract?.daily?.trackKey) {
+      targets.push({
+        slot: PREPARATION_SLOTS.DAILY,
+        trackKey: contract.daily.trackKey,
+        challenge: contract.daily,
+      });
+    }
+    const stage = contract?.campaignStage;
+    if (stage?.trackKey) {
+      targets.push({
+        slot: PREPARATION_SLOTS.CAMPAIGN,
+        trackKey: stage.trackKey,
+        challenge: plainRaceChallenge(stage.trackKey),
+      });
+    }
+    return targets;
+  }
+
+  // Prepares every target at the same time, then puts the first one on
+  // screen. A target that cannot be prepared fails the loader, which offers
+  // Retry.
+  async prepareInitialRaceTracks(mode, targets) {
+    const records = await Promise.all(
+      targets.map((target) => this.prepareRaceTrack(target.slot, target)),
+    );
+    await this.loadTrack(targets[0]?.trackKey ?? DEFAULT_TRACK_KEY, {
+      loadPlayerProgress: false,
+      showStartOverlayOnReset: false,
+      preserveDailyChallengeContext: mode !== "home",
+      prepared: records[0] ?? null,
+    });
   }
 
   async loadStartupGraphics(mode, { onContractPhase, onTrackPhase } = {}) {
@@ -792,16 +862,12 @@ export class RealTimeRacer {
     const fontsReadyPromise = globalThis.document?.fonts?.ready;
 
     onContractPhase?.();
-    const trackKey = await this.resolveInitialTrackKey(mode);
+    const targets = await this.resolveInitialRaceTargets(mode);
 
     onTrackPhase?.();
-    this.trackReadyPromise = trackKey
-      ? this.loadTrack(trackKey, {
-        loadPlayerProgress: false,
-        showStartOverlayOnReset: false,
-        preserveDailyChallengeContext: mode !== "home",
-      })
-      : this.ensureInitialContract(mode);
+    this.trackReadyPromise = mode === "challenge"
+      ? this.ensureInitialContract(mode)
+      : this.prepareInitialRaceTracks(mode, targets);
     await Promise.all([
       this.trackReadyPromise,
       fontsReadyPromise,

@@ -31,6 +31,12 @@ function assetOptionsKey(options = {}) {
     return `${options.qualityLevel ?? 0}:${options.frameSkip ?? 0}`;
 }
 
+// The race challenge of a Campaign stage or a Head to Head: its presentation
+// is the plain one of its track.
+export function plainRaceChallenge(trackKey) {
+    return { trackKey, skin: 'default' };
+}
+
 export function resolveRacePresentation(trackKey, track, challenge = null) {
     return resolveTrackPresentation(trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.RACE,

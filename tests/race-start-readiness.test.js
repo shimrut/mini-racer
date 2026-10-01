@@ -177,3 +177,78 @@ describe('the engine and the selected lobby card', () => {
         delete globalThis.fetch;
     });
 });
+
+describe('Campaign Next and the next stage track', () => {
+    it('keeps Next disabled, and still the main action, until the track is ready', async () => {
+        const { ModalShell } = await import('../game/race/ui-modal-shell.js');
+        const dom = new JSDOM(`
+            <div id="modal-combined-view"><div class="combined-actions">
+                <button id="combined-restart-btn"><span class="combined-action-btn-label"></span></button>
+                <button id="combined-next-btn"><span class="combined-action-btn-label"></span></button>
+            </div></div>
+        `, { url: 'https://example.com/' });
+        global.document = dom.window.document;
+        const shell = new ModalShell({});
+        const next = document.getElementById('combined-next-btn');
+        const action = vi.fn();
+
+        shell._syncCombinedNextRace({ label: 'Next', enabled: true, action });
+        shell.setCombinedNextRaceReady(false);
+        expect(next.disabled).toBe(true);
+        expect(next.classList.contains('combined-action-btn--primary')).toBe(true);
+
+        shell.setCombinedNextRaceEnabled(true);
+        expect(next.disabled).toBe(true);
+        shell.setCombinedNextRaceReady(true);
+        expect(next.disabled).toBe(false);
+
+        shell.setCombinedNextRaceEnabled(false);
+        expect(next.disabled).toBe(true);
+    });
+
+    function campaignRacer(overrides = {}) {
+        return {
+            ...campaignEngineMethods,
+            modal: {
+                setCombinedNextRaceReady: vi.fn(),
+                matchesModalScoreboardContext: vi.fn(() => true),
+            },
+            waitForQuietMoment: async () => {},
+            findPreparedRaceTrack: vi.fn(() => null),
+            ...overrides,
+        };
+    }
+
+    it('prepares an unlocked next stage in the Next slot, then enables Next', async () => {
+        const prepareRaceTrack = vi.fn(async (slot, { beforeBuild }) => (await beforeBuild()) ? { trackKey: 'circuit' } : null);
+        const racer = campaignRacer({ prepareRaceTrack });
+        racer.prepareCampaignNextTrack(
+            { raceId: 'numbered-v1-01' },
+            { unlocked: true, stage: { raceId: 'numbered-v1-02', trackKey: 'circuit', lapCount: 1 } },
+        );
+        expect(racer.modal.setCombinedNextRaceReady).toHaveBeenLastCalledWith(false);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(prepareRaceTrack).toHaveBeenCalledWith(PREPARATION_SLOTS.NEXT, expect.objectContaining({ trackKey: 'circuit' }));
+        expect(racer.modal.matchesModalScoreboardContext).toHaveBeenCalledWith({ challengeId: 'numbered-v1-01' });
+        expect(racer.modal.setCombinedNextRaceReady).toHaveBeenLastCalledWith(true);
+    });
+
+    it('enables Next at once when the next track is already prepared, and skips a locked stage', () => {
+        const prepareRaceTrack = vi.fn();
+        const racer = campaignRacer({
+            prepareRaceTrack,
+            findPreparedRaceTrack: vi.fn(() => ({ trackKey: 'circuit' })),
+        });
+        racer.prepareCampaignNextTrack(
+            { raceId: 'numbered-v1-01' },
+            { unlocked: true, stage: { raceId: 'numbered-v1-02', trackKey: 'circuit', lapCount: 1 } },
+        );
+        expect(racer.modal.setCombinedNextRaceReady).toHaveBeenCalledWith(true);
+        expect(prepareRaceTrack).not.toHaveBeenCalled();
+
+        racer.modal.setCombinedNextRaceReady.mockClear();
+        racer.prepareCampaignNextTrack({ raceId: 'numbered-v1-01' }, { unlocked: false, stage: { trackKey: 'circuit' } });
+        expect(racer.modal.setCombinedNextRaceReady).not.toHaveBeenCalled();
+    });
+});
