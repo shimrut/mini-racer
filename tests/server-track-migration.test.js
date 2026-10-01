@@ -107,6 +107,41 @@ describe('copy of unplayed tracks', () => {
         expect(again.dailyList).toBe('kept');
     });
 
+    it('refuses to copy a track that a series published after the run took its list', async () => {
+        // The run's series list is older: the manifest never loads these records.
+        const record = (id, status, trackKey) => ({
+            version: 1,
+            id,
+            name: id,
+            ground: 'tarmac',
+            stages: [{ trackKey, laps: 1, requiredMedals: 0 }],
+            status,
+            publishedStageCount: status === 'published' ? 1 : 0,
+            publishedAt: status === 'published' ? noon.toISOString() : null,
+            origin: 'creator',
+            revision: 1,
+            createdAt: noon.toISOString(),
+            createdBy: 'ModTwo',
+            updatedAt: noon.toISOString(),
+            updatedBy: 'ModTwo',
+        });
+        for (const series of [record('night-v1', 'published', 'babylonRace'), record('dusk-v1', 'draft', 'kettleRun')]) {
+            strings.set(`dailygp:campaign:series:v1:series:${series.id}`, JSON.stringify(series));
+            const index = hashes.get('dailygp:campaign:series:v1:index') ?? new Map();
+            index.set(series.id, '1');
+            hashes.set('dailygp:campaign:series:v1:index', index);
+        }
+
+        const report = await runTrackMigration({ username: 'ModOne', now: noon });
+
+        expect(report.failed).toEqual([
+            { key: 'babylonRace', error: 'This track became a race while the copy was running.' },
+        ]);
+        expect(await store.readStoredTrack('babylonRace')).toBeNull();
+        // A draft stage is not raced yet, so its track is still copied.
+        expect(report.copied).toContain('kettleRun');
+    });
+
     it('writes nothing on a dry run', async () => {
         const report = await runTrackMigration({ username: 'ModOne', dryRun: true, now: noon });
         expect(report.copied.length).toBeGreaterThan(0);

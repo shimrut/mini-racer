@@ -10,7 +10,7 @@ import { readDailySchedule, saveDailySchedule } from '../daily/daily-schedule-st
 import { buildLockedTrackCopy, matchesAppTrack } from './track-copy.js';
 import { TrackInputError } from './track-shape.js';
 import { deleteStoredTrack, readStoredTrackKeys, saveLockedTrackCopy, saveStoredTrack } from './track-store.js';
-import { readTrackUsage } from './track-usage.js';
+import { isTrackPlayedNow, readTrackUsage } from './track-usage.js';
 
 // Three copies move the app tracks into Redis. A second run of each copies
 // only what the first run did not copy.
@@ -143,7 +143,7 @@ async function copyBuiltInTrack(trackKey: string, username: string, now: Date): 
         track: builtIn,
         medalRow: APP_MEDAL_ROWS[trackKey] ?? null,
     }, { username, origin: 'migrated', trusted: true, now, assertUnplayed: async (key) => {
-        if ((await readTrackUsage()).playedTrackKeys.has(key)) {
+        if (await isTrackPlayedNow(key)) {
             throw new TrackInputError('This track became a race while the copy was running.');
         }
     } });
