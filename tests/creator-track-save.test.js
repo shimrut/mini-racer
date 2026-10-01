@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TRACKS } from '../game/track/tracks.js';
-import { creatorTrackContent, hasCreatorUnsavedWork, saveCreatorTrackSnapshot } from '../tools/mapmaker/creator-track-save.js';
+import {
+    captureUnsavedCreatorWork,
+    creatorTrackContent,
+    hasCreatorUnsavedWork,
+    restoreUnsavedCreatorWork,
+    saveCreatorTrackSnapshot,
+} from '../tools/mapmaker/creator-track-save.js';
+import { clearPendingMedalText, setPendingMedalText } from '../tools/mapmaker/pending-medal-text.js';
 
 const medalRow = { author: 10, gold: 12, silver: 15, bronze: 20 };
 
@@ -15,6 +22,7 @@ function editorState() {
         creatorRecords: new Map([['firstTrack', { revision: 3 }]]),
         creatorSaveErrors: new Map(), creatorWriteGeneration: 0,
         medalRowByKey: new Map(), medalTimes: { firstTrack: medalRow }, draftLoopsByKey: new Map(),
+        pendingMedalText: new Map(), editHistories: new Map(),
         baselineQualityCodesByKey: new Map(), baselineGeometryByKey: new Map(),
         creatorRecordMeta: (record) => ({ revision: record.revision, checksPassed: record.checksPassed }),
         setCreatorSaveStatus: vi.fn(), syncActionButtons: vi.fn(), syncCreatorTrackState: vi.fn(),
@@ -123,6 +131,35 @@ describe('Creator track save acknowledgements', () => {
     });
 });
 
+describe('Creator typed medal text', () => {
+    it('keeps the track unsaved when medal text is typed during the save', async () => {
+        const editor = editorState();
+        const request = delaySave();
+        const saving = saveCreatorTrackSnapshot(editor, 'firstTrack', JSON.stringify);
+        setPendingMedalText(editor.pendingMedalText, 'firstTrack', 'gold', '13');
+        request.acknowledge();
+        expect(await saving).toBe(true);
+        expect(editor.state.dirtyTrackKeys.has('firstTrack')).toBe(true);
+        expect(editor.setStatus).toHaveBeenLastCalledWith(expect.stringContaining('Newer changes are still unsaved'));
+    });
+
+    it('keeps typed text through a refresh that replaces the tracks', () => {
+        const editor = editorState();
+        editor.isCreatorLocked = (key) => Boolean(editor.creatorRecords.get(key)?.lockedAt);
+        setPendingMedalText(editor.pendingMedalText, 'firstTrack', 'gold', '');
+        setPendingMedalText(editor.pendingMedalText, 'firstTrack', 'silver', '1');
+        const unsaved = captureUnsavedCreatorWork(editor);
+        // The refresh hydrates each server record. That replaces the typed text.
+        editor.state.tracks = { firstTrack: structuredClone(TRACKS.circuit) };
+        editor.creatorRecords = new Map([['firstTrack', { revision: 4 }]]);
+        clearPendingMedalText(editor.pendingMedalText, 'firstTrack');
+        restoreUnsavedCreatorWork(editor, unsaved);
+        expect(editor.pendingMedalText.get('firstTrack')).toEqual(new Map([['gold', ''], ['silver', '1']]));
+        expect(editor.state.dirtyTrackKeys.has('firstTrack')).toBe(true);
+        expect(editor.creatorRecords.get('firstTrack').revision).toBe(3);
+    });
+});
+
 describe('Creator navigation guard', () => {
     it('checks all tracks, drawings, panel changes and pending writes', () => {
         const editor = editorState();
@@ -133,6 +170,9 @@ describe('Creator navigation guard', () => {
         editor.draftLoopsByKey.set('secondTrack', [{ x: 1, y: 1 }]);
         expect(hasCreatorUnsavedWork(editor)).toBe(true);
         editor.draftLoopsByKey.clear();
+        setPendingMedalText(editor.pendingMedalText, 'firstTrack', 'gold', '1');
+        expect(hasCreatorUnsavedWork(editor)).toBe(true);
+        editor.pendingMedalText.clear();
         editor.state.draftLoop = [{ x: 1, y: 1 }];
         expect(hasCreatorUnsavedWork(editor)).toBe(true);
         editor.state.draftLoop = [];

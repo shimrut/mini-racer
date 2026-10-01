@@ -44,7 +44,20 @@ import {
 import { TrackPreviews } from './mapmaker/track-preview.js';
 import { creatorApi } from './mapmaker/creator-api.js';
 import { CreatorPanels } from './mapmaker/creator-panels.js';
-import { creatorTrackContent, hasCreatorUnsavedWork, saveCreatorTrackSnapshot } from './mapmaker/creator-track-save.js';
+import {
+    captureUnsavedCreatorWork,
+    hasCreatorUnsavedWork,
+    restoreUnsavedCreatorWork,
+    saveCreatorTrackSnapshot,
+} from './mapmaker/creator-track-save.js';
+import {
+    clearPendingMedalText,
+    hasPendingMedalText,
+    medalFieldText,
+    movePendingMedalText,
+    readPendingMedalText,
+    setPendingMedalText,
+} from './mapmaker/pending-medal-text.js';
 import { MAPMAKER_ONLINE, deleteCloudMap, listCloudMaps, saveCloudMap } from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
@@ -367,6 +380,8 @@ class MapmakerApp {
         this.seriesData = normalizeCampaignSeriesData(seriesFileData);
         this.medalTimes = { ...medalTimesFileData };
         this.medalRowByKey = new Map();
+        // Typed medal text that is not in the medal row yet, by track and tier.
+        this.pendingMedalText = new Map();
         this.autoRoadGuideByKey = new Map();
         this.recoveryTimer = null;
         this.skipBeforeUnload = false;
@@ -1043,6 +1058,10 @@ class MapmakerApp {
             this.markDirty('Updated track name.', derived);
         });
 
+        // Typing keeps the text at once. The change event puts it in the row.
+        for (const tier of MEDAL_TIERS) {
+            this.medalInputs[tier].addEventListener('input', () => this.recordMedalText(tier));
+        }
         this.medalInputs.author.addEventListener('change', () => {
             this.setAuthorTime(Number(this.medalInputs.author.value));
         });
@@ -1297,8 +1316,8 @@ class MapmakerApp {
             ?? null;
         const fixed = this.medalTimesFixed(trackKey) || Boolean(this.creatorDeletingKey);
         for (const tier of MEDAL_TIERS) {
-            const value = Number(row?.[tier]);
-            this.medalInputs[tier].value = Number.isFinite(value) && value > 0 ? value.toFixed(2) : '';
+            const pending = fixed ? undefined : readPendingMedalText(this.pendingMedalText, trackKey, tier);
+            this.medalInputs[tier].value = medalFieldText(pending, row?.[tier]);
             this.medalInputs[tier].disabled = fixed;
         }
 
@@ -1324,7 +1343,7 @@ class MapmakerApp {
             this.draftLapsList.appendChild(note);
         }
 
-        const edited = this.medalRowByKey.has(trackKey);
+        const edited = this.medalRowByKey.has(trackKey) || hasPendingMedalText(this.pendingMedalText, trackKey);
         const error = row ? getMedalRowError(row) : 'Set all four medal times.';
         const bronze = Number(row?.bronze);
         const notes = [];
@@ -1346,24 +1365,67 @@ class MapmakerApp {
         this.medalTimesState.className = `pill${!row || error ? ' pill-warn' : edited ? ' pill-warn' : ' pill-ok'}`;
     }
 
+    // An author time fills the other three medals, so it replaces the whole
+    // row and every typed medal text. A refused time keeps its typed text.
     setAuthorTime(authorSec) {
-        if (this.medalTimesFixed()) return;
+        if (this.medalTimesFixed()) return false;
         const row = suggestMedalTimes(authorSec);
         if (!row) {
             this.setStatus('The author time must be more than 0 s.', true);
-            return;
+            return false;
         }
         this.medalRowByKey.set(this.state.selectedTrackKey, row);
+        clearPendingMedalText(this.pendingMedalText, this.state.selectedTrackKey);
         this.syncMedalTimesPanel();
         this.markDirty(`Set the author time to ${row.author.toFixed(2)} s.`);
+        return true;
     }
 
+    // The row takes all four fields as they show, so every typed text is in it.
     updateMedalRowFromInputs() {
         if (this.medalTimesFixed()) return;
         const row = Object.fromEntries(MEDAL_TIERS.map((tier) => [tier, Number(this.medalInputs[tier].value)]));
         this.medalRowByKey.set(this.state.selectedTrackKey, row);
+        clearPendingMedalText(this.pendingMedalText, this.state.selectedTrackKey);
         this.syncMedalTimesPanel();
         this.markDirty('Changed the medal times.');
+    }
+
+    // Puts the typed medal text of the open track in its row, as the change
+    // event does. A field can keep text with no change event: text typed back
+    // to its first value. An author time that equals the row changes nothing,
+    // so it does not fill the other medals again.
+    commitPendingMedalText(key) {
+        if (!hasPendingMedalText(this.pendingMedalText, key)) return true;
+        if (key !== this.state.selectedTrackKey) return false;
+        const authorText = readPendingMedalText(this.pendingMedalText, key, 'author');
+        if (authorText !== undefined) {
+            const row = this.medalRowByKey.get(key)
+                ?? this.medalTimes[this.state.originalTrackKeyByKey.get(key) ?? key] ?? null;
+            const author = Number(authorText);
+            if (author > 0 && author === Number(row?.author)) {
+                clearPendingMedalText(this.pendingMedalText, key, ['author']);
+            } else if (!this.setAuthorTime(author)) {
+                return false;
+            }
+        }
+        if (hasPendingMedalText(this.pendingMedalText, key)) this.updateMedalRowFromInputs();
+        return !hasPendingMedalText(this.pendingMedalText, key);
+    }
+
+    // Keeps the typed text and marks the track unsaved. It does not repaint the
+    // field: a number field reports a half-typed "12." as empty.
+    recordMedalText(tier) {
+        if (this.medalTimesFixed()) return;
+        const key = this.state.selectedTrackKey;
+        setPendingMedalText(this.pendingMedalText, key, tier, this.medalInputs[tier].value);
+        this.state.dirtyTrackKeys.add(key);
+        this.medalTimesState.textContent = 'Unsaved';
+        this.medalTimesState.className = 'pill pill-warn';
+        this.syncActionButtons();
+        if (this.creatorMode && this.creatorSavingKey !== key && !this.creatorSaveErrors.has(key)) {
+            this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
+        }
     }
 
     loadTrack(trackKey) {
@@ -1449,6 +1511,7 @@ class MapmakerApp {
         const medalRow = this.medalRowByKey.get(currentKey);
         this.medalRowByKey.delete(currentKey);
         if (medalRow) this.medalRowByKey.set(nextKey, medalRow);
+        movePendingMedalText(this.pendingMedalText, currentKey, nextKey);
         const cloudKey = this.cloudKeyByKey.get(currentKey);
         this.cloudKeyByKey.delete(currentKey);
         if (cloudKey) this.cloudKeyByKey.set(nextKey, cloudKey);
@@ -3418,6 +3481,9 @@ class MapmakerApp {
         if (record.medalRow) this.medalTimes[key] = record.medalRow;
         else delete this.medalTimes[key];
         this.medalRowByKey.delete(key);
+        // The server version replaces the local one, typed text included. A
+        // refresh puts back the unsaved work of a dirty track after this.
+        clearPendingMedalText(this.pendingMedalText, key);
         if (record.draftLoop?.length) this.draftLoopsByKey.set(key, cloneTracks(record.draftLoop));
         else this.draftLoopsByKey.delete(key);
         this.state.dirtyTrackKeys.delete(key);
@@ -3474,25 +3540,13 @@ class MapmakerApp {
                 return;
             }
             const previousKey = this.state.selectedTrackKey;
-            const unsaved = [...this.state.dirtyTrackKeys]
-                .filter((key) => this.state.tracks[key])
-                .map((key) => ({ key, content: creatorTrackContent(this, key),
-                    history: this.editHistories.get(key), record: this.creatorRecords.get(key),
-                }));
+            const unsaved = captureUnsavedCreatorWork(this);
             this.state.tracks = {};
             this.creatorRecords.clear();
             this.editHistories = new Map();
             // The picker lists the newest tracks first.
             for (const record of [...tracks].reverse()) this.addCreatorRecord(record);
-            for (const { key, content, history, record } of unsaved) {
-                this.state.tracks[key] = content.track;
-                this.editHistories.set(key, history ?? createEditHistory(content.track));
-                if (record && !this.isCreatorLocked(key)) this.creatorRecords.set(key, record);
-                if (content.medalRow) this.medalRowByKey.set(key, content.medalRow);
-                if (content.draftLoop.length) this.draftLoopsByKey.set(key, content.draftLoop);
-                else this.draftLoopsByKey.delete(key);
-                this.state.dirtyTrackKeys.add(key);
-            }
+            restoreUnsavedCreatorWork(this, unsaved);
             this.applyCreatorPlaces(daily, seriesView);
             this.creatorPanels.receiveViews({ daily, seriesView, copyView, generation: panelGeneration });
             this.creatorLoaded = true;
@@ -3564,6 +3618,10 @@ class MapmakerApp {
             this.setStatus('A track in the game has this name already. Choose another name.', true);
             return false;
         }
+        if (!this.commitPendingMedalText(key)) {
+            this.setStatus(`Cannot save ${name}: finish the medal times.`, true);
+            return false;
+        }
         const medalRow = this.medalRowByKey.get(key) ?? this.medalTimes[key] ?? null;
         const medalError = medalRow ? getMedalRowError(medalRow) : null;
         if (medalError) {
@@ -3609,6 +3667,7 @@ class MapmakerApp {
             this.editHistories.delete(key);
             this.draftLoopsByKey.delete(key);
             this.medalRowByKey.delete(key);
+            clearPendingMedalText(this.pendingMedalText, key);
             delete this.medalTimes[key];
             this.state.originalTrackKeyByKey.delete(key);
             this.state.dirtyTrackKeys.delete(key);

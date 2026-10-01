@@ -53,6 +53,34 @@ function moveItem(list, from, to) {
     return next;
 }
 
+// A new series takes its key from its name until the key is typed.
+function seriesIdFromName(name) {
+    const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return base ? `${/^[a-z]/.test(base) ? base : `s-${base}`}-v1`.slice(0, 40) : '';
+}
+
+// The medals-needed field shows the typed text, else the saved number.
+function seriesMedalsText(stage) {
+    if (typeof stage.requiredMedalsText === 'string') return stage.requiredMedalsText;
+    return Number.isFinite(stage.requiredMedals) ? String(stage.requiredMedals) : '';
+}
+
+// The series as the server stores it. The typed text is only for the field.
+function seriesContent(draft) {
+    return {
+        name: draft.name,
+        ground: draft.ground,
+        stages: draft.stages.map(({ trackKey, laps, requiredMedals }) => ({ trackKey, laps, requiredMedals })),
+    };
+}
+
+// The series as the moderator typed it. A newer edit that gives the same
+// number ("05" after "5") is still a newer edit.
+function seriesTypedContent(draft) {
+    return JSON.stringify({ ...seriesContent(draft), id: draft.id,
+        typed: draft.stages.map((stage) => stage.requiredMedalsText ?? null) });
+}
+
 export class CreatorPanels {
     // `confirm` opens the page's own dialog. Reddit ignores window.confirm.
     constructor({ onOpenTrack, onTracksChanged, setStatus, confirm }) {
@@ -397,7 +425,25 @@ export class CreatorPanels {
                 text: 'A series in the app changes only with an app release. Copy a hidden one to Redis on the Copy screen.',
             }),
         ]);
-        this.seriesRoot.replaceChildren(side, this.renderSeriesEditor());
+        const draft = this.seriesDraft;
+        const structure = this.seriesEditorStructure();
+        const refs = this.seriesEditorRefs;
+        if (draft && refs?.draft === draft && refs.structure === structure && refs.root.isConnected
+            && refs.stages.length === draft.stages.length
+            && refs.stages.every((entry, index) => entry.stage === draft.stages[index])) {
+            // The editor's layout is the same: update it in place, so the field
+            // being typed in keeps its text and focus, and a button under the
+            // pointer stays.
+            refs.side.replaceWith(side);
+            refs.side = side;
+            this.syncSeriesEditor();
+        } else {
+            const focus = this.captureSeriesFocus();
+            const editor = this.renderSeriesEditor();
+            this.seriesRoot.replaceChildren(side, editor);
+            if (this.seriesEditorRefs) Object.assign(this.seriesEditorRefs, { root: editor, side, structure });
+            this.restoreSeriesFocus(focus);
+        }
         if (this.seriesDestructive) {
             this.seriesRoot.querySelectorAll('button, input, select').forEach((control) => {
                 control.disabled = true;
@@ -405,9 +451,104 @@ export class CreatorPanels {
         }
     }
 
+    // What the editor shows apart from the typed values. When it changes, the
+    // editor is built again.
+    seriesEditorStructure() {
+        const draft = this.seriesDraft;
+        if (!draft || !this.seriesView) return 'none';
+        const trackByKey = new Map(this.seriesView.tracks.map((track) => [track.key, track]));
+        return JSON.stringify({
+            isNew: Boolean(draft.isNew),
+            status: draft.status,
+            fixed: draft.publishedStageCount ?? 0,
+            ground: draft.ground,
+            stages: draft.stages.map((stage) => {
+                const track = trackByKey.get(stage.trackKey);
+                return [stage.trackKey, stage.laps, track?.name, track?.ready, track?.ground, track?.source];
+            }),
+            candidates: this.seriesCandidates(draft).map((track) => track.key),
+            error: this.seriesSaveError?.draft === draft ? this.seriesSaveError.message : null,
+            destructive: this.seriesDestructive,
+        });
+    }
+
+    seriesCandidates(draft) {
+        const inSeries = new Set(draft.stages.map((stage) => stage.trackKey));
+        return this.seriesView.tracks
+            .filter((track) => track.ready && !inSeries.has(track.key) && track.ground === draft.ground
+                && (!track.usedBy || track.usedBy === draft.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // A rebuild gives focus back to the same field of the same draft.
+    captureSeriesFocus() {
+        const active = document.activeElement;
+        if (!active || !this.seriesRoot.contains(active) || !active.dataset?.field) return null;
+        let start = null;
+        let end = null;
+        try {
+            start = active.selectionStart;
+            end = active.selectionEnd;
+        } catch {
+            // A number field has no text selection.
+        }
+        return { draft: this.seriesDraft, field: active.dataset.field, start, end };
+    }
+
+    restoreSeriesFocus(focus) {
+        if (!focus || focus.draft !== this.seriesDraft) return;
+        const target = this.seriesRoot.querySelector(`[data-field="${focus.field}"]`);
+        if (!target || target.disabled) return;
+        target.focus();
+        if (focus.start === null || focus.start === undefined) return;
+        try {
+            target.setSelectionRange(focus.start, focus.end);
+        } catch {
+            // A number field has no text selection.
+        }
+    }
+
+    // A typed value is in the draft at once. Only the parts that depend on it
+    // change; the fields stay, so the text and the focus stay.
+    markSeriesEdited() {
+        this.seriesDirty = true;
+        this.syncSeriesEditor();
+    }
+
+    syncSeriesEditor() {
+        const refs = this.seriesEditorRefs;
+        const draft = this.seriesDraft;
+        if (!refs || !draft || refs.draft !== draft) return;
+        const fixed = draft.publishedStageCount ?? 0;
+        const unpublished = draft.stages.length - fixed;
+        refs.heading.textContent = draft.name || 'New series';
+        if (document.activeElement !== refs.nameInput && refs.nameInput.value !== draft.name) {
+            refs.nameInput.value = draft.name;
+        }
+        if (document.activeElement !== refs.idInput && refs.idInput.value !== draft.id) {
+            refs.idInput.value = draft.id;
+        }
+        refs.idInput.disabled = !draft.isNew || this.seriesSavingDraft === draft;
+        refs.saveButton.disabled = !this.seriesDirty || this.busy;
+        refs.liveButton.disabled = this.seriesDirty || this.busy || draft.isNew || unpublished <= 0;
+        refs.deleteButton.disabled = this.busy || draft.isNew || fixed > 0;
+        refs.stages.forEach(({ stage, medals, error }, index) => {
+            const text = seriesMedalsText(stage);
+            if (document.activeElement !== medals && medals.value !== text) medals.value = text;
+            const message = index < fixed ? null : getRequiredMedalsError(
+                stage.requiredMedals,
+                index,
+                index > 0 ? draft.stages[index - 1].requiredMedals : 0,
+            );
+            error.textContent = message ?? '';
+            error.hidden = !message;
+        });
+    }
+
     renderSeriesEditor() {
         const draft = this.seriesDraft;
         if (!draft) {
+            this.seriesEditorRefs = null;
             return element('div', { className: 'creator-series-editor' }, [
                 element('p', { className: 'field-hint', text: 'Choose a series, or start a new one.' }),
             ]);
@@ -420,21 +561,22 @@ export class CreatorPanels {
             this.renderSeries();
         };
 
-        const nameInput = element('input', { attrs: { type: 'text', maxlength: 40, value: draft.name } });
-        nameInput.addEventListener('change', () => {
+        const nameInput = element('input', { attrs: {
+            type: 'text', maxlength: 40, value: draft.name, 'data-field': 'series-name',
+        } });
+        nameInput.addEventListener('input', () => {
             draft.name = nameInput.value;
             if (draft.isNew && !draft.idTouched && this.seriesSavingDraft !== draft) {
-                const base = nameInput.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-                draft.id = base ? `${/^[a-z]/.test(base) ? base : `s-${base}`}-v1`.slice(0, 40) : '';
+                draft.id = seriesIdFromName(nameInput.value);
             }
-            changed();
+            this.markSeriesEdited();
         });
         const idInput = element('input', { attrs: { type: 'text', maxlength: 40, value: draft.id,
-            disabled: !draft.isNew || this.seriesSavingDraft === draft } });
-        idInput.addEventListener('change', () => {
+            'data-field': 'series-id', disabled: !draft.isNew || this.seriesSavingDraft === draft } });
+        idInput.addEventListener('input', () => {
             draft.id = idInput.value.trim();
             draft.idTouched = true;
-            changed();
+            this.markSeriesEdited();
         });
         const groundSelect = element('select', { attrs: { disabled: fixed > 0 } }, TRACK_GROUND_KEYS.map((key) => (
             element('option', {
@@ -447,6 +589,7 @@ export class CreatorPanels {
             changed();
         });
 
+        const stageRefs = [];
         const stageRows = draft.stages.map((stage, index) => {
             const track = trackByKey.get(stage.trackKey) ?? { name: stage.trackKey, ready: false };
             const locked = index < fixed;
@@ -461,19 +604,25 @@ export class CreatorPanels {
             });
             const medals = element('input', {
                 attrs: {
-                    type: 'number', min: 0, step: 1, value: stage.requiredMedals,
+                    type: 'number', min: 0, step: 1, value: seriesMedalsText(stage),
                     disabled: locked || index === 0, 'aria-label': 'Medals needed',
+                    'data-field': `stage-medals:${stage.trackKey}`,
                 },
             });
-            medals.addEventListener('change', () => {
-                stage.requiredMedals = Number(medals.value);
-                changed();
+            // The typed text stays as it is, so a blank field stays blank.
+            medals.addEventListener('input', () => {
+                stage.requiredMedalsText = medals.value;
+                stage.requiredMedals = medals.value.trim() === '' ? null : Number(medals.value);
+                this.markSeriesEdited();
             });
-            const error = locked ? null : getRequiredMedalsError(
+            const message = locked ? null : getRequiredMedalsError(
                 stage.requiredMedals,
                 index,
                 index > 0 ? draft.stages[index - 1].requiredMedals : 0,
             );
+            const error = element('p', { className: 'creator-row-error', text: message ?? '' });
+            error.hidden = !message;
+            stageRefs.push({ stage, medals, error });
             return element('li', { className: 'creator-row' }, [
                 element('span', { className: 'creator-row-index', text: String(index + 1) }),
                 track.source && track.source !== 'app'
@@ -503,15 +652,11 @@ export class CreatorPanels {
                         changed();
                     }, { disabled: locked, title: 'Take out of the series' }),
                 ]),
-                error ? element('p', { className: 'creator-row-error', text: error }) : null,
+                error,
             ]);
         });
 
-        const inSeries = new Set(draft.stages.map((stage) => stage.trackKey));
-        const candidates = tracks
-            .filter((track) => track.ready && !inSeries.has(track.key) && track.ground === draft.ground
-                && (!track.usedBy || track.usedBy === draft.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
+        const candidates = this.seriesCandidates(draft);
         const addSelect = element('select', { attrs: { 'aria-label': 'Track to add' } }, [
             element('option', { text: candidates.length ? 'Choose a track' : 'No free track on this ground', attrs: { value: '' } }),
             ...candidates.map((track) => element('option', {
@@ -521,32 +666,39 @@ export class CreatorPanels {
         ]);
         const addStage = () => {
             if (!addSelect.value) return;
-            const previous = draft.stages.at(-1)?.requiredMedals ?? 0;
+            const previous = Number(draft.stages.at(-1)?.requiredMedals);
             draft.stages = [...draft.stages, {
                 trackKey: addSelect.value,
                 laps: 1,
-                requiredMedals: draft.stages.length ? previous + 2 : 0,
+                requiredMedals: draft.stages.length ? (Number.isFinite(previous) ? previous : 0) + 2 : 0,
             }];
             changed();
         };
 
         const unpublished = draft.stages.length - fixed;
+        const heading = element('h2', { text: draft.name || 'New series' });
+        const saveButton = button('Save', () => this.saveSeries(), {
+            className: 'primary-btn',
+            disabled: !this.seriesDirty || this.busy,
+        });
+        const liveButton = button(fixed ? 'Make new stages live' : 'Make live', () => this.publishSeries(), {
+            disabled: this.seriesDirty || this.busy || draft.isNew || unpublished <= 0,
+            title: 'Players see the series. The stages cannot change after this.',
+        });
+        const deleteButton = button('Delete', () => this.deleteSeries(), {
+            className: 'danger-btn',
+            disabled: this.busy || draft.isNew || fixed > 0,
+        });
+        this.seriesEditorRefs = {
+            draft, heading, nameInput, idInput, saveButton, liveButton, deleteButton, stages: stageRefs,
+        };
         return element('div', { className: 'creator-series-editor' }, [
             element('div', { className: 'creator-panel-head' }, [
-                element('h2', { text: draft.name || 'New series' }),
+                heading,
                 badge(draft.status === 'published' ? 'Live' : 'Draft', draft.status === 'published' ? 'ok' : ''),
-                button('Save', () => this.saveSeries(), {
-                    className: 'primary-btn',
-                    disabled: !this.seriesDirty || this.busy,
-                }),
-                button(fixed ? 'Make new stages live' : 'Make live', () => this.publishSeries(), {
-                    disabled: this.seriesDirty || this.busy || draft.isNew || unpublished <= 0,
-                    title: 'Players see the series. The stages cannot change after this.',
-                }),
-                button('Delete', () => this.deleteSeries(), {
-                    className: 'danger-btn',
-                    disabled: this.busy || draft.isNew || fixed > 0,
-                }),
+                saveButton,
+                liveButton,
+                deleteButton,
             ]),
             this.seriesSaveError?.draft === draft
                 ? element('p', { className: 'creator-error', text: this.seriesSaveError.message }) : null,
@@ -579,7 +731,8 @@ export class CreatorPanels {
             return;
         }
         const seriesId = draft.id;
-        const snapshot = structuredClone({ name: draft.name, ground: draft.ground, stages: draft.stages });
+        const snapshot = structuredClone(seriesContent(draft));
+        const typedAtStart = seriesTypedContent(draft);
         const baseRevision = draft.isNew ? 0 : draft.revision;
         this.seriesSavingDraft = draft;
         this.seriesSaveError = null;
@@ -598,12 +751,30 @@ export class CreatorPanels {
             // The Daily list shows which tracks are Campaign stages.
             this.refresh('daily', 'copy');
             if (this.seriesDraft === draft) {
-                const unchanged = JSON.stringify({ name: draft.name, ground: draft.ground, stages: draft.stages })
-                    === JSON.stringify(snapshot);
+                const unchanged = seriesTypedContent(draft) === typedAtStart;
                 this.selectedSeriesId = series.id;
-                if (unchanged) this.seriesDraft = structuredClone(series);
-                else Object.assign(draft, { id: series.id, isNew: false, revision: series.revision,
-                    status: series.status, publishedStageCount: series.publishedStageCount });
+                // The draft keeps its identity, so the field being typed in
+                // keeps its focus. Newer edits stay in it.
+                if (unchanged) {
+                    const { stages, ...fields } = structuredClone(series);
+                    Object.assign(draft, fields);
+                    delete draft.isNew;
+                    delete draft.idTouched;
+                    const sameStages = stages.length === draft.stages.length
+                        && stages.every((stage, index) => stage.trackKey === draft.stages[index].trackKey);
+                    if (sameStages) {
+                        // The stage fields keep their stage objects.
+                        stages.forEach((stage, index) => {
+                            Object.assign(draft.stages[index], stage);
+                            delete draft.stages[index].requiredMedalsText;
+                        });
+                    } else {
+                        draft.stages = stages;
+                    }
+                } else {
+                    Object.assign(draft, { id: series.id, isNew: false, revision: series.revision,
+                        status: series.status, publishedStageCount: series.publishedStageCount });
+                }
                 this.seriesDirty = !unchanged;
                 this.setStatus(unchanged ? `Saved ${series.name}.`
                     : `Saved the earlier changes to ${series.name}. Newer changes are still unsaved.`);

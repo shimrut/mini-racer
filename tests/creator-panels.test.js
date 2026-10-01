@@ -476,3 +476,223 @@ describe('Creator tabs keep their data', () => {
         expect(calls).toMatchObject({ series: 1, copy: 1 });
     });
 });
+
+describe('Creator Campaign fields keep typed text', () => {
+    const draftView = {
+        series: [{
+            id: 'day-v1',
+            name: 'Day Races',
+            ground: 'tarmac',
+            stages: [
+                { trackKey: 'dayLoop', laps: 1, requiredMedals: 0 },
+                { trackKey: 'duskLoop', laps: 1, requiredMedals: 2 },
+                { trackKey: 'dawnLoop', laps: 1, requiredMedals: 4 },
+            ],
+            status: 'draft',
+            publishedStageCount: 0,
+            revision: 2,
+        }],
+        appSeries: [],
+        tracks: [
+            { key: 'dayLoop', name: 'Day Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: 'day-v1' },
+            { key: 'duskLoop', name: 'Dusk Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: 'day-v1' },
+            { key: 'dawnLoop', name: 'Dawn Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: 'day-v1' },
+            { key: 'freeLoop', name: 'Free Loop', ground: 'tarmac', source: 'creator', ready: true, usedBy: null },
+        ],
+    };
+
+    const root = () => document.getElementById('creator-series-view');
+    const field = (name) => root().querySelector(`[data-field="${name}"]`);
+
+    function type(input, text) {
+        input.focus();
+        input.value = text;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // A click on Save takes the focus first, so the field sends its change event.
+    function leave(input) {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.blur();
+    }
+
+    function server({ hold = false } = {}) {
+        const puts = [];
+        const pendingPut = deferred();
+        let view = structuredClone(draftView);
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'PUT') {
+                const body = JSON.parse(options.body);
+                puts.push({ url, body });
+                const answer = jsonResponse({ series: { ...view.series[0], ...body,
+                    id: decodeURIComponent(String(url).split('/').pop()), revision: body.baseRevision + 1 } });
+                if (!hold) return answer;
+                await pendingPut.promise;
+                return answer;
+            }
+            if (String(url).includes('/api/creator/daily')) return jsonResponse(dailyView);
+            if (String(url).includes('/api/creator/migration')) return jsonResponse({ report: null, preview: { copied: [] } });
+            return jsonResponse(structuredClone(view));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        return {
+            puts,
+            fetchMock,
+            releasePut: () => pendingPut.resolve(),
+            setView: (next) => { view = next; },
+        };
+    }
+
+    async function openPanels() {
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('day-v1');
+        return panels;
+    }
+
+    it('saves a typed name, key or medal target on the first Save click', async () => {
+        const api = server();
+        const panels = await openPanels();
+        const save = buttonsByText(root(), 'Save')[0];
+        expect(save.disabled).toBe(true);
+        type(field('series-name'), 'Typed Name');
+        type(field('stage-medals:duskLoop'), '3');
+        leave(field('stage-medals:duskLoop'));
+        expect(save.isConnected).toBe(true);
+        expect(save.disabled).toBe(false);
+        save.click();
+        await vi.waitFor(() => expect(api.puts).toHaveLength(1));
+        expect(api.puts[0].body).toMatchObject({ name: 'Typed Name', stages: [{}, { requiredMedals: 3 }, {}] });
+        expect(api.puts[0].body.stages[1]).not.toHaveProperty('requiredMedalsText');
+
+        await vi.waitFor(() => expect(panels.busy).toBe(false));
+        await panels.startNewSeries();
+        type(field('series-name'), 'Fresh Series');
+        expect(field('series-id').value).toBe('fresh-series-v1');
+        type(field('series-id'), 'my-key');
+        type(field('series-name'), 'Fresh Series Two');
+        leave(field('series-name'));
+        expect(field('series-id').value).toBe('my-key');
+        const newSave = buttonsByText(root(), 'Save')[0];
+        newSave.click();
+        await vi.waitFor(() => expect(api.puts).toHaveLength(2));
+        expect(api.puts[1].url).toBe('/api/creator/series/my-key');
+    });
+
+    it('keeps a blank medal target blank through a refresh, and keeps the focus', async () => {
+        const api = server();
+        const panels = await openPanels();
+        const medals = field('stage-medals:duskLoop');
+        type(medals, '');
+        expect(panels.seriesDraft.stages[1].requiredMedals).toBeNull();
+        const error = medals.closest('li').querySelector('.creator-row-error');
+        expect(error.hidden).toBe(false);
+
+        await panels.loadSeries();
+        expect(field('stage-medals:duskLoop')).toBe(medals);
+        expect(medals.value).toBe('');
+        expect(document.activeElement).toBe(medals);
+
+        // A refresh that changes what the editor shows builds it again.
+        const changed = structuredClone(draftView);
+        changed.tracks.find((track) => track.key === 'freeLoop').ready = false;
+        api.setView(changed);
+        await panels.loadSeries();
+        const rebuilt = field('stage-medals:duskLoop');
+        expect(rebuilt).not.toBe(medals);
+        expect(rebuilt.value).toBe('');
+        expect(document.activeElement).toBe(rebuilt);
+    });
+
+    it('keeps text typed while a read is pending', async () => {
+        server();
+        const panels = await openPanels();
+        const read = deferred();
+        const fetchMock = globalThis.fetch;
+        globalThis.fetch = vi.fn(async (...args) => {
+            await read.promise;
+            return fetchMock(...args);
+        });
+        const loading = panels.loadSeries();
+        const name = field('series-name');
+        type(name, 'Typed while reading');
+        read.resolve();
+        await loading;
+        expect(field('series-name').value).toBe('Typed while reading');
+        expect(document.activeElement).toBe(field('series-name'));
+        expect(panels.seriesDirty).toBe(true);
+    });
+
+    it('keeps text typed while a save is pending, even when it gives the same number', async () => {
+        const api = server({ hold: true });
+        const panels = await openPanels();
+        type(field('series-name'), 'Sent name');
+        type(field('stage-medals:duskLoop'), '3');
+        leave(field('stage-medals:duskLoop'));
+        buttonsByText(root(), 'Save')[0].click();
+        await vi.waitFor(() => expect(api.puts).toHaveLength(1));
+        type(field('series-name'), 'Sent name and more');
+        type(field('stage-medals:duskLoop'), '03');
+        api.releasePut();
+        await vi.waitFor(() => expect(panels.busy).toBe(false));
+        expect(panels.seriesDirty).toBe(true);
+        expect(field('series-name').value).toBe('Sent name and more');
+        expect(field('stage-medals:duskLoop').value).toBe('03');
+        expect(document.activeElement).toBe(field('stage-medals:duskLoop'));
+        expect(panels.seriesDraft.revision).toBe(3);
+    });
+
+    it('acknowledges an unchanged save without replacing the draft or the fields', async () => {
+        const api = server({ hold: true });
+        const panels = await openPanels();
+        const draft = panels.seriesDraft;
+        type(field('stage-medals:duskLoop'), '3');
+        leave(field('stage-medals:duskLoop'));
+        const medals = field('stage-medals:duskLoop');
+        buttonsByText(root(), 'Save')[0].click();
+        await vi.waitFor(() => expect(api.puts).toHaveLength(1));
+        api.releasePut();
+        await vi.waitFor(() => expect(panels.busy).toBe(false));
+        expect(panels.seriesDirty).toBe(false);
+        expect(panels.seriesDraft).toBe(draft);
+        expect(field('stage-medals:duskLoop')).toBe(medals);
+        expect(draft.stages[1]).not.toHaveProperty('requiredMedalsText');
+        type(medals, '5');
+        expect(panels.seriesDraft.stages[1].requiredMedals).toBe(5);
+    });
+
+    it('gives the focus back to the same stage after a reorder', async () => {
+        server();
+        const panels = await openPanels();
+        type(field('stage-medals:duskLoop'), '3');
+        const [first, dusk, dawn] = panels.seriesDraft.stages;
+        panels.seriesDraft.stages = [first, dawn, dusk];
+        panels.renderSeries();
+        expect(document.activeElement?.dataset.field).toBe('stage-medals:duskLoop');
+        expect(document.activeElement.value).toBe('3');
+    });
+
+    it('shows the server values again when the series is opened again', async () => {
+        server();
+        const panels = await openPanels();
+        type(field('stage-medals:duskLoop'), '');
+        await panels.selectSeries('day-v1', { force: true });
+        expect(field('stage-medals:duskLoop').value).toBe('2');
+        expect(panels.seriesDraft.stages[1]).not.toHaveProperty('requiredMedalsText');
+    });
+
+    it('keeps a key that a save is using while the name changes', async () => {
+        const api = server({ hold: true });
+        const panels = await openPanels();
+        await panels.startNewSeries();
+        type(field('series-name'), 'Fresh Series');
+        leave(field('series-name'));
+        buttonsByText(root(), 'Save')[0].click();
+        await vi.waitFor(() => expect(api.puts).toHaveLength(1));
+        type(field('series-name'), 'Fresh Series Renamed');
+        expect(panels.seriesDraft.id).toBe('fresh-series-v1');
+        expect(field('series-id').disabled).toBe(true);
+        api.releasePut();
+        await vi.waitFor(() => expect(panels.busy).toBe(false));
+        expect(panels.seriesDraft.id).toBe('fresh-series-v1');
+    });
+});
