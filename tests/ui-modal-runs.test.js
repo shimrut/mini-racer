@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
 import { ModalContentUi } from '../game/race/ui-modal-content.js';
@@ -1646,6 +1646,7 @@ describe('Daily finish share chooser', () => {
                 body: {
                     status,
                     challengeId: 'challenge-1',
+                    postId: 't3_challenge1',
                     postUrl: 'https://reddit.com/r/miniracer/challenge1',
                 },
             })),
@@ -1661,9 +1662,109 @@ describe('Daily finish share chooser', () => {
 
             expect(panel.querySelector('.result-share-panel__title').textContent).toBe(expectedTitle);
             expect(panel.querySelector('.result-share-panel__copy').textContent).toBe(expectedCopy);
+            expect([...panel.querySelectorAll('.result-share-panel__button')].map((button) => button.textContent))
+                .toEqual(['Copy Link', 'Send Challenge', 'Done']);
         } finally {
             global.document = originalDocument;
         }
+    });
+
+    describe('challenge link buttons', () => {
+        async function createdChallengePanel(body, hooks = {}) {
+            const dom = new JSDOM(`
+                <div id="modal">
+                    <div id="modal-lap-times"></div>
+                    <div id="modal-combined-view"></div>
+                    <button id="combined-playlist-btn"><span class="combined-action-btn-label">CHALLENGE</span></button>
+                </div>
+            `, { url: 'http://localhost' });
+            global.document = dom.window.document;
+            const shell = new ModalShell({
+                getRedditUsername: () => 'Racer',
+                previewShare: vi.fn(async () => ({
+                    ok: true,
+                    body: {
+                        status: 'ready',
+                        challengeToken: 'challenge-token-1',
+                        username: 'Racer',
+                        title: 'Can you beat 25.640s on Number Three?',
+                    },
+                })),
+                confirmShare: vi.fn(async () => ({
+                    ok: true,
+                    body: { status: 'created', challengeId: 'challenge-1', ...body },
+                })),
+                ...hooks,
+            });
+            const triggerButton = dom.window.document.getElementById('combined-playlist-btn');
+            const hostView = dom.window.document.getElementById('modal-combined-view');
+            await shell._startShare({ kind: 'head-to-head', source: 'campaign' }, triggerButton, hostView);
+            const panel = dom.window.document.querySelector('.result-share-panel');
+            await panel.querySelector('.result-share-panel__button--primary').onclick();
+            const button = (label) => [...panel.querySelectorAll('.result-share-panel__button')]
+                .find((item) => item.textContent === label);
+            return { panel, button };
+        }
+
+        const postBody = {
+            postId: 't3_challenge1',
+            postUrl: 'https://reddit.com/r/miniracer/comments/challenge1',
+        };
+        let originalDocument;
+        beforeEach(() => {
+            originalDocument = global.document;
+        });
+        afterEach(() => {
+            global.document = originalDocument;
+        });
+
+        it('copies the challenge post link', async () => {
+            const copyText = vi.fn(async () => undefined);
+            const { button } = await createdChallengePanel(postBody, { copyText });
+
+            const copy = button('Copy Link');
+            await copy.onclick();
+
+            expect(copyText).toHaveBeenCalledWith(postBody.postUrl);
+            expect(copy.textContent).toBe('Copied');
+        });
+
+        it('says so when the browser refuses the copy', async () => {
+            const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+            try {
+                const copyText = vi.fn(async () => {
+                    throw new Error('refused');
+                });
+                const { button } = await createdChallengePanel(postBody, { copyText });
+
+                const copy = button('Copy Link');
+                await copy.onclick();
+
+                expect(copy.textContent).toBe('Copy failed');
+            } finally {
+                error.mockRestore();
+            }
+        });
+
+        it('opens the share sheet on the challenge post, not on the current post', async () => {
+            const shareChallengePost = vi.fn(async () => undefined);
+            const { panel, button } = await createdChallengePanel(postBody, { shareChallengePost });
+
+            expect(panel.querySelector('.result-share-panel__button--primary')).toBe(button('Send Challenge'));
+            await button('Send Challenge').onclick();
+
+            expect(shareChallengePost).toHaveBeenCalledWith({
+                post: 't3_challenge1',
+                text: 'Can you beat 25.640s on Number Three?',
+            });
+        });
+
+        it('offers no Send Challenge without the challenge post ID', async () => {
+            const { panel } = await createdChallengePanel({ postUrl: postBody.postUrl });
+
+            expect([...panel.querySelectorAll('.result-share-panel__button')].map((item) => item.textContent))
+                .toEqual(['Copy Link', 'Done']);
+        });
     });
 
     it('offers no second Brag when Reddit cannot confirm the first', async () => {

@@ -27,7 +27,7 @@ import {
     handleMenuListKeydown,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
-import { scheduleAfterModalPaint } from '../ui/dom.js';
+import { copyTextToClipboard, scheduleAfterModalPaint } from '../ui/dom.js';
 
 function isButtonElement(node) {
     return typeof HTMLButtonElement !== 'undefined' && node instanceof HTMLButtonElement;
@@ -92,6 +92,8 @@ export class ModalShell {
         confirmShare = null,
         getNextChallenge = null,
         openChallengePost = null,
+        copyText = null,
+        shareChallengePost = null,
     } = {}) {
         this.content = content;
         this.getLeaderboards = getLeaderboards;
@@ -105,6 +107,8 @@ export class ModalShell {
         this.confirmShare = confirmShare;
         this.getNextChallenge = getNextChallenge;
         this.openChallengePost = openChallengePost;
+        this.copyText = copyText;
+        this.shareChallengePost = shareChallengePost;
         this._modalCloseFallbackTimer = null;
         this._modalCloseTransitionEndHandler = null;
         this._modalKind = null;
@@ -607,6 +611,57 @@ export class ModalShell {
         }
     }
 
+    async _copyChallengeLink(button, postUrl) {
+        try {
+            if (typeof this.copyText === 'function') {
+                await this.copyText(postUrl);
+            } else {
+                await copyTextToClipboard(postUrl);
+            }
+            button.textContent = 'Copied';
+        } catch (error) {
+            console.error('Could not copy the challenge link:', error);
+            button.textContent = 'Copy failed';
+        }
+    }
+
+    // Reddit's share sheet shares the post that the player is on, unless the
+    // call names a post. This popup is on the Daily or Campaign post.
+    async _sendChallenge(postId, text) {
+        try {
+            if (typeof this.shareChallengePost === 'function') {
+                await this.shareChallengePost({ post: postId, text });
+                return;
+            }
+            const { showShareSheet } = await import('@devvit/web/client');
+            await showShareSheet({ post: postId, ...(text ? { text } : {}) });
+        } catch (error) {
+            console.error('Could not open the share sheet:', error);
+        }
+    }
+
+    _challengeShareButtons(result, shareText) {
+        const buttons = [];
+        if (typeof result?.postUrl === 'string' && result.postUrl) {
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'result-share-panel__button';
+            copy.textContent = 'Copy Link';
+            copy.setAttribute('aria-label', 'Copy challenge link');
+            copy.onclick = () => this._copyChallengeLink(copy, result.postUrl);
+            buttons.push(copy);
+        }
+        if (typeof result?.postId === 'string' && result.postId.startsWith('t3_')) {
+            const send = document.createElement('button');
+            send.type = 'button';
+            send.className = 'result-share-panel__button result-share-panel__button--primary';
+            send.textContent = 'Send Challenge';
+            send.onclick = () => this._sendChallenge(result.postId, shareText);
+            buttons.push(send);
+        }
+        return buttons;
+    }
+
     async _offerPostedConcedeNextChallenge(button) {
         if (!button) return;
         if (typeof this._nextChallengePostUrl === 'string') {
@@ -893,6 +948,7 @@ export class ModalShell {
         commented = false,
         keepShareAvailable = false,
         noteText = '',
+        shareText = '',
     } = {}) {
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
         const isChallengeRepeat = (isChallengeCreate && result?.status === 'already_created')
@@ -919,13 +975,18 @@ export class ModalShell {
         done.className = 'result-share-panel__button';
         done.textContent = 'Done';
         done.onclick = () => this._closeSharePanel();
-        actions.appendChild(done);
+        const shareButtons = isChallengeCreate ? this._challengeShareButtons(result, shareText) : [];
+        const buttons = [...shareButtons, done];
+        const preferredIndex = Math.max(0, buttons.findIndex((button) => (
+            button.classList.contains('result-share-panel__button--primary')
+        )));
+        actions.append(...buttons);
         panel.append(title, copy, actions);
         triggerButton.disabled = !keepShareAvailable;
         if (this._isPostedConcede()) {
             void this._offerPostedConcedeNextChallenge(triggerButton);
-            resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
-                preferredIndex: 0,
+            resetMenuKeyboardState(this._shareMenuKeyboardState, buttons, {
+                preferredIndex,
                 container: actions,
                 focusPreferred: true,
             });
@@ -943,8 +1004,8 @@ export class ModalShell {
         if (spentCommentText) {
             triggerButton.setAttribute('aria-label', spentCommentText.aria);
         }
-        resetMenuKeyboardState(this._shareMenuKeyboardState, [done], {
-            preferredIndex: 0,
+        resetMenuKeyboardState(this._shareMenuKeyboardState, buttons, {
+            preferredIndex,
             container: actions,
             focusPreferred: true,
         });
@@ -1177,6 +1238,7 @@ export class ModalShell {
                         bragged: isBrag,
                         commented: isChallengeComment,
                         keepShareAvailable: isDailyShare,
+                        shareText: isChallenge ? body.title : '',
                     });
                 } catch (error) {
                     confirm.disabled = false;

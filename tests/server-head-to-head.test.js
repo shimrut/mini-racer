@@ -639,6 +639,7 @@ describe('head-to-head service', () => {
         expect(second.body).toMatchObject({
             status: 'already_created',
             challengeId: first.body.challengeId,
+            postId: 't3_challenge1',
             postUrl: first.body.postUrl,
             carUnlocks: {
                 progress: {
@@ -658,7 +659,11 @@ describe('head-to-head service', () => {
 
             expect(created).toMatchObject({
                 status: 200,
-                body: { status: 'created', postUrl: 'https://reddit.com/r/miniracer/challenge1' },
+                body: {
+                    status: 'created',
+                    postId: 't3_challenge1',
+                    postUrl: 'https://reddit.com/r/miniracer/challenge1',
+                },
             });
             expect(error).toHaveBeenCalledWith(
                 'Head to Head post was created without its flair:',
@@ -719,6 +724,7 @@ describe('head-to-head service', () => {
             status: 200,
             body: {
                 status: 'already_created',
+                postId: recoveredPost.id,
                 postUrl: recoveredPost.url,
             },
         });

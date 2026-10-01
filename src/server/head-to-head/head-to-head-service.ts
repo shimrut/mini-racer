@@ -720,6 +720,7 @@ export function createHeadToHeadService(
                     body: {
                         status: 'already_created',
                         challengeId: existing.challengeId,
+                        postId: existing.postId,
                         postUrl: existing.postUrl,
                         carUnlocks,
                     },
@@ -748,6 +749,7 @@ export function createHeadToHeadService(
                     body: {
                         status: 'already_created',
                         challengeId: saved.challengeId,
+                        postId: saved.postId,
                         postUrl: saved.postUrl,
                         carUnlocks,
                     },
@@ -841,6 +843,7 @@ export function createHeadToHeadService(
                 body: {
                     status: 'created',
                     challengeId: saved.challengeId,
+                    postId: saved.postId,
                     postUrl: saved.postUrl,
                     carUnlocks,
                     },
