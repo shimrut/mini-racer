@@ -53,6 +53,37 @@ export function restoreUnsavedCreatorWork(editor, unsaved) {
     }
 }
 
+// The version of each track that the server has, with its revision. An edit
+// that brings a track back to it leaves nothing to save.
+function savedContents(editor) {
+    editor.savedContentByKey ??= new Map();
+    return editor.savedContentByKey;
+}
+
+export function rememberSavedCreatorContent(editor, record) {
+    savedContents(editor).set(record.key, {
+        revision: record.revision,
+        content: trackContent({
+            track: record.track,
+            draftLoop: record.draftLoop ?? [],
+            medalRow: record.medalRow ?? null,
+        }),
+    });
+}
+
+// True when the track is exactly the version that the server has. A save in
+// flight, a save with no clear answer, typed medal text, or a record of
+// another revision keeps it unsaved.
+export function isCreatorTrackAtSavedVersion(editor, key) {
+    const saved = savedContents(editor).get(key);
+    const record = editor.creatorRecords.get(key);
+    if (!saved || !record || saved.revision !== record.revision) return false;
+    if (!editor.state.tracks[key] || editor.creatorSavingKey === key) return false;
+    if (uncertainTracks(editor).has(key)) return false;
+    if (hasPendingMedalText(editor.pendingMedalText, key)) return false;
+    return trackContent(creatorTrackContent(editor, key)) === saved.content;
+}
+
 export function hasCreatorUnsavedWork(editor) {
     return editor.busy || editor.state.dirtyTrackKeys.size > 0
         || editor.state.draftLoop.length > 0
@@ -93,6 +124,7 @@ function setTrackBaseline(editor, key, track, geometrySignature) {
 // the track since, it is clean.
 function acknowledgeTrack(editor, key, saved, geometrySignature, unchanged) {
     editor.creatorRecords.set(key, editor.creatorRecordMeta(saved));
+    rememberSavedCreatorContent(editor, saved);
     editor.state.originalTrackKeyByKey.set(key, key);
     if (saved.medalRow) editor.medalTimes[key] = saved.medalRow;
     else delete editor.medalTimes[key];

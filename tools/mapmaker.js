@@ -47,8 +47,10 @@ import { CreatorPanels } from './mapmaker/creator-panels.js';
 import {
     captureUnsavedCreatorWork,
     hasCreatorUnsavedWork,
+    isCreatorTrackAtSavedVersion,
     keepLockedCreatorDraft,
     loadLockedCreatorTrack,
+    rememberSavedCreatorContent,
     restoreUnsavedCreatorWork,
     saveCreatorTrackWithRecovery,
 } from './mapmaker/creator-track-save.js';
@@ -2208,8 +2210,7 @@ class MapmakerApp {
     // Online, Save keeps an unfinished road, so a drawn point is a change to save.
     draftLoopChanged() {
         if (MAPMAKER_ONLINE || this.creatorMode) {
-            this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
-            if (this.creatorMode) this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
+            this.markTrackChanged();
             this.syncActionButtons();
         }
         this.scheduleDraftRecovery();
@@ -2920,8 +2921,7 @@ class MapmakerApp {
             const history = this.getEditHistory();
             history.recordEdit(history.current(), this.track);
         }
-        this.state.dirtyTrackKeys.add(this.state.selectedTrackKey);
-        if (this.creatorMode) this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
+        this.markTrackChanged();
         this.syncActionButtons();
         if (updateStatus) {
             this.setStatus(message);
@@ -2929,6 +2929,22 @@ class MapmakerApp {
         this.scheduleDraftRecovery();
         this.scheduleQualityCheck();
         this.draw();
+    }
+
+    // Marks the open track changed. In the Creator, an edit that brings the
+    // track back to the version on the server (an Undo, or a value typed back)
+    // leaves it saved, as after a save.
+    markTrackChanged() {
+        const key = this.state.selectedTrackKey;
+        if (this.creatorMode && isCreatorTrackAtSavedVersion(this, key)) {
+            this.state.dirtyTrackKeys.delete(key);
+            this.medalRowByKey.delete(key);
+            this.creatorSaveErrors.delete(key);
+            this.syncCreatorTrackState();
+            return;
+        }
+        this.state.dirtyTrackKeys.add(key);
+        if (this.creatorMode) this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
     }
 
     syncActionButtons() {
@@ -3494,6 +3510,7 @@ class MapmakerApp {
         const track = cloneTracks(record.track);
         this.state.tracks[key] = track;
         this.creatorRecords.set(key, this.creatorRecordMeta(record));
+        rememberSavedCreatorContent(this, record);
         this.editHistories.set(key, createEditHistory(track));
         this.state.originalTrackKeyByKey.set(key, key);
         if (record.medalRow) this.medalTimes[key] = record.medalRow;

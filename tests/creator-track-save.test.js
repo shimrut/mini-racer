@@ -4,6 +4,8 @@ import {
     captureUnsavedCreatorWork,
     creatorTrackContent,
     hasCreatorUnsavedWork,
+    isCreatorTrackAtSavedVersion,
+    rememberSavedCreatorContent,
     restoreUnsavedCreatorWork,
     saveCreatorTrackSnapshot,
 } from '../tools/mapmaker/creator-track-save.js';
@@ -181,5 +183,88 @@ describe('Creator navigation guard', () => {
         editor.creatorPanels = null;
         editor.busy = true;
         expect(hasCreatorUnsavedWork(editor)).toBe(true);
+    });
+});
+
+describe('Creator track back at its saved version', () => {
+    function savedEditor() {
+        const editor = editorState();
+        rememberSavedCreatorContent(editor, {
+            key: 'firstTrack',
+            revision: 3,
+            track: structuredClone(TRACKS.circuit),
+            draftLoop: [],
+            medalRow,
+        });
+        return editor;
+    }
+
+    it('knows a track that an edit brought back to the saved version', () => {
+        const editor = savedEditor();
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+
+        const x = editor.state.tracks.firstTrack.outer[0].x;
+        editor.state.tracks.firstTrack.outer[0].x = x + 1;
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        // Undo gives back a copy of the earlier track.
+        editor.state.tracks.firstTrack = JSON.parse(JSON.stringify({
+            ...editor.state.tracks.firstTrack,
+            outer: editor.state.tracks.firstTrack.outer.map((point, index) => (index === 0 ? { ...point, x } : point)),
+        }));
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+    });
+
+    it('counts the name, the medal times and the unfinished road', () => {
+        const editor = savedEditor();
+        editor.state.tracks.firstTrack.name = 'Other name';
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        editor.state.tracks.firstTrack.name = `${TRACKS.circuit.name} `;
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+
+        editor.medalRowByKey.set('firstTrack', { ...medalRow, gold: 12.5 });
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        // A time typed back to its value, written another way, is the same.
+        editor.medalRowByKey.set('firstTrack', { ...medalRow, gold: 12.001 });
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+
+        editor.state.draftLoop = [{ x: 1, y: 2 }];
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        editor.state.draftLoop = [];
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+    });
+
+    it('keeps the track unsaved for typed text, a save in flight, another revision or a new track', () => {
+        const editor = savedEditor();
+        setPendingMedalText(editor.pendingMedalText, 'firstTrack', 'gold', '1');
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        clearPendingMedalText(editor.pendingMedalText, 'firstTrack');
+
+        editor.creatorSavingKey = 'firstTrack';
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+        editor.creatorSavingKey = null;
+
+        // The editor holds another revision: the saved content is not known.
+        editor.creatorRecords.set('firstTrack', { revision: 4 });
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+
+        expect(isCreatorTrackAtSavedVersion(editor, 'secondTrack')).toBe(false);
+    });
+
+    it('takes a save as the new saved version, and a save with no answer as unknown', async () => {
+        const editor = savedEditor();
+        editor.state.tracks.firstTrack.name = 'New name';
+        const request = delaySave();
+        const saving = saveCreatorTrackSnapshot(editor, 'firstTrack', JSON.stringify);
+        request.acknowledge();
+        await saving;
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(true);
+        editor.state.tracks.firstTrack.name = TRACKS.circuit.name;
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
+
+        // The answer is lost: the server can hold this name or the earlier one.
+        vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+        await saveCreatorTrackSnapshot(editor, 'firstTrack', JSON.stringify);
+        editor.state.tracks.firstTrack.name = 'New name';
+        expect(isCreatorTrackAtSavedVersion(editor, 'firstTrack')).toBe(false);
     });
 });
