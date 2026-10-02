@@ -36,13 +36,24 @@ export async function revealInstalledRace(engine) {
 
 // Explicit Retry/Restart adopts a new definition. Collision resets continue to
 // use the fixed definition and runtime of the current attempt.
-export async function reloadChangedRaceTrack(engine, options = {}) {
+export async function reloadChangedRaceTrack(engine, { isStillCurrent = () => true, ...options } = {}) {
     if (hasCurrentTrackDefinition(engine)) return;
-    await engine.loadTrack(engine.currentTrackKey, {
+    const trackKey = engine.currentTrackKey;
+    const challenge = engine.activeDailyChallenge;
+    // A removed override may reveal a built-in whose chunk was never needed
+    // on entry. This explicit reload is the definition-loading exception.
+    await engine.loadRaceDefinitions?.([trackKey], { challenge });
+    if (!isStillCurrent()) return;
+    const prepared = engine.readyRaceTrack?.('selected', trackKey, challenge);
+    await engine.loadTrack(trackKey, {
         loadPlayerProgress: false,
         preserveDailyChallengeContext: true,
         preserveDailyChallengeOnReset: true,
         showStartOverlayOnReset: false,
+        keepScreen: true,
+        prepared: prepared ?? null,
+        loadedOnly: typeof engine.loadRaceDefinitions === 'function',
+        isStillCurrent,
         ...options,
     });
 }

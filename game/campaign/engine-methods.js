@@ -4,7 +4,7 @@ import { normalizeCampaignLobbyState } from '../lobby/service.js';
 import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
 import { mergeLeaderboardPages } from '../scoreboard/ui.js';
 import { getTrackName } from '../track/catalog.js';
-import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { getLoadedClientTrack } from '../track/client-registry.js';
 import {
     getStaleRunTrackReason,
     hasCurrentTrackDefinition,
@@ -28,6 +28,7 @@ import {
     campaignHasSeriesChoice,
     CAMPAIGN_ID,
     CAMPAIGN_SERIES,
+    CAMPAIGN_LIVE_STAGES,
     countCampaignMedals,
     getCampaignSeriesStages,
     getCampaignStage,
@@ -436,8 +437,17 @@ function selectedCampaignSeriesId(engine) {
 export const campaignEngineMethods = {
     // Shows another series on the Campaign screen. Its stages paint at once from
     // the stage list, and its progress arrives with the next bootstrap.
-    selectCampaignSeries(seriesId) {
+    async selectCampaignSeries(seriesId) {
         if (!isCampaignSeriesId(seriesId) || seriesId === selectedCampaignSeriesId(this)) return;
+        this.cancelRacePreparation?.();
+        const continuation = this._raceContinuationToken;
+        try {
+            await this.loadCampaignRaceDefinitions?.();
+        } catch (error) {
+            this.lobbyUi?.setRaceStartError?.('campaign', 'Could not load this series. Try again.');
+            return;
+        }
+        if (this._raceContinuationToken !== continuation) return;
         this.campaignSeriesId = seriesId;
         writeSelectedCampaignSeriesId(seriesId);
         this.selectedCampaignStageId = null;
@@ -533,7 +543,10 @@ export const campaignEngineMethods = {
         const requestId = (this._campaignBootstrapRequestId || 0) + 1;
         this._campaignBootstrapRequestId = requestId;
         const promise = getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) })
-            .then((bootstrap) => {
+            .then(async (bootstrap) => {
+                if (bootstrap?.authoritative !== false && bootstrap?.availability !== 'unavailable') {
+                    await this.loadCampaignRaceDefinitions?.();
+                }
                 // Times that waited for the series list can go now.
                 if (
                     isStoredSeriesListLoaded()
@@ -571,12 +584,33 @@ export const campaignEngineMethods = {
         return resolveDefaultCampaignStage(this);
     },
 
+    loadCampaignRaceDefinitions() {
+        return this.loadRaceDefinitions?.(CAMPAIGN_LIVE_STAGES.map((stage) => stage.trackKey));
+    },
+
+    async warmCampaignRaceDefinitions() {
+        const bootstrap = await getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) });
+        if (bootstrap?.authoritative === false || bootstrap?.availability === 'unavailable') {
+            throw new Error('Campaign progress could not load. Try again.');
+        }
+        await campaignEngineMethods.loadCampaignRaceDefinitions.call(this);
+        const state = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
+        const stage = getCampaignStage(getDefaultCampaignLobbyStage(state)?.id);
+        if (!stage?.trackKey) throw new Error('The Campaign has no playable stage.');
+        const prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.CAMPAIGN, {
+            trackKey: stage.trackKey,
+            challenge: toRaceChallenge(stage),
+        });
+        return { bootstrap, stage, prepared };
+    },
+
     async prepareInitialCampaignLaunch({
         prepareTrack = true,
         loadPersonalBest = true,
     } = {}) {
         const stage = await resolveDefaultCampaignStage(this);
         if (!stage) return null;
+        await this.loadCampaignRaceDefinitions?.();
 
         this.activeRaceMode = 'campaign';
         this.activeCampaignStage = stage;
@@ -624,6 +658,7 @@ export const campaignEngineMethods = {
     // Entering the Campaign shows the series; a return from a race shows the stages.
     // With only one live series, the Campaign always shows the stages.
     showCampaignLobby({ refresh = true, view = 'stages' } = {}) {
+        this.cancelRacePreparation?.();
         this.campaignLobbyView = view === 'series' && campaignHasSeriesChoice() ? 'series' : 'stages';
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
@@ -656,7 +691,10 @@ export const campaignEngineMethods = {
             });
         }
         if (refresh) {
-            void this.ensureCampaignBootstrap({ forceRefresh: true });
+            void this.ensureCampaignBootstrap({ forceRefresh: true }).catch((error) => {
+                console.error('Could not load Campaign tracks:', error);
+                this.lobbyUi?.setRaceStartError?.('campaign', 'Could not load the Campaign tracks. Try again.');
+            });
         }
     },
 
@@ -665,8 +703,7 @@ export const campaignEngineMethods = {
         if (!isCampaignSeriesId(seriesId)) return;
         if (seriesId !== selectedCampaignSeriesId(this)) {
             this.campaignLobbyView = 'stages';
-            this.selectCampaignSeries(seriesId);
-            return;
+            return this.selectCampaignSeries(seriesId);
         }
         this.showCampaignLobby({ view: 'stages', refresh: !this._campaignBootstrapReady });
     },
@@ -694,7 +731,7 @@ export const campaignEngineMethods = {
         this.syncCampaignStartReadiness?.();
     },
 
-    // Start is enabled once the selected stage's track layout is checked.
+    // Every interactive stage already has its definition in memory.
     syncCampaignStartReadiness() {
         const stage = this.campaignCarousel?.getSelectedChallenge?.();
         const ready = stage?.trackKey && stage.unlocked
@@ -743,6 +780,8 @@ export const campaignEngineMethods = {
             trackKey: stage.trackKey,
             challenge: toRaceChallenge(stage),
             isStillSelected: () => this.campaignCarousel?.getSelectedChallenge?.()?.id === stage.id
+                && this.activeRaceMode === 'campaign' && this.lobbyUi?.getMode?.() === 'campaign'
+                && this.startOverlay?.isStartOverlayVisible?.() === true
                 && this.status !== 'playing' && this.status !== 'starting',
         });
     },
@@ -771,13 +810,16 @@ export const campaignEngineMethods = {
             return null;
         }
         if (this.startButtonPending) return;
+        this.cancelRacePreparation?.({ preservePrepared: true });
+        const continuation = this._raceContinuationToken;
+        const stillCurrent = () => this._raceContinuationToken === continuation;
         this.lobbyUi?.clearRaceStartError?.('campaign');
         if (!preserveRaceComparisonTarget) this.clearRaceComparisonTarget?.();
         this.startButtonPending = true;
         this.lobbyUi?.setCampaignPrimaryLoading?.(true);
         try {
             await this.ensureCampaignBootstrap();
-            if (this.activeRaceMode !== 'campaign') return;
+            if (!stillCurrent() || this.activeRaceMode !== 'campaign') return;
 
             const requestedId = stageLike?.raceId || stageLike?.id || null;
             const unlockedStages = Array.isArray(this.campaignLobbyState?.stages)
@@ -798,6 +840,7 @@ export const campaignEngineMethods = {
                 const verificationSettled = await this.awaitCampaignVerificationSettled(
                     confirmUnlockFor,
                 );
+                if (!stillCurrent()) return;
                 if (!verificationSettled) {
                     this.lobbyUi?.setRaceStartError?.(
                         'campaign',
@@ -837,7 +880,8 @@ export const campaignEngineMethods = {
                 });
             }
             if (!preserveRaceComparisonTarget) this.pbGhost.clearTrack();
-            if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
+            if (!(this.isInstalledRaceTrack?.(stage.trackKey, raceChallenge)
+                ?? hasCurrentTrackDefinition(this, stage.trackKey))) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
@@ -845,13 +889,17 @@ export const campaignEngineMethods = {
                     showStartOverlayOnReset: false,
                     keepScreen: true,
                     prepared: prepared ?? null,
+                    loadedOnly: true,
+                    challenge: raceChallenge,
                 });
             }
+            if (!stillCurrent()) return;
             this.applyDailyChallenge(raceChallenge);
             this.activeRaceMode = 'campaign';
             if (cachedPersonalBest) this.applyCampaignPersonalBest(stage, cachedPersonalBest);
             void this.journeys?.startAttempt?.({ mode: 'campaign', reason: 'initial_start' });
             await revealInstalledRace(this);
+            if (!stillCurrent()) return;
             this.startSequence();
 
             if (startRequest) void this.confirmCampaignRaceStart(stage, startRequest);
@@ -868,6 +916,7 @@ export const campaignEngineMethods = {
                 });
             }
         } catch (error) {
+            if (!stillCurrent()) return;
             console.error('Could not start Campaign race:', error);
             await this.loadCampaignLobby({ show: true });
             this.lobbyUi?.setRaceStartError?.(
@@ -882,7 +931,8 @@ export const campaignEngineMethods = {
 
     async startCampaignStageAgainstOpponent(stage, target) {
         if (!stage || !target) return false;
-        const track = await loadClientTrack(stage.trackKey);
+        const track = getLoadedClientTrack(stage.trackKey);
+        if (!track) return false;
         this.clearRaceComparisonTarget?.();
         if (!this.installRaceComparisonTarget?.(
             { ...target, mode: 'campaign' },

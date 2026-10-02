@@ -63,6 +63,10 @@ const known = {
         return next;
     },
     hGet: async (key, field) => hashes.get(key)?.get(field) ?? null,
+    hMGet: async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null),
+    hScan: async () => ({ cursor: 0, fieldValues: [] }),
+    zRange: async () => [],
+    zCard: async () => 0,
     hGetAll: async (key) => {
         const values = await held('hGetAll', [key], () => Object.fromEntries(hashes.get(key) ?? new Map()));
         if (faults.bumpOnIndexRead && key === TRACK_INDEX_KEY) {
@@ -88,13 +92,21 @@ const mockRedis = new Proxy(known, { get: (target, name) => target[name] ?? (asy
 installTrackRedisTransactions(mockRedis, strings, hashes);
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }));
-vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
+vi.mock('@devvit/web/server', () => ({
+    redis: mockRedis, context: mockContext, cache: async (source) => source(),
+}));
+vi.mock('../src/server/competition/replay-validator.js', () => ({
+    validateDailyGpReplayDetailed: vi.fn(),
+}));
 
 const catalog = await import('../src/server/tracks/stored-catalog.ts');
 const tracks = await import('../src/server/tracks/track-store.ts');
 const series = await import('../src/server/campaign/series-store.ts');
 const { registerCompetitionRoutes } = await import('../src/server/routes/competition-routes.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
+const daily = await import('../src/server/daily/daily-gp-store.ts');
+const player = await import('../src/server/player/player-account-store.ts');
+const { validateDailyGpReplayDetailed } = await import('../src/server/competition/replay-validator.ts');
 
 const medalRow = { author: 9.1, gold: 9.4, silver: 9.7, bronze: 10.1 };
 
@@ -122,6 +134,7 @@ beforeEach(() => {
     faults.mGet = 0;
     faults.bumpOnIndexRead = false;
     known.mGet.mockClear();
+    validateDailyGpReplayDetailed.mockReset();
     mockContext.subredditId = 't5_one';
     coldCache();
     tracks.installStoredTrackResolver();
@@ -359,5 +372,173 @@ describe('Daily answers confirm the catalog after they know their track', () => 
         await dailyHandlers()['/api/daily/active']({}, active);
         expect(active.statusCode).toBe(503);
         expect(active.body).toEqual({ error: 'The tracks could not load. Try again.' });
+    });
+});
+
+describe('Daily geometry boundaries', () => {
+    function dailyContract(offset, trackKey, overrides = {}) {
+        const day = Math.floor(Date.now() / 86_400_000) - offset;
+        const startsAt = new Date(day * 86_400_000).toISOString();
+        const challengeDate = startsAt.slice(0, 10);
+        return {
+            id: `daily-gp-${challengeDate}`,
+            challengeDate,
+            trackKey,
+            startsAt,
+            endsAt: new Date((day + 1) * 86_400_000).toISOString(),
+            availableUntil: new Date((day + 7) * 86_400_000).toISOString(),
+            ...overrides,
+        };
+    }
+
+    async function writeChallenge(challenge) {
+        await known.hSet('dailygp:challenges', { [challenge.id]: JSON.stringify(challenge) });
+    }
+
+    async function withCatalogPin(callback) {
+        await catalog.ensureStoredCatalogLoaded();
+        return series.runWithPinnedStoredSeries(() => tracks.runWithPinnedStoredTracks(callback));
+    }
+
+    it('discovers a custom Daily published after the middleware catalog pin', async () => {
+        await withCatalogPin(async () => {
+            await saveTrack('nightOne', 'Night One');
+            await tracks.lockStoredTrack('nightOne', 'daily');
+            const challenge = dailyContract(0, 'nightOne');
+            await writeChallenge(challenge);
+            expect(daily.parseStoredChallenge(JSON.stringify(challenge))).toBeNull();
+
+            await expect(daily.getServerDailyGpChallengeById(challenge.id)).resolves.toMatchObject(challenge);
+
+            expect(TRACKS.nightOne.name).toBe('Night One');
+            expect(placed(['nightOne'])).toEqual(['nightOne']);
+        });
+    });
+
+    it('validates a Daily submission with the override placed after the middleware pin', async () => {
+        await tracks.saveStoredTrack('smallSteps', {
+            track: { ...smallSteps, name: 'Placed Small Steps', cornerRadius: 3 }, medalRow,
+        }, { username: 'ModOne', origin: 'migrated', trusted: true });
+        await withCatalogPin(async () => {
+            await catalog.loadStoredTracks(['smallSteps']);
+            expect(placed(['smallSteps'])).toEqual([]);
+            await tracks.lockStoredTrack('smallSteps', 'daily');
+            const challenge = dailyContract(0, 'smallSteps');
+            await writeChallenge(challenge);
+            let validatedTrack;
+            validateDailyGpReplayDetailed.mockImplementation(() => {
+                validatedTrack = TRACKS.smallSteps;
+                return { ok: false, failure: { reason: 'no_finish' } };
+            });
+
+            const reply = await daily.submitServerDailyGpRun({
+                challengeId: challenge.id, trackKey: 'smallSteps', redditUsername: 'RacerOne', replay: {},
+            });
+
+            expect(reply.status).toBe(422);
+            expect(reply.body.reason).toBe('no_finish');
+            expect(validatedTrack.name).toBe('Placed Small Steps');
+            expect(validatedTrack.cornerRadius).toBe(3);
+            expect(validateDailyGpReplayDetailed).toHaveBeenCalledOnce();
+        });
+    });
+
+    it('refuses to validate a Daily replay when its indexed definition is unavailable', async () => {
+        await saveTrack('nightOne', 'Night One');
+        await tracks.lockStoredTrack('nightOne', 'daily');
+        const challenge = dailyContract(0, 'nightOne');
+        await writeChallenge(challenge);
+        strings.delete(trackRecordKey('nightOne'));
+        coldCache();
+        await withCatalogPin(async () => {
+            await expect(daily.submitServerDailyGpRun({
+                challengeId: challenge.id, trackKey: 'nightOne', redditUsername: 'RacerOne', replay: {},
+            })).rejects.toBeInstanceOf(catalog.StoredCatalogUnavailableError);
+            expect(validateDailyGpReplayDetailed).not.toHaveBeenCalled();
+        });
+    });
+
+    it('confirms an already loaded Daily contract before snapshot geometry is read', async () => {
+        await withCatalogPin(async () => {
+            await saveTrack('nightOne', 'Night One');
+            await tracks.lockStoredTrack('nightOne', 'daily');
+            const challenge = daily.parseStoredChallenge(JSON.stringify(dailyContract(0, 'circuit')));
+            challenge.trackKey = 'nightOne';
+
+            const snapshot = await daily.getServerDailyGpSnapshot({
+                challengeId: challenge.id, loadedChallenge: challenge,
+            });
+
+            expect(snapshot).toMatchObject({ topRows: [], objectiveType: challenge.objectiveType });
+            expect(TRACKS.nightOne.name).toBe('Night One');
+            expect(placed(['nightOne'])).toEqual(['nightOne']);
+        });
+    });
+
+    it('hydrates requested PB days without reading unrelated missing track records', async () => {
+        await saveTrack('nightOne', 'Night One');
+        await tracks.lockStoredTrack('nightOne', 'daily');
+        await saveTrack('nightTwo', 'Night Two');
+        await tracks.lockStoredTrack('nightTwo', 'daily');
+        const requested = dailyContract(1, 'nightOne');
+        await writeChallenge(dailyContract(0, 'nightTwo'));
+        await writeChallenge(requested);
+        // The current day is still indexed, but its definition is unavailable.
+        strings.delete(trackRecordKey('nightTwo'));
+        coldCache();
+        await withCatalogPin(async () => {
+            known.mGet.mockClear();
+
+            const reply = await player.getServerPlayerTrackPbSummaries({
+                redditUsername: 'RacerOne', challengeIds: [requested.id, requested.id, 'daily-gp-1999-01-01'],
+            });
+
+            expect(reply).toEqual({
+                playerId: 'reddit:racerone', trackPbs: { [requested.id]: null, 'daily-gp-1999-01-01': null },
+            });
+            expect(TRACKS.nightOne.name).toBe('Night One');
+            const recordReads = known.mGet.mock.calls.flatMap(([keys]) => keys.filter((key) => key.includes(':track:')));
+            expect(recordReads).toEqual([trackRecordKey('nightOne')]);
+        });
+    });
+
+    it('confirms a requested PB custom key learned after the middleware pin', async () => {
+        await withCatalogPin(async () => {
+            await saveTrack('nightOne', 'Night One');
+            await tracks.lockStoredTrack('nightOne', 'daily');
+            const requested = dailyContract(1, 'nightOne');
+            await writeChallenge(requested);
+            known.mGet.mockClear();
+
+            const reply = await player.getServerPlayerTrackPbSummaries({
+                redditUsername: 'RacerOne', challengeIds: [requested.id],
+            });
+
+            expect(reply.trackPbs).toEqual({ [requested.id]: null });
+            expect(TRACKS.nightOne.name).toBe('Night One');
+            expect(known.mGet.mock.calls.flatMap(([keys]) => keys.filter((key) => key.includes(':track:'))))
+                .toEqual([trackRecordKey('nightOne')]);
+            expect(hashes.get('dailygp:challenges').size).toBe(1);
+        });
+    });
+
+    it('keeps PB requests inside the canonical playlist and availability window', async () => {
+        const expired = dailyContract(1, 'nightOne', { availableUntil: new Date(Date.now() - 1).toISOString() });
+        const offPlaylist = dailyContract(8, 'nightOne', {
+            availableUntil: new Date(Date.now() + 86_400_000).toISOString(),
+        });
+        await writeChallenge(dailyContract(0, 'circuit'));
+        await writeChallenge(expired);
+        await writeChallenge(offPlaylist);
+        await withCatalogPin(async () => {
+            known.mGet.mockClear();
+
+            const reply = await player.getServerPlayerTrackPbSummaries({
+                redditUsername: 'RacerOne', challengeIds: [expired.id, offPlaylist.id],
+            });
+
+            expect(reply.trackPbs).toEqual({ [expired.id]: null, [offPlaylist.id]: null });
+            expect(known.mGet.mock.calls.flatMap(([keys]) => keys.filter((key) => key.includes(':track:')))).toEqual([]);
+        });
     });
 });

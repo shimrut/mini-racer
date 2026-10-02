@@ -48,12 +48,8 @@ describe('mode-priority startup', () => {
         expect(engineSource).not.toContain(
             'invokeModeMethod("challenge", "previewHeadToHead"',
         );
-        expect(dailySource).toContain(
-            '&& !hasCurrentTrackDefinition(this, challenge.trackKey)',
-        );
-        expect(campaignSource).toContain(
-            'if (!hasCurrentTrackDefinition(this, stage.trackKey))',
-        );
+        expect(dailySource).toContain('isInstalledRaceTrack');
+        expect(campaignSource).toContain('isInstalledRaceTrack');
     });
 
     it('loads only the requested client track and reuses its geometry', async () => {
@@ -294,6 +290,10 @@ describe('mode-priority startup', () => {
         racer.installModeRuntime = vi.fn(async () => {});
         racer.ensureModeRuntime = vi.fn(async () => {});
         racer.showCampaignLobby = vi.fn();
+        racer.warmRaceMode = vi.fn(async () => ({
+            bootstrap: { authoritative: true }, stage: { trackKey: 'numberZero' },
+        }));
+        racer.applyCampaignLobbyBootstrap = vi.fn();
 
         await racer.activateMode('campaign');
 

@@ -14,6 +14,7 @@ vi.mock('../game/track/stored-track-service.js', () => service);
 const { createRacePreparation, PREPARATION_SLOTS } = await import('../game/track/race-preparation.js');
 const { loadClientTrack } = await import('../game/track/client-registry.js');
 const { registerStoredTrack, clearStoredTracksForTests } = await import('../game/track/stored-tracks.js');
+const { trackEngineMethods } = await import('../game/track/engine-methods.js');
 
 function preparation(options = {}) {
     return createRacePreparation({
@@ -28,9 +29,42 @@ beforeEach(() => {
 
 afterEach(() => {
     clearStoredTracksForTests();
+    vi.unstubAllGlobals();
 });
 
 describe('race preparation', () => {
+    it('keeps the pending preparation when the same card settles twice', async () => {
+        vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+        await loadClientTrack('smallSteps');
+        let idle;
+        vi.stubGlobal('requestIdleCallback', vi.fn((callback) => { idle = callback; }));
+        const engine = { ...trackEngineMethods, qualityLevel: 1, frameSkip: 0 };
+        const target = { trackKey: 'smallSteps', challenge: { id: 'same-card', trackKey: 'smallSteps' } };
+        const first = engine.prepareSelectedRaceTrack('daily', target);
+        const second = engine.prepareSelectedRaceTrack('daily', { ...target, challenge: { ...target.challenge } });
+        expect(second).toBe(first);
+        await vi.waitFor(() => expect(idle).toBeTypeOf('function'));
+        idle();
+        await first;
+        expect(engine.findPreparedRaceTrack('smallSteps', target.challenge)).toBeTruthy();
+        expect(assets.getTrackCanvasAsset).toHaveBeenCalledOnce();
+    });
+
+    it('cancels an idle selected preparation when the lobby is left', async () => {
+        vi.stubGlobal('window', { location: { hostname: 'localhost' } });
+        await loadClientTrack('smallSteps');
+        let idle;
+        vi.stubGlobal('requestIdleCallback', vi.fn((callback) => { idle = callback; }));
+        const engine = { ...trackEngineMethods, qualityLevel: 1, frameSkip: 0 };
+        const pending = engine.prepareSelectedRaceTrack('daily', { trackKey: 'smallSteps' });
+        await vi.waitFor(() => expect(idle).toBeTypeOf('function'));
+        engine.cancelRacePreparation();
+        idle();
+        await pending;
+        expect(engine.findPreparedRaceTrack('smallSteps')).toBeNull();
+        expect(assets.getTrackCanvasAsset).not.toHaveBeenCalled();
+    });
+
     it('confirms, loads and builds a track once, and keeps the built parts', async () => {
         const races = preparation();
         const record = await races.prepare(PREPARATION_SLOTS.SELECTED, { trackKey: 'smallSteps' });

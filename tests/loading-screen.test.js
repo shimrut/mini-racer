@@ -22,7 +22,7 @@ function createLoadingScreen() {
   };
 
   vi.stubGlobal("document", {
-    body: { classList: { remove: vi.fn() } },
+    body: { classList: { add: vi.fn(), remove: vi.fn() } },
     getElementById: vi.fn((id) => nodes[id] ?? null),
   });
 
@@ -78,6 +78,20 @@ describe("LoadingScreen", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(retryButton.hidden).toBe(true);
     expect(element.classList.remove).toHaveBeenCalledWith("loader-failed");
+  });
+
+  it("reopens after startup and clears an earlier Retry state for mode entry", async () => {
+    vi.stubGlobal("setTimeout", (callback) => { callback(); return 1; });
+    const { screen, element, statusText, retryButton } = createLoadingScreen();
+    screen.showError("Daily unavailable", vi.fn());
+    await screen.dismiss();
+    screen.begin("Loading Campaign…");
+
+    expect(screen.isComplete).toBe(false);
+    expect(statusText.textContent).toBe("Loading Campaign…");
+    expect(retryButton.hidden).toBe(true);
+    expect(document.body.classList.add).toHaveBeenCalledWith("loading-active");
+    expect(element.setAttribute).toHaveBeenCalledWith("aria-busy", "true");
   });
 
   it("lets CSS own the bar crawl in one place", () => {

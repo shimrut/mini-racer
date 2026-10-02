@@ -11,10 +11,10 @@ function guestProgressSelectionKey(guestPlayerId, redditPlayerId) {
     .digest("base64url")}`;
 }
 
-vi.mock("@devvit/redis", () => ({
-  redis,
-  redisCompressed: redis,
-}));
+vi.mock("@devvit/redis", async () => {
+  const { asCompressedRedis } = await import("./helpers/redis-compressed-face.js");
+  return { redis, redisCompressed: asCompressedRedis(redis) };
+});
 
 const {
   getGuestProgressSelection,

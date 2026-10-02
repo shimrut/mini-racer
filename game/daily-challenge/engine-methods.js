@@ -43,7 +43,7 @@ import {
 } from "../medals/last-lap-medal-storage.js";
 import { getTrackCanvasAsset } from "../track/assets.js";
 import { DEFAULT_TRACK_KEY } from "../track/catalog.js";
-import { getLoadedClientTrack, loadClientTrack } from "../track/client-registry.js";
+import { getLoadedClientTrack } from "../track/client-registry.js";
 import {
   getStaleRunTrackReason,
   hasChangedTrackDefinition,
@@ -431,7 +431,7 @@ export const dailyChallengeEngineMethods = {
       if (!isSurfaceOpen()) return;
       if (this.status === "playing" || this.status === "starting") return;
 
-      const track = await loadClientTrack(challenge.trackKey);
+      const track = getLoadedClientTrack(challenge.trackKey);
       if (!track) return;
       const presentation = resolveTrackPresentation(challenge.trackKey, {
         surface: TRACK_PRESENTATION_SURFACES.RACE,
@@ -464,11 +464,16 @@ export const dailyChallengeEngineMethods = {
     }
 
     if (hasCurrentTrackDefinition(this, targetTrackKey)) {
-      await this.refreshTrackPresentation();
+      await this.refreshTrackPresentation(challenge);
       return;
     }
 
-    await this.loadTrack(targetTrackKey, { loadPlayerProgress: false });
+    await this.loadTrack(targetTrackKey, {
+      loadPlayerProgress: false,
+      preserveDailyChallengeContext: true,
+      loadedOnly: true,
+      challenge,
+    });
   },
 
   setDailyChallengeLobbySummary(challenge) {
@@ -508,10 +513,33 @@ export const dailyChallengeEngineMethods = {
     });
   },
 
+  async loadDailyRaceDefinitions(challenge = this.currentDailyChallenge) {
+    const playlist = await getDailyChallengePlaylist();
+    const byId = new Map([...getCachedDailyChallengePlaylist(), ...playlist]
+      .filter(isDailyChallengeStillPlayable).map((entry) => [entry.id, entry]));
+    if (challenge?.trackKey) byId.set(challenge.id, challenge);
+    const challenges = [...byId.values()];
+    await this.loadRaceDefinitions?.(challenges.map((entry) => entry.trackKey), { challenge });
+    this._loadedDailyPlaylist = challenges;
+    return challenges;
+  },
+
+  async warmDailyRaceDefinitions() {
+    const challenge = await getActiveDailyChallenge();
+    if (!challenge?.trackKey) throw new Error('The Daily has no playable track.');
+    const playlist = await dailyChallengeEngineMethods.loadDailyRaceDefinitions.call(this, challenge);
+    const prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.DAILY, {
+      trackKey: challenge.trackKey,
+      challenge,
+    });
+    return { challenge, playlist, prepared };
+  },
+
   async loadDailyChallengeCritical({
     prepareTrack = true,
     loadPersonalBest = true,
     throwOnError = false,
+    isStillCurrent = () => true,
   } = {}) {
     try {
       const pending = this.initialDailyChallengeRequestPromise ?? getActiveDailyChallenge();
@@ -524,6 +552,10 @@ export const dailyChallengeEngineMethods = {
           this.initialDailyChallengeRequestPromise = null;
         }
       }
+      if (typeof this.loadDailyRaceDefinitions === 'function') {
+        await this.loadDailyRaceDefinitions(challenge);
+      }
+      if (!isStillCurrent()) return null;
       this.currentDailyChallenge = challenge || null;
       this.activeDailyChallenge = null;
       this.setDailyChallengeLobbySummary(challenge);
@@ -539,10 +571,7 @@ export const dailyChallengeEngineMethods = {
       return challenge;
     } catch (error) {
       console.error("Error loading daily challenge:", error);
-      this.currentDailyChallenge = null;
-      this.activeDailyChallenge = null;
-      if (prepareTrack) await this.syncReadyBackgroundTrack(null);
-      this.dailyChallengeUi.setDailyChallengeSummary(null);
+      if (!this.currentDailyChallenge) this.dailyChallengeUi.setDailyChallengeSummary(null);
       if (throwOnError) throw error;
       return null;
     }
@@ -717,9 +746,23 @@ export const dailyChallengeEngineMethods = {
       return;
     }
 
+    this.cancelRacePreparation?.({ preservePrepared: true });
+    const continuation = this._raceContinuationToken;
+    const stillCurrent = () => this._raceContinuationToken === continuation;
+
     const availableUntilMs = Date.parse(challenge.availableUntil || "");
     if (Number.isFinite(availableUntilMs) && Date.now() >= availableUntilMs) {
-      const refreshed = await this.loadDailyChallengeCritical();
+      this.startButtonPending = true;
+      let refreshed;
+      try {
+        refreshed = await this.loadDailyChallengeCritical({ prepareTrack: false, loadPersonalBest: false, throwOnError: true, isStillCurrent: stillCurrent });
+      } catch (error) {
+        if (stillCurrent()) this.lobbyUi?.setRaceStartError?.('daily', 'Could not load the next Daily. Tap Retry Start.');
+        return;
+      } finally {
+        this.startButtonPending = false;
+      }
+      if (!stillCurrent()) return;
       const refreshedUntil = Date.parse(refreshed?.availableUntil || "");
       const refreshedPlayable = refreshed
         && (!Number.isFinite(refreshedUntil) || Date.now() < refreshedUntil);
@@ -751,7 +794,8 @@ export const dailyChallengeEngineMethods = {
         : null;
       if (
         challenge.trackKey
-        && !hasCurrentTrackDefinition(this, challenge.trackKey)
+        && !(this.isInstalledRaceTrack?.(challenge.trackKey, challenge)
+          ?? hasCurrentTrackDefinition(this, challenge.trackKey))
       ) {
         await this.loadTrack(challenge.trackKey, {
           loadPlayerProgress: false,
@@ -760,8 +804,12 @@ export const dailyChallengeEngineMethods = {
           showStartOverlayOnReset: false,
           keepScreen: true,
           prepared: prepared ?? null,
+          loadedOnly: true,
+          challenge,
         });
       }
+
+      if (!stillCurrent()) return;
 
       if (!this.raceComparisonTarget) {
         const hasPreparedGhostAsset =
@@ -796,8 +844,10 @@ export const dailyChallengeEngineMethods = {
         replaceActive: replaceActiveJourney,
       });
       await revealInstalledRace(this);
+      if (!stillCurrent()) return;
       this.startSequence();
     } catch (error) {
+      if (!stillCurrent()) return;
       console.error("Could not start Daily race:", error);
       this.activeDailyChallenge = null;
       this.showDailyLobby?.({ selectChallengeId: challenge.id });
@@ -826,28 +876,24 @@ export const dailyChallengeEngineMethods = {
     }
     loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
     playlistRequestNeeded = loadedChallenges.length < 7;
-    this.confirmRaceTracks?.(loadedChallenges.map((challenge) => challenge?.trackKey));
     this.dailyChallengeUi.openPlaylistModal(
-      loadedChallenges.length ? loadedChallenges : null,
-      playlistActions,
+      null,
+      null,
     );
     if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
-    this.scheduleDailyPlaylistPrewarm(loadedChallenges);
-
-    if (playlistRequestNeeded) {
-      try {
+    try {
+      if (playlistRequestNeeded) {
         loadedChallenges = await getDailyChallengePlaylist();
-        if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
-        loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
-        this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
-        this.scheduleDailyPlaylistPrewarm(loadedChallenges);
-      } catch (error) {
-        console.error("Error loading daily challenge playlist:", error);
-        if (!loadedChallenges.length && this.dailyChallengeUi.isPlaylistModalOpen?.()) {
-          this.dailyChallengeUi.openPlaylistModal([], null);
-        }
-        return;
       }
+      await this.loadRaceDefinitions?.(loadedChallenges.map((entry) => entry.trackKey), { challenge: this.currentDailyChallenge });
+      if (!this.dailyChallengeUi.isPlaylistModalOpen?.()) return;
+      loadedChallenges = decorateChallengesWithTrackPersonalBests(this, loadedChallenges);
+      this.dailyChallengeUi.renderPlaylist(loadedChallenges, playlistActions);
+      this.scheduleDailyPlaylistPrewarm(loadedChallenges);
+    } catch (error) {
+      console.error("Error loading daily challenge playlist:", error);
+      if (this.dailyChallengeUi.isPlaylistModalOpen?.()) this.dailyChallengeUi.renderPlaylist([], playlistActions);
+      return;
     }
 
     try {
@@ -886,26 +932,28 @@ export const dailyChallengeEngineMethods = {
       || null;
 
     let challenges = this.dailyCarouselChallenges();
-    // A list saved on the phone is not confirmed. One request confirms all of
-    // it before the cards load their tracks.
-    this.confirmRaceTracks?.(challenges.map((challenge) => challenge?.trackKey));
-    this.paintDailyCarousel(challenges, {
-      selectedChallengeId: preferredId,
-      loading: true,
-    });
-
-    if (challenges.length < DAILY_PLAYLIST_DAYS) {
-      try {
+    // An already hydrated list can stay interactive while a refreshed list
+    // arrives. New definitions are resolved before the replacement paints.
+    const paintedCached = typeof this.loadRaceDefinitions !== 'function'
+      || challenges.every((entry) => this.canStartRaceTrack?.(entry.trackKey, entry) === true);
+    if (paintedCached) this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId, loading: challenges.length < DAILY_PLAYLIST_DAYS });
+    let fetchedPlaylist = false;
+    try {
+      if (challenges.length < DAILY_PLAYLIST_DAYS) {
         const fetched = await getDailyChallengePlaylist();
         if (isStale()) return;
         if (fetched.length) {
-          challenges = getCachedDailyChallengePlaylist();
-          this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId });
+          challenges = this.dailyCarouselChallenges();
+          fetchedPlaylist = true;
         }
-      } catch (error) {
-        console.error("Error loading daily challenge playlist:", error);
       }
+      await this.loadRaceDefinitions?.(challenges.map((entry) => entry.trackKey), { challenge: this.currentDailyChallenge });
       if (isStale()) return;
+      if (!paintedCached || fetchedPlaylist) this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId });
+    } catch (error) {
+      console.error("Error loading daily challenge playlist:", error);
+      if (!isStale()) this.lobbyUi?.setRaceStartError?.('daily', 'Could not load the Daily tracks. Tap Retry Start.');
+      return;
     }
 
     try {
@@ -969,7 +1017,7 @@ export const dailyChallengeEngineMethods = {
     this.syncDailyStartReadiness?.();
   },
 
-  // Start is enabled once the selected card's track layout is checked.
+  // Every interactive card already has its definition in memory.
   syncDailyStartReadiness() {
     const challenge = this.dailyCarousel?.getSelectedChallenge?.();
     const ready = challenge?.trackKey
@@ -987,6 +1035,8 @@ export const dailyChallengeEngineMethods = {
       trackKey: challenge.trackKey,
       challenge,
       isStillSelected: () => this.dailyCarousel?.getSelectedChallenge?.()?.id === challenge.id
+        && this.activeRaceMode === 'daily' && this.lobbyUi?.getMode?.() === 'daily'
+        && this.startOverlay?.isStartOverlayVisible?.() === true
         && this.status !== "playing" && this.status !== "starting",
     });
     void this.ensureDailyCarouselRank(challenge.id);
@@ -1415,9 +1465,18 @@ export const dailyChallengeEngineMethods = {
   restartDailyChallenge({ reason = "restart" } = {}) {
     if (!this.activeDailyChallenge) return;
     if (hasChangedTrackDefinition(this)) {
-      return reloadChangedRaceTrack(this, { preserveRaceComparisonTarget: reason !== "improve" })
-        .then(() => this.restartDailyChallenge({ reason }))
+      this.cancelRacePreparation?.();
+      const continuation = this._raceContinuationToken;
+      const stillCurrent = () => this._raceContinuationToken === continuation;
+      return reloadChangedRaceTrack(this, { preserveRaceComparisonTarget: reason !== "improve", isStillCurrent: stillCurrent })
+        .then(async () => {
+          if (this._raceContinuationToken !== continuation) return;
+          await revealInstalledRace(this);
+          if (this._raceContinuationToken !== continuation) return;
+          this.restartDailyChallenge({ reason });
+        })
         .catch((error) => {
+          if (!stillCurrent()) return;
           console.error("Could not prepare the updated Daily track:", error);
           this.showDailyLobby?.({ selectChallengeId: this.activeDailyChallenge?.id });
           this.lobbyUi?.setRaceStartError?.("daily", "Could not confirm this track. Retry before racing.");
@@ -1434,7 +1493,8 @@ export const dailyChallengeEngineMethods = {
 
   async startDailyChallengeAgainstOpponent(challenge, target) {
     if (!challenge || !target) return false;
-    const track = await loadClientTrack(challenge.trackKey);
+    const track = getLoadedClientTrack(challenge.trackKey);
+    if (!track) return false;
     this.clearRaceComparisonTarget?.();
     if (!this.installRaceComparisonTarget?.(
       { ...target, mode: "daily" },

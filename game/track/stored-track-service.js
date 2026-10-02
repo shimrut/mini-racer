@@ -62,7 +62,12 @@ export function registerStoredTracksFromPayload(tracks, { confirmedTrackKeys = [
         throw new Error('The track layout could not be confirmed. Retry before racing.');
     }
     for (const entry of entries) {
-        if (entry) registerStoredTrack(entry);
+        if (entry) {
+            registerStoredTrack(entry);
+            // Authoritative Campaign answers also carry the tracks of the
+            // other published series. Reuse those confirmations too.
+            if (requested.length) confirmedKeys.add(entry.key);
+        }
     }
     for (const key of requested) {
         if (isBuiltInTrack(key) && !entries.some((entry) => entry?.key === key)) unregisterStoredTrack(key);

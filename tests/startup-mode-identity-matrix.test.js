@@ -16,6 +16,7 @@ function createRacer(mode, identity, calls) {
         calls.push('daily-contract');
         return { trackKey: 'daily-track' };
     });
+    racer.loadDailyRaceDefinitions = vi.fn(async () => []);
     racer.prepareInitialCampaignLaunch = vi.fn(async () => {
         calls.push('campaign-contract');
         return { stage: { raceId: 'numbered-v1-0', trackKey: 'campaign-track' } };
@@ -102,27 +103,25 @@ describe('direct-mode startup identity matrix', () => {
         await racer.loadStartupGraphics('daily');
     });
 
-    it('prepares both the Daily and the Campaign stage before Home shows', async () => {
+    it('prepares only Home graphics while its race services are pending', async () => {
         const calls = [];
         const racer = createRacer('home', 'signed-in', calls);
         racer.installModeRuntime = vi.fn(async () => null);
-        racer.resolveDefaultCampaignStage = vi.fn(async () => {
-            calls.push('campaign-stage');
-            return { raceId: 'numbered-v1-0', trackKey: 'campaign-track' };
-        });
+        racer.loadDailyChallengeCritical = vi.fn(() => new Promise(() => {}));
+        racer.resolveDefaultCampaignStage = vi.fn(() => new Promise(() => {}));
 
         await racer.loadStartupGraphics('home');
 
-        expect(calls).toContain('prepare:daily:daily-track');
-        expect(calls).toContain('prepare:campaign:campaign-track');
-        // The Daily is the track on screen; the Campaign stage stays prepared.
+        expect(racer.loadDailyChallengeCritical).not.toHaveBeenCalled();
+        expect(racer.resolveDefaultCampaignStage).not.toHaveBeenCalled();
+        expect(racer.prepareRaceTrack).not.toHaveBeenCalled();
         expect(racer.loadTrack).toHaveBeenCalledTimes(1);
-        expect(racer.loadTrack).toHaveBeenCalledWith('daily-track', expect.objectContaining({
-            prepared: { trackKey: 'daily-track' },
+        expect(racer.loadTrack).toHaveBeenCalledWith('circuit', expect.objectContaining({
+            prepared: null,
         }));
     });
 
-    it('keeps Home loading when its Campaign is unavailable', async () => {
+    it('finishes Home race data without consulting unavailable race services', async () => {
         const calls = [];
         const racer = createRacer('home', 'signed-in', calls);
         racer.installModeRuntime = vi.fn(async () => null);
@@ -131,11 +130,15 @@ describe('direct-mode startup identity matrix', () => {
         });
         vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-        await racer.loadStartupGraphics('home');
+        racer.loadDailyChallengeCritical = vi.fn(async () => {
+            throw new Error('Daily unavailable.');
+        });
+        await Promise.all([racer.loadStartupGraphics('home'), racer.loadStartupRaceData('home')]);
 
-        expect(calls).toContain('prepare:daily:daily-track');
-        expect(calls).not.toContain('prepare:campaign:campaign-track');
-        expect(racer.loadTrack).toHaveBeenCalledWith('daily-track', expect.any(Object));
+        expect(racer.loadDailyChallengeCritical).not.toHaveBeenCalled();
+        expect(racer.resolveDefaultCampaignStage).not.toHaveBeenCalled();
+        expect(calls).toContain('profile:signed-in');
+        expect(racer.loadTrack).toHaveBeenCalledWith('circuit', expect.any(Object));
     });
 
     it('fails the loader when a required track cannot be prepared', async () => {

@@ -73,9 +73,9 @@ describe('choosing a Campaign series', () => {
         globalThis.localStorage?.clear?.();
     });
 
-    it('paints the stages of the chosen series at once and asks the server for that series', async () => {
+    it('paints the stages after definitions resolve and asks the server for that series', async () => {
         const context = createContext();
-        context.selectCampaignSeries('test-v1');
+        await context.selectCampaignSeries('test-v1');
 
         expect(context.selectedCampaignStageId).toBeNull();
         const painted = context.lobbyUi.showCampaign.mock.calls[0][0];
@@ -109,7 +109,7 @@ describe('choosing a Campaign series', () => {
         const context = createContext();
         context.showCampaignLobby({ view: 'series', refresh: false });
 
-        context.openCampaignSeries('test-v1');
+        await context.openCampaignSeries('test-v1');
         const opened = context.lobbyUi.showCampaign.mock.calls.at(-1)[0];
         expect(opened.view).toBe('stages');
         expect(opened.seriesId).toBe('test-v1');

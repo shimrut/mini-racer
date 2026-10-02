@@ -774,41 +774,34 @@ export class RealTimeRacer {
         );
         return this.initialChallengeLobbyPromise;
       }
-      if (mode === "home") return this.loadHomeRaceContracts();
       return null;
     });
     return this.initialContractPromise;
   }
 
-  // Home offers both lobbies, so it needs the current Daily and the Campaign
-  // lobby's stage. A Daily or a Campaign that cannot load is left out here;
-  // its own lobby shows that state.
-  async loadHomeRaceContracts() {
-    const [daily, campaignStage] = await Promise.all([
-      Promise.resolve(this.installModeRuntime("daily"))
-        .then(() => this.loadDailyChallengeCritical?.({
-          prepareTrack: false,
-          loadPersonalBest: false,
-        }) ?? null)
-        .catch((error) => {
-          console.warn("The Daily could not load for Home:", error);
-          return null;
-        }),
-      Promise.resolve(this.installModeRuntime("campaign"))
-        .then(() => this.loadStartupPlayer())
-        .then(() => this.resolveDefaultCampaignStage?.() ?? null)
-        .catch((error) => {
-          console.warn("The Campaign could not load for Home:", error);
-          return null;
-        }),
-    ]);
-    return { daily, campaignStage };
+  // Warm caches through the runtime's own methods, without installing another
+  // mode or applying its contract to the active race. Mode entry shares any
+  // pending warmup; a failed warmup can be retried on entry.
+  warmRaceMode(mode) {
+    this._raceModeWarmups ??= new Map();
+    if (this._raceModeWarmups.has(mode)) return this._raceModeWarmups.get(mode);
+    const method = mode === "daily" ? "warmDailyRaceDefinitions" : "warmCampaignRaceDefinitions";
+    const promise = Promise.resolve(this.prefetchModeRuntime(mode))
+      .then((runtime) => {
+        const warm = runtime?.methods?.[method] ?? this[method];
+        return typeof warm === "function" ? warm.call(this) : null;
+      })
+      .finally(() => {
+        if (this._raceModeWarmups.get(mode) === promise) this._raceModeWarmups.delete(mode);
+      });
+    this._raceModeWarmups.set(mode, promise);
+    return promise;
   }
 
   // The races that each entry point prepares before its loader closes. The
   // first one becomes the track on screen.
   async resolveInitialRaceTargets(mode) {
-    if (mode === "challenge") return [];
+    if (mode === "challenge" || mode === "home") return [];
     const contract = await this.ensureInitialContract(mode);
     if (mode === "daily") {
       if (!contract?.trackKey) throw new Error("The daily launch has no playable track.");
@@ -823,23 +816,7 @@ export class RealTimeRacer {
         challenge: plainRaceChallenge(stage.trackKey),
       }];
     }
-    const targets = [];
-    if (contract?.daily?.trackKey) {
-      targets.push({
-        slot: PREPARATION_SLOTS.DAILY,
-        trackKey: contract.daily.trackKey,
-        challenge: contract.daily,
-      });
-    }
-    const stage = contract?.campaignStage;
-    if (stage?.trackKey) {
-      targets.push({
-        slot: PREPARATION_SLOTS.CAMPAIGN,
-        trackKey: stage.trackKey,
-        challenge: plainRaceChallenge(stage.trackKey),
-      });
-    }
-    return targets;
+    return [];
   }
 
   // Prepares every target at the same time, then puts the first one on
@@ -969,13 +946,46 @@ export class RealTimeRacer {
   }
 
   async activateMode(mode, options = {}) {
-    await this.installModeRuntime(mode);
-    if (mode === "daily") return this.showDailyLobby(options);
-    if (mode === "campaign") return this.showCampaignLobby(options);
-    if (mode === "challenge") {
-      return this.loadChallengeLobby(options.challengeId || this.launchTarget?.challengeId || null);
+    if (mode === "home") return this.showHomeLobby();
+    const token = (this._modeEntryToken || 0) + 1;
+    this._modeEntryToken = token;
+    this._modeEntryPending = true;
+    this.cancelRacePreparation?.();
+    this.loadingScreen?.begin?.(`Loading ${MODE_LABELS[mode] ?? "the game"}…`);
+    try {
+      // Import first so an entry cancelled during the download cannot install
+      // its runtime over the mode the player chose afterward.
+      await this.prefetchModeRuntime?.(mode);
+      if (token !== this._modeEntryToken) return null;
+      await this.installModeRuntime(mode);
+      if (token !== this._modeEntryToken) return null;
+      if (mode === "challenge") {
+        await this.loadChallengeLobby(options.challengeId || this.launchTarget?.challengeId || null);
+      } else {
+        const warmed = await this.warmRaceMode(mode);
+        if (token !== this._modeEntryToken) return null;
+        if (mode === "daily") {
+          if (!warmed?.challenge) throw new Error("No playable Daily is available.");
+          this.currentDailyChallenge = warmed.challenge;
+          this.setDailyChallengeLobbySummary(warmed.challenge);
+          this.showDailyLobby(options);
+        } else if (mode === "campaign") {
+          if (!warmed?.stage) throw new Error("Campaign progress is not authoritative.");
+          this.applyCampaignLobbyBootstrap(warmed.bootstrap, { paint: false });
+          this.showCampaignLobby({ ...options, refresh: false });
+        }
+      }
+      if (token !== this._modeEntryToken) return null;
+      this._modeEntryPending = false;
+      await this.loadingScreen?.dismiss?.();
+    } catch (error) {
+      if (token !== this._modeEntryToken) return null;
+      console.error(`Could not enter ${mode}:`, error);
+      this.loadingScreen?.showError?.(
+        `Could not load ${MODE_LABELS[mode] ?? "the game"}. Retry before racing.`,
+        () => void this.activateMode(mode, options),
+      );
     }
-    return this.showHomeLobby();
   }
 
   reportRaceBlockedByTransfer(mode) {
@@ -1064,8 +1074,13 @@ export class RealTimeRacer {
     if (this._secondaryStartupStarted) return;
     this._secondaryStartupStarted = true;
     const secondaryModes = selectModeSecondaryStartupTasks(this.launchTarget.mode);
-    this.dailyChallengeSummaryPromise = Promise.resolve(this.prefetchModeRuntime("daily"))
-      .then(() => this.invokeModeMethod("daily", "refreshDailyChallengeSummary"))
+    this.dailyChallengeSummaryPromise = Promise.resolve()
+      .then(() => {
+        // A summary updates race context, so refresh it only for the visible
+        // Daily. Home/background warming only populates definition/asset caches.
+        if (this.activeRaceMode !== "daily") return null;
+        return this.invokeModeMethod("daily", "refreshDailyChallengeSummary");
+      })
       .catch((error) => {
         console.error("Error loading daily challenge summary:", error);
         return null;
@@ -1075,16 +1090,7 @@ export class RealTimeRacer {
       });
     window.setTimeout(() => {
       for (const mode of secondaryModes) {
-        void this.prefetchModeRuntime(mode)
-          .then(() => {
-            if (mode === "daily") {
-              return this.invokeModeMethod("daily", "prefetchDailyChallengePlaylist");
-            }
-            if (mode === "campaign") {
-              return this.invokeModeMethod("campaign", "ensureCampaignBootstrap");
-            }
-            return null;
-          })
+        void this.warmRaceMode(mode)
           .catch((error) => {
             console.error(`Error warming the ${mode} runtime:`, error);
           });

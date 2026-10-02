@@ -1007,6 +1007,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       showStartOverlayOnReset: false,
       keepScreen: true,
       prepared: null,
+      loadedOnly: true,
+      challenge,
     });
     expect(engine.startSequence).toHaveBeenCalledTimes(1);
   });
@@ -1224,6 +1226,8 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       showStartOverlayOnReset: false,
       keepScreen: true,
       prepared: null,
+      loadedOnly: true,
+      challenge,
     });
     expect(engine.applyDailyChallenge).toHaveBeenCalledWith(challenge);
     expect(engine.startSequence).toHaveBeenCalled();

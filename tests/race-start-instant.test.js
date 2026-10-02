@@ -19,7 +19,7 @@ const { raceEngineMethods } = await import('../game/race/engine-methods.js');
 const { dailyChallengeEngineMethods } = await import('../game/daily-challenge/engine-methods.js');
 const { PREPARATION_SLOTS } = await import('../game/track/race-preparation.js');
 const { clearStoredTrackChecksForTests } = await import('../game/track/stored-track-service.js');
-const { loadClientTrack } = await import('../game/track/client-registry.js');
+const { loadClientTrack, getLoadedClientTrack, clearClientTrackRegistryForTests } = await import('../game/track/client-registry.js');
 
 let originalDocument;
 
@@ -27,6 +27,7 @@ beforeEach(() => {
     originalDocument = globalThis.document;
     globalThis.document = { activeElement: null };
     clearStoredTrackChecksForTests();
+    clearClientTrackRegistryForTests();
 });
 
 afterEach(() => {
@@ -73,6 +74,7 @@ async function lobbyEngine(calls) {
         clearRaceComparisonTarget() {},
         syncCurrentRunPolicy() {},
         requestRender() {},
+        syncCarSpriteAsset: vi.fn(async () => null),
         applyDailyChallenge() {},
         resize({ render } = {}) {
             if (render) calls.push(`draw:${this.trackCanvas?.trackKey}`);
@@ -110,24 +112,20 @@ describe('an instant race start', () => {
         expect(calls).toEqual(['draw:smallSteps', 'closeModal', 'lobbyFade', 'countdown']);
     });
 
-    it('prepares a track that is not ready before it starts, while the lobby stays', async () => {
+    it('does not fetch or import missing definitions after Start is pressed', async () => {
         stubHostedWindow();
-        let answer;
-        vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => {
-            answer = () => resolve({ ok: true, json: async () => ({ tracks: [] }) });
-        })));
+        vi.stubGlobal('fetch', vi.fn());
+        vi.spyOn(console, 'error').mockImplementation(() => {});
         const calls = [];
         const engine = await lobbyEngine(calls);
         const challenge = { id: 'day-3', trackKey: 'smallSteps' };
 
-        const start = engine.handleStartDailyChallenge(challenge);
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await engine.handleStartDailyChallenge(challenge);
         expect(calls).toEqual([]);
         expect(engine.currentTrackKey).toBe('numberOne');
-
-        answer();
-        await start;
-        expect(calls).toEqual(['draw:smallSteps', 'closeModal', 'lobbyFade', 'countdown']);
+        expect(fetch).not.toHaveBeenCalled();
+        expect(engine.lobbyUi.setRaceStartError).toHaveBeenCalledWith('daily', expect.stringContaining('Retry'));
+        expect(getLoadedClientTrack('smallSteps')).toBeNull();
     });
 
     it('never starts a race when its track cannot be confirmed', async () => {

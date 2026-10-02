@@ -6,11 +6,15 @@ import { trackEngineMethods } from '../game/track/engine-methods.js';
 import { dailyChallengeEngineMethods } from '../game/daily-challenge/engine-methods.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
 import { PREPARATION_SLOTS } from '../game/track/race-preparation.js';
+import { clearClientTrackRegistryForTests, loadRaceDefinitions } from '../game/track/client-registry.js';
+import { clearStoredTrackChecksForTests } from '../game/track/stored-track-service.js';
 
 let originalDocument;
 
 beforeEach(() => {
     originalDocument = global.document;
+    clearClientTrackRegistryForTests();
+    clearStoredTrackChecksForTests();
     const dom = new JSDOM(`
         <button id="daily-challenge-start-btn"><span class="main-menu__label"></span></button>
         <p id="daily-start-message" hidden></p>
@@ -23,6 +27,7 @@ beforeEach(() => {
 afterEach(() => {
     global.document = originalDocument;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
 });
 
 describe('a Start button with several reasons to stay disabled', () => {
@@ -83,20 +88,20 @@ describe('the engine and the selected lobby card', () => {
         };
     }
 
-    it('marks the selected Daily card ready only when its track is prepared', () => {
+    it('marks the selected Daily card ready after its definition loads without preparing assets', async () => {
         const challenge = { id: 'day-1', trackKey: 'smallSteps' };
-        const prepared = { trackKey: 'smallSteps' };
         const racer = engine({
             dailyCarousel: { getSelectedChallenge: () => challenge },
             findPreparedRaceTrack: vi.fn(() => null),
+            raceTrackNeedsConfirmation: () => false,
         });
         racer.syncDailyStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', false);
 
-        racer.findPreparedRaceTrack.mockReturnValue(prepared);
+        await loadRaceDefinitions(['smallSteps'], { requireConfirmation: false });
         racer.syncDailyStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', true);
-        expect(racer.findPreparedRaceTrack).toHaveBeenCalledWith('smallSteps', challenge);
+        expect(racer.findPreparedRaceTrack).not.toHaveBeenCalled();
     });
 
     it('marks a locked Campaign stage as no race, and an unlocked one by its track', () => {
@@ -114,7 +119,7 @@ describe('the engine and the selected lobby card', () => {
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('campaign', true);
     });
 
-    it('enables Start on a card whose layout is checked, before its track is drawn', async () => {
+    it('enables Start after confirmation and definition import, before the picture is drawn', async () => {
         vi.stubGlobal('window', {
             location: { hostname: 'reddit.example', pathname: '/game.html' },
             localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
@@ -128,9 +133,8 @@ describe('the engine and the selected lobby card', () => {
         racer.syncDailyStartReadiness();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', false);
 
-        // One check for the whole list, when the lobby opens; nothing is drawn.
-        racer.confirmRaceTracks(['smallSteps', 'numberOne']);
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await racer.loadRaceDefinitions(['smallSteps', 'numberOne']);
+        racer.syncDailyStartReadiness();
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(racer.findPreparedRaceTrack('smallSteps', challenge)).toBeNull();
         expect(racer.lobbyUi.setStartTrackReady).toHaveBeenLastCalledWith('daily', true);
@@ -143,6 +147,9 @@ describe('the engine and the selected lobby card', () => {
         const challenge = { id: 'day-1', trackKey: 'smallSteps' };
         const racer = engine({
             prepareRaceTrack,
+            canStartRaceTrack: () => true,
+            activeRaceMode: 'daily',
+            lobbyUi: { getMode: () => 'daily', setStartTrackReady: vi.fn() },
             startOverlay: { isStartOverlayVisible: () => true },
             dailyCarousel: { getSelectedChallenge: () => challenge },
             ensureDailyCarouselRank: vi.fn(async () => {}),
@@ -165,7 +172,7 @@ describe('the engine and the selected lobby card', () => {
             beforeBuild = target.beforeBuild;
             return new Promise(() => {});
         });
-        const racer = engine({ prepareRaceTrack });
+        const racer = engine({ prepareRaceTrack, canStartRaceTrack: () => true });
         racer.prepareSelectedRaceTrack('daily', {
             trackKey: selected.trackKey,
             challenge: selected,
@@ -178,6 +185,7 @@ describe('the engine and the selected lobby card', () => {
 
     it('shows Retry Start when the selected track cannot be prepared', async () => {
         const racer = engine({
+            canStartRaceTrack: () => true,
             prepareRaceTrack: vi.fn(async () => {
                 throw new Error('The track layout could not be confirmed. Retry before racing.');
             }),
@@ -189,11 +197,13 @@ describe('the engine and the selected lobby card', () => {
         expect(racer.lobbyUi.setRaceStartError).toHaveBeenCalledWith('daily', 'Track failed to load. Tap Retry Start.');
     });
 
-    it('confirms a saved Daily list in one request before its cards load', () => {
+    it('hydrates a saved Daily list in one shared request before its cards load', async () => {
         globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ tracks: [] }) }));
         const racer = engine();
-        racer.confirmRaceTracks(['albertGardens', 'bucharestScramble', 'budapestRun']);
-        racer.confirmRaceTracks(['albertGardens', 'bucharestScramble', 'budapestRun']);
+        await Promise.all([
+            racer.loadRaceDefinitions(['albertGardens', 'bucharestScramble', 'budapestRun']),
+            racer.loadRaceDefinitions(['albertGardens', 'bucharestScramble', 'budapestRun']),
+        ]);
 
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(fetch.mock.calls[0][0]).toBe('/api/tracks/stored?keys=albertGardens%2CbucharestScramble%2CbudapestRun');

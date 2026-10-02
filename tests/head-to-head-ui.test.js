@@ -73,6 +73,7 @@ describe('Head to Head lobby and finish', () => {
                 updateChallengeFinishHero: vi.fn(),
                 setChallengeWinActions,
             },
+            activateMode: vi.fn(),
             restartActiveRace: vi.fn(),
             loadChallengeLobby: vi.fn(),
             showDailyLobby: vi.fn(),
@@ -921,6 +922,7 @@ describe('Head to Head lobby and finish', () => {
     it('points a won duel at the other two modes', async () => {
         const setChallengeWinActions = vi.fn();
         const context = {
+            activateMode: vi.fn(),
             activeHeadToHead: {
                 challengeId: 'challenge-1',
                 trackKey: 'numberZero',
@@ -964,8 +966,10 @@ describe('Head to Head lobby and finish', () => {
         const { dailyAction, campaignAction } = setChallengeWinActions.mock.calls.at(-1)[0];
         dailyAction();
         campaignAction();
-        expect(context.showDailyLobby).toHaveBeenCalledTimes(1);
-        expect(context.showCampaignLobby).toHaveBeenCalledTimes(1);
+        expect(context.activateMode).toHaveBeenCalledWith('daily');
+        expect(context.activateMode).toHaveBeenCalledWith('campaign');
+        expect(context.showDailyLobby).not.toHaveBeenCalled();
+        expect(context.showCampaignLobby).not.toHaveBeenCalled();
     });
 
     it('offers Daily and Campaign on a local beat before the server answers, then restores Improve if it was not a beat', async () => {
@@ -1531,6 +1535,8 @@ describe('Head to Head lobby and finish', () => {
             showStartOverlayOnReset: false,
             keepScreen: true,
             prepared: null,
+            loadedOnly: true,
+            challenge: { trackKey: 'numberZero', skin: 'default' },
         });
         expect(context.startSequence).toHaveBeenCalledTimes(1);
     });

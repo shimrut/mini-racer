@@ -11,6 +11,14 @@ export class LoadingScreen {
     this.isComplete = false;
   }
 
+  begin(label) {
+    this.isComplete = false;
+    this.clearError();
+    this.element?.setAttribute("aria-valuenow", "0");
+    document.body.classList.add(this.activeClass);
+    this.setStatus(label);
+  }
+
   setStatus(status) {
     if (this.isComplete || !status) return;
     if (this.statusText) this.statusText.textContent = status;

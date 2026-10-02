@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTrackDefinitionIdentity } from '../game/track/definition-identity.js';
 import { getTrackCanvasAsset, getTrackRuntimeAsset } from '../game/track/assets.js';
 import { clearStoredTracksForTests, getStoredTrack } from '../game/track/stored-tracks.js';
-import { clearClientTrackRegistryForTests, loadClientTrack } from '../game/track/client-registry.js';
+import { clearClientTrackRegistryForTests, loadClientTrack, loadRaceDefinitions } from '../game/track/client-registry.js';
 import { clearStoredTrackChecksForTests, ensureStoredTracks, registerStoredTracksFromPayload } from '../game/track/stored-track-service.js';
 import { CHANGED_TRACK_RUN_MESSAGE, getStaleRunTrackReason } from '../game/track/race-definition.js';
 import { trackEngineMethods } from '../game/track/engine-methods.js';
@@ -14,6 +14,7 @@ import { modeRouterEngineMethods } from '../game/modes/engine-methods.js';
 import { getActiveDailyChallenge } from '../game/daily-challenge/service.js';
 import { fitTrackPreviewCanvas } from '../game/ui/track-carousel.js';
 import { renderCachedTrackPreviewCanvas } from '../game/track/preview-renderer.js';
+import { PREPARATION_SLOTS, plainRaceChallenge } from '../game/track/race-preparation.js';
 
 vi.mock('../game/track/canvas.js', async (importOriginal) => ({
     ...await importOriginal(),
@@ -126,6 +127,84 @@ describe('authoritative stored layout before racing', () => {
 });
 
 describe('same-key assets and fixed active attempts', () => {
+    it('starts a confirmed loaded same-key Daily with its own picture and no source request', async () => {
+        vi.stubGlobal('window', {
+            location: { hostname: 'reddit.example', pathname: '/game.html' },
+            localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+        });
+        vi.stubGlobal('document', { activeElement: null });
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+        registerStoredTracksFromPayload([], { confirmedTrackKeys: ['kettleRun'] });
+        await loadRaceDefinitions(['kettleRun']);
+        const engine = {
+            ...trackEngineMethods,
+            status: 'ready', activeRaceMode: 'daily', trackLoadRequestId: 0,
+            qualityLevel: 1, frameSkip: 0, activeGeometry: {},
+            requestRender: vi.fn(), syncCurrentRunPolicy: vi.fn(),
+            hud: { setGround: vi.fn(), setBestTime: vi.fn() },
+            reset: vi.fn(), applyDailyChallenge: vi.fn(), startSequence: vi.fn(), resize: vi.fn(),
+            startOverlay: { beginRaceStartTransition: vi.fn() },
+        };
+        const plain = await engine.prepareRaceTrack(PREPARATION_SLOTS.DAILY, {
+            trackKey: 'kettleRun', challenge: plainRaceChallenge('kettleRun'),
+        });
+        await engine.loadTrack('kettleRun', {
+            prepared: plain, loadPlayerProgress: false, preserveDailyChallengeContext: true,
+        });
+        const previousCanvas = engine.trackCanvas;
+        const challenge = { id: 'desert-daily', trackKey: 'kettleRun', skin: 'desert' };
+        await dailyChallengeEngineMethods.handleStartDailyChallenge.call(engine, challenge);
+        expect(engine.startSequence).toHaveBeenCalledOnce();
+        const selected = engine.findPreparedRaceTrack('kettleRun', challenge);
+        expect(selected.presentation.key).not.toBe(plain.presentation.key);
+        expect(engine.currentTrackPresentation).toBe(selected.presentation);
+        expect(engine.trackCanvas).toBe(selected.canvasAsset.canvas);
+        expect(engine.trackCanvas).not.toBe(previousCanvas);
+        expect(engine.startSequence).toHaveBeenCalledOnce();
+        expect(fetchMock).not.toHaveBeenCalled();
+        engine.qualityLevel = 2;
+        expect(engine.isInstalledRaceTrack('kettleRun', challenge)).toBe(false);
+        expect(engine.readyRaceTrack(PREPARATION_SLOTS.SELECTED, 'kettleRun', challenge).optionsKey).toBe('2:0');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('retains the expired active Daily when Restart is pressed', () => {
+        const activeDailyChallenge = { id: 'expired-active', trackKey: 'circuit', availableUntil: '2000-01-01T00:00:00Z' };
+        const engine = {
+            activeDailyChallenge, currentTrackKey: 'circuit', currentTrack: null,
+            handleStartDailyChallenge: vi.fn(), loadDailyChallengeCritical: vi.fn(), reset: vi.fn(),
+        };
+        dailyChallengeEngineMethods.restartDailyChallenge.call(engine);
+        expect(engine.activeDailyChallenge).toBe(activeDailyChallenge);
+        expect(engine.loadDailyChallengeCritical).not.toHaveBeenCalled();
+        expect(engine.handleStartDailyChallenge).not.toHaveBeenCalled();
+        expect(engine.reset).toHaveBeenCalledWith(true, expect.objectContaining({ preserveDailyChallenge: true }));
+    });
+
+    it.each([false, true])('does not install or report a late changed-track Restart after leaving (reject=%s)', async (reject) => {
+        registerStoredTracksFromPayload([storedTrack({ cornerRadius: 0 })]);
+        let complete;
+        const recovery = new Promise((resolve, rejectLoad) => { complete = reject ? rejectLoad : resolve; });
+        const engine = {
+            ...trackEngineMethods,
+            activeRaceMode: 'daily', currentTrackKey: 'circuit', currentTrack: storedTrack().track, trackCanvas: {},
+            activeDailyChallenge: { id: 'run', trackKey: 'circuit' },
+            loadRaceDefinitions: vi.fn(() => recovery), loadTrack: vi.fn(), reset: vi.fn(),
+            showDailyLobby: vi.fn(), lobbyUi: { setRaceStartError: vi.fn() },
+            restartDailyChallenge: dailyChallengeEngineMethods.restartDailyChallenge,
+        };
+        const restart = engine.restartDailyChallenge();
+        engine.cancelRacePreparation();
+        engine.activeRaceMode = 'home';
+        complete(reject ? new Error('offline') : undefined);
+        await restart;
+        expect(engine.loadTrack).not.toHaveBeenCalled();
+        expect(engine.reset).not.toHaveBeenCalled();
+        expect(engine.showDailyLobby).not.toHaveBeenCalled();
+        expect(engine.lobbyUi.setRaceStartError).not.toHaveBeenCalled();
+    });
+
     it.each([
         ['global radius', (track) => { track.cornerRadius = 0; }],
         ['point radius', (track) => { track.outer[0].cornerRadius = 0; }],

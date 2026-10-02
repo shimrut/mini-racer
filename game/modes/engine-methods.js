@@ -3,10 +3,17 @@ import {
     deferLobbyWorkUntilAfterPaint,
 } from '../lobby/deferred-work.js';
 import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
-import { hasChangedTrackDefinition, reloadChangedRaceTrack } from '../track/race-definition.js';
+import { hasChangedTrackDefinition, reloadChangedRaceTrack, revealInstalledRace } from '../track/race-definition.js';
 
 export const modeRouterEngineMethods = {
     showHomeLobby() {
+        const wasEnteringMode = this._modeEntryPending === true;
+        this._modeEntryToken = (this._modeEntryToken || 0) + 1;
+        this.cancelRacePreparation?.();
+        if (wasEnteringMode) {
+            this._modeEntryPending = false;
+            this.loadingScreen?.dismiss?.();
+        }
         cancelDeferredLobbyWork(this);
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
@@ -25,6 +32,7 @@ export const modeRouterEngineMethods = {
     },
 
     showDailyLobby({ selectChallengeId = null } = {}) {
+        this.cancelRacePreparation?.();
         if (this.status !== 'ready' || this.currentChallengeRun) {
             this.reset(false, { showStartOverlay: false });
         }
@@ -91,9 +99,18 @@ export const modeRouterEngineMethods = {
         }
         if (!this.currentChallengeRun) return;
         if (hasChangedTrackDefinition(this)) {
-            return reloadChangedRaceTrack(this)
-                .then(() => this.restartActiveRace())
+            this.cancelRacePreparation?.();
+            const continuation = this._raceContinuationToken;
+            const stillCurrent = () => this._raceContinuationToken === continuation;
+            return reloadChangedRaceTrack(this, { isStillCurrent: stillCurrent })
+                .then(async () => {
+                    if (this._raceContinuationToken !== continuation) return;
+                    await revealInstalledRace(this);
+                    if (this._raceContinuationToken !== continuation) return;
+                    this.restartActiveRace();
+                })
                 .catch((error) => {
+                    if (!stillCurrent()) return;
                     console.error('Could not prepare the updated race track:', error);
                     this.returnToActiveLobby?.();
                     this.lobbyUi?.setRaceStartError?.(this.activeRaceMode, 'Could not confirm this track. Retry before racing.');

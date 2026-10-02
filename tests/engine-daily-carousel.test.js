@@ -133,6 +133,33 @@ afterEach(() => {
 });
 
 describe('daily carousel engine wiring', () => {
+    it('resolves every cached definition before publishing interactive cards', async () => {
+        playlistState.cached = CHALLENGES;
+        let releaseDefinitions;
+        const definitions = new Promise((resolve) => { releaseDefinitions = resolve; });
+        const { engine, render } = createEngine({ loadRaceDefinitions: vi.fn(() => definitions) });
+        const pending = dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
+        await vi.waitFor(() => expect(engine.loadRaceDefinitions).toHaveBeenCalled());
+        expect(engine.loadRaceDefinitions).toHaveBeenCalledWith(DAY_TRACKS, { challenge: null });
+        expect(render).not.toHaveBeenCalled();
+        releaseDefinitions();
+        await pending;
+        expect(render.mock.calls[0][0].map((card) => card.challengeId)).toEqual(CHALLENGES.map((entry) => entry.id));
+    });
+
+    it('keeps unresolved definitions out of the carousel when loading fails', async () => {
+        playlistState.cached = CHALLENGES;
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { engine, render } = createEngine({
+            loadRaceDefinitions: vi.fn().mockRejectedValue(new Error('offline')),
+            lobbyUi: { setRaceStartError: vi.fn() },
+        });
+        await dailyChallengeEngineMethods.refreshDailyCarousel.call(engine);
+        expect(render).not.toHaveBeenCalled();
+        expect(engine.lobbyUi.setRaceStartError).toHaveBeenCalledWith('daily', expect.stringContaining('Retry'));
+        error.mockRestore();
+    });
+
     it('paints the cached run of days before the network answers', async () => {
         playlistState.cached = CHALLENGES.slice(0, 2);
         playlistState.fetched = CHALLENGES;

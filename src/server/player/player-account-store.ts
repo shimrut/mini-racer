@@ -1,5 +1,7 @@
 import { redis } from '@devvit/redis';
 import { TRACKS } from '../../../game/track/tracks.js';
+import { hasTrack } from '../../../game/track/catalog.js';
+import { confirmStoredTracks } from '../tracks/stored-catalog.js';
 import {
     sanitizeRedditUsername,
 } from '../../../game/shared/leaderboard-identity.js';
@@ -47,7 +49,7 @@ import {
 import {
     getGuestProgressSelection,
     getServerDailyGpPlayableChallenge,
-    getServerDailyGpPlaylist,
+    getServerDailyGpPlaylistContracts,
     guestProgressRecoveryRequiredError,
     guestProgressSelectionKey,
     pendingSelectionPayload,
@@ -267,8 +269,15 @@ export async function getServerPlayerTrackPbSummaries({
             typeof value === 'string' && Boolean(value)
         )))].slice(0, DAILY_GP_PLAYLIST_DAYS)
         : [];
-    const playlist = await getServerDailyGpPlaylist();
+    if (requestedIds.length === 0) {
+        return { playerId: identity.canonicalPlayerId, trackPbs: {} };
+    }
+    const playlist = await getServerDailyGpPlaylistContracts(new Date(), requestedIds);
     const challengeById = new Map(playlist.map((challenge) => [challenge.id, challenge]));
+    await confirmStoredTracks([...new Set(requestedIds.flatMap((challengeId) => {
+        const challenge = challengeById.get(challengeId);
+        return challenge ? [challenge.trackKey] : [];
+    }))]);
     const trackPbs: Record<string, {
         trackKey: string;
         bestTimeMs: number;
@@ -279,7 +288,7 @@ export async function getServerPlayerTrackPbSummaries({
 
     for (const challengeId of requestedIds) {
         const challenge = challengeById.get(challengeId);
-        if (!challenge) {
+        if (!challenge || !hasTrack(challenge.trackKey)) {
             trackPbs[challengeId] = null;
             continue;
         }

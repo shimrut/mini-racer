@@ -3092,6 +3092,8 @@ describe('Campaign lobby and shared modal adapters', () => {
             showStartOverlayOnReset: false,
             keepScreen: true,
             prepared: null,
+            loadedOnly: true,
+            challenge: expect.objectContaining({ id: 'numbered-v1-00', trackKey: 'numberZero', skin: 'default' }),
         });
         expect(context.startSequence).toHaveBeenCalledTimes(1);
     });

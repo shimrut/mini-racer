@@ -173,6 +173,9 @@ export const headToHeadEngineMethods = {
         onTrackPhase = null,
         onGhostPhase = null,
     } = {}) {
+        this.cancelRacePreparation?.();
+        const continuation = this._raceContinuationToken;
+        const stillCurrent = () => this._raceContinuationToken === continuation;
         this.headToHeadChallengeId = challengeId;
         cancelDeferredLobbyWork(this);
         if (this.status !== 'ready' || this.currentChallengeRun) {
@@ -200,6 +203,7 @@ export const headToHeadEngineMethods = {
                 },
             };
         }
+        if (!stillCurrent()) return;
         const contextual = globalThis.devvit?.context?.postData;
         if (response.body?.status === 'own_challenge') {
             this.activeHeadToHead = null;
@@ -222,18 +226,23 @@ export const headToHeadEngineMethods = {
             try {
                 onTrackPhase?.();
                 registerStoredTracksFromPayload(response.body?.storedTracks, { confirmedTrackKeys: [challenge.trackKey] });
+                await this.loadRaceDefinitions?.([challenge.trackKey]);
+                if (!stillCurrent()) return;
                 // The challenge's track is ready before the lobby shows Start.
                 const prepared = typeof this.prepareRaceTrack === 'function'
                     ? await this.prepareRaceTrack(PREPARATION_SLOTS.CHALLENGE, {
                         trackKey: challenge.trackKey,
                         challenge: plainRaceChallenge(challenge.trackKey),
+                        beforeBuild: stillCurrent,
                     })
                     : await ensureStoredTracks([challenge.trackKey], { requireConfirmation: true });
+                if (!stillCurrent()) return;
                 await this.loadTrack(challenge.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
                     prepared: prepared ?? null,
+                    isStillCurrent: stillCurrent,
                 });
                 if (this.activeHeadToHead?.frozenGhost) {
                     onGhostPhase?.();
@@ -244,6 +253,7 @@ export const headToHeadEngineMethods = {
                     });
                 }
             } catch (error) {
+                if (!stillCurrent()) return;
                 console.error('Failed to prepare the Head to Head track:', error);
                 challengeReady = false;
                 this.activeHeadToHead = null;
@@ -257,6 +267,7 @@ export const headToHeadEngineMethods = {
                 };
             }
         }
+        if (!stillCurrent()) return;
         const retryable = !response.ok
             && (response.status === 0 || response.status >= 500);
         const remembered = outcome
@@ -278,6 +289,7 @@ export const headToHeadEngineMethods = {
     },
 
     showChallengeLobby() {
+        this.cancelRacePreparation?.();
         cancelDeferredLobbyWork(this);
         const challenge = this.activeHeadToHead;
         if (!challenge) {
@@ -327,6 +339,9 @@ export const headToHeadEngineMethods = {
         if (isVerificationQueueSubmissionBlocked()) return null;
         const challenge = this.activeHeadToHead;
         if (!challenge || this.startButtonPending) return;
+        this.cancelRacePreparation?.({ preservePrepared: true });
+        const continuation = this._raceContinuationToken;
+        const stillCurrent = () => this._raceContinuationToken === continuation;
         this.startButtonPending = true;
         try {
             const origin = challenge.origin?.mode === 'daily'
@@ -347,15 +362,19 @@ export const headToHeadEngineMethods = {
                 stage.trackKey,
                 plainRaceChallenge(stage.trackKey),
             );
-            if (!hasCurrentTrackDefinition(this, stage.trackKey)) {
+            if (!(this.isInstalledRaceTrack?.(stage.trackKey, plainRaceChallenge(stage.trackKey))
+                ?? hasCurrentTrackDefinition(this, stage.trackKey))) {
                 await this.loadTrack(stage.trackKey, {
                     loadPlayerProgress: false,
                     preserveDailyChallengeContext: true,
                     showStartOverlayOnReset: false,
                     keepScreen: true,
                     prepared: prepared ?? null,
+                    loadedOnly: true,
+                    challenge: plainRaceChallenge(stage.trackKey),
                 });
             }
+            if (!stillCurrent()) return;
             if (challenge.frozenGhost) {
                 const challengerName = typeof challenge.challengerUsername === 'string'
                     ? challenge.challengerUsername.trim()
@@ -382,8 +401,10 @@ export const headToHeadEngineMethods = {
             void this.journeys?.startAttempt?.({ mode: 'challenge', reason: 'initial_start' });
             this.recordHeadToHeadStart?.();
             await revealInstalledRace(this);
+            if (!stillCurrent()) return;
             this.startSequence();
         } catch (error) {
+            if (!stillCurrent()) return;
             console.error('Could not start Head to Head race:', error);
             this.startOverlay?.showStartOverlay?.(this.hasAnyData, this.isReturningPlayer);
             this.lobbyUi?.showChallenge?.({
@@ -491,8 +512,8 @@ export const headToHeadEngineMethods = {
 
         const applyWinActions = () => {
             this.modal.setChallengeWinActions?.({
-                dailyAction: () => this.showDailyLobby(),
-                campaignAction: () => this.showCampaignLobby(),
+                dailyAction: () => this.activateMode('daily'),
+                campaignAction: () => this.activateMode('campaign'),
             });
         };
         const optimisticWin = localDifferenceMs !== null && localDifferenceMs < 0;

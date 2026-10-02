@@ -7,8 +7,8 @@ import {
     hasTrack,
 } from '../../../game/track/catalog.js';
 import { readDailySchedulePool } from './daily-schedule-store.js';
-import { queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
-import { loadStoredTracks, reloadPinnedCatalog } from '../tracks/stored-catalog.js';
+import { assertTrackKey, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import { confirmStoredTracks, loadStoredTracks, reloadPinnedCatalog } from '../tracks/stored-catalog.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { withTrackPlacementLock, commitTrackPlacement, TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
 import { TRACKS } from '../../../game/track/tracks.js';
@@ -651,7 +651,7 @@ function createEmptyDailySnapshot(challenge: DailyGpChallenge): SnapshotPayload 
     return createEmptySnapshot(toDailyCompetition(challenge), DAILY_GP_DEFAULT_LIMIT);
 }
 
-export function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {
+function parseStoredChallengeContract(raw: string | null | undefined): DailyGpChallenge | null {
     if (!raw) return null;
 
     try {
@@ -666,10 +666,7 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
             return null;
         }
 
-        const trackKey = typeof parsed.trackKey === 'string' ? parsed.trackKey : '';
-        if (!hasTrack(trackKey)) {
-            return null;
-        }
+        const trackKey = assertTrackKey(parsed.trackKey);
 
         const startsAt = typeof parsed.startsAt === 'string' ? parsed.startsAt : '';
         const endsAt = typeof parsed.endsAt === 'string' ? parsed.endsAt : '';
@@ -701,15 +698,31 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
     }
 }
 
+export function parseStoredChallenge(raw: string | null | undefined): DailyGpChallenge | null {
+    const challenge = parseStoredChallengeContract(raw);
+    try {
+        return challenge && hasTrack(challenge.trackKey) ? challenge : null;
+    } catch (_error) {
+        return null;
+    }
+}
+
+// Transfer/history readers keep their pinned catalog. Player geometry readers
+// first discover contracts without dropping a key published after that pin.
+type DailyChallengeReadMode = 'pinned' | 'contract';
+
 // Loads the stored tracks that these Dailies race, in one read, before the
 // request reads their layout, name or medal times.
 async function loadChallengeTracks(challenges: readonly (DailyGpChallenge | null | undefined)[]): Promise<void> {
     await loadStoredTracks(challenges.map((challenge) => challenge?.trackKey));
 }
 
-async function readStoredDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
+async function readStoredDailyGpChallenge(
+    challengeId: string,
+    mode: DailyChallengeReadMode = 'pinned',
+): Promise<DailyGpChallenge | null> {
     const raw = await redis.hGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challengeId);
-    return parseStoredChallenge(raw);
+    return mode === 'contract' ? parseStoredChallengeContract(raw) : parseStoredChallenge(raw);
 }
 
 async function maintainChallengeHistory(now = new Date()): Promise<void> {
@@ -809,10 +822,13 @@ async function writeStoredDailyGpChallenge(challenge: DailyGpChallenge): Promise
     return commitDailyChallenge(challenge);
 }
 
-async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Promise<DailyGpChallenge | null> {
-    const stored = await readStoredDailyGpChallenge(challengeId);
+async function readStoredOrBackfilledDailyGpChallenge(
+    challengeId: string,
+    mode: DailyChallengeReadMode = 'pinned',
+): Promise<DailyGpChallenge | null> {
+    const stored = await readStoredDailyGpChallenge(challengeId, mode);
     if (stored) {
-        await loadChallengeTracks([stored]);
+        if (mode === 'pinned') await loadChallengeTracks([stored]);
         return stored;
     }
 
@@ -822,7 +838,7 @@ async function readStoredOrBackfilledDailyGpChallenge(challengeId: string): Prom
     }
 
     const written = await writeStoredDailyGpChallenge(backfilled);
-    await loadChallengeTracks([written]);
+    if (mode === 'pinned') await loadChallengeTracks([written]);
     return written;
 }
 
@@ -892,12 +908,12 @@ function getTodayChallengeId(): string {
     return createDailyChallengeId(formatUtcChallengeDate(startsAt));
 }
 
-async function pickTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
+async function pickTodayDailyGpChallenge(mode: DailyChallengeReadMode = 'pinned'): Promise<DailyGpChallenge> {
     const dayIndex = getUtcDayIndex(new Date());
     const startsAt = getUtcDayStart(dayIndex);
     const challengeId = createDailyChallengeId(formatUtcChallengeDate(startsAt));
 
-    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId, mode);
     if (stored) {
         return stored;
     }
@@ -906,12 +922,12 @@ async function pickTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     return buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
 }
 
-async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
+async function resolveTodayDailyGpChallenge(mode: DailyChallengeReadMode = 'pinned'): Promise<DailyGpChallenge> {
     const dayIndex = getUtcDayIndex(new Date());
     const startsAt = getUtcDayStart(dayIndex);
     const challengeId = createDailyChallengeId(formatUtcChallengeDate(startsAt));
 
-    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId, mode);
     if (stored) {
         return stored;
     }
@@ -920,7 +936,7 @@ async function resolveTodayDailyGpChallenge(): Promise<DailyGpChallenge> {
     const challenge = buildDailyGpChallengeForDayIndexWithTrack(dayIndex, DEFAULT_TRACK_KEY);
 
     const committed = await commitDailyChallenge(challenge, dayIndex);
-    await loadChallengeTracks([committed]);
+    if (mode === 'pinned') await loadChallengeTracks([committed]);
     return committed;
 }
 
@@ -1064,14 +1080,14 @@ function guestProgressTransferNotNeededError(): Error {
 
 async function resolveGuestTransferDailyChallenges(challengeIds?: string[]): Promise<DailyGpChallenge[]> {
     if (!Array.isArray(challengeIds)) {
-        return getServerDailyGpPlaylist();
+        return readDailyGpPlaylist();
     }
     if (challengeIds.length === 0) return [];
     // One read for every stored day; a day not stored yet takes the usual path.
     const storedRaw = await redis.hMGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, challengeIds);
     const challenges = await Promise.all(challengeIds.map((challengeId, index) => (
         parseStoredChallenge(storedRaw[index])
-            ?? getServerDailyGpChallengeById(challengeId, { persistFallback: false })
+            ?? readDailyGpChallengeById(challengeId, { persistFallback: false })
     )));
     await loadChallengeTracks(challenges);
     if (challenges.some((challenge) => !challenge || !TRACKS[challenge.trackKey])) {
@@ -1119,18 +1135,24 @@ async function guestOwnsDailyDay(
 }
 
 export async function getServerDailyGpChallenge(): Promise<DailyGpChallenge> {
-    return resolveTodayDailyGpChallenge();
+    const challenge = await resolveTodayDailyGpChallenge('contract');
+    await confirmStoredTracks([challenge.trackKey]);
+    if (!hasTrack(challenge.trackKey)) {
+        throw new TrackPlacementRetryError('The Daily track could not be confirmed. Retry before racing.');
+    }
+    return challenge;
 }
 
-export async function getServerDailyGpChallengeById(
+async function readDailyGpChallengeById(
     challengeId?: string | null,
     { persistFallback = true }: { persistFallback?: boolean } = {},
+    mode: DailyChallengeReadMode = 'pinned',
 ): Promise<DailyGpChallenge | null> {
     if (typeof challengeId !== 'string' || !challengeId) {
         return null;
     }
 
-    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId);
+    const stored = await readStoredOrBackfilledDailyGpChallenge(challengeId, mode);
     if (stored) {
         return stored;
     }
@@ -1140,9 +1162,19 @@ export async function getServerDailyGpChallengeById(
     }
 
     if (persistFallback) {
-        return resolveTodayDailyGpChallenge();
+        return resolveTodayDailyGpChallenge(mode);
     }
-    return pickTodayDailyGpChallenge();
+    return pickTodayDailyGpChallenge(mode);
+}
+
+export async function getServerDailyGpChallengeById(
+    challengeId?: string | null,
+    options: { persistFallback?: boolean } = {},
+): Promise<DailyGpChallenge | null> {
+    const challenge = await readDailyGpChallengeById(challengeId, options, 'contract');
+    if (!challenge) return null;
+    await confirmStoredTracks([challenge.trackKey]);
+    return hasTrack(challenge.trackKey) ? challenge : null;
 }
 
 export async function getServerFinalDailyGpPodium(
@@ -1221,14 +1253,14 @@ export async function getServerFinalDailyGpPodiumGhosts(
 
 export async function getServerDailyGpPlayableChallenge(challengeId?: string | null): Promise<DailyGpChallenge | null> {
     const challenge = challengeId === getTodayChallengeId()
-        ? await resolveTodayDailyGpChallenge()
+        ? await getServerDailyGpChallenge()
         : await getServerDailyGpChallengeById(challengeId, { persistFallback: false });
     if (challenge && isDailyGpChallengePlayable(challenge)) {
         return challenge;
     }
 
     if (challengeId === getTodayChallengeId()) {
-        const activeChallenge = await resolveTodayDailyGpChallenge();
+        const activeChallenge = await getServerDailyGpChallenge();
         if (isDailyGpChallengePlayable(activeChallenge)) {
             return activeChallenge;
         }
@@ -1257,34 +1289,58 @@ export async function getServerDailyGpPlayerBest({
     return entry ? { challenge, bestTimeMs: entry.bestTimeMs } : null;
 }
 
-export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyGpChallenge[]> {
+async function readDailyGpPlaylist(
+    now = new Date(),
+    mode: DailyChallengeReadMode = 'pinned',
+    requestedIds?: readonly string[],
+): Promise<DailyGpChallenge[]> {
     const todayIndex = getUtcDayIndex(now);
     const challenges: DailyGpChallenge[] = [];
-    const activeChallenge = await getServerDailyGpChallenge();
-
+    const requested = requestedIds ? new Set(requestedIds) : null;
     const challengeIds = Array.from({ length: DAILY_GP_PLAYLIST_DAYS }, (_unused, offset) => (
         createDailyChallengeId(getUtcDayStart(todayIndex - offset).toISOString().slice(0, 10))
-    ));
-    const storedIds = challengeIds.filter((challengeId) => challengeId !== activeChallenge.id);
+    )).filter((challengeId) => !requested || requested.has(challengeId));
+    if (!challengeIds.length) return [];
+    const activeChallenge = !requested || requested.has(getTodayChallengeId())
+        ? await resolveTodayDailyGpChallenge(mode) : null;
+    const storedIds = challengeIds.filter((challengeId) => challengeId !== activeChallenge?.id);
     const storedRaw = storedIds.length > 0
         ? await redis.hMGet(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY, storedIds)
         : [];
     const storedById = new Map(storedIds.map((challengeId, index) => [
         challengeId,
-        parseStoredChallenge(typeof storedRaw[index] === 'string' ? storedRaw[index] : null),
+        (mode === 'contract' ? parseStoredChallengeContract : parseStoredChallenge)(
+            typeof storedRaw[index] === 'string' ? storedRaw[index] : null,
+        ),
     ]));
 
     for (const challengeId of challengeIds) {
-        const challenge = challengeId === activeChallenge.id
+        const challenge = challengeId === activeChallenge?.id
             ? activeChallenge
-            : storedById.get(challengeId) ?? await readStoredOrBackfilledDailyGpChallenge(challengeId);
+            : storedById.get(challengeId) ?? await readStoredOrBackfilledDailyGpChallenge(challengeId, mode);
         if (challenge && isDailyGpChallengePlayable(challenge, now)) {
             challenges.push(challenge);
         }
     }
 
-    await loadChallengeTracks(challenges);
+    if (mode === 'pinned') await loadChallengeTracks(challenges);
     return challenges;
+}
+
+// PB summaries intersect these contracts with their requested IDs before
+// confirming/loading tracks; another playable day's missing record cannot
+// block an otherwise valid PB request.
+export async function getServerDailyGpPlaylistContracts(
+    now = new Date(),
+    requestedIds?: readonly string[],
+): Promise<DailyGpChallenge[]> {
+    return readDailyGpPlaylist(now, 'contract', requestedIds);
+}
+
+export async function getServerDailyGpPlaylist(now = new Date()): Promise<DailyGpChallenge[]> {
+    const challenges = await getServerDailyGpPlaylistContracts(now);
+    await confirmStoredTracks(challenges.map((challenge) => challenge.trackKey));
+    return challenges.filter((challenge) => hasTrack(challenge.trackKey));
 }
 
 type ClassifiedGuestDailySource = {
@@ -2036,7 +2092,7 @@ export async function getGuestProgressSelection({
             return leaveSelectionPending(undefined, 'recovery_required');
         }
     }
-    const dailyPlaylist = await getServerDailyGpPlaylist();
+    const dailyPlaylist = await readDailyGpPlaylist();
     const [guestEvidence, accountEvidence] = await Promise.all([
         readProgressEvidence(guestPlayerId, dailyPlaylist),
         readProgressEvidence(redditPlayerId, dailyPlaylist),
@@ -2247,7 +2303,7 @@ export async function selectGuestProgress({
                     ? guestProgressTransferNotNeededError()
                     : guestProgressRecoveryRequiredError();
             }
-            newTransferPlaylist = await getServerDailyGpPlaylist();
+            newTransferPlaylist = await readDailyGpPlaylist();
             if (!await guestHoldsTransferableProgress(guestPlayerId, newTransferPlaylist)) {
                 throw guestProgressTransferNotNeededError();
             }
@@ -2301,7 +2357,7 @@ export async function selectGuestProgress({
             ? currentRecord.dailyChallengeSpecs.map(transferChallengeFromSpec)
             : currentRecord?.dailyChallengeIds
                 ? await resolveGuestTransferDailyChallenges(currentRecord.dailyChallengeIds)
-                : newTransferPlaylist ?? await getServerDailyGpPlaylist();
+                : newTransferPlaylist ?? await readDailyGpPlaylist();
         const dailyChallengeIds = currentRecord?.dailyChallengeIds
             ?? frozenChallenges.map((challenge) => challenge.id);
         const dailyChallengeSpecs = currentRecord?.dailyChallengeSpecs
@@ -2727,7 +2783,8 @@ export async function getServerDailyGpSnapshot({
     if (!challenge) {
         return createEmptyDailySnapshot(await getServerDailyGpChallenge());
     }
-    await loadChallengeTracks([challenge]);
+    await confirmStoredTracks([challenge.trackKey]);
+    if (!hasTrack(challenge.trackKey)) return createEmptyDailySnapshot(challenge);
 
     const identity = await resolveAuthorizedPlayerIdentity({
         playerId,

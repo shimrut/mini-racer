@@ -76,10 +76,10 @@ flowchart LR
   subreddit in Redis
   (`src/server/tracks/`, `src/server/daily/daily-schedule-store.ts`,
   `src/server/campaign/series-store.ts`) and checks moderator membership on
-  every Creator route. Each request loads the stored tracks and published
-  series into `game/track/stored-tracks.js` and
-  `game/campaign/stored-series.js`, so `TRACKS`, the catalog, the medal times
-  and the Campaign lists find them before the built-in ones. A stored track
+  every Creator route. Requests pin a paired track-index/published-series
+  snapshot, then load the named records needed by their consumers into
+  `game/track/stored-tracks.js` and `game/campaign/stored-series.js`. `TRACKS`,
+  the catalog, medal times and Campaign lists prefer stored overrides. A stored track
   locks when it becomes a Daily or its series goes live. See
   `docs/creator-redis-tracks-plan-2026-09-30.md`. Community maps
   (`game/community/`, `src/server/community/`) stay hidden from players.
@@ -796,10 +796,26 @@ inert racer shell before awaiting a deferred mode runtime. The shell starts with
 a procedural car and no external track request. `game/startup/coordinator.js`
 then owns one ordered plan per launch mode. Daily and Head to Head start
 their server requests and the account request while the selected mode file is
-still downloading, then prepare only that mode’s track. Campaign starts the
+still downloading. Campaign starts the
 account request during that download, then asks for campaign progress after
-identity has settled and prepares its default unlocked stage. Home alone
-requests the default track.
+identity has settled. Home loads its default cosmetic track and profile; it
+does not wait for Daily or Campaign contracts, definitions or pictures.
+
+`loadRaceDefinitions(keys)` consumes the existing mode response's stored
+definitions/confirmed keys, batches missing authoritative confirmations and
+finishes built-in definition imports before a playable menu is exposed. Daily
+loads the playable playlist plus its resolved post/current track. Campaign
+loads every live series' definitions, including locked stages. Head to Head
+loads its resolved challenge definition. Priority runtime/canvas preparation
+uses the post Daily (otherwise current Daily), the first unfinished unlocked
+Campaign stage (otherwise the last unlocked), or the Head to Head course.
+Remaining pictures reuse existing local runtime/canvas caches and idle warming.
+
+Entering a mode from Home or another mode reuses the loading screen and waits
+for that mode's definitions and priority preparation. Home's Daily/Campaign
+warmup fills definition/asset caches through prefetched runtime methods without
+installing an unrelated runtime or changing active race/selection state. A
+failed warmup leaves Home usable; the affected mode owns loading and Retry.
 
 The splash stays up until the selected mode’s contract and track are ready,
 then fades with the shared 160ms motion token. Player car images and
@@ -810,21 +826,38 @@ Start.
 than an unconditional constructor load, so direct Daily, Campaign, and Head to
 Head never render the default track first.
 
-Daily and Campaign start paths use the same canvas-presence safeguard as Head
-to Head: a matching track key does not skip loading when `trackCanvas` is absent.
+Normal Start, Next, Improve and unchanged-course Restart use loaded definitions
+without a track request or definition import. Optional pictures can build
+locally while the existing surface stays visible. Matching keys also check
+definition identity, presentation and asset options before reusing an installed
+course; a new course is drawn before dismissing the lobby or finish surface.
+Repeated identical carousel settles share preparation without cancelling it.
+
+Explicit Restart adopts an updated definition the client has received, retains
+the current surface during any required recovery, then automatically starts
+again. Expiry alone does not change the active Daily on Restart. Starting a
+selection past `availableUntil` resolves and loads its playable replacement,
+then automatically starts it. Leaving cancels pending continuations. Genuine
+load failures retain the existing Retry/error flow and ranked safeguards.
+
 Client definition chunks are bounded to 20 seconds. A failed or timed-out
 selected track never enters the countdown: Daily, Campaign, and Head to Head
 restore their lobby, clear the pending start state, and expose an in-place
-retry action. A failed initial track is contained by the selected mode's
-Preparing/Retry surface after loader handoff instead of blocking racer
-construction indefinitely.
+retry action. A failed initial essential keeps the splash visible with Retry;
+the racer shell still exists and can retry startup without reconstruction.
 
 Client track definitions are loaded through `game/track/client-registry.js` and
 Vite's per-definition chunks. The compatibility `game/track/tracks.js` registry
-remains for server, tooling, and non-game build paths; client carousel previews
-and race setup no longer import all geometry up front. Non-selected mode code,
-playlist data, and Campaign warming are installed after the selected lobby is
-interactive through `game/modes/runtime-loader.js`.
+remains for server, tooling, and non-game build paths. Non-selected mode code,
+definitions and priority pictures warm after the selected lobby is interactive
+through `game/modes/runtime-loader.js` without applying another mode's context.
+
+Server Daily geometry consumers discover structurally valid contracts before
+refreshing the paired catalog and loading named definitions. History/transfer
+readers retain their pinned behavior. PB summaries bound requested challenge
+IDs to the canonical playable seven-day list before reading contracts and load
+only their distinct selected track definitions; an unrelated missing record
+does not block a valid requested PB. HTTP response shapes are unchanged.
 
 `RealTimeRacer.invokeModeMethod` is the shared dispatcher for lazy Daily,
 Campaign, and Head to Head actions. It must invoke installed methods with the

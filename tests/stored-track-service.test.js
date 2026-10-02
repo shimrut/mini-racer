@@ -3,10 +3,11 @@ import {
     clearStoredTrackChecksForTests,
     ensureStoredTracks,
     registerStoredTracksFromPayload,
+    isTrackLayoutConfirmed,
 } from '../game/track/stored-track-service.js';
 import { clearStoredTracksForTests, getStoredTrack } from '../game/track/stored-tracks.js';
 import { hasTrack, getTrackName } from '../game/track/catalog.js';
-import { clearClientTrackRegistryForTests, loadClientTrack } from '../game/track/client-registry.js';
+import { clearClientTrackRegistryForTests, getLoadedClientTrack, loadClientTrack, loadRaceDefinitions } from '../game/track/client-registry.js';
 
 function wireTrack(key, name = 'Night Loop') {
     return {
@@ -41,6 +42,36 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('stored track service', () => {
+    it('consumes all stored definitions carried by an authoritative series answer', async () => {
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+        registerStoredTracksFromPayload([wireTrack('nightLoop'), wireTrack('publishedLoop')], {
+            confirmedTrackKeys: ['nightLoop'],
+        });
+        const tracks = await loadRaceDefinitions(['publishedLoop', 'nightLoop', 'nightLoop']);
+        expect(tracks).toHaveLength(2);
+        expect(isTrackLayoutConfirmed('publishedLoop')).toBe(true);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('loads built-in chunks after an empty authoritative answer before resolving', async () => {
+        let answerRequest;
+        const fetchMock = vi.fn(() => new Promise((resolve) => { answerRequest = resolve; }));
+        vi.stubGlobal('fetch', fetchMock);
+        const definitions = loadRaceDefinitions(['circuit', 'smallSteps', 'circuit']);
+        expect(getLoadedClientTrack('circuit')).toBeNull();
+        expect(getLoadedClientTrack('smallSteps')).toBeNull();
+        answerRequest(answer([]));
+        const tracks = await definitions;
+        expect(tracks).toEqual([getLoadedClientTrack('circuit'), getLoadedClientTrack('smallSteps')]);
+        expect(tracks.every(Boolean)).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not treat cosmetic registration as an authoritative confirmation', () => {
+        registerStoredTracksFromPayload([wireTrack('nightLoop')]);
+        expect(isTrackLayoutConfirmed('nightLoop')).toBe(false);
+    });
     it('asks once for the keys that the app does not have, and registers the answer', async () => {
         const fetchMock = vi.fn(async () => answer([wireTrack('nightLoop')]));
         vi.stubGlobal('fetch', fetchMock);

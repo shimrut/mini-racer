@@ -13,6 +13,7 @@ import { RaceHud } from '../game/race/ui-hud.js';
 import { dailyChallengeEngineMethods } from '../game/daily-challenge/engine-methods.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
 import { trackEngineMethods } from '../game/track/engine-methods.js';
+import { loadRaceDefinitions } from '../game/track/client-registry.js';
 
 const ghost = {
   schemaVersion: 2,
@@ -186,6 +187,9 @@ describe('leaderboard race comparison target', () => {
   });
 
   it('routes Daily and Campaign leaderboard starts through opponent-preserving entry points', async () => {
+    // The mode loader resolves the competition definitions before standings
+    // expose their interactive opponent rows.
+    await loadRaceDefinitions(['circuit', 'numberZero'], { requireConfirmation: false });
     const target = { displayName: 'Rival', bestTimeMs: 12_000, ghost };
     const dailyChallenge = {
       id: 'daily-1',
@@ -397,6 +401,8 @@ describe('leaderboard race comparison target', () => {
       showStartOverlayOnReset: false,
       keepScreen: true,
       prepared: null,
+      loadedOnly: true,
+      challenge,
     });
     expect(engine.prepareTrackPersonalBestGhost).not.toHaveBeenCalled();
     expect(engine.pbGhost.clearTrack).not.toHaveBeenCalled();
