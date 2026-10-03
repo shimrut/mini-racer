@@ -572,9 +572,10 @@ export async function saveStoredTrack(
 const LOCK_ATTEMPTS = 5;
 const LOCK_RETRY_MS = 150;
 
-// Locks a stored track when players can start to race it. It does nothing to
-// a built-in track or to a track that is locked already. A save that holds
-// the track at the same moment makes it wait and try again.
+// Locks a stored track. It does nothing to a built-in track or to a track
+// that is locked already. A save that holds the track at the same moment
+// makes it wait and try again. Only tests call it, to set up a locked track:
+// the game locks a track in the Daily or series placement (freezeStoredTrack).
 export async function lockStoredTrack(
     trackKey: string,
     reason: StoredTrackLockReason,

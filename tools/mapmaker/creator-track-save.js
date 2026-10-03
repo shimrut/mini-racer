@@ -179,6 +179,8 @@ async function sendCreatorTrack(editor, key, geometrySignature) {
     }
 }
 
+// Saves once, with no conflict recovery. Only tests call it: the Creator
+// saves with saveCreatorTrackWithRecovery.
 export async function saveCreatorTrackSnapshot(editor, key, geometrySignature) {
     return (await sendCreatorTrack(editor, key, geometrySignature)).saved;
 }
