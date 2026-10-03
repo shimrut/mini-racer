@@ -18,6 +18,7 @@ import { isTrackLayoutConfirmed } from './stored-track-service.js';
 import { createRacePreparation, PREPARATION_SLOTS, raceAssetOptionsKey, resolveRacePresentation } from './race-preparation.js';
 import { hasCurrentTrackDefinition } from './race-definition.js';
 import { getPlayerProgressState } from "../player/progress-state.js";
+import { NARROW_VIEWPORT_MAX_WIDTH } from "../race/race-camera.js";
 
 const CANVAS_RESIZE_SETTLE_MS = 120;
 
@@ -183,7 +184,7 @@ export const trackEngineMethods = {
   },
 
   scheduleResizeCommit() {
-    this.isNarrowViewport = window.innerWidth <= 768;
+    this.isNarrowViewport = window.innerWidth <= NARROW_VIEWPORT_MAX_WIDTH;
     if (this.resizeCommitTimer !== null) {
       clearTimeout(this.resizeCommitTimer);
     }
@@ -212,7 +213,7 @@ export const trackEngineMethods = {
     this.viewportWidth = viewport.cssWidth;
     this.viewportHeight = viewport.cssHeight;
     this.viewportDevicePixelRatio = viewport.devicePixelRatio;
-    this.isNarrowViewport = window.innerWidth <= 768;
+    this.isNarrowViewport = window.innerWidth <= NARROW_VIEWPORT_MAX_WIDTH;
     if (render) {
       this.render(0, 1);
       this._needsRender = false;
