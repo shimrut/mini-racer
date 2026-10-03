@@ -579,11 +579,6 @@ export const campaignEngineMethods = {
         return promise;
     },
 
-    // The stage that the Campaign lobby selects when it opens.
-    resolveDefaultCampaignStage() {
-        return resolveDefaultCampaignStage(this);
-    },
-
     loadCampaignRaceDefinitions() {
         return this.loadRaceDefinitions?.(CAMPAIGN_LIVE_STAGES.map((stage) => stage.trackKey));
     },

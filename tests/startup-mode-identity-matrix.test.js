@@ -108,12 +108,12 @@ describe('direct-mode startup identity matrix', () => {
         const racer = createRacer('home', 'signed-in', calls);
         racer.installModeRuntime = vi.fn(async () => null);
         racer.loadDailyChallengeCritical = vi.fn(() => new Promise(() => {}));
-        racer.resolveDefaultCampaignStage = vi.fn(() => new Promise(() => {}));
+        racer.prepareInitialCampaignLaunch = vi.fn(() => new Promise(() => {}));
 
         await racer.loadStartupGraphics('home');
 
         expect(racer.loadDailyChallengeCritical).not.toHaveBeenCalled();
-        expect(racer.resolveDefaultCampaignStage).not.toHaveBeenCalled();
+        expect(racer.prepareInitialCampaignLaunch).not.toHaveBeenCalled();
         expect(racer.prepareRaceTrack).not.toHaveBeenCalled();
         expect(racer.loadTrack).toHaveBeenCalledTimes(1);
         expect(racer.loadTrack).toHaveBeenCalledWith('circuit', expect.objectContaining({
@@ -125,7 +125,7 @@ describe('direct-mode startup identity matrix', () => {
         const calls = [];
         const racer = createRacer('home', 'signed-in', calls);
         racer.installModeRuntime = vi.fn(async () => null);
-        racer.resolveDefaultCampaignStage = vi.fn(async () => {
+        racer.prepareInitialCampaignLaunch = vi.fn(async () => {
             throw new Error('Campaign progress is not authoritative.');
         });
         vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -136,7 +136,7 @@ describe('direct-mode startup identity matrix', () => {
         await Promise.all([racer.loadStartupGraphics('home'), racer.loadStartupRaceData('home')]);
 
         expect(racer.loadDailyChallengeCritical).not.toHaveBeenCalled();
-        expect(racer.resolveDefaultCampaignStage).not.toHaveBeenCalled();
+        expect(racer.prepareInitialCampaignLaunch).not.toHaveBeenCalled();
         expect(calls).toContain('profile:signed-in');
         expect(racer.loadTrack).toHaveBeenCalledWith('circuit', expect.any(Object));
     });
