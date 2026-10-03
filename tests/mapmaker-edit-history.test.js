@@ -48,9 +48,8 @@ describe('Mapmaker edit history', () => {
         history.commitEdit(original);
         original.outer[0].x = 100;
 
-        expect(history.canUndo).toBe(true);
         expect(history.undo().outer[0].x).toBe(0);
-        expect(history.canUndo).toBe(false);
+        expect(history.undo()).toBeNull();
         expect(history.redo().outer[0].x).toBe(4);
         expect(history.redo()).toBeNull();
     });
@@ -65,14 +64,14 @@ describe('Mapmaker edit history', () => {
         expect(history.undo()).toBeNull();
         expect(history.redo()).toEqual({ x: 2 });
         history.recordEdit({ x: 2 }, { x: 4 });
-        expect(history.canRedo).toBe(false);
+        expect(history.redo()).toBeNull();
         expect(history.undo()).toEqual({ x: 2 });
         expect(history.undo()).toEqual({ x: 1 });
         expect(history.undo()).toBeNull();
 
         history.reset({ x: 8 });
         expect(history.current()).toEqual({ x: 8 });
-        expect(history.canUndo).toBe(false);
+        expect(history.undo()).toBeNull();
     });
 
     it('ignores unchanged and canceled edits', () => {
@@ -82,7 +81,7 @@ describe('Mapmaker edit history', () => {
         history.beginEdit({ x: 0 });
         history.cancelEdit();
         expect(history.commitEdit({ x: 1 })).toBe(false);
-        expect(history.canUndo).toBe(false);
+        expect(history.undo()).toBeNull();
     });
 });
 
