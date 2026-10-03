@@ -77,12 +77,6 @@ if (!APP_SERIES.some((series) => series.id === CAMPAIGN_NUMBERS_SERIES_ID && ser
     throw new Error('The Numbers Campaign series must stay live.');
 }
 
-// Players choose a series only when more than one is live. With one, the
-// Campaign opens its stages, with no series screen and no series choice.
-// This is the answer for the app series alone; campaignHasSeriesChoice()
-// also counts the published series from the Creator.
-export const CAMPAIGN_HAS_SERIES_CHOICE = APP_SERIES.filter((series) => series.live).length > 1;
-
 // The app series with the published stored series. A stored series replaces
 // the app series with the same name, but never Numbers. New stored series
 // come after the app series. Each stored list is built once: on the server,
@@ -161,6 +155,9 @@ export const CAMPAIGN_SERIES = liveList(() => currentViews().live);
 
 export const CAMPAIGN_LIVE_STAGES = liveList(() => currentViews().liveStages);
 
+// Players choose a series only when more than one is live. With one, the
+// Campaign opens its stages, with no series screen and no series choice.
+// The count includes the published series from the Creator.
 export function campaignHasSeriesChoice() {
     return currentViews().live.length > 1;
 }

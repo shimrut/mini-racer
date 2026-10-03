@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-    CAMPAIGN_HAS_SERIES_CHOICE,
     CAMPAIGN_ID,
     CAMPAIGN_NUMBERS_SERIES_ID,
     CAMPAIGN_SERIES,
+    campaignHasSeriesChoice,
     countCampaignMedals,
     getCampaignSeriesStages,
     getCampaignStage,
@@ -25,7 +25,7 @@ describe('Campaign manifest', () => {
     it('lets players see only the series on a live ground', () => {
         // Mini Rally is held back while dirt is not live, so there is no series choice.
         expect(CAMPAIGN_SERIES.map((series) => series.id)).toEqual(['numbered-v1']);
-        expect(CAMPAIGN_HAS_SERIES_CHOICE).toBe(false);
+        expect(campaignHasSeriesChoice()).toBe(false);
         const tenStages = Array.from({ length: 10 }, (_, index) => ({ trackKey: `t${index}` }));
         expect(isCampaignSeriesLive({ id: 'test-v1', ground: 'tarmac', stages: tenStages })).toBe(true);
         for (const ground of ['dirt', 'grip', 'snow', 'water', 'space']) {

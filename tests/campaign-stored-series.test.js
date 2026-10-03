@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     CAMPAIGN_ALL_SERIES,
-    CAMPAIGN_HAS_SERIES_CHOICE,
     CAMPAIGN_LIVE_STAGES,
     CAMPAIGN_NUMBERS_SERIES_ID,
     CAMPAIGN_SERIES,
@@ -33,7 +32,7 @@ afterEach(() => clearStoredSeriesForTests());
 describe('published Creator series in the Campaign', () => {
     it('keeps the app series alone when nothing is stored', () => {
         expect(CAMPAIGN_SERIES.map((series) => series.id)).toEqual([CAMPAIGN_NUMBERS_SERIES_ID]);
-        expect(campaignHasSeriesChoice()).toBe(CAMPAIGN_HAS_SERIES_CHOICE);
+        expect(campaignHasSeriesChoice()).toBe(false);
         expect(Array.isArray(CAMPAIGN_SERIES)).toBe(true);
     });
 

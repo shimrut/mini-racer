@@ -15,7 +15,7 @@ vi.mock('../game/campaign/service.js', async (importOriginal) => ({
     getCampaignBootstrap: vi.fn(),
 }));
 
-const { CAMPAIGN_HAS_SERIES_CHOICE } = await import('../game/campaign/manifest.js');
+const { campaignHasSeriesChoice } = await import('../game/campaign/manifest.js');
 const { campaignEngineMethods } = await import('../game/campaign/engine-methods.js');
 const { LobbyUi } = await import('../game/lobby/ui.js');
 
@@ -53,7 +53,7 @@ function mountLobby(handlers) {
 
 describe('Campaign with one live series', () => {
     it('has no series choice', () => {
-        expect(CAMPAIGN_HAS_SERIES_CHOICE).toBe(false);
+        expect(campaignHasSeriesChoice()).toBe(false);
     });
 
     it('opens the stages, not the series screen', () => {
