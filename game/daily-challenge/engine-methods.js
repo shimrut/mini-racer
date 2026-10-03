@@ -31,7 +31,6 @@ import {
   getDailyChallengeSnapshot,
   getDailyChallengeTrackName,
   isDailyChallengeStoredResultForChallenge,
-  prefetchDailyChallengeSnapshots,
 } from "./service.js";
 import { buildDailyCarouselCards } from "./carousel-model.js";
 import { createVerificationSnapshot, getDailyChallengeVerificationEntry, getVerificationSnapshotFromQueueEntry } from "../scoreboard/verification-queue.js";
@@ -1060,16 +1059,6 @@ export const dailyChallengeEngineMethods = {
   selectDailyCarouselChallenge(challengeId) {
     if (!challengeId) return false;
     return Boolean(this.dailyCarousel?.selectChallenge?.(challengeId));
-  },
-
-  prefetchDailyChallengePlaylist() {
-    getDailyChallengePlaylist()
-      .then((challenges) => prefetchDailyChallengeSnapshots(
-        challenges.map((challenge) => challenge?.id).filter(Boolean),
-      ))
-      .catch((error) => {
-        console.error("Error preloading daily challenge playlist:", error);
-      });
   },
 
   handleDailyChallengeLapCompleted(lapTime, {

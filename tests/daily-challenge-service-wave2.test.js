@@ -10,7 +10,6 @@ import {
     getDailyChallengeSnapshot,
     getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
-    prefetchDailyChallengeSnapshots,
     previewDailyChallengeShare,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
@@ -322,7 +321,7 @@ describe('daily-challenge service wave 2', () => {
         })).toBe(true);
     });
 
-    it('prefetches only challenge ids that are missing from the snapshot cache', async () => {
+    it('lists only challenge ids that are missing from the snapshot cache', async () => {
         const cached = buildChallenge({ id: 'prefetch-cached' });
         const missing = buildChallenge({ id: 'prefetch-missing' });
         cacheDailyChallengePlaylist([cached, missing]);
@@ -335,14 +334,9 @@ describe('daily-challenge service wave 2', () => {
             objectiveType: 'single_lap_fastest',
         }));
         await getDailyChallengeSnapshot({ challengeId: cached.id, forceRefresh: true });
-        fetch.mockClear();
 
         expect(getDailyChallengeSnapshotIdsToFetch([cached.id, missing.id, cached.id]))
             .toEqual(['prefetch-missing']);
-
-        await prefetchDailyChallengeSnapshots([cached.id, missing.id]);
-        expect(fetch).toHaveBeenCalledTimes(1);
-        expect(fetch.mock.calls[0][0]).toContain('prefetch-missing');
     });
 
     it('uses hour-only labels when remaining minutes divide evenly', () => {

@@ -948,16 +948,6 @@ export async function getDailyChallengeSnapshot({
     }
 }
 
-export async function prefetchDailyChallengeSnapshots(challengeIds = []) {
-    const uniqueIds = getDailyChallengeSnapshotIdsToFetch(challengeIds);
-
-    if (!uniqueIds.length) return;
-
-    await Promise.allSettled(
-        uniqueIds.map((challengeId) => getDailyChallengeSnapshot({ challengeId }))
-    );
-}
-
 export async function submitDailyChallengeBestTime({
     challengeId,
     trackKey = null,

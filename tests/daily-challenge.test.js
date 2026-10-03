@@ -13,7 +13,6 @@ import {
     getCachedDailyChallengePlaylist,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
-    prefetchDailyChallengeSnapshots,
     previewDailyChallengeShare,
     confirmDailyChallengeShare,
     requestFeaturedDailyChallengeStart,
@@ -867,7 +866,7 @@ describe('daily-challenge service', () => {
         });
     });
 
-    it('reports missing snapshot ids and prefetches only those', async () => {
+    it('reports only the snapshot ids that are missing', async () => {
         const cachedId = 'prefetch-cached';
         const missingId = 'prefetch-missing';
         fetch.mockResolvedValue(createJsonResponse({
@@ -877,13 +876,6 @@ describe('daily-challenge service', () => {
             totalCount: 1,
         }));
         await getDailyChallengeSnapshot({ challengeId: cachedId, forceRefresh: true });
-        fetch.mockClear();
-        fetch.mockResolvedValue(createJsonResponse({
-            topRows: [],
-            nearbyRows: [],
-            currentPlayerRow: null,
-            totalCount: 0,
-        }));
 
         expect(getDailyChallengeSnapshotIdsToFetch([
             cachedId,
@@ -894,10 +886,6 @@ describe('daily-challenge service', () => {
             null,
         ])).toEqual([missingId]);
         expect(getDailyChallengeSnapshotIdsToFetch('nope')).toEqual([]);
-
-        await prefetchDailyChallengeSnapshots([cachedId, missingId, missingId]);
-        expect(fetch).toHaveBeenCalledTimes(1);
-        expect(fetch.mock.calls[0][0]).toContain(missingId);
     });
 
     it('returns a mock playlist when preview fetch fails', async () => {
@@ -1881,7 +1869,7 @@ describe('daily-challenge service', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('returns cached snapshots without refetching and skips prefetch when nothing is missing', async () => {
+    it('returns cached snapshots without refetching', async () => {
         const challengeId = 'cached-snapshot-hit';
         fetch.mockResolvedValue(createJsonResponse({
             topRows: [{ bestTimeMs: 12000 }],
@@ -1895,9 +1883,6 @@ describe('daily-challenge service', () => {
 
         const cached = await getDailyChallengeSnapshot({ challengeId });
         expect(cached.totalCount).toBe(1);
-        expect(fetch).not.toHaveBeenCalled();
-
-        await prefetchDailyChallengeSnapshots([challengeId]);
         expect(fetch).not.toHaveBeenCalled();
     });
 

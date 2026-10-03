@@ -5,7 +5,6 @@ import {
     getDailyChallengeBestResult,
     getDailyChallengeCardStatus,
     getDailyChallengeSnapshot,
-    prefetchDailyChallengeSnapshots,
 } from '../game/daily-challenge/service.js';
 import {
     formatDailyChallengeBestLabel,
@@ -184,25 +183,5 @@ describe('daily-challenge service wave3', () => {
 
         expect(snapshot.totalCount).toBe(0);
         expect(fetch).toHaveBeenCalledTimes(2);
-    });
-
-    it('prefetches only ids that are missing from the snapshot cache (L964-L971)', async () => {
-        const cachedId = 'prefetch-cached-wave3';
-        const missingId = 'prefetch-missing-wave3';
-        fetch.mockResolvedValue(createJsonResponse({
-            topRows: [],
-            nearbyRows: [],
-            currentPlayerRow: null,
-            totalCount: 0,
-            objectiveType: 'single_lap_fastest',
-        }));
-
-        await getDailyChallengeSnapshot({ challengeId: cachedId, forceRefresh: true });
-        fetch.mockClear();
-
-        await prefetchDailyChallengeSnapshots([cachedId, missingId, '', missingId]);
-
-        expect(fetch).toHaveBeenCalledTimes(1);
-        expect(fetch.mock.calls[0][0]).toContain(`challengeId=${missingId}`);
     });
 });

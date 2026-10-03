@@ -13,7 +13,6 @@ import {
     getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
-    prefetchDailyChallengeSnapshots,
     previewDailyChallengeShare,
     requestFeaturedDailyChallengeStart,
     submitDailyChallengeBestTime,
@@ -563,7 +562,7 @@ describe('daily-challenge mutation survivors', () => {
         expect(memoryLocalStorage.getItem('VectorGpDailyChallengeSnapshotCache')).toBeNull();
     });
 
-    it('no-ops snapshot prefetch when every id is already cached', async () => {
+    it('finds no snapshot to fetch when every id is already cached', async () => {
         const challengeId = 'prefetch-noop-challenge';
         fetch.mockResolvedValue(createJsonResponse({
             topRows: [],
@@ -573,12 +572,8 @@ describe('daily-challenge mutation survivors', () => {
             objectiveType: 'single_lap_fastest',
         }));
         await getDailyChallengeSnapshot({ challengeId, forceRefresh: true });
-        fetch.mockClear();
 
-        await prefetchDailyChallengeSnapshots([challengeId, challengeId, '']);
-
-        expect(fetch).not.toHaveBeenCalled();
-        expect(getDailyChallengeSnapshotIdsToFetch([challengeId, ''])).toEqual([]);
+        expect(getDailyChallengeSnapshotIdsToFetch([challengeId, challengeId, ''])).toEqual([]);
     });
 
     it('accepts submit payloads exactly at the minimum and maximum allowed times', async () => {

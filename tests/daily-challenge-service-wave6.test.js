@@ -10,7 +10,6 @@ import {
     getDailyChallengeSnapshotIdsToFetch,
     isDailyChallengeStoredResultForChallenge,
     isPreviewPage,
-    prefetchDailyChallengeSnapshots,
     resolveDailyPlaylistCacheExpiresAt,
     submitDailyChallengeBestTime,
 } from '../game/daily-challenge/service.js';
@@ -323,22 +322,9 @@ describe('daily-challenge service wave6', () => {
         });
     });
 
-    it('deduplicates missing snapshot ids before prefetch (L602-L606)', async () => {
+    it('deduplicates missing snapshot ids (L602-L606)', () => {
         expect(getDailyChallengeSnapshotIdsToFetch(['dup-a', 'dup-a', '', 42, 'dup-b']))
             .toEqual(['dup-a', 'dup-b']);
-
-        fetch.mockResolvedValue(createJsonResponse({
-            topRows: [],
-            nearbyRows: [],
-            currentPlayerRow: null,
-            totalCount: 0,
-            objectiveType: 'single_lap_fastest',
-        }));
-
-        await prefetchDailyChallengeSnapshots(['dup-a', 'dup-a', '', 42, 'dup-b']);
-
-        expect(fetch).toHaveBeenCalledTimes(2);
-        expect(getDailyChallengeSnapshotIdsToFetch(['dup-a', 'dup-b'])).toEqual([]);
     });
 
     it('rejects submit payloads below the minimum daily time (L988-L990)', async () => {
