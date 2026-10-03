@@ -344,10 +344,6 @@ export async function loadStoredTrackEntries(trackKeys: string[]): Promise<boole
     return matched;
 }
 
-export function listedStoredTrackKeys(): string[] {
-    return [...(currentStoredTrackIndex()?.values.keys() ?? [])];
-}
-
 export function clearStoredTrackCacheForTests(): void {
     indexByInstall.clear();
     loadedByInstall.clear();
@@ -360,13 +356,13 @@ export async function readStoredTrack(trackKey: string): Promise<StoredTrackReco
     return parseRecord(await redis.get(recordKey(trackKey)));
 }
 
-// Every stored track with its shape, newest change first. Only the Creator
-// reads this list.
 // The keys of every stored track, in one read.
 export async function readStoredTrackKeys(): Promise<Set<string>> {
     return new Set(Object.keys((await redis.hGetAll(INDEX_KEY)) ?? {}));
 }
 
+// Every stored track with its shape, newest change first. Only the Creator
+// reads this list.
 export async function listStoredTrackRecords(): Promise<StoredTrackRecord[]> {
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
     const records = await readRecords(Object.keys(index));

@@ -1,7 +1,6 @@
 import { redis } from '@devvit/redis';
 import {
     STORED_TRACKS_REVISION_KEY,
-    listedStoredTrackKeys,
     loadStoredTrackEntries,
     publishStoredTrackIndex,
     readStoredTrackCacheRevision,
@@ -106,11 +105,6 @@ export async function loadStoredTracks(trackKeys: readonly (string | null | unde
         }
     }
     throw new StoredCatalogUnavailableError(new Error('A stored track did not match the track list.'));
-}
-
-// Only the Creator, the copies and the moderator pages list every track.
-export async function loadAllStoredTracks(): Promise<void> {
-    await loadStoredTracks(listedStoredTrackKeys());
 }
 
 // A route that learned its tracks while it ran reads the catalog again, since
