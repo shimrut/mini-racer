@@ -196,7 +196,6 @@ export function createRacePreparation({
         prepareLoaded,
         release,
         findRecord,
-        isReady: (trackKey, challenge = null) => Boolean(findRecord(trackKey, challenge)),
         getSlotState,
         subscribe,
     };

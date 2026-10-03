@@ -75,7 +75,6 @@ describe('race preparation', () => {
             runtime: { kind: 'runtime' },
             canvasAsset: { kind: 'canvas' },
         });
-        expect(races.isReady('smallSteps')).toBe(true);
         expect(races.findRecord('smallSteps')).toBe(record);
     });
 
@@ -116,7 +115,7 @@ describe('race preparation', () => {
         expect(await older).toBeNull();
         expect(newer.trackKey).toBe('numberTwo');
         expect(races.getSlotState(PREPARATION_SLOTS.SELECTED)).toMatchObject({ trackKey: 'numberTwo', ready: true });
-        expect(races.isReady('numberOne')).toBe(false);
+        expect(races.findRecord('numberOne')).toBeNull();
     });
 
     it('reports a failed confirmation, and prepares again on retry', async () => {
@@ -127,10 +126,10 @@ describe('race preparation', () => {
             .rejects.toThrow('Retry before racing');
         expect(races.getSlotState(PREPARATION_SLOTS.SELECTED)).toMatchObject({ ready: false });
         expect(races.getSlotState(PREPARATION_SLOTS.SELECTED).error).toBeInstanceOf(Error);
-        expect(races.isReady('smallSteps')).toBe(false);
+        expect(races.findRecord('smallSteps')).toBeNull();
 
         await races.prepare(PREPARATION_SLOTS.SELECTED, { trackKey: 'smallSteps' });
-        expect(races.isReady('smallSteps')).toBe(true);
+        expect(races.findRecord('smallSteps')).not.toBeNull();
     });
 
     it('skips the server check when the target needs none', async () => {
@@ -151,7 +150,7 @@ describe('race preparation', () => {
             track: { ...app, startAngle: app.startAngle + 1 },
         });
 
-        expect(races.isReady('smallSteps')).toBe(false);
+        expect(races.findRecord('smallSteps')).toBeNull();
         expect(races.getSlotState(PREPARATION_SLOTS.DAILY).ready).toBe(false);
     });
 
@@ -161,11 +160,11 @@ describe('race preparation', () => {
         const beforeBuild = vi.fn(async () => stillWanted);
         await races.prepare(PREPARATION_SLOTS.SELECTED, { trackKey: 'smallSteps', beforeBuild });
         expect(beforeBuild).toHaveBeenCalledTimes(1);
-        expect(races.isReady('smallSteps')).toBe(true);
+        expect(races.findRecord('smallSteps')).not.toBeNull();
 
         stillWanted = false;
         expect(await races.prepare(PREPARATION_SLOTS.SELECTED, { trackKey: 'numberOne', beforeBuild })).toBeNull();
-        expect(races.isReady('numberOne')).toBe(false);
+        expect(races.findRecord('numberOne')).toBeNull();
         expect(assets.getTrackCanvasAsset).toHaveBeenCalledTimes(1);
         expect(races.getSlotState(PREPARATION_SLOTS.SELECTED)).toBeNull();
     });
