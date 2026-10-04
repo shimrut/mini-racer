@@ -505,50 +505,6 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
 
 const SKID_MARK_MIN_SPEED = 2.5;
 
-function getEffectiveGrip(config, gripBase, speedRatio) {
-    const downforce = Number(config.downforceGrip);
-    const gripFromDownforce = (Number.isFinite(downforce) && downforce > 0)
-        ? gripBase * downforce * speedRatio * speedRatio
-        : 0;
-    return gripBase + gripFromDownforce;
-}
-
-function getSteerGripScale(config, ground) {
-    return Number.isFinite(Number(config.steerGripScale))
-        ? clamp(Number(config.steerGripScale) * ground.steerGripScale, 0.05, 1.5)
-        : 0.45 * ground.steerGripScale;
-}
-
-// How many degrees below the drift angle the limit starts to work.
-const DRIFT_ANGLE_FADE_DEG = 8;
-
-// When the player steers into a slide that is wider than the drift angle,
-// the nose turns only as fast as the grip turns the car's path. The slide
-// then stops growing and settles at the drift angle. Below the angle, the
-// limit fades out, so taps and short slides turn as before.
-function limitTurnToDriftAngle(state, desiredAngularVelocity, steerInput, speed, steeringGrip, driftAngle) {
-    if (speed <= 0.001) return desiredAngularVelocity;
-    const headingX = Math.cos(state.angle);
-    const headingY = Math.sin(state.angle);
-    const forwardSpeed = state.velocity.x * headingX + state.velocity.y * headingY;
-    if (forwardSpeed <= 0) return desiredAngularVelocity;
-    const lateralSpeed = state.velocity.y * headingX - state.velocity.x * headingY;
-    // The nose is ahead of the path on the side the player steers to.
-    if (steerInput * lateralSpeed >= 0) return desiredAngularVelocity;
-
-    const slideShare = Math.abs(lateralSpeed) / speed;
-    const holdShare = Math.sin((driftAngle * Math.PI) / 180);
-    const fadeShare = Math.sin((Math.max(0, driftAngle - DRIFT_ANGLE_FADE_DEG) * Math.PI) / 180);
-    if (slideShare <= fadeShare) return desiredAngularVelocity;
-
-    const pathTurnRate = Math.max(0, steeringGrip) * slideShare * (forwardSpeed / speed);
-    const holdTurnRate = pathTurnRate * Math.min(1, holdShare / slideShare);
-    const wanted = Math.abs(desiredAngularVelocity);
-    const limited = Math.min(wanted, holdTurnRate);
-    const fade = clamp((slideShare - fadeShare) / Math.max(1e-9, holdShare - fadeShare), 0, 1);
-    return Math.sign(desiredAngularVelocity) * (wanted + (limited - wanted) * fade);
-}
-
 export {
     CONTACT_EPSILON,
     createSegment,
@@ -633,16 +589,7 @@ export function updateSimulation(
             const steerSpeedFactor = (Number.isFinite(steerTrim) && steerTrim > 0)
                 ? 1 - steerTrim * speedRatio * speedRatio
                 : 1;
-            let desiredAngularVelocity = steerInput * ((Number(config.turnRate) || 0) * ground.turnRate) * steerSpeedFactor;
-            // A ground with a drift angle lets a held slide settle at that
-            // angle. Tarmac has none.
-            if (ground.driftAngle > 0 && steerInput !== 0) {
-                desiredAngularVelocity = limitTurnToDriftAngle(
-                    state, desiredAngularVelocity, steerInput, currentSpeed,
-                    getEffectiveGrip(config, gripBase, speedRatio) * getSteerGripScale(config, ground),
-                    ground.driftAngle
-                );
-            }
+            const desiredAngularVelocity = steerInput * ((Number(config.turnRate) || 0) * ground.turnRate) * steerSpeedFactor;
 
             const angularResponse = Number.isFinite(Number(config.angularResponse))
                 ? clamp(Number(config.angularResponse) * ground.angularResponse, 4, 48)
@@ -697,8 +644,14 @@ export function updateSimulation(
 
 
 
-            const effectiveGrip = getEffectiveGrip(config, gripBase, speedRatio);
-            const steerGripScale = getSteerGripScale(config, ground);
+            const downforce = Number(config.downforceGrip);
+            const gripFromDownforce = (Number.isFinite(downforce) && downforce > 0)
+                ? gripBase * downforce * speedRatio * speedRatio
+                : 0;
+            const effectiveGrip = gripBase + gripFromDownforce;
+            const steerGripScale = Number.isFinite(Number(config.steerGripScale))
+                ? clamp(Number(config.steerGripScale) * ground.steerGripScale, 0.05, 1.5)
+                : 0.45 * ground.steerGripScale;
             const activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
             lateralSpeed *= Math.exp(-activeGrip * dt);
             // A ground with slide scrub takes forward speed while the car

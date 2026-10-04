@@ -1,5 +1,3 @@
-- On Dirt, a long slide settles at a steady angle and keeps more speed. Before, the car turned further sideways and slowed down quickly.
-
 - A Campaign series is live when it is made live in the Creator, whatever the grounds of its stages. Mini Rally and Formula Mini stay hidden until they are made live there. The series screen no longer shows **Coming soon**.
 
 - Tracks on Dirt and Track can go in the Daily list.

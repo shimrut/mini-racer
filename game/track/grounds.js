@@ -12,13 +12,10 @@
 //   angularResponse  how quickly the car starts and stops turning
 //   highSpeedSteerTrim  how much less the car turns at top speed: more
 //                    makes the front push wide
-// These three are values, not multipliers. Tarmac has 0, which turns them off:
+// These two are values, not multipliers. Tarmac has 0, which turns them off:
 //   yawCarry         0 to 1: how much the car keeps turning after the
 //                    player lets go
 //   slideScrub       the forward speed that a slide takes, each second
-//   driftAngle       the slide angle, in degrees, where a held slide
-//                    settles: past it, steering into the slide turns the
-//                    nose only as fast as the grip turns the car's path
 
 export const DEFAULT_TRACK_GROUND_KEY = 'tarmac';
 
@@ -34,7 +31,6 @@ const TARMAC = Object.freeze({
     highSpeedSteerTrim: 1,
     yawCarry: 0,
     slideScrub: 0,
-    driftAngle: 0,
     skidMarkMinSlipRatio: 0.28
 });
 
@@ -52,7 +48,6 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 1.0,
         yawCarry: 0.1,
         slideScrub: 0,
-        driftAngle: 40,
         skidMarkMinSlipRatio: 0.4
     }),
     snow: Object.freeze({
@@ -67,7 +62,6 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 1.4,
         yawCarry: 0,
         slideScrub: 0,
-        driftAngle: 0,
         skidMarkMinSlipRatio: 0.5
     }),
     // A race-circuit road: the car holds its line and almost never slides.
@@ -88,7 +82,6 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 0.9,
         yawCarry: 0,
         slideScrub: 3,
-        driftAngle: 0,
         skidMarkMinSlipRatio: 0.28
     }),
     // Open water: the jet ski is driven, not a car. The hull slides wide in
@@ -107,7 +100,6 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 1,
         yawCarry: 0.25,
         slideScrub: 0.4,
-        driftAngle: 0,
         skidMarkMinSlipRatio: 0.45
     }),
     // A space lane: the spaceship is driven, not a car. It speeds up
@@ -126,7 +118,6 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 1,
         yawCarry: 0,
         slideScrub: 0,
-        driftAngle: 0,
         skidMarkMinSlipRatio: 0.45
     })
 });
