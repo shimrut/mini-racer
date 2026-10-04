@@ -31,7 +31,7 @@ import {
     readDraftLaps,
     recordDraftLap,
 } from './mapmaker/medal-times.js';
-import { MAPMAKER_ONLINE } from './mapmaker/cloud-maps.js';
+import { MAPMAKER_ONLINE, cloudStorageKey, loadCloudSession, verifyCloudSession } from './mapmaker/cloud-maps.js';
 
 const DRAFT_KEY = 'mapmaker:playtest-draft:v1';
 const CREATOR_PLAYTEST = document.body?.dataset.creatorPlaytest === 'true';
@@ -114,7 +114,7 @@ function validGate(gate) {
 function readDraft() {
     let saved;
     try {
-        saved = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null');
+        saved = JSON.parse(sessionStorage.getItem(cloudStorageKey(DRAFT_KEY)) || 'null');
     } catch {
         throw new Error('The browser could not read this track. Return to Mapmaker and try Test Drive again.');
     }
@@ -550,29 +550,41 @@ deviceMobileQuery.addEventListener('change', () => setRaceFrame(raceFrame));
 setRaceFrame(raceFrame);
 window.addEventListener('resize', render);
 
-try {
-    draft = readDraft();
-    ui.title.textContent = draft.track.name || draft.trackKey || 'Test Drive';
-    geometry = buildTrackGeometry(draft.track);
-    collision = buildCollisionRuntime(geometry);
-    const presentation = resolveTrackPresentation(draft.trackKey, { ground: draft.track.ground });
-    trackPresentation = presentation;
-    const art = buildTrackCanvas(draft.track, geometry, presentation);
-    trackCanvas = art.canvas;
-    trackCanvasOrigin = art.origin;
-    hud = new RaceHud();
-    hud.setMaxSpeed(getTrackGroundMaxSpeedKph(CONFIG.maxSpeed, draft.track));
-    hud.setGround(getTrackGround(draft.track).key);
-    draftLapsKey = draftLapsStorageKey(draft.trackKey, draft.track);
-    draftLaps = readDraftLaps(getStorage(), draftLapsKey);
-    loadCar();
-    resetRun();
-    syncBestLap();
-} catch (error) {
-    loadError = error instanceof Error ? error.message : 'Could not load this draft.';
-    ui.feedback.textContent = loadError;
-    ui.note.textContent = loadError;
-    ui.note.hidden = false;
+async function loadDrive() {
+    try {
+        if (MAPMAKER_ONLINE) await loadCloudSession();
+        draft = readDraft();
+        ui.title.textContent = draft.track.name || draft.trackKey || 'Test Drive';
+        geometry = buildTrackGeometry(draft.track);
+        collision = buildCollisionRuntime(geometry);
+        const presentation = resolveTrackPresentation(draft.trackKey, { ground: draft.track.ground });
+        trackPresentation = presentation;
+        const art = buildTrackCanvas(draft.track, geometry, presentation);
+        trackCanvas = art.canvas;
+        trackCanvasOrigin = art.origin;
+        hud = new RaceHud();
+        hud.setMaxSpeed(getTrackGroundMaxSpeedKph(CONFIG.maxSpeed, draft.track));
+        hud.setGround(getTrackGround(draft.track).key);
+        draftLapsKey = cloudStorageKey(draftLapsStorageKey(draft.trackKey, draft.track));
+        draftLaps = readDraftLaps(getStorage(), draftLapsKey);
+        loadCar();
+        resetRun();
+        syncBestLap();
+    } catch (error) {
+        loadError = error instanceof Error ? error.message : 'Could not load this draft.';
+        ui.feedback.textContent = loadError;
+        ui.note.textContent = loadError;
+        ui.note.hidden = false;
+    }
+}
+void loadDrive();
+if (MAPMAKER_ONLINE) {
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) window.location.reload();
+    });
+    window.addEventListener('focus', () => {
+        void verifyCloudSession().catch(() => window.location.reload());
+    });
 }
 
 function frame(now) {

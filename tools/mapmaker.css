@@ -866,3 +866,20 @@ button.track-card:hover:not(:disabled) {
         top: 4rem;
     }
 }
+.cloud-load-state {
+    position: fixed;
+    z-index: 20;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(28rem, calc(100% - 2rem));
+    padding: 1.25rem;
+    border: 1px solid #3b4c62;
+    border-radius: 12px;
+    background: #111b2b;
+    color: #e6e9ef;
+    box-shadow: 0 12px 48px #050b16b3;
+}
+
+.cloud-load-state p { margin: 0 0 1rem; }
+.cloud-load-state button + button { margin-left: 0.5rem; }

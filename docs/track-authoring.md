@@ -230,15 +230,47 @@ so maps can be made on a laptop, tablet or phone.
 
 - **Passcode.** The page asks for a passcode and then stays open for 30 days
   in that browser. Five wrong codes from one address lock it for 15 minutes.
-  The passcode is the Cloudflare secret `MAPMAKER_PASSCODE`. Set or change it
+  The original password is the Cloudflare secret `MAPMAKER_PASSCODE`. It keeps
+  the existing cloud maps. Set or change it
   with:
   `npx -y wrangler@latest pages secret put MAPMAKER_PASSCODE --project-name miniracer`
+  Additional issued passwords belong in the secret `MAPMAKER_PASSCODES`, as
+  a JSON object mapping stable workspace IDs to passwords, for example
+  `{"creator1":"issued-password-one","creator2":"issued-password-two"}`.
+  Set it with `wrangler pages secret put MAPMAKER_PASSCODES --project-name miniracer`.
+  Keep real passwords out of the repository. IDs use letters, digits, `_` or
+  `-`, up to 64 characters; `legacy` is reserved. IDs and passwords must be
+  unique. Malformed configuration closes the Mapmaker until corrected.
+  Keep an ID when rotating its password so its maps remain available. A
+  password change or removal ends that workspace's sessions. People using the
+  same password share one workspace. **Switch password** signs out; unsaved
+  work stays in that workspace's browser recovery.
+  The original password workspace shows every ground in the editor and picker.
+  All other issued passwords show only **Street**. These choices come from the
+  authenticated session, so switching passwords updates both controls. This
+  changes the visible choices; saved tracks keep their existing ground data.
 - **Cloud maps.** Online, **Save** keeps the open map in a private cloud list
   (Cloudflare KV `MAPMAKER_KV`). It saves unfinished maps too and runs no
-  checks. It never changes the game. The track picker lists the game's tracks
-  and your cloud maps; a cloud map shows **Cloud**. **Remove track** deletes a
-  cloud map. If the map was an edit of a game track, the game's own version
-  comes back.
+  admission checks. The picker shows only your password's maps. Opening the
+  editor loads your newest saved map, or a blank map when there are none.
+  Other passwords cannot list, overwrite, rename or delete your maps, even
+  when the names match. **Remove track** deletes your cloud map; removing the
+  final map opens a blank editor. It never changes the game.
+  Existing maps saved before workspace isolation remain with the original
+  password because the old records contain no individual author identity.
+  Browser recovery, Test Drive drafts and lap times are scoped to the same
+  workspace. Old shared browser drafts are not loaded by the online editor.
+  A tab opened under a different password must reload before saving.
+  The existing KV backend has eventual consistency: a map list after a rapid
+  reload or from another location can briefly lag a successful save or removal.
+  See [Cloudflare's KV consistency documentation](https://developers.cloudflare.com/kv/concepts/how-kv-works/#consistency).
+- **Editor updates.** The online build uses the same Mapmaker and Test Drive
+  source as the local tool. It includes road-line bend editing, whole-road and
+  per-section widths, corner rounding, undo/redo, grounds, checks and medal
+  times. Cloud saves preserve the editable road line, widths and rounding.
+  Save records the submitted version; later edits remain unsaved. Renamed
+  unsaved maps retain their cloud identity through recovery, so their next
+  save replaces the previous name.
 - **At home.** Add the passcode to `.env.local` in the repo root and restart
   `npm run mapmaker`:
 
@@ -258,6 +290,27 @@ so maps can be made on a laptop, tablet or phone.
   `miniracer`. The site holds the promo page (`LP/`) and the Mapmaker, because
   each upload replaces the whole site. The passcode check and the cloud map
   API are Pages Functions in `site/`.
+
+On 2026-10-04, the current editor and password workspaces were published to
+`miniracer.club` (Pages deployment `bb41a408.miniracer.pages.dev`). Five new
+workspace IDs, `creator1` through `creator5`, are configured in the secret;
+their passwords are excluded from source and documentation. The original
+password remains configured. Validation passed 212 focused Mapmaker/Creator
+tests, typecheck and the site build, plus actual Pages desktop/phone browser
+checks for editing, recovery, password switching and save interleavings.
+Hosted checks verified all five passwords, independent same-name saves,
+rename/delete isolation, stale-owner rejection and exact test-fixture cleanup.
+The original two cloud maps retained the same count and content hash. Hosted
+desktop and phone checks also passed own-only startup, picker, New track and
+Switch password. Live write/read checks allowed for KV propagation.
+
+The same day's follow-up deployment, `301664bc.miniracer.pages.dev`, limits
+the editor ground selector and picker ground filters to Street for the five
+issued passwords; the original Brooster password retains all six grounds.
+Existing saved ground data is preserved. All 57 focused session/site/history/
+medal tests, typecheck and the site build passed. Local and hosted desktop/phone
+checks passed the menus and password switching with zero page errors, and
+live session checks confirmed the choices for all six passwords.
 
 ## Adding A Track
 
@@ -373,8 +426,8 @@ with the other moderators. It stays shared if removed later. Copied app tracks
 and raced tracks remain shared. Existing unassigned Creator drafts belong to
 their recorded original author. Track names still produce keys that must be
 unique within the subreddit; choose another name if a key is already used.
-This applies only to the Reddit Creator. Website cloud maps keep their existing
-passcode and shared storage.
+The Reddit Creator uses Reddit account identity. Website cloud maps use
+separate issued-password workspaces; see **Online Mapmaker** above.
 
 The Redis Creator may save incomplete tracks as unassigned drafts. A track
 must have finished walls, passing Checks, and all four valid medal times
@@ -418,6 +471,9 @@ author, gold, silver and bronze.
 Each track has one ground for the full lap. Choose it with **Ground** under
 **Shape** in the Mapmaker panel. The choices come from `TRACK_GROUNDS` in
 `game/track/grounds.js`.
+
+Several surfaces within one lap are not implemented. For the proposed area
+model and scope, see [mixed-track-surfaces-feasibility-2026-10-04.md](./mixed-track-surfaces-feasibility-2026-10-04.md).
 
 - **Street** is the default. The Mapmaker does not write a `ground` field for
   a tarmac track.

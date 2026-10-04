@@ -165,6 +165,8 @@ import sharkTail from './definitions/shark-tail.js';
 import hookBend from './definitions/hook-bend.js';
 import windingLane from './definitions/winding-lane.js';
 import grandSlam from './definitions/grand-slam.js';
+import dirtyDancing from './definitions/dirty-dancing.js';
+import greyHarbor from './definitions/grey-harbor.js';
 import { TRACK_CATALOG } from './catalog.js';
 import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
 
@@ -336,6 +338,8 @@ const TRACK_GEOMETRY = {
     hookBend,
     windingLane,
     grandSlam,
+    dirtyDancing,
+    greyHarbor,
 };
 
 // The tracks in the app, without the stored tracks.

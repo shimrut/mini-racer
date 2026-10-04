@@ -793,8 +793,17 @@ These are useful, but they are not on the critical player path:
   here; the existing player and poster stock defaults remain unchanged.
 - `site/`, `tools/build-site.js`, `tools/mapmaker/cloud-maps.js`
   The miniracer.club Cloudflare Pages project: the promo page (`LP/`) and the
-  online Mapmaker at `/mapmaker`, locked by a passcode. Online **Save** stores
-  maps in the `MAPMAKER_KV` cloud list; the local Mapmaker opens them and
+  online Mapmaker at `/mapmaker`, with private workspaces selected by issued
+  passwords. `MAPMAKER_PASSCODE` retains the original `map:` records;
+  `MAPMAKER_PASSCODES` maps stable IDs to additional passwords. Middleware
+  signs owner identity and scopes list/save/rename/delete to that owner.
+  `/api/session` supplies the browser's opaque owner ID and visible ground
+  choices, and signs out. Only the original password workspace sees all
+  grounds; other issued passwords see Street in the editor and picker.
+  Browser recovery, Test Drive and lap keys use the same identity; API owner
+  fencing rejects stale tabs after password switching. Online starts with
+  only owned maps or a blank editor, using the shared current editing source.
+  Online **Save** stores maps in `MAPMAKER_KV`; the local Mapmaker opens them and
   deletes the cloud copy once it saves one into the game. See
   `docs/track-authoring.md`, **Online Mapmaker**.
 - `tools/runner.*`

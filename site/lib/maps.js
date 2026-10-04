@@ -1,5 +1,6 @@
 import { isValidDraft } from '../../tools/mapmaker/edit-history.js';
 import { normalizeMedalRow } from '../../tools/mapmaker/medal-times.js';
+import { LEGACY_OWNER, isWorkspaceId } from './gate.js';
 
 // Cloud maps: Mapmaker drafts saved online, one KV entry for each track key.
 const MAP_PREFIX = 'map:';
@@ -10,6 +11,11 @@ export class MapError extends Error {
         super(message);
         this.status = status;
     }
+}
+
+function mapPrefix(ownerId) {
+    if (!isWorkspaceId(ownerId)) throw new MapError('The Mapmaker is locked. Reload and enter your password.', 401);
+    return ownerId === LEGACY_OWNER ? MAP_PREFIX : `workspace-map:${ownerId}:`;
 }
 
 // A cloud map is a draft with its medal times and the time it was saved.
@@ -39,11 +45,12 @@ export async function readMapBody(request) {
 }
 
 // Newest first.
-export async function listMaps(kv) {
+export async function listMaps(kv, ownerId) {
+    const prefix = mapPrefix(ownerId);
     const maps = [];
     let cursor;
     do {
-        const page = await kv.list({ prefix: MAP_PREFIX, cursor });
+        const page = await kv.list({ prefix, cursor });
         const values = await Promise.all(page.keys.map((key) => kv.get(key.name, 'json')));
         maps.push(...values.filter(Boolean));
         cursor = page.list_complete ? undefined : page.cursor;
@@ -52,15 +59,16 @@ export async function listMaps(kv) {
 }
 
 // replaceKey is the map's earlier key, when the track was renamed since.
-export async function saveMap(kv, trackKey, body) {
+export async function saveMap(kv, trackKey, body, ownerId) {
+    const prefix = mapPrefix(ownerId);
     const map = normalizeCloudMap(trackKey, body);
-    await kv.put(MAP_PREFIX + trackKey, JSON.stringify(map));
+    await kv.put(prefix + trackKey, JSON.stringify(map));
     if (typeof body.replaceKey === 'string' && body.replaceKey !== trackKey) {
-        await kv.delete(MAP_PREFIX + body.replaceKey);
+        await kv.delete(prefix + body.replaceKey);
     }
     return map;
 }
 
-export function deleteMap(kv, trackKey) {
-    return kv.delete(MAP_PREFIX + trackKey);
+export function deleteMap(kv, trackKey, ownerId) {
+    return kv.delete(mapPrefix(ownerId) + trackKey);
 }

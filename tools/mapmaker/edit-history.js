@@ -1,4 +1,6 @@
 import { isTrackGroundKey } from '../../game/track/grounds.js';
+import { MEDAL_TIERS, normalizeMedalRow } from './medal-times.js';
+import { isValidRoadLine } from './road-line.js';
 
 // A history instance belongs to one selected track. Keep only authored data in
 // snapshots; pointer/canvas state is rebuilt by the editor after restoration.
@@ -108,7 +110,8 @@ function validTrack(track) {
         && ['cornerRadius'].every(
             (key) => track[key] === undefined || Number.isFinite(track[key]),
         )
-        && (track.ground === undefined || isTrackGroundKey(track.ground));
+        && (track.ground === undefined || isTrackGroundKey(track.ground))
+        && (track.roadLine === undefined || isValidRoadLine(track.roadLine));
 }
 
 // A draft: { trackKey, originalTrackKey, track, draftLoop }. The browser
@@ -127,13 +130,22 @@ function normalizeRecovery(recovery) {
     const keys = new Set();
     const drafts = [];
     for (const draft of recovery.drafts) {
-        if (!isValidDraft(draft) || keys.has(draft.trackKey)) return null;
+        if (!isValidDraft(draft) || keys.has(draft.trackKey)
+            || (draft.cloudKey !== undefined && draft.cloudKey !== null && !validKey(draft.cloudKey))) return null;
+        if (draft.pendingMedalText !== undefined && (!draft.pendingMedalText
+            || typeof draft.pendingMedalText !== 'object' || Array.isArray(draft.pendingMedalText)
+            || !Object.entries(draft.pendingMedalText).every(([tier, text]) => (
+                MEDAL_TIERS.includes(tier) && typeof text === 'string' && text.length <= 100
+            )))) return null;
         keys.add(draft.trackKey);
         drafts.push({
             trackKey: draft.trackKey,
             originalTrackKey: draft.originalTrackKey,
             track: copySnapshot(draft.track),
             draftLoop: copySnapshot(draft.draftLoop),
+            ...(draft.cloudKey !== undefined ? { cloudKey: draft.cloudKey } : {}),
+            ...(draft.medalRow !== undefined ? { medalRow: normalizeMedalRow(draft.medalRow) } : {}),
+            ...(draft.pendingMedalText !== undefined ? { pendingMedalText: copySnapshot(draft.pendingMedalText) } : {}),
         });
     }
     // The selected track may be clean while another track has an unsaved draft.

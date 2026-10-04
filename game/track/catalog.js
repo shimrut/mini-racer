@@ -168,6 +168,8 @@ export const TRACK_CATALOG = {
     hookBend: { name: "Hook Bend" },
     windingLane: { name: "Winding Lane" },
     grandSlam: { name: "Grand Slam", ground: "grip" },
+    dirtyDancing: { name: "Dirty Dancing", ground: "dirt" },
+    greyHarbor: { name: "Grey Harbor" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

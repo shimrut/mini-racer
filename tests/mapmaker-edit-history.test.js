@@ -86,6 +86,22 @@ describe('Mapmaker edit history', () => {
 });
 
 describe('Mapmaker draft recovery', () => {
+    it('preserves renamed cloud identity, medals and the editable road through recovery', () => {
+        const storage = memoryStorage();
+        const draft = recovery();
+        draft.drafts[0].cloudKey = 'previousName';
+        draft.drafts[0].medalRow = { author: 20, gold: 21, silver: 22, bronze: 23 };
+        draft.drafts[0].pendingMedalText = { gold: '21.5' };
+        draft.drafts[0].track.roadLine = {
+            width: 4.455,
+            points: [point(0, 0), { ...point(20, 0), width: 4.798, cornerRadius: 5 }, point(20, 20)],
+        };
+        expect(saveDraftRecovery(storage, draft, 'alice')).toBe(true);
+        expect(loadDraftRecovery(storage, 'bob')).toBeNull();
+        expect(loadDraftRecovery(storage, 'alice')).toEqual(draft);
+        draft.drafts[0].track.roadLine.points[1].width = 200;
+        expect(saveDraftRecovery(storage, draft, 'alice')).toBe(false);
+    });
     it('preserves valid local corner radii and rejects invalid ones', () => {
         const storage = memoryStorage();
         const draft = recovery();

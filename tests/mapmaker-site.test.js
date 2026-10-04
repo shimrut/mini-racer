@@ -2,35 +2,48 @@ import { describe, expect, it } from 'vitest';
 import {
     MAX_FAILURES,
     PASSCODE_HEADER,
+    OWNER_HEADER,
+    LEGACY_OWNER,
     SESSION_COOKIE,
     checkPasscode,
     createSession,
     isGatedPath,
     isValidSession,
     readCookie,
+    readWorkspaces,
     safeEqual,
 } from '../site/lib/gate.js';
 import { listMaps, normalizeCloudMap, readMapBody, saveMap } from '../site/lib/maps.js';
 import { onRequest } from '../site/functions/_middleware.js';
+import { onRequestGet } from '../site/functions/api/maps/index.js';
+import { onRequestPut, onRequestDelete } from '../site/functions/api/maps/[key].js';
 import { TRACKS } from '../game/track/tracks.js';
+import { TRACK_GROUND_KEYS } from '../game/track/grounds.js';
 
 const PASSCODE = '482913';
 const ORIGIN = 'https://miniracer.club';
 
-function createKv() {
+function createKv(pageSize = Infinity) {
     const store = new Map();
+    const listRequests = [];
     return {
         store,
+        listRequests,
         async get(key, type) {
             if (!store.has(key)) return null;
             return type === 'json' ? JSON.parse(store.get(key)) : store.get(key);
         },
         async put(key, value) { store.set(key, value); },
         async delete(key) { store.delete(key); },
-        async list({ prefix }) {
+        async list({ prefix, cursor }) {
+            listRequests.push({ prefix, cursor });
+            const names = [...store.keys()].filter((name) => name.startsWith(prefix)).sort();
+            const start = Number(cursor ?? 0);
+            const end = Math.min(start + pageSize, names.length);
             return {
-                keys: [...store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
-                list_complete: true,
+                keys: names.slice(start, end).map((name) => ({ name })),
+                list_complete: end >= names.length,
+                cursor: end >= names.length ? '' : String(end),
             };
         },
     };
@@ -46,6 +59,51 @@ function request(path, init = {}) {
 
 function run(req, env) {
     return onRequest({ request: req, env, next: async () => new Response('asset') });
+}
+
+function runApi(req, env) {
+    const context = {
+        request: req,
+        env,
+        data: {},
+        params: { key: decodeURIComponent(new URL(req.url).pathname.split('/').pop()) },
+        async next() {
+            if (new URL(req.url).pathname === '/api/maps' && req.method === 'GET') return onRequestGet(context);
+            if (req.method === 'PUT') return onRequestPut(context);
+            if (req.method === 'DELETE') return onRequestDelete(context);
+            return new Response('asset');
+        },
+    };
+    return onRequest(context);
+}
+
+async function login(env, passcode) {
+    const form = new FormData();
+    form.set('passcode', passcode);
+    const response = await run(request('/mapmaker/unlock', { method: 'POST', body: form }), env);
+    expect(response.status).toBe(303);
+    return response.headers.get('Set-Cookie').split(';')[0];
+}
+
+async function putMap(env, cookie, key, body = {}) {
+    return runApi(request(`/api/maps/${key}`, {
+        method: 'PUT',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ track: sampleTrack(), ...body }),
+    }), env);
+}
+
+async function mapsFor(env, cookie) {
+    const response = await runApi(request('/api/maps', { headers: { Cookie: cookie } }), env);
+    expect(response.status).toBe(200);
+    return (await response.json()).maps;
+}
+
+async function legacyToken(passcode, expires) {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', encoder.encode(passcode), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`mapmaker-session:${expires}`)));
+    return `${expires}.${btoa(String.fromCharCode(...signature)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 }
 
 function sampleTrack() {
@@ -75,8 +133,9 @@ describe('mapmaker passcode gate', () => {
         expect(await isValidSession(token, PASSCODE, now + 1000)).toBe(true);
         expect(await isValidSession(token, 'other-code', now + 1000)).toBe(false);
         expect(await isValidSession(token, PASSCODE, now + 31 * 24 * 60 * 60 * 1000)).toBe(false);
-        const [expires, signature] = token.split('.');
-        expect(await isValidSession(`${Number(expires) + 1}.${signature}`, PASSCODE, now)).toBe(false);
+        const [version, owner, expires, signature] = token.split('.');
+        expect(await isValidSession(`${version}.${owner}.${Number(expires) + 1}.${signature}`, PASSCODE, now)).toBe(false);
+        expect(await isValidSession(`${token}.extra`, PASSCODE, now)).toBe(false);
         expect(await isValidSession(null, PASSCODE, now)).toBe(false);
     });
 
@@ -139,7 +198,7 @@ describe('mapmaker site middleware', () => {
 
         const page = await run(request('/mapmaker/', { headers: { Cookie: cookie.split(';')[0] } }), env);
         expect(await page.text()).toBe('asset');
-        expect(page.headers.get('Cache-Control')).toBe('private, no-cache');
+        expect(page.headers.get('Cache-Control')).toBe('private, no-store');
     });
 
     it('lets the local Mapmaker in with the passcode header', async () => {
@@ -186,11 +245,191 @@ describe('cloud maps', () => {
     it('moves a renamed map to its new key and lists the newest first', async () => {
         const kv = createKv();
         const track = sampleTrack();
-        await saveMap(kv, 'firstName', { track });
-        await saveMap(kv, 'other', { track });
-        await saveMap(kv, 'secondName', { track, replaceKey: 'firstName' });
-        const maps = await listMaps(kv);
+        await saveMap(kv, 'firstName', { track }, LEGACY_OWNER);
+        await saveMap(kv, 'other', { track }, LEGACY_OWNER);
+        await saveMap(kv, 'secondName', { track, replaceKey: 'firstName' }, LEGACY_OWNER);
+        const maps = await listMaps(kv, LEGACY_OWNER);
         expect(maps.map((map) => map.trackKey).sort()).toEqual(['other', 'secondName']);
         expect(maps[0].updatedAt >= maps[1].updatedAt).toBe(true);
+    });
+});
+
+describe('cloud map password workspaces through middleware and routes', () => {
+    function sharedEnv() {
+        return { ...createEnv(), MAPMAKER_PASSCODES: JSON.stringify({ alice: 'alice-password', bob: 'bob-password' }) };
+    }
+
+    it('offers every ground only to the original password workspace', async () => {
+        const env = sharedEnv();
+        const legacy = await login(env, PASSCODE);
+        const alice = await login(env, 'alice-password');
+        const admin = await run(request('/api/session', { headers: { Cookie: legacy } }), env);
+        expect((await admin.json()).groundKeys).toEqual(TRACK_GROUND_KEYS);
+        const issued = await run(request('/api/session?owner=legacy', { headers: { Cookie: alice } }), env);
+        expect((await issued.json()).groundKeys).toEqual(['tarmac']);
+        const importSession = await run(request('/api/session', { headers: { Cookie: legacy, [PASSCODE_HEADER]: 'bob-password' } }), env);
+        expect((await importSession.json()).groundKeys).toEqual(['tarmac']);
+    });
+
+    it('isolates identical track keys and preserves the legacy list only for its original password', async () => {
+        const env = sharedEnv();
+        await saveMap(env.MAPMAKER_KV, 'existing', { track: sampleTrack() }, LEGACY_OWNER);
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        const legacy = await login(env, PASSCODE);
+        expect((await putMap(env, alice, 'sameName', { track: { ...sampleTrack(), name: 'Alice map' } })).status).toBe(200);
+        expect((await putMap(env, bob, 'sameName', { track: { ...sampleTrack(), name: 'Bob map' } })).status).toBe(200);
+        expect((await mapsFor(env, alice)).map((map) => map.track.name)).toEqual(['Alice map']);
+        expect((await mapsFor(env, bob)).map((map) => map.track.name)).toEqual(['Bob map']);
+        expect((await mapsFor(env, legacy)).map((map) => map.trackKey)).toEqual(['existing']);
+    });
+
+    it('scopes rename, replaceKey and deletion to the authenticated workspace', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        await putMap(env, alice, 'sameName');
+        await putMap(env, bob, 'sameName');
+        const renamed = await putMap(env, alice, 'renamed', { replaceKey: 'sameName', ownerId: 'bob' });
+        expect(renamed.status).toBe(200);
+        expect((await mapsFor(env, alice)).map((map) => map.trackKey)).toEqual(['renamed']);
+        expect((await mapsFor(env, bob)).map((map) => map.trackKey)).toEqual(['sameName']);
+        const removed = await runApi(request('/api/maps/sameName?owner=bob', { method: 'DELETE', headers: { Cookie: alice } }), env);
+        expect(removed.status).toBe(200);
+        expect((await mapsFor(env, bob)).map((map) => map.trackKey)).toEqual(['sameName']);
+        await runApi(request('/api/maps/renamed', { method: 'DELETE', headers: { Cookie: alice } }), env);
+        expect(await mapsFor(env, alice)).toEqual([]);
+    });
+
+    it('does not accept a caller-supplied workspace in a body, URL or escaped replacement key', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        await putMap(env, bob, 'victim');
+        await putMap(env, alice, 'ownMap', { owner: 'bob', replaceKey: 'workspace-map:bob:victim' });
+        await runApi(request('/api/maps/workspace-map%3Abob%3Avictim?ownerId=bob', { method: 'DELETE', headers: { Cookie: alice } }), env);
+        const list = await runApi(request('/api/maps?owner=bob', { headers: { Cookie: alice, 'X-Owner': 'bob' } }), env);
+        expect((await list.json()).maps.map((map) => map.trackKey)).toEqual(['ownMap']);
+        expect((await mapsFor(env, bob)).map((map) => map.trackKey)).toEqual(['victim']);
+    });
+
+    it('uses an explicit import password before a cookie and rejects a wrong explicit password', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        await putMap(env, bob, 'bobMap');
+        const response = await runApi(request('/api/maps', { headers: { Cookie: alice, [PASSCODE_HEADER]: 'bob-password' } }), env);
+        expect((await response.json()).maps.map((map) => map.trackKey)).toEqual(['bobMap']);
+        const wrong = await runApi(request('/api/maps', { headers: { Cookie: alice, [PASSCODE_HEADER]: 'wrong' } }), env);
+        expect(wrong.status).toBe(401);
+    });
+
+    it('keeps sessions bound to their signed owner, including tampered and legacy cookies', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        const tampered = alice.replace('v2.alice.', 'v2.bob.');
+        expect((await runApi(request('/api/maps', { headers: { Cookie: tampered } }), env)).status).toBe(401);
+        const token = await legacyToken(PASSCODE, Date.now() + 60_000);
+        const oldCookie = `${SESSION_COOKIE}=${token}`;
+        await saveMap(env.MAPMAKER_KV, 'oldMap', { track: sampleTrack() }, LEGACY_OWNER);
+        expect((await mapsFor(env, oldCookie)).map((map) => map.trackKey)).toEqual(['oldMap']);
+        const namedOnly = { ...env, MAPMAKER_PASSCODE: undefined, MAPMAKER_PASSCODES: JSON.stringify({ alice: PASSCODE }) };
+        expect((await runApi(request('/api/maps', { headers: { Cookie: oldCookie } }), namedOnly)).status).toBe(401);
+        expect(await mapsFor(namedOnly, await login(namedOnly, PASSCODE))).toEqual([]);
+    });
+
+    it('preserves workspace maps across password rotation and invalidates rotated or revoked sessions', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        await putMap(env, alice, 'aliceMap');
+        const before = await run(request('/api/session', { headers: { Cookie: alice } }), env);
+        const originalOwner = (await before.json()).ownerId;
+        env.MAPMAKER_PASSCODES = JSON.stringify({ alice: 'new-alice-password', bob: 'bob-password' });
+        expect((await runApi(request('/api/maps', { headers: { Cookie: alice } }), env)).status).toBe(401);
+        const newCookie = await login(env, 'new-alice-password');
+        expect((await mapsFor(env, newCookie)).map((map) => map.trackKey)).toEqual(['aliceMap']);
+        const after = await run(request('/api/session', { headers: { Cookie: newCookie } }), env);
+        expect((await after.json()).ownerId).toBe(originalOwner);
+        env.MAPMAKER_PASSCODES = JSON.stringify({ bob: 'bob-password' });
+        expect((await runApi(request('/api/maps', { headers: { Cookie: newCookie } }), env)).status).toBe(401);
+    });
+
+    it('fences an old tab after another password changes the shared browser cookie', async () => {
+        const env = sharedEnv();
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        const session = await run(request('/api/session', { headers: { Cookie: alice } }), env);
+        const ownerId = (await session.json()).ownerId;
+        expect(ownerId).toMatch(/^[a-f0-9]{64}$/);
+        for (const method of ['GET', 'PUT', 'DELETE']) {
+            const response = await runApi(request(method === 'GET' ? '/api/maps' : '/api/maps/mapFromOldTab', {
+                method,
+                headers: { Cookie: bob, [OWNER_HEADER]: ownerId },
+                ...(method === 'PUT' ? { body: JSON.stringify({ track: sampleTrack() }) } : {}),
+            }), env);
+            expect(response.status).toBe(409);
+        }
+        expect(await mapsFor(env, bob)).toEqual([]);
+        expect((await putMap(env, alice, 'correctSession')).status).toBe(200);
+        const matching = await runApi(request('/api/maps', { headers: { Cookie: alice, [OWNER_HEADER]: ownerId } }), env);
+        expect(matching.status).toBe(200);
+    });
+
+    it('clears a browser session when switching passwords', async () => {
+        const response = await run(request('/api/session', { method: 'DELETE' }), sharedEnv());
+        expect(response.status).toBe(204);
+        expect(response.headers.get('Set-Cookie')).toContain(`${SESSION_COOKIE}=;`);
+        expect(response.headers.get('Set-Cookie')).toContain('Max-Age=0');
+        expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    });
+
+    it('requires authenticated middleware context even when handlers are called directly', async () => {
+        const env = sharedEnv();
+        expect((await onRequestGet({ env })).status).toBe(401);
+        expect((await onRequestDelete({ env, params: { key: 'any' } })).status).toBe(401);
+        expect((await onRequestPut({ env, params: { key: 'any' }, request: request('/api/maps/any', { method: 'PUT', body: JSON.stringify({ track: sampleTrack() }) }) })).status).toBe(401);
+        expect(env.MAPMAKER_KV.store.size).toBe(0);
+    });
+
+    it('keeps every pagination request inside its workspace prefix', async () => {
+        const env = { ...sharedEnv(), MAPMAKER_KV: createKv(1) };
+        const alice = await login(env, 'alice-password');
+        const bob = await login(env, 'bob-password');
+        await putMap(env, alice, 'first');
+        await putMap(env, alice, 'second');
+        await putMap(env, alice, 'third');
+        await putMap(env, bob, 'foreign');
+        expect((await mapsFor(env, alice)).map((map) => map.trackKey).sort()).toEqual(['first', 'second', 'third']);
+        expect(env.MAPMAKER_KV.listRequests).toEqual([
+            { prefix: 'workspace-map:alice:', cursor: undefined },
+            { prefix: 'workspace-map:alice:', cursor: '1' },
+            { prefix: 'workspace-map:alice:', cursor: '2' },
+        ]);
+    });
+
+    it.each([
+        '{',
+        '[]',
+        'null',
+        '{"alice":42}',
+        '{"alice":""}',
+        '{"bad:id":"a"}',
+        '{"legacy":"a"}',
+        '{"alice":"a","alice":"b"}',
+        '{"alice":"a","\\u0061lice":"b"}',
+        '{"alice":"same","bob":"same"}',
+        `{"alice":"${PASSCODE}"}`,
+    ])('fails closed for malformed or ambiguous password configuration %s', async (config) => {
+        const env = { ...createEnv(), MAPMAKER_PASSCODES: config };
+        expect(() => readWorkspaces(env)).toThrow();
+        const response = await run(request('/api/maps', { headers: { [PASSCODE_HEADER]: PASSCODE } }), env);
+        expect(response.status).toBe(503);
+        expect(env.MAPMAKER_KV.store.size).toBe(0);
+    });
+
+    it('accepts string passwords containing JSON punctuation without mistaking it for a second workspace', () => {
+        const complex = 'a", "bob": "b';
+        const env = { ...createEnv(), MAPMAKER_PASSCODES: JSON.stringify({ alice: complex }) };
+        expect(readWorkspaces(env).get('alice')).toBe(complex);
     });
 });

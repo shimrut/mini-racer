@@ -15,6 +15,7 @@ import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/
 import {
     clearDraftRecovery,
     createEditHistory,
+    DRAFT_RECOVERY_KEY,
     loadDraftRecovery,
     saveDraftRecovery,
 } from './mapmaker/edit-history.js';
@@ -78,7 +79,10 @@ import {
     readPendingMedalText,
     setPendingMedalText,
 } from './mapmaker/pending-medal-text.js';
-import { MAPMAKER_ONLINE, deleteCloudMap, listCloudMaps, saveCloudMap } from './mapmaker/cloud-maps.js';
+import {
+    MAPMAKER_ONLINE, cloudStorageKey, closeCloudSession, deleteCloudMap, getCloudGroundKeys,
+    listCloudMaps, loadCloudSession, saveCloudMap, verifyCloudSession,
+} from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
 const PLAYTEST_DRAFT_KEY = 'mapmaker:playtest-draft:v1';
@@ -236,9 +240,10 @@ class MapmakerApp {
         this.flowCount = document.getElementById('flow-count');
         this.flowRules = document.getElementById('flow-rules');
 
-        const initialTrackKey = this.creatorMode ? 'newTrack' : Object.keys(TRACKS)[0];
+        const ownTracksOnly = this.creatorMode || MAPMAKER_ONLINE;
+        const initialTrackKey = ownTracksOnly ? 'newTrack' : Object.keys(TRACKS)[0];
         this.state = {
-            tracks: this.creatorMode ? { newTrack: createBlankTrack() } : cloneTracks({ ...TRACKS }),
+            tracks: ownTracksOnly ? { newTrack: createBlankTrack() } : cloneTracks({ ...TRACKS }),
             selectedTrackKey: initialTrackKey,
             tool: 'edit',
             selectedHandle: null,
@@ -251,7 +256,7 @@ class MapmakerApp {
             hoverSegment: null,
             drag: null,
             dirtyTrackKeys: new Set(),
-            originalTrackKeyByKey: new Map(this.creatorMode ? []
+            originalTrackKeyByKey: new Map(ownTracksOnly ? []
                 : Object.keys(TRACKS).map((trackKey) => [trackKey, trackKey])),
             isSpaceDown: false,
             skipDrawClick: false,
@@ -272,7 +277,7 @@ class MapmakerApp {
         this.activeHistoryEditKey = null;
         this.draftLoopsByKey = new Map();
         this.seriesData = normalizeCampaignSeriesData(seriesFileData);
-        this.medalTimes = { ...medalTimesFileData };
+        this.medalTimes = MAPMAKER_ONLINE ? {} : { ...medalTimesFileData };
         this.medalRowByKey = new Map();
         // Typed medal text that is not in the medal row yet, by track and tier.
         this.pendingMedalText = new Map();
@@ -314,6 +319,7 @@ class MapmakerApp {
         // The local Mapmaker lists the cloud maps in the track picker.
         this.cloudMaps = [];
         this.cloudMapsError = '';
+        this.cloudReady = !MAPMAKER_ONLINE;
         this.scheduleKeys = new Set(TRACK_SCHEDULE_KEYS);
         this.trackPickerPlace = 'all';
         this.trackPickerGround = 'all';
@@ -323,28 +329,21 @@ class MapmakerApp {
 
         if (MAPMAKER_ONLINE) {
             document.querySelectorAll('.local-only').forEach((element) => { element.hidden = true; });
+            document.querySelectorAll('.online-only').forEach((element) => { element.hidden = false; });
         }
         this.buildOptionGroup(this.cornerRadiusOptions, 'corner-radius', CORNER_RADIUS_PRESETS);
         if (this.roadWidthOptions) this.buildOptionGroup(this.roadWidthOptions, 'road-width', ROAD_WIDTHS);
-        this.buildOptionGroup(this.groundOptions, 'ground', TRACK_GROUND_KEYS.map((key) => ({
-            value: key,
-            label: TRACK_GROUNDS[key].label,
-        })));
+        this.buildGroundControls();
         this.buildFilterGroup(this.trackPlaceFilters, [
             { value: 'all', label: 'All' },
-            { value: 'daily', label: 'Daily' },
-            { value: 'campaign', label: 'Campaign' },
-            { value: 'unused', label: 'Not used' },
-            ...(this.creatorMode ? [] : [{ value: 'cloud', label: 'Cloud' }]),
+            ...(MAPMAKER_ONLINE ? [] : [
+                { value: 'daily', label: 'Daily' },
+                { value: 'campaign', label: 'Campaign' },
+                { value: 'unused', label: 'Not used' },
+                ...(this.creatorMode ? [] : [{ value: 'cloud', label: 'Cloud' }]),
+            ]),
         ], (value) => {
             this.trackPickerPlace = value;
-            this.renderTrackPicker();
-        });
-        this.buildFilterGroup(this.trackGroundFilters, [
-            { value: 'all', label: 'Any ground' },
-            ...TRACK_GROUND_KEYS.map((key) => ({ value: key, label: TRACK_GROUNDS[key].label })),
-        ], (value) => {
-            this.trackPickerGround = value;
             this.renderTrackPicker();
         });
         let storedPanelHidden = null;
@@ -373,9 +372,24 @@ class MapmakerApp {
             document.getElementById('creator-loader-retry')
                 ?.addEventListener('click', () => void this.loadCreatorTracks());
             void this.loadCreatorTracks();
+        } else if (MAPMAKER_ONLINE) {
+            document.getElementById('cloud-retry-btn').addEventListener('click', () => void this.loadCloudMapsOnline());
+            document.querySelectorAll('[data-switch-password]').forEach((button) => {
+                button.addEventListener('click', () => void this.switchCloudPassword());
+            });
+            window.addEventListener('pageshow', (event) => {
+                if (event.persisted) window.location.reload();
+            });
+            window.addEventListener('focus', () => {
+                if (!this.cloudReady) return;
+                void verifyCloudSession().catch(() => {
+                    this.flushDraftRecovery();
+                    window.location.reload();
+                });
+            });
+            void this.loadCloudMapsOnline();
         } else {
             this.offerDraftRecovery();
-            if (MAPMAKER_ONLINE) this.loadCloudMapsOnline();
         }
     }
 
@@ -424,13 +438,13 @@ class MapmakerApp {
     }
 
     scheduleDraftRecovery() {
-        if (this.creatorMode) return;
+        if (this.creatorMode || !this.cloudReady) return;
         if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
         this.recoveryTimer = setTimeout(() => this.flushDraftRecovery(), 200);
     }
 
     flushDraftRecovery() {
-        if (this.creatorMode) return;
+        if (this.creatorMode || !this.cloudReady) return;
         if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
         this.recoveryTimer = null;
         // Until Restore or Discard is chosen, the stored maps are not in the editor yet.
@@ -446,29 +460,34 @@ class MapmakerApp {
             originalTrackKey: this.state.originalTrackKeyByKey.get(key) ?? null,
             track: this.state.tracks[key],
             draftLoop: this.draftLoopsByKey.get(key) ?? [],
+            ...(MAPMAKER_ONLINE ? {
+                cloudKey: this.cloudKeyByKey.get(key) ?? null,
+                medalRow: this.getMedalRow(key),
+                pendingMedalText: Object.fromEntries(this.pendingMedalText.get(key) ?? []),
+            } : {}),
         }));
         if (drafts.length) {
             saveDraftRecovery(getBrowserStorage('localStorage'), {
                 selectedTrackKey: keys.has(this.state.selectedTrackKey) ? this.state.selectedTrackKey : null,
                 drafts,
-            });
+            }, cloudStorageKey(DRAFT_RECOVERY_KEY));
         } else {
-            clearDraftRecovery(getBrowserStorage('localStorage'));
+            clearDraftRecovery(getBrowserStorage('localStorage'), cloudStorageKey(DRAFT_RECOVERY_KEY));
         }
     }
 
     offerDraftRecovery() {
-        const recovery = loadDraftRecovery(getBrowserStorage('localStorage'));
+        const recovery = loadDraftRecovery(getBrowserStorage('localStorage'), cloudStorageKey(DRAFT_RECOVERY_KEY));
         if (!recovery?.drafts.length) {
-            try { getBrowserStorage('sessionStorage')?.removeItem('mapmaker:return-from-playtest:v1'); } catch {}
+            try { getBrowserStorage('sessionStorage')?.removeItem(cloudStorageKey('mapmaker:return-from-playtest:v1')); } catch {}
             return;
         }
         let returningFromPlaytest = false;
         try {
-            returningFromPlaytest = getBrowserStorage('sessionStorage')?.getItem('mapmaker:return-from-playtest:v1') === '1';
+            returningFromPlaytest = getBrowserStorage('sessionStorage')?.getItem(cloudStorageKey('mapmaker:return-from-playtest:v1')) === '1';
         } catch {}
         if (returningFromPlaytest) {
-            try { getBrowserStorage('sessionStorage')?.removeItem('mapmaker:return-from-playtest:v1'); } catch {}
+            try { getBrowserStorage('sessionStorage')?.removeItem(cloudStorageKey('mapmaker:return-from-playtest:v1')); } catch {}
             this.restoreDraftRecovery(recovery);
             return;
         }
@@ -477,7 +496,7 @@ class MapmakerApp {
         this.restoreDraftsDialog.showModal();
         this.restoreDraftsDialog.addEventListener('close', () => {
             if (this.restoreDraftsDialog.returnValue !== 'restore') {
-                clearDraftRecovery(getBrowserStorage('localStorage'));
+                clearDraftRecovery(getBrowserStorage('localStorage'), cloudStorageKey(DRAFT_RECOVERY_KEY));
                 return;
             }
             this.restoreDraftRecovery(recovery);
@@ -487,7 +506,7 @@ class MapmakerApp {
     // Puts a draft in the editor as an unsaved track. A renamed draft replaces
     // the saved track it came from.
     addDraft(draft) {
-        if (draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
+        if (!MAPMAKER_ONLINE && draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
             delete this.state.tracks[draft.originalTrackKey];
             this.state.originalTrackKeyByKey.delete(draft.originalTrackKey);
             this.editHistories.delete(draft.originalTrackKey);
@@ -498,12 +517,30 @@ class MapmakerApp {
             this.state.originalTrackKeyByKey.set(draft.trackKey, draft.originalTrackKey);
         }
         if (draft.draftLoop.length) this.draftLoopsByKey.set(draft.trackKey, draft.draftLoop);
+        else this.draftLoopsByKey.delete(draft.trackKey);
+        if (draft.cloudKey) this.cloudKeyByKey.set(draft.trackKey, draft.cloudKey);
+        if (Object.hasOwn(draft, 'medalRow')) {
+            if (draft.medalRow) this.medalRowByKey.set(draft.trackKey, draft.medalRow);
+            else this.medalRowByKey.delete(draft.trackKey);
+        }
+        if (draft.pendingMedalText) {
+            this.pendingMedalText.set(draft.trackKey, new Map(Object.entries(draft.pendingMedalText)));
+        }
         this.editHistories.set(draft.trackKey, createEditHistory(draft.track));
     }
 
     restoreDraftRecovery(recovery) {
-        recovery.drafts.forEach((draft) => this.addDraft(draft));
-        this.loadTrack(recovery.selectedTrackKey || recovery.drafts[0].trackKey);
+        recovery.drafts.forEach((draft) => {
+            if (MAPMAKER_ONLINE && draft.cloudKey && draft.cloudKey !== draft.trackKey) {
+                delete this.state.tracks[draft.cloudKey];
+                this.cloudKeyByKey.delete(draft.cloudKey);
+                this.editHistories.delete(draft.cloudKey);
+                this.medalRowByKey.delete(draft.cloudKey);
+                this.state.originalTrackKeyByKey.delete(draft.cloudKey);
+            }
+            this.addDraft(draft);
+        });
+        this.loadTrack(this.state.tracks[recovery.selectedTrackKey] ? recovery.selectedTrackKey : recovery.drafts[0].trackKey);
         this.setStatus(`Restored ${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'}.`);
     }
 
@@ -518,12 +555,28 @@ class MapmakerApp {
     // Online, the cloud maps are the saved tracks, so they open clean. A map
     // with unsaved changes in this browser keeps them.
     async loadCloudMapsOnline() {
+        if (this.cloudLoading) return;
+        this.cloudLoading = true;
+        document.querySelector('.maker-header').inert = true;
+        document.querySelector('.maker-editor').inert = true;
+        const loadState = document.getElementById('cloud-load-state');
+        loadState.hidden = false;
+        document.getElementById('cloud-load-message').textContent = 'Loading your maps…';
+        document.getElementById('cloud-retry-btn').hidden = true;
         let maps;
         try {
+            await loadCloudSession();
+            this.buildGroundControls();
             maps = await listCloudMaps();
         } catch (error) {
-            this.setStatus(`Cannot load your cloud maps: ${error.message}`, true);
+            document.getElementById('cloud-load-message').textContent = `Cannot load your maps: ${error.message}`;
+            document.getElementById('cloud-retry-btn').hidden = false;
+            this.cloudLoading = false;
             return;
+        }
+        if (maps.length && !this.cloudReady) {
+            this.state.tracks = {};
+            this.editHistories.clear();
         }
         for (const map of [...maps].reverse()) {
             if (this.state.dirtyTrackKeys.has(map.trackKey)) {
@@ -536,13 +589,33 @@ class MapmakerApp {
         // Open the track just driven in Test Drive, else the newest cloud map.
         let drivenKey = null;
         try {
-            drivenKey = JSON.parse(getBrowserStorage('sessionStorage')?.getItem(PLAYTEST_DRAFT_KEY) ?? 'null')?.trackKey ?? null;
+            drivenKey = JSON.parse(getBrowserStorage('sessionStorage')?.getItem(cloudStorageKey(PLAYTEST_DRAFT_KEY)) ?? 'null')?.trackKey ?? null;
         } catch {}
         const openKey = this.state.dirtyTrackKeys.size
             ? this.state.selectedTrackKey
             : [drivenKey, maps[0]?.trackKey, this.state.selectedTrackKey].find((key) => key && this.state.tracks[key]);
         this.loadTrack(this.state.tracks[openKey] ? openKey : Object.keys(this.state.tracks)[0]);
+        this.cloudReady = true;
+        this.cloudLoading = false;
+        document.querySelector('.maker-header').inert = false;
+        document.querySelector('.maker-editor').inert = false;
+        loadState.hidden = true;
+        this.syncMedalTimesPanel();
+        this.syncActionButtons();
+        this.offerDraftRecovery();
         if (this.trackPickerDialog.open) this.renderTrackPicker();
+    }
+
+    async switchCloudPassword() {
+        if (this.busy) return;
+        this.flushDraftRecovery();
+        try {
+            await closeCloudSession();
+            this.skipBeforeUnload = true;
+            window.location.assign('/mapmaker/');
+        } catch (error) {
+            this.setStatus(error.message, true);
+        }
     }
 
     async refreshCloudMapsLocal() {
@@ -931,11 +1004,27 @@ class MapmakerApp {
         }
     }
 
+    buildGroundControls() {
+        const keys = getCloudGroundKeys();
+        this.buildOptionGroup(this.groundOptions, 'ground', keys.map((key) => ({
+            value: key,
+            label: TRACK_GROUNDS[key].label,
+        })));
+        this.buildFilterGroup(this.trackGroundFilters, [
+            { value: 'all', label: 'Any ground' },
+            ...keys.map((key) => ({ value: key, label: TRACK_GROUNDS[key].label })),
+        ], (value) => {
+            this.trackPickerGround = value;
+            this.renderTrackPicker();
+        });
+    }
+
     syncGroundControl() {
         this.checkOption(this.groundOptions, getTrackGround(this.track).key);
     }
 
     setGround(key) {
+        if (!getCloudGroundKeys().includes(key)) return;
         this.track.ground = key;
         const storedKey = getStoredTrackGroundKey(this.track);
         if (storedKey === null) {
@@ -1288,6 +1377,7 @@ class MapmakerApp {
     }
 
     medalTimesFixed(trackKey = this.state.selectedTrackKey) {
+        if (MAPMAKER_ONLINE) return false;
         if (this.creatorMode) return this.isCreatorLocked(trackKey);
         const stage = this.getSavedStage(trackKey);
         return Boolean(stage && isAppCampaignSeriesLive(stage.series) && this.getSavedMedalRow(trackKey));
@@ -1305,7 +1395,7 @@ class MapmakerApp {
             this.medalInputs[tier].disabled = fixed;
         }
 
-        const laps = this.track ? readDraftLaps(getBrowserStorage('localStorage'), draftLapsStorageKey(trackKey, this.track)) : [];
+        const laps = this.track && this.cloudReady ? readDraftLaps(getBrowserStorage('localStorage'), cloudStorageKey(draftLapsStorageKey(trackKey, this.track))) : [];
         this.draftLapsList.replaceChildren();
         const addLapButton = (lap, label, kind) => {
             const button = document.createElement('button');
@@ -1327,7 +1417,8 @@ class MapmakerApp {
             this.draftLapsList.appendChild(note);
         }
 
-        const edited = this.medalRowByKey.has(trackKey) || hasPendingMedalText(this.pendingMedalText, trackKey);
+        const edited = (MAPMAKER_ONLINE ? this.state.dirtyTrackKeys.has(trackKey) : this.medalRowByKey.has(trackKey))
+            || hasPendingMedalText(this.pendingMedalText, trackKey);
         const error = row ? getMedalRowError(row) : 'Set all four medal times.';
         const bronze = Number(row?.bronze);
         const notes = [];
@@ -1407,6 +1498,7 @@ class MapmakerApp {
         this.medalTimesState.textContent = 'Unsaved';
         this.medalTimesState.className = 'pill pill-warn';
         this.syncActionButtons();
+        if (MAPMAKER_ONLINE) this.scheduleDraftRecovery();
         if (this.creatorMode && this.creatorSavingKey !== key && !this.creatorSaveErrors.has(key)) {
             this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
         }
@@ -1624,17 +1716,16 @@ class MapmakerApp {
             this.editHistories.delete(selectedKey);
             this.draftLoopsByKey.delete(selectedKey);
             this.medalRowByKey.delete(selectedKey);
+            clearPendingMedalText(this.pendingMedalText, selectedKey);
             this.baselineQualityCodesByKey.delete(selectedKey);
             this.baselineGeometryByKey.delete(selectedKey);
             this.autoRoadGuideByKey.delete(selectedKey);
             this.state.originalTrackKeyByKey.delete(selectedKey);
             this.state.dirtyTrackKeys.delete(selectedKey);
-            // Online, a deleted cloud copy of a game track shows the game version again.
-            if (MAPMAKER_ONLINE && originalKey && TRACKS[originalKey]) {
-                this.state.tracks[originalKey] = cloneTracks(TRACKS[originalKey]);
-                this.state.originalTrackKeyByKey.set(originalKey, originalKey);
-                this.editHistories.delete(originalKey);
-                nextKey = originalKey;
+            // Keep a usable blank editor after its final map is removed.
+            if (!nextKey) {
+                nextKey = 'newTrack';
+                this.state.tracks[nextKey] = createBlankTrack();
             }
             this.state.selectedTrackKey = nextKey;
             this.resetView();
@@ -3183,7 +3274,11 @@ class MapmakerApp {
             return;
         }
         this.saveTrackBtn.textContent = isDirty ? 'Save' : 'Saved';
-        this.saveTrackBtn.disabled = this.busy || !isDirty;
+        this.saveTrackBtn.disabled = this.busy || !this.cloudReady || !isDirty;
+        if (MAPMAKER_ONLINE) {
+            this.removeTrackBtn.disabled = this.busy || !this.cloudReady;
+            this.trackNameInput.disabled = this.busy;
+        }
         // Only the local Mapmaker can remove a track from the game.
         this.removeTrackBtn.hidden = MAPMAKER_ONLINE
             && this.state.originalTrackKeyByKey.has(key) && !this.cloudKeyByKey.has(key);
@@ -4116,7 +4211,8 @@ class MapmakerApp {
             return;
         }
         try {
-            window.sessionStorage.setItem(PLAYTEST_DRAFT_KEY, JSON.stringify({
+            if (MAPMAKER_ONLINE) await verifyCloudSession();
+            window.sessionStorage.setItem(cloudStorageKey(PLAYTEST_DRAFT_KEY), JSON.stringify({
                 trackKey: this.state.selectedTrackKey,
                 track,
             }));
@@ -4124,7 +4220,7 @@ class MapmakerApp {
                 this.openCreatorTestDrive();
                 return;
             }
-            window.sessionStorage.setItem('mapmaker:return-from-playtest:v1', '1');
+            window.sessionStorage.setItem(cloudStorageKey('mapmaker:return-from-playtest:v1'), '1');
             this.flushDraftRecovery();
             this.skipBeforeUnload = true;
             window.location.assign('mapmaker-playtest.html');
@@ -4138,26 +4234,58 @@ class MapmakerApp {
     // Mapmaker adds the map to the game.
     async saveToCloud() {
         const trackKey = this.state.selectedTrackKey;
+        if (!this.commitPendingMedalText(trackKey)) {
+            this.setStatus('Finish the medal times before saving.', true);
+            return;
+        }
+        const medalError = this.medalRowByKey.has(trackKey) ? getMedalRowError(this.medalRowByKey.get(trackKey)) : null;
+        if (medalError) {
+            this.setStatus(medalError, true);
+            return;
+        }
+        const submittedTrack = this.track;
+        const snapshot = cloneTracks({
+            trackKey,
+            originalTrackKey: this.state.originalTrackKeyByKey.get(trackKey) ?? null,
+            track: submittedTrack,
+            draftLoop: this.state.draftLoop,
+            medalRow: this.medalRowByKey.get(trackKey) ?? null,
+            replaceKey: this.cloudKeyByKey.get(trackKey) ?? null,
+        });
         this.busy = true;
         this.syncActionButtons();
         this.setStatus(`Saving ${this.track.name} to your cloud maps...`);
         try {
-            await saveCloudMap({
-                trackKey,
-                originalTrackKey: this.state.originalTrackKeyByKey.get(trackKey) ?? null,
-                track: this.track,
-                draftLoop: this.state.draftLoop,
-                medalRow: this.medalRowByKey.get(trackKey) ?? null,
-                replaceKey: this.cloudKeyByKey.get(trackKey) ?? null,
-            });
-            this.cloudKeyByKey.set(trackKey, trackKey);
-            this.markSaved(`Saved ${this.track.name} to cloud maps. Add it to the game from the Mapmaker at home.`);
+            await saveCloudMap(snapshot);
+            // Bind the acknowledgement to the submitted map, even if the user
+            // renamed it or selected another map while the request was running.
+            const liveKey = Object.keys(this.state.tracks).find((key) => this.state.tracks[key] === submittedTrack)
+                ?? (this.state.tracks[trackKey] ? trackKey : null);
+            if (liveKey) {
+                this.cloudKeyByKey.set(liveKey, trackKey);
+                const liveLoop = liveKey === this.state.selectedTrackKey
+                    ? this.state.draftLoop : this.draftLoopsByKey.get(liveKey) ?? [];
+                const unchanged = liveKey === trackKey
+                    && !hasPendingMedalText(this.pendingMedalText, liveKey)
+                    && JSON.stringify(this.state.tracks[liveKey]) === JSON.stringify(snapshot.track)
+                    && JSON.stringify(liveLoop) === JSON.stringify(snapshot.draftLoop)
+                    && JSON.stringify(this.medalRowByKey.get(liveKey) ?? null) === JSON.stringify(snapshot.medalRow);
+                if (unchanged) {
+                    this.state.dirtyTrackKeys.delete(liveKey);
+                    this.baselineGeometryByKey.set(liveKey, geometrySignature(snapshot.track));
+                    this.baselineQualityCodesByKey.set(liveKey, new Set(validateTrackQuality(snapshot.track).issues
+                        .filter((issue) => issue.severity === 'error').map((issue) => issue.code)));
+                }
+                this.scheduleDraftRecovery();
+                this.setStatus(`Saved ${snapshot.track.name} to cloud maps.${unchanged ? '' : ' Newer edits remain unsaved.'}`);
+            }
         } catch (error) {
             console.error(error);
             this.setStatus(error.message, true);
         } finally {
             this.busy = false;
             this.syncActionButtons();
+            this.syncMedalTimesPanel();
         }
     }
 
@@ -4246,4 +4374,20 @@ class MapmakerApp {
     }
 }
 
-new MapmakerApp();
+const app = new MapmakerApp();
+window.render_game_to_text = () => JSON.stringify({
+    mode: 'mapmaker',
+    ready: app.cloudReady,
+    tracks: Object.keys(app.state.tracks),
+    selectedTrackKey: app.state.selectedTrackKey,
+    name: app.track?.name,
+    tool: app.state.tool,
+    dirtyTracks: [...app.state.dirtyTrackKeys],
+    draftPoints: app.state.draftLoop.length,
+    roadLine: app.track?.roadLine ?? null,
+    outerPoints: app.track?.outer.length ?? 0,
+    innerPoints: app.track?.inner.length ?? 0,
+    medalRow: app.getMedalRow(),
+    status: app.statusMessage,
+});
+window.advanceTime = () => app.draw();

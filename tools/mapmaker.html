@@ -29,6 +29,12 @@
         </div>
     </header>
 
+    <div id="cloud-load-state" class="cloud-load-state" role="status" hidden>
+        <p id="cloud-load-message"></p>
+        <button id="cloud-retry-btn" type="button" hidden>Retry</button>
+        <button type="button" data-switch-password>Switch password</button>
+    </div>
+
     <main class="maker-editor">
         <section class="maker-stage">
             <canvas id="map-canvas"></canvas>
@@ -129,6 +135,7 @@
 
             <section class="panel-section panel-footer">
                 <button id="remove-track-btn" type="button" class="danger-btn">Remove track</button>
+                <button type="button" class="online-only" data-switch-password hidden>Switch password</button>
             </section>
         </aside>
     </main>
