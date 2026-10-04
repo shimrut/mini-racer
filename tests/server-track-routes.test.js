@@ -47,6 +47,45 @@ function deps(overrides = {}) {
 }
 
 describe('track routes', () => {
+    it('passes the authenticated account to every Creator list, read and delete', async () => {
+        const dependencies = deps();
+        const base = await startApp(dependencies);
+        expect(await (await fetch(`${base}/api/creator/tracks?full=1`)).json())
+            .toEqual({ username: 'RaceMod', tracks: [{ key: 'nightCut', track: {} }] });
+        await fetch(`${base}/api/creator/tracks`);
+        expect(dependencies.listStoredTrackRecords).toHaveBeenCalledWith('RaceMod');
+        expect(dependencies.listStoredTracks).toHaveBeenCalledWith('RaceMod');
+        expect((await fetch(`${base}/api/creator/tracks/nightCut`)).status).toBe(404);
+        expect(dependencies.readStoredTrack).toHaveBeenCalledWith('nightCut', 'RaceMod');
+        await fetch(`${base}/api/creator/tracks/nightCut?baseRevision=2`, { method: 'DELETE' });
+        expect(dependencies.deleteStoredTrack.mock.calls[0][1]).toMatchObject({ username: 'RaceMod', baseRevision: '2' });
+        await fetch(`${base}/api/creator/daily`);
+        expect(dependencies.readCreatorDailyView).toHaveBeenCalledWith('RaceMod');
+    });
+
+    it('rejects stale account-bound requests before reading or changing a track', async () => {
+        const dependencies = deps();
+        const base = await startApp(dependencies);
+        const responses = await Promise.all([
+            fetch(`${base}/api/creator/tracks/nightCut?creatorUsername=OtherMod`),
+            fetch(`${base}/api/creator/tracks/nightCut?creatorUsername=OtherMod`, { method: 'DELETE' }),
+            fetch(`${base}/api/creator/tracks/nightCut`, {
+                method: 'PUT', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ creatorUsername: 'OtherMod', track: {} }),
+            }),
+        ]);
+        expect(responses.map((response) => response.status)).toEqual([409, 409, 409]);
+        expect((await responses[0].json()).error).toBe('The Reddit account changed. Reopen the Creator before saving.');
+        expect(dependencies.readStoredTrack).not.toHaveBeenCalled();
+        expect(dependencies.saveStoredTrack).not.toHaveBeenCalled();
+        expect(dependencies.deleteStoredTrack).not.toHaveBeenCalled();
+        const matching = await fetch(`${base}/api/creator/tracks/nightCut`, {
+            method: 'PUT', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ creatorUsername: ' racemOD ', track: {} }),
+        });
+        expect(matching.status).toBe(200);
+    });
+
     it('checks moderator membership before every Creator read and write', async () => {
         const dependencies = deps({
             assertModeratorForSubreddit: vi.fn(async () => {

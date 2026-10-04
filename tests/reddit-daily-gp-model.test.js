@@ -26,11 +26,9 @@ import {
     formatRankLabel,
     getDailyGpCompetitionDeadlineMs,
     getDailyGpCompetitionTtlSeconds,
-    getDailyGpEligibleLapCounts,
     getUtcDayIndex,
     isDailyGpChallengePlayable,
     normalizeDailyGpRaceContract,
-    selectDailyGpLapCount,
 } from '../src/server/daily/daily-gp-model.ts';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
@@ -145,32 +143,12 @@ describe('reddit daily gp model', () => {
         );
     });
 
-    it('selects one or two laps only for Daily tracks under 10s author time', () => {
-        expect(getDailyGpEligibleLapCounts('circuit')).toEqual([1, 2]);
-        expect(getDailyGpEligibleLapCounts('goldenMarsh')).toEqual([1, 2]);
-        expect(getDailyGpEligibleLapCounts('speedAltar')).toEqual([1]);
-        expect(getDailyGpEligibleLapCounts('moebiusStrip')).toEqual([1]);
-        expect(getDailyGpEligibleLapCounts('cedarRidgeCircuit')).toEqual([1]);
-        expect(getDailyGpEligibleLapCounts('not-a-track')).toEqual([1]);
-
-        const challengeId = 'daily-gp-2026-05-06';
-        expect(selectDailyGpLapCount(challengeId, 'circuit')).toBe(
-            selectDailyGpLapCount(challengeId, 'circuit'),
-        );
-        const shortTrackOutcomes = new Set(
-            Array.from({ length: 90 }, (_, day) => selectDailyGpLapCount(
-                `daily-gp-2026-08-${String(day + 1).padStart(2, '0')}`,
-                'circuit',
-            )),
-        );
-        expect(shortTrackOutcomes).toEqual(new Set([1, 2]));
-        const longTrackOutcomes = new Set(
-            Array.from({ length: 90 }, (_, day) => selectDailyGpLapCount(
-                `daily-gp-2026-08-${String(day + 1).padStart(2, '0')}`,
-                'moebiusStrip',
-            )),
-        );
-        expect(longTrackOutcomes).toEqual(new Set([1]));
+    it('publishes every new Daily as one lap', () => {
+        for (const trackKey of ['circuit', 'goldenMarsh', 'moebiusStrip']) {
+            const challenge = buildDailyGpChallengeForDayIndexWithTrack(20_000, trackKey);
+            expect(challenge.objectiveParams).toEqual({ lapCount: 1 });
+            expect(challenge.objectiveType).toBe('single_lap_fastest');
+        }
     });
 
     it('keeps persisted three-lap contracts valid for historical Daily races', () => {

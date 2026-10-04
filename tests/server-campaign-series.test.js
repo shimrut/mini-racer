@@ -99,6 +99,12 @@ function createTransaction() {
     };
 }
 
+// Only Numbers is live from the app data. These tests need a second live
+// series, as if the Creator had made it live.
+vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    isAppCampaignSeriesLive: (series) => ['numbered-v1', 'test-v1'].includes(series?.id),
+}));
 vi.mock('@devvit/redis', () => ({
     redis: mockRedis,
     redisCompressed: mockRedis,

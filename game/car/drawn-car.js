@@ -5,6 +5,7 @@ import { SNOW_CAR } from "./drawn-car/snow.js";
 import { JET_SKI } from "./drawn-car/jet-ski.js";
 import { SPACESHIP } from "./drawn-car/spaceship.js";
 import { isHexColor, paintTones } from "./drawn-car/paint.js";
+import { DRAWN_CAR_SKINS, isDrawnCarAsset } from "./drawn-car-skins.js";
 
 // Draws a car in code from its parts. Each part is its own file in
 // game/car/drawn-car/parts/, and a car file such as
@@ -72,10 +73,21 @@ const REPAINT_INTERVAL_SEC = 1 / 40;
 const SLOW_REPAINT_INTERVAL_SEC = 1 / 15;
 
 export class DrawnCar {
-  constructor(car = FORMULA_CAR, skin = {}, { pixelsPerUnit = 3 } = {}) {
+  constructor(car = FORMULA_CAR, skin = {}, { pixelsPerUnit = 3, paint = null, decalStyle = null } = {}) {
     this.car = car;
     this.pixelsPerUnit = pixelsPerUnit;
-    this.placements = placeParts(car, skin);
+    this.livery = { ...car.livery, ...(skin.livery || {}), ...paint };
+    const styleSkin = isDrawnCarAsset(decalStyle) ? DRAWN_CAR_SKINS[decalStyle] : null;
+    const selectedStyle = styleSkin && DRAWN_CAR_MODELS[styleSkin.car] === car ? styleSkin : null;
+    this.decals = { ...car.decals, ...((selectedStyle || skin).decals || {}) };
+    // Keep the preset untouched. A custom livery needs a visible third area
+    // when its original decal layout does not use that channel. Explicitly
+    // selected decals keep their layout even when it uses fewer channels.
+    if (selectedStyle === null && paint !== null && !Object.values(this.decals).includes("tertiary")) {
+      this.decals.rearWingEnds = "tertiary";
+    }
+    this.paintForArea = makePaint(this.livery, this.decals);
+    this.placements = placeParts(car, skin, this.paintForArea);
     this.runs = groupRuns(this.placements);
     // The layers of each picture size, by pixels per car unit.
     this.layerSets = new Map();
@@ -153,6 +165,22 @@ export class DrawnCar {
   get sprite() {
     if (!this.staticSprite) this.staticSprite = this.paint(null, STILL);
     return this.staticSprite;
+  }
+
+  // A clean detail of named parts, without the tires/frame around them.
+  // The Garage fits the painted bounds into its thumbnail without stretching.
+  partSprite(partIds, { paint = null, single = false } = {}) {
+    const pixels = Math.ceil(this.car.boxSize * this.pixelsPerUnit);
+    const canvas = createCanvas(pixels, pixels);
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(this.pixelsPerUnit, 0, 0, this.pixelsPerUnit, pixels / 2, pixels / 2);
+    for (const placement of this.placements) {
+      if (!partIds.includes(placement.id)) continue;
+      drawPlacement(ctx, paint ? { ...placement, paint } : placement, STILL, this.car.outline);
+      if (single) break;
+    }
+    return canvas;
   }
 
   // Draws the car at the origin, with the nose on the +x axis. The box of the
@@ -274,9 +302,8 @@ export class DrawnCar {
 
 // The parts of the car with the skin changes, in drawing order. A mirrored
 // part gets a second placement for the right side.
-function placeParts(car, skin = {}) {
+function placeParts(car, skin, paint) {
   const carColors = { ...car.colors, ...(skin.colors || {}) };
-  const paint = makePaint(car, skin);
   const placements = [];
   for (const item of car.parts) {
     const change = skin.parts?.[item.id] || {};
@@ -304,9 +331,7 @@ function placeParts(car, skin = {}) {
 // Gives the paint of a decal area: the four tones of its color, or null when
 // the area has no paint. "fallback" is the paint when the area has no paint
 // or an unknown one, for the areas that always need paint.
-function makePaint(car, skin = {}) {
-  const livery = { ...car.livery, ...(skin.livery || {}) };
-  const decals = { ...car.decals, ...(skin.decals || {}) };
+function makePaint(livery, decals) {
   const tones = new Map();
   const tonesOf = (value) => {
     if (value === null || value === undefined) return null;
@@ -316,7 +341,12 @@ function makePaint(car, skin = {}) {
     }
     return tones.get(value);
   };
-  return (area, fallback = null) => tonesOf(decals[area]) ?? tonesOf(fallback);
+  const paint = (area, fallback = null) => tonesOf(decals[area]) ?? tonesOf(fallback);
+  paint.channelFor = (area, fallback = null) => {
+    const value = tonesOf(decals[area]) ? decals[area] : fallback;
+    return tonesOf(value) && Object.hasOwn(livery, value) ? value : null;
+  };
+  return paint;
 }
 
 // Splits the parts into groups: parts that do not move and are next to each

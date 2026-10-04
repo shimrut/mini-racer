@@ -606,18 +606,27 @@ body[data-lobby-mode="campaign"] #start-overlay {
 }
 
 .track-carousel--lobby .track-carousel__nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--carousel-arrow-size, 2.5rem);
+    height: var(--carousel-arrow-size, 2.5rem);
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: rgba(2, 6, 23, 0.72);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: color var(--dur-base) ease;
+}
+
+.track-carousel--lobby .track-carousel__nav {
     grid-area: 1 / 1;
     position: static;
     inset: auto;
     align-self: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    margin: 0;
-    padding: 0;
-    gap: 0;
-    border-radius: var(--radius-full);
-    background: rgba(2, 6, 23, 0.72);
-    color: var(--text-color);
     z-index: 3;
 }
 
@@ -678,8 +687,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     }
 
     .track-carousel--lobby .track-carousel__nav {
-        width: 2.25rem;
-        height: 2.25rem;
+        --carousel-arrow-size: 2.25rem;
     }
 
     .track-carousel--lobby .track-carousel__count {

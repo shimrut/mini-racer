@@ -81,6 +81,13 @@ function hashTrackRegistry(trackRegistry) {
         .digest('hex');
 }
 
+function hashRaceShape(track) {
+    return hashTrackRegistry(Object.fromEntries(
+        ['outer', 'inner', 'startLine', 'startPos', 'startAngle', 'checkpoints', 'cornerRadius']
+            .map((key) => [key, track[key]]),
+    ));
+}
+
 describe('track runtime integrity', () => {
     it('keeps the complete compatibility registry with Daily as an ordered subset', () => {
         expect(Object.keys(TRACKS)).toEqual(Object.keys(TRACK_CATALOG));
@@ -210,7 +217,16 @@ describe('track runtime integrity', () => {
             'wildCrest',
             'dirtValley',
             'warpedLoop',
-            'oldMountain',
+            'budapestRun',
+            'bucharestScramble',
+            'babylonRace',
+            'centralDistrict',
+            'smallSteps',
+            'lapinLoop',
+            'mountainPass',
+            'sharkTail',
+            'hookBend',
+            'windingLane',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -247,16 +263,11 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
             'd5f930078b4bd671d6d50aa8a61cc1c08c74d0acdc14ade07d1f6fcd581d0576',
         );
-        // Mountain Peak, Shark Fin, Twisted Clover, Hook Loop, Crooked Arrow and
-        // Winding Road were reshaped on purpose on 2026-09-25. The next three hashes
-        // include those shapes. They also include the reshapes of 2026-09-27: 12
-        // Daily tracks, and Water Pistol in place of Gun Slinger, which was never live.
-        // Hook Loop, Shark Fin, Twin Wings and Winding Road were reshaped again later
-        // on 2026-09-27, before they were ever a live Daily day. On 2026-09-29,
-        // Broken Antler got simpler corners, and Winding Road got rounder corners
-        // and moved gates. The same day, every definition dropped the unused
-        // drawWidth and lineSmoothing fields, so these hashes all moved.
-        // Old Mountain is the August Mountain Peak layout, appended after that.
+        // Eight tracks now restore their original race shapes. Four later layouts
+        // survive as Mountain Pass, Shark Tail, Hook Bend and Winding Lane.
+        // The historical subsets above remain unchanged; the fingerprints below
+        // include the restorations, subsequent additions and metadata cleanup.
+        // Dedicated shape checks below pin both the originals and saved variants.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -264,17 +275,42 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            '9ec0d85ececf610060e786f1914ca01c46b280ea1430795b531727a6c82f95c7',
+            'dd1476c68a0d83fd9cf3e7d4dc30aa50dd9641585a5819dd1ae4999cf50aa325',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            '4c4654b67fc05b67be1ec7998ad78ff575efb0614bd6c89621c0377f75efdd31',
+            'd5bbad33c382fab3e7ae3d29f469989e73532147fc988424118c3635f4489d9f',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            'ecec07a9bca647a28a4991b98c9429ec1f3f43acf75e7ac60e4a39770e7826f7',
+            '7c493f7f0648aca359740b0451a2faf49d646f5f5692e7868a4db1d115182d1e',
         );
+    });
+
+    // Expected shapes come from the original definitions: 0feab0e0 for Mountain
+    // Peak/Shark Fin, and 0239dc89 for the other six. Ignore obsolete metadata.
+    it.each([
+        ['mountainPeak', 'e2a304522363a745bb8cdc19ea4ae638b12c6892502c19706ddfef50938a41a8'],
+        ['sharkFin', 'ca6129fa8ea9fef14c634f347aafabd38a0bb5783f3e2f36ec878d128089900b'],
+        ['crookedArrow', '7a2b2f92f9aa04eff1bb079e4f73ae8d70b2c9c7d508d5453439a200679f5135'],
+        ['doubleTrouble', 'e8338c8dbc3fcfa35e8c5f3c45f93c9bb4a14457054330011fa8a29df0925b90'],
+        ['hookLoop', '2748aeecf20f2d8fdbb2ee741a3c95cda985182631063f2bee2c849aba309dbc'],
+        ['lightningHook', 'ae7e01bbd8ac099abc67413af8fec503a8671fb96e2435e4167703aa7d019111'],
+        ['twistedClover', '65754998770cdf02a7b91e90b26e8b72a73546a9ed524b4f4e5c0b23ddfcc0e6'],
+        ['windingRoad', 'e4b53042c0a51954dd43ace17f69647092108ad4b295628d6f63037d4b6952ac'],
+    ])('keeps %s restored to its original race shape', (trackKey, expectedHash) => {
+        expect(hashRaceShape(TRACKS[trackKey])).toBe(expectedHash);
+    });
+
+    // Saved variants match the later layouts at 439c4d76, before restoration.
+    it.each([
+        ['mountainPass', 'e351d9ef5e15e6f38bb00e54a2f704095875c8b59c86326ca67c93ed84e486f8'],
+        ['sharkTail', '0acdfa1b2ef08112f356a4a552b0c282141115fa209643a4d0c0c64960ab0e3f'],
+        ['hookBend', '3b8888f3d931d7fdfe6ef8e89dd538e82a168961afc80fd8ce8f6a039b08fd42'],
+        ['windingLane', '5222611f6201fd013ed0e0f9aa7d1242e8ef9d45a6fa69d23f920ee1b8016b6b'],
+    ])('keeps %s as the preserved later race shape', (trackKey, expectedHash) => {
+        expect(hashRaceShape(TRACKS[trackKey])).toBe(expectedHash);
     });
 
     it('keeps Kettle Run nested and its lap gates ordered for a complete timed lap', () => {
@@ -352,6 +388,17 @@ describe('track runtime integrity', () => {
             if (!Object.hasOwn(track, 'ground')) return;
             expect(isTrackGroundKey(track.ground), `${trackKey} has an unknown ground`).toBe(true);
             expect(track.ground, `${trackKey} should omit the default ground`).not.toBe(DEFAULT_TRACK_GROUND_KEY);
+        });
+    });
+
+    // Campaign menus read the series surfaces from the catalog, not from the
+    // track geometry. The two must name the same ground.
+    it('names the same ground in the catalog and in the track definition', () => {
+        Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
+            expect(metadata.ground ?? DEFAULT_TRACK_GROUND_KEY, `${trackKey} catalog ground`)
+                .toBe(TRACKS[trackKey]?.ground ?? DEFAULT_TRACK_GROUND_KEY);
+            expect(metadata.ground, `${trackKey} catalog should omit the default ground`)
+                .not.toBe(DEFAULT_TRACK_GROUND_KEY);
         });
     });
 

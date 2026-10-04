@@ -1,4 +1,4 @@
-import { listAppSeriesDefinitions, listStoredSeries, readStoredSeries } from './series-store.js';
+import { listAppSeriesDefinitions, listStoredSeries } from './series-store.js';
 
 // A track goes in one place only: the Daily list or one Campaign stage. This
 // finds the series that use a track: the stored series, and the app series
@@ -20,9 +20,4 @@ export async function readSeriesTrackUse(): Promise<Map<string, string>> {
 export async function findSeriesUsingTrack(trackKey: string, exceptSeriesId?: string): Promise<string | null> {
     const seriesId = (await readSeriesTrackUse()).get(trackKey) ?? null;
     return seriesId && seriesId !== exceptSeriesId ? seriesId : null;
-}
-
-export async function readSeriesGround(seriesId: string): Promise<string | null> {
-    const stored = await readStoredSeries(seriesId);
-    return stored?.ground ?? listAppSeriesDefinitions().find((series) => series.id === seriesId)?.ground ?? null;
 }

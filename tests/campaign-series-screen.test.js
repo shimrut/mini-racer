@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // jsdom has no canvas; the pictures are drawn by the carousel code, tested elsewhere.
+// Only Numbers is live from the app data. These tests need a second live
+// series, as if the Creator had made it live.
+vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),
+}));
 vi.mock('../game/ui/track-carousel.js', () => ({
     renderTrackPreviewCanvas: vi.fn(),
     trackPreviewPixelScale: () => 1,
@@ -12,6 +18,9 @@ vi.mock('../game/ui/track-carousel.js', () => ({
 vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby/campaign-series-screen.js';
 import { LobbyUi } from '../game/lobby/ui.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
+
+afterEach(() => clearStoredSeriesForTests());
 
 describe('Campaign series screen', () => {
     it('lists every series on a live ground with its ground, stage count and medals', () => {
@@ -19,9 +28,9 @@ describe('Campaign series screen', () => {
             seriesId: 'numbered-v1',
             series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
         });
-        expect(rows.map((row) => [row.name, row.comingSoon, row.infoParts])).toEqual([
-            ['Numbers', false, ['Street · 16 stages', '23/64 medals']],
-            ['Mini Rally', false, ['Dirt · 10 stages', '0/40 medals']],
+        expect(rows.map((row) => [row.name, row.infoParts])).toEqual([
+            ['Numbers', ['Street · 16 stages', '23/64 medals']],
+            ['Mini Rally', ['Dirt · 10 stages', '0/40 medals']],
         ]);
         expect(rows[0].current).toBe(true);
     });
@@ -30,6 +39,33 @@ describe('Campaign series screen', () => {
         const rows = buildCampaignSeriesRows({});
         expect(rows.map((row) => row.previewTrackKey))
             .toEqual(['numberZero', 'countryRoad']);
+    });
+
+    it('shows mixed published stages using actual surfaces and the first stage picture', () => {
+        registerStoredSeries([{
+            id: 'mixed-v1', name: 'Mixed Races', ground: 'snow', grounds: ['dirt', 'tarmac'],
+            stages: [
+                { trackKey: 'countryRoad', laps: 1, requiredMedals: 0 },
+                { trackKey: 'numberZero', laps: 1, requiredMedals: 2 },
+            ],
+        }]);
+        const row = buildCampaignSeriesRows({ series: [{ id: 'mixed-v1', medalCount: 3 }] })
+            .find((entry) => entry.id === 'mixed-v1');
+        expect(row).toMatchObject({
+            previewTrackKey: 'countryRoad', infoParts: ['Mixed · 2 stages', '3/8 medals'],
+        });
+    });
+
+    it('lists a series made live in the Creator, whatever its stage surfaces', () => {
+        registerStoredSeries([{
+            id: 'held-v1', name: 'Held Races', ground: 'tarmac', grounds: ['tarmac', 'snow'],
+            stages: [
+                { trackKey: 'numberZero', laps: 1, requiredMedals: 0 },
+                { trackKey: 'snowCircuit', laps: 1, requiredMedals: 2 },
+            ],
+        }]);
+        expect(buildCampaignSeriesRows({}).find((row) => row.id === 'held-v1')?.infoParts)
+            .toEqual(['Mixed · 2 stages', '0/8 medals']);
     });
 
     it('shows medals in gold for a finished series', () => {

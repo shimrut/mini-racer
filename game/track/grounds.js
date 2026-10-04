@@ -39,18 +39,15 @@ export const TRACK_GROUNDS = Object.freeze({
     dirt: Object.freeze({
         key: 'dirt',
         label: 'Dirt',
-accel: 0.7,
-maxSpeed: 0.87,
-
-grip: 0.7,
-steerGripScale: 0.6,
-
-turnRate: 0.78,
-angularResponse: 0.45,
-highSpeedSteerTrim: 1.0,
-
-yawCarry: 0.2,
-slideScrub: 0,
+        accel: 0.7,
+        maxSpeed: 0.87,
+        grip: 0.6,
+        steerGripScale: 0.85,
+        turnRate: 0.78,
+        angularResponse: 0.6,
+        highSpeedSteerTrim: 1.0,
+        yawCarry: 0.1,
+        slideScrub: 0,
         skidMarkMinSlipRatio: 0.4
     }),
     snow: Object.freeze({
@@ -59,10 +56,10 @@ slideScrub: 0,
         accel: 0.65,
         maxSpeed: 0.85,
         grip: 0.4,
-        steerGripScale: 0.7,
+        steerGripScale: 1,
         turnRate: 0.7,
-        angularResponse: 0.9,
-        highSpeedSteerTrim: 1,
+        angularResponse: 0.6,
+        highSpeedSteerTrim: 1.4,
         yawCarry: 0,
         slideScrub: 0,
         skidMarkMinSlipRatio: 0.5
@@ -75,7 +72,7 @@ slideScrub: 0,
     // It has its own car sound and its own cars.
     grip: Object.freeze({
         key: 'grip',
-        label: 'Circuit',
+        label: 'Track',
         accel: 1.02,
         maxSpeed: 1.14,
         grip: 2,

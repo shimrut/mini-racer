@@ -1,8 +1,8 @@
-import { CAMPAIGN_ALL_SERIES } from '../campaign/manifest.js';
+import { CAMPAIGN_SERIES } from '../campaign/manifest.js';
 import { DEFAULT_TRACK_KEY, hasTrack } from '../track/catalog.js';
-import { isLiveGround } from '../track/live-grounds.js';
+import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../campaign/series-surfaces.js';
 import { renderTrackPreviewCanvas, trackPreviewPixelScale } from '../ui/track-carousel.js';
-import { formatSeriesMedals, getSeriesGroundLabel } from './campaign-series-picker.js';
+import { formatSeriesMedals } from './campaign-series-picker.js';
 
 // The Campaign series screen: one row for each series, with a picture of its
 // first track, its name in the Home menu type, and one line of detail.
@@ -21,20 +21,18 @@ const PREVIEW_CSS_HEIGHT = 58;
 function previewTrackKeyFor(series) {
     const firstStageTrackKey = series.stages[0]?.trackKey;
     if (firstStageTrackKey && hasTrack(firstStageTrackKey)) return firstStageTrackKey;
-    const groundTrackKey = GROUND_PREVIEW_TRACK_KEYS[series.ground];
+    const groundTrackKey = GROUND_PREVIEW_TRACK_KEYS[getCampaignSeriesGrounds(series)[0]];
     return groundTrackKey && hasTrack(groundTrackKey) ? groundTrackKey : DEFAULT_TRACK_KEY;
 }
 
-// Every series on a live ground, in data file order. A series that is not live
-// yet is "Coming soon". A series on another ground is not listed. Medals come
-// from the bootstrap summary of the live series.
+// The live series, in data file order. Medals come from the bootstrap summary
+// of the live series.
 export function buildCampaignSeriesRows(state = {}) {
     const summaries = new Map(
         (Array.isArray(state?.series) ? state.series : []).map((summary) => [summary.id, summary]),
     );
-    return CAMPAIGN_ALL_SERIES.filter((series) => isLiveGround(series.ground)).map((series) => {
+    return CAMPAIGN_SERIES.map((series) => {
         const summary = summaries.get(series.id) ?? null;
-        const comingSoon = !series.live;
         const medals = formatSeriesMedals({
             medalCount: summary?.medalCount ?? 0,
             stageCount: series.stages.length,
@@ -42,14 +40,11 @@ export function buildCampaignSeriesRows(state = {}) {
         return {
             id: series.id,
             name: series.name,
-            comingSoon,
-            finished: !comingSoon && summary?.finished === true,
+            finished: summary?.finished === true,
             current: series.id === state?.seriesId,
             previewTrackKey: previewTrackKeyFor(series),
             // Parts of the detail line. A narrow screen puts each part on its own line.
-            infoParts: comingSoon
-                ? [getSeriesGroundLabel(series.ground), 'Coming soon']
-                : [`${getSeriesGroundLabel(series.ground)} · ${series.stages.length} stages`, `${medals} medals`],
+            infoParts: [`${getCampaignSeriesSurfaceLabel(series)} · ${series.stages.length} stages`, `${medals} medals`],
         };
     });
 }
@@ -62,14 +57,8 @@ function buildRow(row, onChoose) {
     button.dataset.lobbyAction = '';
     button.setAttribute('role', 'listitem');
     button.classList.toggle('is-current', row.current);
-    button.classList.toggle('is-coming-soon', row.comingSoon);
-    button.disabled = row.comingSoon;
-    button.setAttribute('aria-label', row.comingSoon
-        ? `${row.name}. Coming soon`
-        : `${row.name}. ${row.infoParts.join(', ')}`);
-    button.addEventListener('click', () => {
-        if (!row.comingSoon) onChoose?.(row.id);
-    });
+    button.setAttribute('aria-label', `${row.name}. ${row.infoParts.join(', ')}`);
+    button.addEventListener('click', () => onChoose?.(row.id));
 
     const preview = document.createElement('span');
     preview.className = 'campaign-series-row__preview';

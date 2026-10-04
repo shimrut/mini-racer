@@ -1,6 +1,12 @@
 export const MENU_SELECTED_CLASS = 'is-menu-selected';
 export const MENU_KEYBOARD_CUE_CLASS = 'has-keyboard-menu-cue';
 
+export function isNativeActionTarget(target) {
+    return Boolean(target?.matches?.(
+        'button, a[href], input[type="button"], input[type="submit"], input[type="reset"]',
+    ));
+}
+
 function isEditableTarget(target) {
     if (!target || typeof target !== 'object') return false;
     if (typeof Element !== 'undefined' && !(target instanceof Element)) return false;
@@ -91,6 +97,9 @@ export function applyMenuSelection(buttons, index, {
 }
 
 function resolveSelectedIndex(buttons, state, getActiveElement) {
+    const activeIndex = buttons.indexOf(getActiveElement());
+    if (activeIndex >= 0) return activeIndex;
+
     if (
         typeof state?.selectedIndex === 'number'
         && state.selectedIndex >= 0
@@ -98,10 +107,6 @@ function resolveSelectedIndex(buttons, state, getActiveElement) {
     ) {
         return state.selectedIndex;
     }
-
-    const activeElement = getActiveElement();
-    const activeIndex = buttons.indexOf(activeElement);
-    if (activeIndex >= 0) return activeIndex;
 
     const markedIndex = buttons.findIndex((button) => (
         button.classList?.contains?.(MENU_SELECTED_CLASS)
@@ -187,9 +192,16 @@ export function handleMenuListKeydown(event, {
 
     const key = event.key;
     const direction = getMenuNavDirection(key);
+    if (key === 'Tab') {
+        dismissMenuKeyboardCue(state, buttons, { container, preferredIndex: state.selectedIndex });
+        return false;
+    }
+    const activeElement = getActiveElement();
+    if ((direction || key === 'Enter') && isNativeActionTarget(activeElement)
+        && !buttons.includes(activeElement)) return false;
 
     if (direction) {
-        const currentIndex = resolveSelectedIndex(buttons, state, getActiveElement);
+        const currentIndex = resolveSelectedIndex(buttons, state, () => activeElement);
         const nextIndex = findSpatialMenuIndex(buttons, currentIndex, direction);
         if (nextIndex < 0) {
             if (state.keyboardNavActive || currentIndex < 0) return false;
@@ -209,10 +221,12 @@ export function handleMenuListKeydown(event, {
     }
 
     if (key === 'Enter') {
-        const index = resolveSelectedIndex(buttons, state, getActiveElement);
+        const index = resolveSelectedIndex(buttons, state, () => activeElement);
         const selected = index >= 0 ? buttons[index] : null;
         if (!selected || selected.disabled) return false;
 
+        state.selectedIndex = index;
+        if (state.keyboardNavActive) applyMenuSelection(buttons, index, { container });
         event.preventDefault?.();
         event.stopPropagation?.();
         selected.click?.();

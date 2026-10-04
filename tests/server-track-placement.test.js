@@ -108,12 +108,12 @@ it.each([
 it.each(['daily', 'campaign'])('keeps a %s assignment complete until explicitly removed', async (mode) => {
     if (mode === 'daily') await schedule.saveDailySchedule([trackKey], { username: 'Mod' });
     else await series.saveStoredSeries('placement-v1', planner, { username: 'Mod' });
-    await expect(tracks.saveStoredTrack(trackKey, { track: shape, medalRow: null }, { username: 'Mod', baseRevision: 1 }))
+    await expect(tracks.saveStoredTrack(trackKey, { track: shape, medalRow: null }, { username: 'Mod', baseRevision: 2 }))
         .rejects.toThrow('before saving unfinished work');
     expect((await tracks.readStoredTrack(trackKey)).medalRow).toEqual(medalRow);
     if (mode === 'daily') await schedule.saveDailySchedule(['circuit'], { username: 'Mod', baseRevision: 1 });
     else await series.deleteStoredSeries('placement-v1', { baseRevision: 1 });
-    expect((await tracks.saveStoredTrack(trackKey, { track: shape }, { username: 'Mod', baseRevision: 1 })).medalRow).toBeNull();
+    expect((await tracks.saveStoredTrack(trackKey, { track: shape }, { username: 'Mod', baseRevision: 2 })).medalRow).toBeNull();
 });
 
 it('does not acquire a per-track lock for every Daily list entry', async () => {
@@ -127,7 +127,7 @@ it('refuses a new held-ground Daily entry and a listed track changing to a held 
     await expect(schedule.saveDailySchedule([trackKey], { username: 'Mod' })).rejects.toThrow('not live');
     await tracks.saveStoredTrack(trackKey, { track: shape, medalRow }, { username: 'Mod', baseRevision: 2 });
     await schedule.saveDailySchedule([trackKey], { username: 'Mod' });
-    await expect(tracks.saveStoredTrack(trackKey, { track: { ...shape, ground: 'snow' }, medalRow }, { username: 'Mod', baseRevision: 3 }))
+    await expect(tracks.saveStoredTrack(trackKey, { track: { ...shape, ground: 'snow' }, medalRow }, { username: 'Mod', baseRevision: 4 }))
         .rejects.toThrow('out of the Daily list');
 });
 
@@ -149,7 +149,7 @@ it('serializes admission against an unfinished save, then checks the committed a
         .rejects.toThrow('Retry before racing');
     finishRead(); await admission;
     redis.get.mockImplementation(get);
-    await expect(tracks.saveStoredTrack(trackKey, { track: shape }, { username: 'Mod', baseRevision: 1 }))
+    await expect(tracks.saveStoredTrack(trackKey, { track: shape }, { username: 'Mod', baseRevision: 2 }))
         .rejects.toThrow('before saving unfinished work');
 });
 
@@ -177,7 +177,7 @@ it('commits Daily history and its track freeze together, and makes the first ans
     expect(challenge.trackKey).toBe(trackKey);
     expect(JSON.parse(hashes.get('dailygp:challenges').get(challenge.id)).trackKey).toBe(trackKey);
     expect(tracks.describePlacedStoredTracks([trackKey])).toHaveLength(1);
-    await expect(tracks.saveStoredTrack(trackKey, { track: shape, medalRow }, { username: 'Mod', baseRevision: 2 })).rejects.toThrow('locked');
+    await expect(tracks.saveStoredTrack(trackKey, { track: shape, medalRow }, { username: 'Mod', baseRevision: 3 })).rejects.toThrow('locked');
 });
 
 it('returns the committed winner to a Daily request that loses the midnight race', async () => {
@@ -192,17 +192,24 @@ it('returns the committed winner to a Daily request that loses the midnight race
     expect((await tracks.readStoredTrack(trackKey)).lockedAt).toBeNull();
 });
 
-it('selects the lap contract from the fresh medal row that it freezes', async () => {
+it('publishes one lap while freezing the fresh medal row despite a stale overlay', async () => {
     await loadStoredTracks([trackKey]);
-    let date = new Date('2030-02-15T12:00:00.000Z');
-    while (buildDailyGpChallengeForDayIndexWithTrack(getUtcDayIndex(date), trackKey).objectiveParams.lapCount !== 2) {
-        date = new Date(date.getTime() + 86_400_000);
-    }
-    vi.setSystemTime(date);
     await schedule.saveDailySchedule([trackKey], { username: 'Mod' });
-    await tracks.saveStoredTrack(trackKey, { track: shape, medalRow: { author: 12, gold: 13, silver: 14, bronze: 15 } }, { username: 'Mod', baseRevision: 1 });
+    const freshMedalRow = { author: 12, gold: 13, silver: 14, bronze: 15 };
+    await tracks.saveStoredTrack(trackKey, { track: shape, medalRow: freshMedalRow }, { username: 'Mod', baseRevision: 2 });
     // The request overlay still has the previous author time.
-    expect((await daily.getServerDailyGpChallenge()).objectiveParams.lapCount).toBe(1);
+    const challenge = await daily.getServerDailyGpChallenge();
+    expect(challenge).toMatchObject({
+        trackKey,
+        objectiveType: 'single_lap_fastest',
+        objectiveParams: { lapCount: 1 },
+    });
+    expect(JSON.parse(hashes.get('dailygp:challenges').get(challenge.id))).toEqual(challenge);
+    expect(await tracks.readStoredTrack(trackKey)).toMatchObject({
+        medalRow: freshMedalRow,
+        lockReason: 'daily',
+    });
+    expect((await tracks.readStoredTrack(trackKey)).lockedAt).toBeTruthy();
 });
 
 it('commits Campaign publication and every new stage freeze together', async () => {

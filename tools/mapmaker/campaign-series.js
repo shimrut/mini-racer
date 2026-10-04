@@ -1,7 +1,7 @@
 import {
     CAMPAIGN_STAGE_MAX_LAPS,
     getRequiredMedalsError,
-    isCampaignSeriesLive,
+    isAppCampaignSeriesLive,
 } from '../../game/campaign/series-rules.js';
 
 export const DAILY_DESTINATION = 'daily';
@@ -176,7 +176,7 @@ export function applyTrackSeriesUpdate(data, {
     }
 
     if (current) {
-        const live = isCampaignSeriesLive(current.series);
+        const live = isAppCampaignSeriesLive(current.series);
         const stage = current.series.stages[current.stageIndex];
         const staysInSeries = target.type === 'series' && target.seriesId === current.series.id;
         if (live) {
@@ -239,7 +239,7 @@ export function moveSeriesStage(data, seriesId, trackKey, direction) {
     const next = cloneData(data);
     const series = next.series.find((entry) => entry.id === seriesId);
     if (!series) throw new Error(`Campaign series ${seriesId} does not exist.`);
-    if (isCampaignSeriesLive(series)) throw liveStageError(series, 'change the stage order');
+    if (isAppCampaignSeriesLive(series)) throw liveStageError(series, 'change the stage order');
     const from = series.stages.findIndex((stage) => stage.trackKey === trackKey);
     if (from === -1) throw new Error(`Track ${trackKey} is not in ${series.name}.`);
     const to = from + (direction < 0 ? -1 : 1);

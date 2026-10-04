@@ -6,17 +6,50 @@ export { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from "./car-unlock
 
 const drawnCars = new Map();
 
+// Rendering callers supply their own paint and decal style. Generic assets remain the preset;
+// saved picks and unlock rules keep the original asset names.
+export function getCarSpriteCacheKey(assetName, options) {
+  const car = getDrawnCar(assetName, options);
+  if (!car) return assetName;
+  return [assetName, JSON.stringify(car.livery), JSON.stringify(car.decals)].join("|");
+}
+
+export function getCarPaintColors(assetName, options) {
+  const car = getDrawnCar(assetName, options);
+  if (!car) return null;
+  return Object.fromEntries(Object.entries(car.livery).map(([channel, color]) => [
+    channel, typeof color === "string" ? color : color.base,
+  ]));
+}
+
 // The car for a skin that is drawn in code, or null for an image skin. There
-// is one car for each skin name. Its sprite is the car at rest.
-export function getDrawnCar(assetName) {
+// is one preset and one latest customized variant per asset, so another caller's
+// preset preview does not evict the player's current car. Its sprite is at rest.
+export function getDrawnCar(assetName, { paint = null, decalStyle = null } = {}) {
   if (!isDrawnCarAsset(assetName)) return null;
-  let car = drawnCars.get(assetName);
-  if (!car) {
-    const skin = DRAWN_CAR_SKINS[assetName];
-    car = new DrawnCar(DRAWN_CAR_MODELS[skin.car], skin, { pixelsPerUnit: 3 });
-    drawnCars.set(assetName, car);
+  const skin = DRAWN_CAR_SKINS[assetName];
+  const model = DRAWN_CAR_MODELS[skin.car];
+  const styleSkin = isDrawnCarAsset(decalStyle) ? DRAWN_CAR_SKINS[decalStyle] : null;
+  const selectedStyle = styleSkin?.car === skin.car ? decalStyle : null;
+  let variants = drawnCars.get(assetName);
+  if (!variants) {
+    variants = {};
+    drawnCars.set(assetName, variants);
   }
-  return car;
+  if (paint === null && selectedStyle === null) {
+    variants.preset ||= new DrawnCar(model, skin, { pixelsPerUnit: 3 });
+    return variants.preset;
+  }
+  const key = JSON.stringify([
+    paint === null ? null : [paint.main || "", paint.accent || "", paint.tertiary || ""],
+    selectedStyle,
+  ]);
+  if (variants.painted?.key !== key) {
+    variants.painted = {
+      key, car: new DrawnCar(model, skin, { pixelsPerUnit: 3, paint, decalStyle: selectedStyle }),
+    };
+  }
+  return variants.painted.car;
 }
 
 export function getCarAssetUrlCandidates(assetName) {
@@ -173,37 +206,43 @@ function prepareSprite(assetName, image) {
 export class CarSpriteLoader {
   #cache = new Map();
   #loadToken = 0;
-  #inFlightAssetName = null;
+  #inFlightAssetKey = null;
   #pendingSettlers = new Map();
   #currentAssetKey = null;
+  #currentVisualKey = null;
 
   get currentAssetKey() {
     return this.#currentAssetKey;
   }
 
-  prefetch(assetName) {
+  get currentVisualKey() {
+    return this.#currentVisualKey;
+  }
+
+  prefetch(assetName, { paint = null, decalStyle = null } = {}) {
     if (!assetName) return null;
     const assetUrlCandidates = getCarAssetUrlCandidates(assetName);
     if (!assetUrlCandidates.length) return null;
 
+    const visualKey = getCarSpriteCacheKey(assetName, { paint, decalStyle });
     const cached = this.#cache.get(assetName);
-    if (cached) return cached;
+    if (cached?.visualKey === visualKey) return cached;
 
     if (isDrawnCarAsset(assetName)) {
-      const sprite = getDrawnCar(assetName).sprite;
+      const sprite = getDrawnCar(assetName, { paint, decalStyle }).sprite;
       if (!sprite) {
         const promise = Promise.reject(new Error(`Unable to draw ${assetName}`));
         promise.catch(() => {});
         return { image: null, status: "error", promise };
       }
-      const record = { image: sprite, status: "loaded", promise: Promise.resolve(sprite) };
+      const record = { image: sprite, status: "loaded", promise: Promise.resolve(sprite), visualKey };
       this.#cache.set(assetName, record);
       return record;
     }
 
     const image = new Image();
     image.decoding = "async";
-    const record = { image, status: "pending", promise: null };
+    const record = { image, status: "pending", promise: null, visualKey };
     record.promise = new Promise((resolve, reject) => {
       let candidateIndex = 0;
       const tryNextCandidate = () => {
@@ -235,25 +274,18 @@ export class CarSpriteLoader {
     return record;
   }
 
-  load(assetName, { onLoaded, onError, onSuperseded } = {}) {
+  load(assetName, { paint = null, decalStyle = null, onLoaded, onError, onSuperseded } = {}) {
     if (!assetName) return;
 
-    if (this.#currentAssetKey === assetName) {
-      const cached = this.#cache.get(assetName);
-      if (cached?.status === "loaded" && cached.image) {
-        onLoaded?.(prepareSprite(assetName, cached.image));
-      }
-      return;
-    }
-
-    const cachedAsset = this.prefetch(assetName);
+    const cachedAsset = this.prefetch(assetName, { paint, decalStyle });
     if (!cachedAsset) return;
+    const visualKey = cachedAsset.visualKey || getCarSpriteCacheKey(assetName, { paint, decalStyle });
 
     const loadToken = (() => {
-      if (this.#inFlightAssetName !== assetName) {
+      if (this.#inFlightAssetKey !== visualKey) {
         this.#settleSuperseded(this.#loadToken);
         this.#loadToken += 1;
-        this.#inFlightAssetName = assetName;
+        this.#inFlightAssetKey = visualKey;
       }
       return this.#loadToken;
     })();
@@ -280,10 +312,11 @@ export class CarSpriteLoader {
 
     const apply = (image) => {
       if (loadToken !== this.#loadToken || !finish()) return;
-      if (this.#inFlightAssetName === assetName) {
-        this.#inFlightAssetName = null;
+      if (this.#inFlightAssetKey === visualKey) {
+        this.#inFlightAssetKey = null;
       }
       this.#currentAssetKey = assetName;
+      this.#currentVisualKey = visualKey;
       onLoaded?.(prepareSprite(assetName, image));
     };
 
@@ -296,10 +329,11 @@ export class CarSpriteLoader {
       .then((image) => apply(image))
       .catch(() => {
         if (loadToken !== this.#loadToken || !finish()) return;
-        if (this.#inFlightAssetName === assetName) {
-          this.#inFlightAssetName = null;
+        if (this.#inFlightAssetKey === visualKey) {
+          this.#inFlightAssetKey = null;
         }
         this.#currentAssetKey = null;
+        this.#currentVisualKey = null;
         onError?.(assetName);
       });
   }

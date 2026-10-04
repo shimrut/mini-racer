@@ -7,12 +7,13 @@ import {
     CAMPAIGN_STAGE_MAX_LAPS,
     getCampaignSeriesMinStages,
     getRequiredMedalsError,
-    isCampaignSeriesLive,
+    isAppCampaignSeriesLive,
 } from '../../../game/campaign/series-rules.js';
 import { setStoredSeriesResolver } from '../../../game/campaign/stored-series.js';
+import { getCampaignSeriesGrounds } from '../../../game/campaign/series-surfaces.js';
 import { hasTrack } from '../../../game/track/catalog.js';
 import { getTrackGround, isTrackGroundKey } from '../../../game/track/grounds.js';
-import { isLiveGround } from '../../../game/track/live-grounds.js';
+import { BUILT_IN_TRACKS } from '../../../game/track/tracks.js';
 import { TrackInputError } from '../tracks/track-shape.js';
 import {
     TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTrack,
@@ -24,6 +25,7 @@ import { buildLockedTrackCopy } from '../tracks/track-copy.js';
 import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/redis-lock.js';
 import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-placement-lock.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
+import { readTracksToShare } from '../tracks/creator-track-access.js';
 
 // Campaign series made in the Creator, and copies of the app series that are
 // not live. A draft is private. A published series is live for players: its
@@ -37,6 +39,8 @@ export type StoredSeriesRecord = {
     id: string;
     name: string;
     ground: string;
+    // Actual grounds of the published stages only. Older records use ground.
+    grounds?: string[];
     stages: StoredSeriesStage[];
     status: StoredSeriesStatus;
     // The stages that players can race. They cannot change.
@@ -54,6 +58,7 @@ export type StoredSeriesDefinition = {
     id: string;
     name: string;
     ground: string;
+    grounds?: string[];
     stages: StoredSeriesStage[];
 };
 
@@ -104,6 +109,7 @@ export function toSeriesDefinition(record: StoredSeriesRecord): StoredSeriesDefi
         id: record.id,
         name: record.name,
         ground: record.ground,
+        grounds: getCampaignSeriesGrounds(record),
         // Players see only the published stages.
         stages: record.stages.slice(0, record.publishedStageCount).map((stage) => ({ ...stage })),
     };
@@ -342,10 +348,7 @@ export async function saveStoredSeries(
                 }
             }
             for (const stage of stages.slice(fixed)) {
-                const complete = await readCompleteTrack(stage.trackKey);
-                if (getTrackGround(complete.track).key !== ground) {
-                    throw new TrackInputError(`${complete.track.name} is on another ground than the series.`);
-                }
+                const complete = await readCompleteTrack(stage.trackKey, username);
                 if (await (isTrackUsedElsewhere ?? trackUsedElsewhere)(stage.trackKey, id)) {
                     throw new TrackInputError(`${complete.track.name} is used somewhere else already.`);
                 }
@@ -356,6 +359,7 @@ export async function saveStoredSeries(
                 id,
                 name,
                 ground,
+                ...(existing?.grounds ? { grounds: [...existing.grounds] } : {}),
                 stages,
                 status: existing?.status ?? 'draft',
                 publishedStageCount: fixed,
@@ -368,8 +372,16 @@ export async function saveStoredSeries(
                 updatedBy: username,
             };
             const cacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
-            return { result: record, reconcile: () => matchesRecord(record, cacheRevision),
-                mutate: (transaction) => queueRecord(transaction, record) };
+            const sharedTracks = await readTracksToShare([
+                ...(existing?.stages.map((stage) => stage.trackKey) ?? []), ...stages.map((stage) => stage.trackKey),
+            ], now);
+            const trackCacheRevision = await readStoredTracksRevision() + sharedTracks.length;
+            return { result: record, reconcile: async () => await matchesRecord(record, cacheRevision)
+                && (await Promise.all(sharedTracks.map((track) => matchesStoredTrack(track, trackCacheRevision)))).every(Boolean),
+                mutate: async (transaction) => {
+                    for (const track of sharedTracks) await queueStoredTrackRecord(transaction, track);
+                    await queueRecord(transaction, record);
+                } };
         })));
 }
 
@@ -387,9 +399,6 @@ export async function publishStoredSeries(
             if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
                 throw new TrackConflictError('This series changed on another device.');
             }
-            if (!isLiveGround(existing.ground)) {
-                throw new TrackInputError('Only a series on a live ground can go live. Other grounds need an app release.');
-            }
             if (existing.stages.length < getCampaignSeriesMinStages(existing)) {
                 throw new TrackInputError('Add more stages before the series goes live.');
             }
@@ -397,11 +406,10 @@ export async function publishStoredSeries(
                 throw new TrackInputError('Every stage of this series is live already.');
             }
             const tracksToLock = [];
-            for (const stage of existing.stages.slice(existing.publishedStageCount)) {
-                const complete = await readCompleteTrack(stage.trackKey);
-                if (getTrackGround(complete.track).key !== existing.ground) {
-                    throw new TrackInputError(`${complete.track.name} is on another ground than the series.`);
-                }
+            const grounds = new Set<string>();
+            for (const stage of existing.stages) {
+                const complete = await readCompleteTrack(stage.trackKey, username);
+                grounds.add(getTrackGround(complete.track).key);
                 if (await trackUsedElsewhere(stage.trackKey, id)) {
                     throw new TrackInputError(`${complete.track.name} is used somewhere else already.`);
                 }
@@ -409,6 +417,7 @@ export async function publishStoredSeries(
             }
             const record: StoredSeriesRecord = {
                 ...existing,
+                grounds: [...grounds],
                 status: 'published',
                 publishedStageCount: existing.stages.length,
                 publishedAt: existing.publishedAt ?? now.toISOString(),
@@ -431,7 +440,7 @@ export async function publishStoredSeries(
 
 export async function deleteStoredSeries(
     seriesIdInput: unknown,
-    { baseRevision }: { baseRevision?: unknown } = {},
+    { baseRevision, now = new Date() }: { baseRevision?: unknown; now?: Date } = {},
 ): Promise<boolean> {
     const id = assertSeriesId(seriesIdInput);
     return withTrackPlacementLock((placementLock) => withSeriesWriteLock(id, (seriesLock) =>
@@ -445,9 +454,13 @@ export async function deleteStoredSeries(
                 throw new TrackInputError(`${existing.name} is live, so it cannot be deleted.`);
             }
             const cacheRevision = Number(await redis.get(REVISION_KEY) ?? 0) + 1;
+            const sharedTracks = await readTracksToShare(existing.stages.map((stage) => stage.trackKey), now);
+            const trackCacheRevision = await readStoredTracksRevision() + sharedTracks.length;
             return { result: true, reconcile: async () => !await redis.get(recordKey(id))
-                && !await redis.hGet(INDEX_KEY, id) && Number(await redis.get(REVISION_KEY) ?? 0) === cacheRevision,
+                && !await redis.hGet(INDEX_KEY, id) && Number(await redis.get(REVISION_KEY) ?? 0) === cacheRevision
+                && (await Promise.all(sharedTracks.map((track) => matchesStoredTrack(track, trackCacheRevision)))).every(Boolean),
                 mutate: async (transaction) => {
+                for (const track of sharedTracks) await queueStoredTrackRecord(transaction, track);
                 await transaction.del(recordKey(id));
                 await transaction.hDel(INDEX_KEY, [id]);
                 await transaction.incrBy(REVISION_KEY, 1);
@@ -527,12 +540,21 @@ export async function removeSeriesCopy(
 
 // Live in the app itself. The Campaign lists also hold the series published
 // from Redis, so they cannot tell a live app series from a hidden app series
-// that a moderator made live in the Creator.
+// that a moderator made live in the Creator. Only Numbers is live in the app
+// itself; the others go live only from the Creator.
 export function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
-    return definition.id === CAMPAIGN_NUMBERS_SERIES_ID || isCampaignSeriesLive({
+    return isAppCampaignSeriesLive({
         id: definition.id,
         ground: definition.ground ?? 'tarmac',
+        grounds: appSeriesGrounds(definition),
         stages: definition.stages ?? [],
+    });
+}
+
+function appSeriesGrounds(definition: AppSeriesDefinition): string[] {
+    return getCampaignSeriesGrounds(definition, (trackKey: string) => {
+        const track = BUILT_IN_TRACKS[trackKey as keyof typeof BUILT_IN_TRACKS];
+        return track ? getTrackGround(track).key : null;
     });
 }
 
@@ -573,6 +595,7 @@ export async function copyLiveAppSeries({
                 id: definition.id,
                 name: definition.name ?? definition.id,
                 ground: definition.ground ?? 'tarmac',
+                grounds: appSeriesGrounds(definition),
                 stages,
                 status: 'published',
                 publishedStageCount: stages.length,

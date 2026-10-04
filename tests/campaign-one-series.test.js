@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
-// Only Numbers is live while Mini Rally is held back. With one series, the
-// Campaign opens its stages, with no series screen and no series choice.
+// Only Numbers is live until the Creator publishes another series. With one
+// series, the Campaign opens its stages, with no series screen and no series choice.
 
 vi.mock('../game/ui/track-carousel.js', () => ({
     renderTrackPreviewCanvas: vi.fn(),
@@ -18,6 +18,7 @@ vi.mock('../game/campaign/service.js', async (importOriginal) => ({
 const { campaignHasSeriesChoice } = await import('../game/campaign/manifest.js');
 const { campaignEngineMethods } = await import('../game/campaign/engine-methods.js');
 const { LobbyUi } = await import('../game/lobby/ui.js');
+const { buildCampaignSeriesRows } = await import('../game/lobby/campaign-series-screen.js');
 
 const NUMBERS = { id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', stageCount: 16, medalCount: 0 };
 
@@ -54,6 +55,12 @@ function mountLobby(handlers) {
 describe('Campaign with one live series', () => {
     it('has no series choice', () => {
         expect(campaignHasSeriesChoice()).toBe(false);
+    });
+
+    // Mini Rally and Formula Mini are drafts in the Creator, so they are not
+    // live and the series screen does not list them.
+    it('keeps the app series other than Numbers off the series screen', () => {
+        expect(buildCampaignSeriesRows({}).map((row) => row.name)).toEqual(['Numbers']);
     });
 
     it('opens the stages, not the series screen', () => {

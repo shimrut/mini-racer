@@ -88,7 +88,7 @@ export const PLAYER_CAR_SKIN_SECTION_META = Object.freeze([
     Object.freeze({ id: 'mini', title: 'Mini cars' }),
     Object.freeze({ id: 'cyberpunk', title: 'Cyberpunk cars' }),
     Object.freeze({ id: 'steampunk', title: 'Steampunk cars' }),
-    Object.freeze({ id: 'grip', title: 'Circuit cars' }),
+    Object.freeze({ id: 'grip', title: 'Track cars' }),
     Object.freeze({ id: 'dirt', title: 'Dirt cars' }),
     Object.freeze({ id: 'snow', title: 'Snow cars' }),
     Object.freeze({ id: 'water', title: 'Jet skis' }),
@@ -107,15 +107,15 @@ export const PLAYER_CAR_SKINS = Object.freeze(
     )
 );
 
-// Garage sections that players do not see for now. Their cars stay valid.
-// The Formula cars are held back: remove 'formula' to show them.
-const HELD_BACK_SKIN_SECTION_IDS = Object.freeze(['formula']);
+// These cars have their own Garage tab, so the Legacy tab leaves them out.
+// Their cars stay valid.
+const OWN_TAB_SKIN_SECTION_IDS = Object.freeze(['formula', 'grip', 'dirt', 'snow', 'water', 'space']);
 
-// The garage shows only the cars of live grounds, and not the held-back sections.
+// The Legacy tab shows only the cars of live grounds that have no tab of their own.
 function buildPlayerCarSkinSections() {
     const byId = new Map(PLAYER_CAR_SKIN_SECTION_META.map((m) => [m.id, []]));
     for (const skin of PLAYER_CAR_SKINS) {
-        if (!isLiveGround(skin.ground) || HELD_BACK_SKIN_SECTION_IDS.includes(skin.series)) continue;
+        if (!isLiveGround(skin.ground) || OWN_TAB_SKIN_SECTION_IDS.includes(skin.series)) continue;
         const bucket = byId.get(skin.series) ?? byId.get('mini');
         bucket.push(skin);
     }

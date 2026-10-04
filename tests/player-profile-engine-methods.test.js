@@ -16,6 +16,7 @@ vi.mock('../game/player/preferences.js', async (importOriginal) => ({
 }));
 
 import { playerProfileEngineMethods } from '../game/player/engine-methods.js';
+import { readPlayerCarPaints, writePlayerCarPaint } from '../game/car/player-car-paint.js';
 import { buildCarUnlockSnapshot } from '../game/car/car-unlock-policy.js';
 import {
     clearActivePlayerOwnerId,
@@ -82,14 +83,17 @@ describe('player profile engine methods', () => {
 
     it('saves preferences only when the server confirmed it has none', async () => {
         const engine = createEngine();
+        writePlayerCarPaint('drawn/mr_grip_circuit', 'main', '#246bff');
 
         await engine.applyPlayerProgressState({ playerPreferences: null, authoritative: true });
 
         expect(preferencesMocks.queuePlayerPreferencesSave).toHaveBeenCalledTimes(1);
+        expect(readPlayerCarPaints()).toEqual({ 'drawn/mr_grip_circuit': { main: '#246bff' } });
     });
 
     it('writes nothing back when the bootstrap never answered', async () => {
         const engine = createEngine();
+        writePlayerCarPaint('drawn/mr_grip_circuit', 'main', '#246bff');
 
         await engine.applyPlayerProgressState({
             playerPreferences: { carSkin: UNLOCKED_CAR },
@@ -101,6 +105,7 @@ describe('player profile engine methods', () => {
             .toHaveBeenCalledWith(null, { authoritative: false });
         expect(engine.applyPersistedPlayerPreferences).not.toHaveBeenCalled();
         expect(preferencesMocks.queuePlayerPreferencesSave).not.toHaveBeenCalled();
+        expect(readPlayerCarPaints()).toEqual({ 'drawn/mr_grip_circuit': { main: '#246bff' } });
     });
 
     it('retries a failed bootstrap and applies the profile once it answers', async () => {

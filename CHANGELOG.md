@@ -1,3 +1,17 @@
+- A Campaign series is live when it is made live in the Creator, whatever the grounds of its stages. Mini Rally and Formula Mini stay hidden until they are made live there. The series screen no longer shows **Coming soon**.
+
+- Tracks on Dirt and Track can go in the Daily list.
+
+- The Circuit ground is now called **Track**.
+
+- In the Creator, a Campaign series can have stages on different grounds. The series shows **Mixed** when its stages use more than one ground.
+
+- Mapmaker Draw now paints a road 7 pictures of the normal car wide (4.798u). Before, it used 7 hit-boxes (3.85u). Tracks already saved stay as they are until you redraw them.
+
+- **Mountain Pass**, **Shark Tail**, **Hook Bend**, and **Winding Lane** join the Daily rotation.
+
+- Every new Daily race is 1 lap. Days already published keep the lap count they had.
+
 - **Open Creator** opens the Creator full screen, the same way **Race Now** opens a race. The post stays up so Reddit allows that.
 
 - In Mapmaker, **Corner** moves one bend. Drag the yellow handle, or use the arrow keys. **Selected corner** keeps that bend's own roundness when the track is saved. **Whole track** still sets every corner.
@@ -11,8 +25,6 @@
 - **Budapest Run** and **Bucharest Scramble** join the Daily rotation. **Mantis Bend** was redrawn, and its medal times are faster.
 
 - The Mapmaker button is now **Test Drive**. The track list can be filtered by Daily, Campaign, Not used or Cloud, and by ground.
-
-- **Old Mountain** is the earlier Mountain Peak layout, kept in the game but not in the Daily rotation. Its medal times are the ones that layout had before Mountain Peak was redrawn.
 
 - Mapmaker Wall Corners now reshape both walls of a corner. Before, only corners made of a single point got rounder; the curve on the other wall, made of many points, stayed the same, so the road got wider in corners. Now that curve is rebuilt to stay one road width away: rounder settings give it a wider curve with more points, and Sharp gives back the tight curve. Switching back and forth returns the same walls, and Draw builds its walls for the chosen setting. Curves shaped by hand are left alone. Saved tracks change only when you pick a setting and save.
 

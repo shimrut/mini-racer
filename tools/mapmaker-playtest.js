@@ -16,10 +16,11 @@ import {
 } from '../game/race/race-camera.js';
 import { RaceHud } from '../game/race/ui-hud.js';
 import { InteractionsUi } from '../game/race/ui-interactions.js';
-import { CarSpriteLoader, getDrawnCar } from '../game/car/sprite.js';
+import { getDefaultDrawnCarAssetForGround } from '../game/car/car-skin-grounds.js';
+import { DRAWN_CAR_DRAW_PIXELS } from '../game/car/drawn-car/formula.js';
+import { getDrawnCar } from '../game/car/sprite.js';
 import { buildTrackCanvas, drawViewportPresentationBackground } from '../game/track/canvas.js';
 import { getTrackGround, getTrackGroundMaxSpeedKph } from '../game/track/grounds.js';
-import { getPosterCarAssetName } from '../game/track/poster-car.js';
 import { lerpAngle } from '../game/track/geometry.js';
 import { resolveTrackPresentation } from '../game/track/presentation.js';
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
@@ -95,8 +96,8 @@ let manualTime = false;
 let hud = null;
 let draftLaps = [];
 let draftLapsKey = null;
-// The race car: an image, or a car drawn in code, sized as in the race.
-const car = { image: null, drawn: null, drawWidth: 64, drawHeight: 32 };
+// The surface's default drawn car, sized as in the race.
+const car = { assetName: null, drawn: null, drawSize: DRAWN_CAR_DRAW_PIXELS };
 const lookAhead = { x: 0, y: 0 };
 const desiredLookAhead = { x: 0, y: 0 };
 // The car moves in fixed steps. As in the race, it is drawn between its last
@@ -181,20 +182,8 @@ function syncBestLap() {
 }
 
 function loadCar() {
-    const assetName = getPosterCarAssetName(draft.track);
-    new CarSpriteLoader().load(assetName, {
-        onLoaded: (image) => {
-            car.image = image;
-            car.drawn = getDrawnCar(assetName);
-            car.drawn?.resetMotion();
-            car.drawWidth = 52;
-            car.drawHeight = 52;
-            render();
-        },
-        onError: () => {
-            console.warn(`Unable to load ${assetName}; Test Drive shows a plain car.`);
-        },
-    });
+    car.assetName = getDefaultDrawnCarAssetForGround(getTrackGround(draft.track).key);
+    car.drawn = getDrawnCar(car.assetName);
 }
 
 function resetRun() {
@@ -364,72 +353,30 @@ function drawGroundEffects(center, zoom, width, height) {
     context.restore();
 }
 
-// Draws the race car as the race does: the drawn car with its wheels and
-// ground marks, or the car image, with the race shadow.
+// Draws the default surface car with the shared animated wheels and ground marks.
 function drawRaceCar(map, zoom, dt) {
     const center = map(displayPose);
-    const drawWidth = car.drawWidth * (CONFIG.carSpriteRenderScale ?? 1);
-    const drawHeight = car.drawHeight * (CONFIG.carSpriteRenderScale ?? 1);
+    const drawWidth = car.drawSize * (CONFIG.carSpriteRenderScale ?? 1);
     context.save();
     context.translate(center.x, center.y);
     context.rotate(displayPose.angle);
     context.scale(zoom / CONFIG.gridSize, zoom / CONFIG.gridSize);
-    if (car.drawn) {
-        const running = state.status === 'playing' && !paused;
-        car.drawn.update(running ? dt : 0, {
-            speedKph: state.cachedSpeed * KPH_PER_WORLD_UNIT,
-            speedPx: running ? state.cachedSpeed * CONFIG.gridSize : 0,
-            steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
-            holding: false,
-            size: drawWidth,
-            lowQuality: false,
-        });
-        car.drawn.drawGround(context, drawWidth);
-    }
+    const running = state.status === 'playing' && !paused;
+    car.drawn.update(running ? dt : 0, {
+        speedKph: state.cachedSpeed * KPH_PER_WORLD_UNIT,
+        speedPx: running ? state.cachedSpeed * CONFIG.gridSize : 0,
+        steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
+        holding: false,
+        size: drawWidth,
+        lowQuality: false,
+    });
+    car.drawn.drawGround(context, drawWidth);
     const look = trackPresentation;
     context.shadowColor = look?.carShadowColor ?? CONFIG.carSpriteShadowColor;
     context.shadowBlur = look?.carShadowBlur ?? CONFIG.carSpriteShadowBlur;
     context.shadowOffsetX = look?.carShadowOffsetX ?? CONFIG.carSpriteShadowOffsetX;
     context.shadowOffsetY = look?.carShadowOffsetY ?? CONFIG.carSpriteShadowOffsetY;
-    if (car.drawn) {
-        car.drawn.draw(context, drawWidth);
-    } else {
-        context.drawImage(car.image, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
-    }
-    context.restore();
-}
-
-function drawCar(map, zoom, dt) {
-    if (car.image) {
-        drawRaceCar(map, zoom, dt);
-        return;
-    }
-    const center = map(displayPose);
-    context.save();
-    context.translate(center.x, center.y);
-    // Same ground shadow as the race, so the car sits on the road.
-    if (trackPresentation?.carShadowColor) {
-        context.shadowColor = trackPresentation.carShadowColor;
-        context.shadowBlur = trackPresentation.carShadowBlur ?? 0;
-        context.shadowOffsetX = trackPresentation.carShadowOffsetX ?? 0;
-        context.shadowOffsetY = trackPresentation.carShadowOffsetY ?? 0;
-    }
-    context.rotate(displayPose.angle);
-    context.scale(zoom, zoom);
-    context.fillStyle = '#07111e';
-    context.fillRect(-0.4, -0.37, 0.22, 0.13);
-    context.fillRect(0.22, -0.37, 0.22, 0.13);
-    context.fillRect(-0.4, 0.24, 0.22, 0.13);
-    context.fillRect(0.22, 0.24, 0.22, 0.13);
-    context.fillStyle = '#f43f5e';
-    context.strokeStyle = '#fff4e6';
-    context.lineWidth = 0.045;
-    context.beginPath();
-    context.roundRect(-0.615, -0.275, 1.23, 0.55, 0.16);
-    context.fill();
-    context.stroke();
-    context.fillStyle = '#fbbf24';
-    context.fillRect(0.18, -0.18, 0.2, 0.36);
+    car.drawn.draw(context, drawWidth);
     context.restore();
 }
 
@@ -499,7 +446,7 @@ function render(dt = 0, alpha = 1) {
         context.fill();
     }
     drawGroundEffects(center, zoom, width, height);
-    drawCar(map, zoom, dt);
+    drawRaceCar(map, zoom, dt);
     // After the finish, the HUD keeps the lap time, as in the race.
     if (state.status === 'playing') hud?.syncHud({ time: state.currentTime, speed: state.cachedSpeed });
 
@@ -545,6 +492,7 @@ function renderGameToText() {
         coordinates: 'world units; origin upper left; x right, y down',
         trackKey: draft.trackKey,
         car: {
+            assetName: car.assetName,
             x: Number(state.pos.x.toFixed(3)),
             y: Number(state.pos.y.toFixed(3)),
             angle: Number(state.angle.toFixed(3)),
@@ -617,9 +565,9 @@ try {
     hud.setGround(getTrackGround(draft.track).key);
     draftLapsKey = draftLapsStorageKey(draft.trackKey, draft.track);
     draftLaps = readDraftLaps(getStorage(), draftLapsKey);
+    loadCar();
     resetRun();
     syncBestLap();
-    loadCar();
 } catch (error) {
     loadError = error instanceof Error ? error.message : 'Could not load this draft.';
     ui.feedback.textContent = loadError;

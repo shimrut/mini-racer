@@ -11,6 +11,8 @@ import {
   getPlayerProgressState,
 } from "./player/progress-state.js";
 import { isVerificationQueueSubmissionBlocked } from "./scoreboard/verification-queue.js";
+import { getActivePlayerOwnerId } from "./player/active-owner.js";
+import { readSelectedCampaignSeriesId } from "./campaign/service.js";
 import { createRunPolicy } from "./race/run-policy.js";
 import {
   detectDevicePerformance,
@@ -19,12 +21,13 @@ import {
 } from "./track/environment.js";
 import { ReplayRecorder } from "./race/replay.js";
 import { SteeringInput } from "./race/steering-input.js";
-import { getCarRearAxleWorldPoint } from "./race/simulation.js";
 import { createCarSprite } from "./car/sprite.js";
-import { CarSpriteLoader } from "./car/sprite.js";
+import { CarSpriteLoader, getCarSpriteCacheKey } from "./car/sprite.js";
 import { normalizePhysicsConfig } from "./car/handling.js";
 import { getTrackGround, getTrackGroundMaxSpeedKph } from "./track/grounds.js";
 import { readPlayerCarSkinAssetName, setPlayerCarUnlockSnapshot } from "./car/player-car-skin.js";
+import { readPlayerCarPaint } from "./car/player-car-paint.js";
+import { readPlayerCarDecalStyle } from "./car/player-car-decals.js";
 import { TrackLayerRenderer } from "./track/layer.js";
 import { RaceHud } from "./race/ui-hud.js";
 import { StartOverlay } from "./race/ui-start-overlay.js";
@@ -85,6 +88,7 @@ import {
   getActiveDailyChallenge,
   getDailyChallengeExpiry,
   getDailyChallengeSnapshot,
+  isDailyRaceWarmupCurrent,
   previewDailyChallengeShare,
   subscribeToDailyChallengeSnapshots,
 } from "./daily-challenge/service.js";
@@ -251,7 +255,7 @@ export class RealTimeRacer {
     }));
     this.tyreTracks = createTyreTrackBuffer();
     this.routeTrace = new RingBuffer(480, () => ({ x: 0, y: 0 }));
-    this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
+    this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle(this.getSelectedCarAssetName());
     this.particles = [];
     this._particleBuckets = new Map();
     this.trailTimer = 0;
@@ -558,20 +562,8 @@ export class RealTimeRacer {
           this.requestRender();
         }
       },
-      onTrailStrokeStyleChanged: (strokeStyle) => {
-        this.routeTraceStrokeStyle = strokeStyle;
-        this.routeTrace.clear();
-        this.trailTimer = 0;
-        if (strokeStyle) {
-          const { x, y } = getCarRearAxleWorldPoint(
-            this.pos,
-            this.angle,
-            this.runtimeConfig,
-          );
-          const slot = this.routeTrace.write();
-          slot.x = x;
-          slot.y = y;
-        }
+      onTrailStrokeStyleChanged: () => {
+        this.syncCarTrailStyle();
         this.requestRender();
       },
       onPlayerPreferencesChanged: () => queuePlayerPreferencesSave(),
@@ -675,15 +667,20 @@ export class RealTimeRacer {
       ? this.currentTrack
       : getLoadedClientTrack(trackKey);
     const assetName = readPlayerCarSkinAssetName(getTrackGround(track).key);
-    if (assetName === this.carSpriteAssetKey) {
-      return { image: this.carSprite, key: assetName };
+    const paint = readPlayerCarPaint(assetName);
+    const decalStyle = readPlayerCarDecalStyle(assetName);
+    const visualKey = getCarSpriteCacheKey(assetName, { paint, decalStyle });
+    if (visualKey === this.carSpriteLoader.currentVisualKey) {
+      return { image: this.carSprite, key: visualKey };
     }
     if (!this.previewCarSprites) this.previewCarSprites = new Map();
     let entry = this.previewCarSprites.get(assetName);
-    if (!entry) {
-      entry = { image: null };
+    if (!entry || entry.key !== visualKey) {
+      entry = { image: null, key: visualKey };
       this.previewCarSprites.set(assetName, entry);
       new CarSpriteLoader().load(assetName, {
+        paint,
+        decalStyle,
         onLoaded: (image) => {
           entry.image = image;
           this.dailyCarousel?.refreshPreviews?.();
@@ -695,14 +692,22 @@ export class RealTimeRacer {
       });
     }
     return entry.image
-      ? { image: entry.image, key: assetName }
+      ? { image: entry.image, key: visualKey }
       : { image: null, key: "loading" };
   }
 
   async displayInitialModeReady(mode) {
     if (mode === "daily") {
+      this.rememberRaceModeWarmup(mode, {
+        challenge: this.currentDailyChallenge,
+        playlist: this._loadedDailyPlaylist,
+      });
       this.showDailyLobby();
     } else if (mode === "campaign") {
+      this.rememberRaceModeWarmup(mode, {
+        bootstrap: this.campaignVerifiedBootstrap ?? this.campaignBootstrap,
+        stage: this.activeCampaignStage,
+      });
       this.showCampaignLobby({ refresh: false, view: "series" });
     } else if (mode !== "challenge") {
       this.showHomeLobby();
@@ -779,22 +784,91 @@ export class RealTimeRacer {
     return this.initialContractPromise;
   }
 
-  // Warm caches through the runtime's own methods, without installing another
-  // mode or applying its contract to the active race. Mode entry shares any
-  // pending warmup; a failed warmup can be retried on entry.
+  getRaceModeWarmupKey(mode) {
+    return JSON.stringify([
+      getActivePlayerOwnerId(),
+      this._raceModeProfileRevision || 0,
+      this.playerProfileAuthoritative !== false,
+      mode === "campaign" ? this.campaignSeriesId || readSelectedCampaignSeriesId() : null,
+      mode === "daily" ? Math.floor(Date.now() / 86_400_000) : null,
+    ]);
+  }
+
+  getRaceModeWarmup(mode) {
+    const state = this._raceModeWarmups?.get(mode);
+    if (!state || state.key !== this.getRaceModeWarmupKey(mode)) return null;
+    if (mode === "daily" && state.result
+      && !isDailyRaceWarmupCurrent(state.result.challenge, state.loadedAt)) return null;
+    return state;
+  }
+
+  rememberRaceModeWarmup(mode, result) {
+    this._raceModeWarmups ??= new Map();
+    this._raceModeWarmups.set(mode, {
+      key: this.getRaceModeWarmupKey(mode), result, loadedAt: Date.now(),
+    });
+    return result;
+  }
+
+  getReadyRaceMode(mode) {
+    const result = this.getRaceModeWarmup(mode)?.result;
+    if (!result) return null;
+    if (mode === "campaign" && (
+      !this._campaignBootstrapReady
+      || this._campaignBootstrapContextKey !== this.getRaceModeWarmupKey(mode)
+      || result.bootstrap !== this.campaignVerifiedBootstrap
+      || result.bootstrap?.authoritative === false
+      || result.bootstrap?.availability === "unavailable"
+    )) return null;
+    const challenge = mode === "daily" ? result.challenge : plainRaceChallenge(result.stage?.trackKey);
+    const trackKey = challenge?.trackKey;
+    const choices = mode === "daily" ? result.playlist : result.bootstrap?.stages;
+    if (!trackKey || !Array.isArray(choices) || !choices.length
+      || !choices.every((choice) => this.isRaceTrackReady(choice.trackKey, mode === "daily" ? choice : null))) return null;
+    const prepared = this.findPreparedRaceTrack(trackKey, challenge);
+    return prepared ? { ...result, prepared } : null;
+  }
+
+  // Retain completed contracts as well as pending work. Assets are checked
+  // separately, so a changed layout/options rebuilds locally without refetching
+  // an otherwise current contract. Background warming never selects a mode.
   warmRaceMode(mode) {
     this._raceModeWarmups ??= new Map();
-    if (this._raceModeWarmups.has(mode)) return this._raceModeWarmups.get(mode);
+    const current = this.getRaceModeWarmup(mode);
+    if (current?.promise) return current.promise;
+    const ready = this.getReadyRaceMode(mode);
+    if (ready) return Promise.resolve(ready);
+    const key = this.getRaceModeWarmupKey(mode);
+    const loadedAt = Date.now();
     const method = mode === "daily" ? "warmDailyRaceDefinitions" : "warmCampaignRaceDefinitions";
     const promise = Promise.resolve(this.prefetchModeRuntime(mode))
       .then((runtime) => {
         const warm = runtime?.methods?.[method] ?? this[method];
-        return typeof warm === "function" ? warm.call(this) : null;
+        return typeof warm === "function" ? warm.call(this, {
+          challenge: mode === "daily" ? current?.result?.challenge : null,
+        }) : null;
+      })
+      .then((result) => {
+        if (key !== this.getRaceModeWarmupKey(mode)) return this.warmRaceMode(mode);
+        if (mode === "daily" && result
+          && !isDailyRaceWarmupCurrent(result.challenge, loadedAt)) {
+          throw new Error("The Daily changed while loading. Retry before racing.");
+        }
+        if (this._raceModeWarmups.get(mode)?.promise === promise && result) {
+          this.rememberRaceModeWarmup(mode, result);
+        }
+        return result;
+      })
+      .catch((error) => {
+        if (key !== this.getRaceModeWarmupKey(mode)) return this.warmRaceMode(mode);
+        throw error;
       })
       .finally(() => {
-        if (this._raceModeWarmups.get(mode) === promise) this._raceModeWarmups.delete(mode);
+        if (this._raceModeWarmups.get(mode)?.promise !== promise) return;
+        if (current?.result) this._raceModeWarmups.set(mode, current);
+        else this._raceModeWarmups.delete(mode);
       });
-    this._raceModeWarmups.set(mode, promise);
+    this._raceModeWarmups.set(mode, { ...current, key, promise });
     return promise;
   }
 
@@ -917,9 +991,7 @@ export class RealTimeRacer {
     this.carEffectsAudio?.setEnabled?.(getCarProceduralAudioEnabled());
     this.proceduralMusic?.setEnabled?.(getMusicEnabled());
     this.pbGhost.setEnabled(getPbGhostEnabled());
-    this.routeTraceStrokeStyle = readPlayerTrailStrokeStyle();
-    this.routeTrace.clear();
-    this.trailTimer = 0;
+    raceEngineMethods.syncCarTrailStyle.call(this, { resetTrace: true, seedTrace: false });
     this.settings.refreshCarAudioPanel();
     this.settings.refreshMusicPanel();
     this.settings.refreshCollisionAutoRestartPanel();
@@ -930,7 +1002,6 @@ export class RealTimeRacer {
     this.settings.refreshPbGhostPanel();
     this.hud.syncPauseControls();
     this.garage.syncSkinSelection();
-    this.garage.syncTrailSelection();
     if (loadCar) await this.syncCarSpriteAsset();
     this.requestRender();
   }
@@ -951,7 +1022,10 @@ export class RealTimeRacer {
     this._modeEntryToken = token;
     this._modeEntryPending = true;
     this.cancelRacePreparation?.();
-    this.loadingScreen?.begin?.(`Loading ${MODE_LABELS[mode] ?? "the game"}…`);
+    let ready = this.getReadyRaceMode(mode);
+    let showingLoader = !ready;
+    const showLoader = () => this.loadingScreen?.begin?.(`Loading ${MODE_LABELS[mode] ?? "the game"}…`);
+    if (showingLoader) showLoader();
     try {
       // Import first so an entry cancelled during the download cannot install
       // its runtime over the mode the player chose afterward.
@@ -962,8 +1036,20 @@ export class RealTimeRacer {
       if (mode === "challenge") {
         await this.loadChallengeLobby(options.challengeId || this.launchTarget?.challengeId || null);
       } else {
-        const warmed = await this.warmRaceMode(mode);
-        if (token !== this._modeEntryToken) return null;
+        let warmed;
+        let contextKey;
+        do {
+          contextKey = this.getRaceModeWarmupKey(mode);
+          ready = this.getReadyRaceMode(mode);
+          if (!ready && !showingLoader) {
+            showingLoader = true;
+            showLoader();
+          }
+          warmed = ready ?? await this.warmRaceMode(mode);
+          if (token !== this._modeEntryToken) return null;
+        } while (contextKey !== this.getRaceModeWarmupKey(mode)
+          || (mode === "campaign" && this.campaignVerifiedBootstrap
+            && warmed?.bootstrap !== this.campaignVerifiedBootstrap));
         if (mode === "daily") {
           if (!warmed?.challenge) throw new Error("No playable Daily is available.");
           this.currentDailyChallenge = warmed.challenge;
@@ -971,7 +1057,9 @@ export class RealTimeRacer {
           this.showDailyLobby(options);
         } else if (mode === "campaign") {
           if (!warmed?.stage) throw new Error("Campaign progress is not authoritative.");
-          this.applyCampaignLobbyBootstrap(warmed.bootstrap, { paint: false });
+          if (this.campaignVerifiedBootstrap !== warmed.bootstrap) {
+            this.applyCampaignLobbyBootstrap(warmed.bootstrap, { paint: false });
+          }
           this.showCampaignLobby({ ...options, refresh: false });
         }
       }
@@ -981,6 +1069,7 @@ export class RealTimeRacer {
     } catch (error) {
       if (token !== this._modeEntryToken) return null;
       console.error(`Could not enter ${mode}:`, error);
+      if (!showingLoader) showLoader();
       this.loadingScreen?.showError?.(
         `Could not load ${MODE_LABELS[mode] ?? "the game"}. Retry before racing.`,
         () => void this.activateMode(mode, options),

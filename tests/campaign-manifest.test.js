@@ -10,7 +10,7 @@ import {
     getCampaignStageMedalCount,
     getCampaignUnlockedRaceIds,
 } from '../game/campaign/manifest.js';
-import { isCampaignSeriesLive } from '../game/campaign/series-rules.js';
+import { isAppCampaignSeriesLive } from '../game/campaign/series-rules.js';
 import { normalizeRaceSpec } from '../game/race/race-spec.js';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
@@ -23,14 +23,12 @@ function getNumbersUnlockedRaceIds(results) {
 
 describe('Campaign manifest', () => {
     it('lets players see only the series on a live ground', () => {
-        // Mini Rally is held back while dirt is not live, so there is no series choice.
+        // A series is live only when the Creator makes it live. In the app
+        // data, only Numbers is live, whatever the grounds of the others.
         expect(CAMPAIGN_SERIES.map((series) => series.id)).toEqual(['numbered-v1']);
         expect(campaignHasSeriesChoice()).toBe(false);
-        const tenStages = Array.from({ length: 10 }, (_, index) => ({ trackKey: `t${index}` }));
-        expect(isCampaignSeriesLive({ id: 'test-v1', ground: 'tarmac', stages: tenStages })).toBe(true);
-        for (const ground of ['dirt', 'grip', 'snow', 'water', 'space']) {
-            expect(isCampaignSeriesLive({ id: `${ground}-v1`, ground, stages: tenStages }), ground).toBe(false);
-        }
+        for (const id of ['dirt-v1', 'grip-v1', 'snow-v1']) expect(isAppCampaignSeriesLive({ id }), id).toBe(false);
+        expect(isAppCampaignSeriesLive({ id: 'numbered-v1' })).toBe(true);
     });
 
     it('defines the immutable numbered-v1 stage order, laps, and medal-total gates', () => {

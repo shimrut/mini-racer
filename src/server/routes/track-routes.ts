@@ -2,6 +2,7 @@ import type { Application, Response } from 'express';
 import { TrackInputError } from '../tracks/track-shape.js';
 import { TrackConflictError } from '../tracks/track-store.js';
 import { TrackPlacementRetryError } from '../tracks/track-placement-lock.js';
+import { normalizedCreatorUsername } from '../tracks/creator-track-access.js';
 
 const MAX_PLAYER_TRACK_KEYS = 50;
 const COPY_KINDS = ['unplayed', 'played-dailies', 'live-campaign'] as const;
@@ -10,9 +11,9 @@ type CopyKind = typeof COPY_KINDS[number];
 export type TrackRouteDependencies = {
     resolveCreatorToolSubredditName(): string | null;
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
-    listStoredTracks(): Promise<unknown[]>;
-    listStoredTrackRecords(): Promise<unknown[]>;
-    readStoredTrack(trackKey: string): Promise<unknown | null>;
+    listStoredTracks(username: string): Promise<unknown[]>;
+    listStoredTrackRecords(username: string): Promise<unknown[]>;
+    readStoredTrack(trackKey: string, username: string): Promise<unknown | null>;
     saveStoredTrack(
         trackKey: unknown,
         input: unknown,
@@ -20,11 +21,11 @@ export type TrackRouteDependencies = {
     ): Promise<unknown>;
     deleteStoredTrack(
         trackKey: unknown,
-        options: { baseRevision?: unknown; isPlaced?: (trackKey: string) => Promise<boolean> },
+        options: { username: string; baseRevision?: unknown; isPlaced?: (trackKey: string) => Promise<boolean> },
     ): Promise<boolean>;
     isTrackPlaced(trackKey: string): Promise<boolean>;
     readPlacedStoredTracks(trackKeys: string[]): Promise<unknown[]>;
-    readCreatorDailyView(): Promise<{ latestTrackKey: string | null }>;
+    readCreatorDailyView(username: string): Promise<{ latestTrackKey: string | null }>;
     runTrackMigration(options: { username: string; dryRun?: boolean }): Promise<unknown>;
     readMigrationReport(): Promise<unknown>;
     runPlayedDailyCopy(options: { username: string; dryRun?: boolean }): Promise<unknown>;
@@ -64,6 +65,12 @@ export async function creatorUsername(dependencies: {
     return dependencies.assertModeratorForSubreddit(subredditName);
 }
 
+function assertCreatorAccount(username: string, expected: unknown): void {
+    if (expected !== undefined && normalizedCreatorUsername(expected) !== normalizedCreatorUsername(username)) {
+        throw new TrackConflictError('The Reddit account changed. Reopen the Creator before saving.');
+    }
+}
+
 function readTrackKeysQuery(value: unknown): string[] {
     const text = typeof value === 'string' ? value : '';
     return [...new Set(text.split(',').map((key) => key.trim()).filter(Boolean))]
@@ -73,11 +80,12 @@ function readTrackKeysQuery(value: unknown): string[] {
 export function registerTrackRoutes(app: Application, dependencies: TrackRouteDependencies): void {
     app.get('/api/creator/tracks', async (req, res) => {
         try {
-            await creatorUsername(dependencies);
+            const username = await creatorUsername(dependencies);
             res.json({
+                username,
                 tracks: req.query.full === '1'
-                    ? await dependencies.listStoredTrackRecords()
-                    : await dependencies.listStoredTracks(),
+                    ? await dependencies.listStoredTrackRecords(username)
+                    : await dependencies.listStoredTracks(username),
             });
         } catch (error) {
             errorResponse(res, error);
@@ -86,8 +94,9 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
 
     app.get('/api/creator/tracks/:key', async (req, res) => {
         try {
-            await creatorUsername(dependencies);
-            const track = await dependencies.readStoredTrack(req.params.key);
+            const username = await creatorUsername(dependencies);
+            assertCreatorAccount(username, req.query.creatorUsername);
+            const track = await dependencies.readStoredTrack(req.params.key, username);
             if (!track) {
                 res.status(404).json({ error: 'Track not found.' });
                 return;
@@ -101,6 +110,7 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.put('/api/creator/tracks/:key', async (req, res) => {
         try {
             const username = await creatorUsername(dependencies);
+            assertCreatorAccount(username, req.body?.creatorUsername);
             const track = await dependencies.saveStoredTrack(req.params.key, req.body, {
                 username,
                 baseRevision: req.body?.baseRevision,
@@ -113,8 +123,10 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
 
     app.delete('/api/creator/tracks/:key', async (req, res) => {
         try {
-            await creatorUsername(dependencies);
+            const username = await creatorUsername(dependencies);
+            assertCreatorAccount(username, req.query.creatorUsername);
             const deleted = await dependencies.deleteStoredTrack(req.params.key, {
+                username,
                 baseRevision: req.query.baseRevision,
                 isPlaced: (trackKey) => dependencies.isTrackPlaced(trackKey),
             });
@@ -130,8 +142,8 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
 
     app.get('/api/creator/daily', async (_req, res) => {
         try {
-            await creatorUsername(dependencies);
-            res.json(await dependencies.readCreatorDailyView());
+            const username = await creatorUsername(dependencies);
+            res.json(await dependencies.readCreatorDailyView(username));
         } catch (error) {
             errorResponse(res, error);
         }
@@ -140,13 +152,13 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
     app.put('/api/creator/daily', async (req, res) => {
         try {
             const username = await creatorUsername(dependencies);
-            const { latestTrackKey } = await dependencies.readCreatorDailyView();
+            const { latestTrackKey } = await dependencies.readCreatorDailyView(username);
             await dependencies.saveDailySchedule(req.body?.keys, {
                 username,
                 baseRevision: req.body?.baseRevision,
                 currentTrackKey: latestTrackKey,
             });
-            res.json(await dependencies.readCreatorDailyView());
+            res.json(await dependencies.readCreatorDailyView(username));
         } catch (error) {
             errorResponse(res, error);
         }

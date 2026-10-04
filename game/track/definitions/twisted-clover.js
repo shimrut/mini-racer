@@ -1,9 +1,9 @@
 import { Point } from '../geometry.js';
 
 export default {
-    cornerRadius: 3,
+    cornerRadius: 1.5,
     outer: [
-        Point(12.649, 31.957),
+        Point(12.696, 31.115),
         Point(12.809, 38.486),
         Point(13.127, 39.977),
         Point(13.981, 41.241),
@@ -25,8 +25,7 @@ export default {
         Point(34.047, 12.356),
         Point(32.807, 12.244),
         Point(31.063, 12.306),
-        Point(29.577, 12.007),
-        Point(28.611, 11.11),
+        Point(28.044, 12.433),
         Point(27.926, 7.839),
         Point(27.577, 6.358),
         Point(26.701, 5.116),
@@ -49,8 +48,7 @@ export default {
         Point(6.006, 31.423),
         Point(7.209, 31.931),
         Point(8.511, 32.024),
-        Point(9.774, 31.693),
-        Point(11.569, 31.48)
+        Point(9.774, 31.693)
     ],
     inner: [
         Point(11.136, 27.278),
@@ -66,8 +64,7 @@ export default {
         Point(24.708, 26.025),
         Point(25.743, 24.955),
         Point(32.313, 20.316),
-        Point(32.671, 16.752),
-        Point(31.419, 15.992),
+        Point(32.383, 15.87),
         Point(29.277, 16.087),
         Point(25.988, 16.253),
         Point(24.466, 14.623),
@@ -78,15 +75,14 @@ export default {
         Point(15.604, 19.431),
         Point(14.343, 20.088),
         Point(7.999, 22.064),
-        Point(8.213, 27.124),
-        Point(9.649, 27.846)
+        Point(8.142, 28.041)
     ],
-    startLine: { p1: Point(11.934, 33.412), p2: Point(17.463, 33.276) },
-    startPos: Point(14.668, 32.094),
-    startAngle: 1.546,
+    startLine: { p1: Point(11.959, 33.155), p2: Point(17.459, 33.053) },
+    startPos: Point(14.686, 31.854),
+    startAngle: 1.552,
     checkpoints: [
         { p1: Point(28.691, 28.677), p2: Point(24.885, 24.763) },
-        { p1: Point(29.23, 10.407), p2: Point(23.383, 11.63) },
+        { p1: Point(28.809, 11.104), p2: Point(23.313, 11.326) },
         { p1: Point(12.076, 15.82), p2: Point(13.711, 21.071) }
     ]
 };

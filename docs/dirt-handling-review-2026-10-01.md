@@ -1,5 +1,11 @@
 # Dirt handling review — 2026-10-01
 
+**Historical preset review.** The dirt settings below have since changed. See
+[the October 3 investigation](dirt-slide-control-investigation-2026-10-03.md)
+for current values and the reproduced slowdown after steering release. The
+"reasonable arcade starting point" assessment below was not supported by a
+human driving audition and must not be treated as acceptance of the feel.
+
 Scope: assess the current local dirt settings for Mini Racer. This review does
 not change driving settings, tests, or race rules. The pre-existing edit in
 `game/track/grounds.js` changes dirt acceleration from 0.65 to 0.6 and maximum

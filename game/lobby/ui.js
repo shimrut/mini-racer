@@ -635,8 +635,8 @@ export class LobbyUi {
         if (this.mode === 'home') return 0;
         if (this.isCampaignSeriesView()) {
             const list = this.campaignSeriesList;
-            const current = list?.querySelector?.('.campaign-series-row.is-current:not(:disabled)')
-                ?? list?.querySelector?.('.campaign-series-row:not(:disabled)');
+            const current = list?.querySelector?.('.campaign-series-row.is-current')
+                ?? list?.querySelector?.('.campaign-series-row');
             const index = buttons.indexOf(current);
             if (index >= 0) return index;
         }

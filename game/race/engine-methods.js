@@ -16,6 +16,7 @@ import {
   strokeSkidMarks,
 } from "./ground-effects.js";
 import { createModalActions } from "./result-flow.js";
+import { DRAWN_CAR_DRAW_PIXELS } from "../car/drawn-car/formula.js";
 import { getDrawnCar, STOCK_CAR_ASSET_NAME } from "../car/sprite.js";
 import {
   getCameraZoom,
@@ -25,6 +26,9 @@ import {
 } from "./race-camera.js";
 import { KPH_PER_WORLD_UNIT } from "../car/handling.js";
 import { readPlayerCarSkinAssetName } from "../car/player-car-skin.js";
+import { readPlayerCarPaint } from "../car/player-car-paint.js";
+import { readPlayerCarDecalStyle } from "../car/player-car-decals.js";
+import { readPlayerTrailStrokeStyle } from "../car/player-trail.js";
 import { getCarAssetsForGround } from "../car/car-skin-grounds.js";
 import {
   getDailyChallengeCopyLabels,
@@ -576,20 +580,41 @@ export const raceEngineMethods = {
   },
 
   syncCarSpriteAsset() {
+    raceEngineMethods.syncCarTrailStyle.call(this);
     return this.loadCarSpriteAsset(this.getSelectedCarAssetName());
   },
 
+  syncCarTrailStyle({ resetTrace = false, seedTrace = true } = {}) {
+    const assetName = this.getSelectedCarAssetName?.()
+      ?? raceEngineMethods.getSelectedCarAssetName.call(this);
+    const strokeStyle = readPlayerTrailStrokeStyle(assetName);
+    if (!resetTrace && strokeStyle === this.routeTraceStrokeStyle) return;
+    this.routeTraceStrokeStyle = strokeStyle;
+    this.routeTrace?.clear();
+    this.trailTimer = 0;
+    if (seedTrace && strokeStyle && this.routeTrace?.write && this.pos) {
+      const { x, y } = getCarRearAxleWorldPoint(this.pos, this.angle, this.runtimeConfig);
+      const slot = this.routeTrace.write();
+      slot.x = x;
+      slot.y = y;
+    }
+  },
+
   loadCarSpriteAsset(assetName) {
+    const paint = readPlayerCarPaint(assetName);
+    const decalStyle = readPlayerCarDecalStyle(assetName);
     return new Promise((resolve) => {
       this.carSpriteLoader.load(assetName, {
+        paint,
+        decalStyle,
         onLoaded: (image) => {
           this.carSprite = image;
           // A skin drawn in code moves in the race. The sprite is only the car
           // at rest, for the ghost car and the track cards.
-          this.drawnCar = getDrawnCar(assetName);
+          this.drawnCar = getDrawnCar(assetName, { paint, decalStyle });
           this.drawnCar?.resetMotion();
-          this.carSpriteDrawWidth = 52;
-          this.carSpriteDrawHeight = 52;
+          this.carSpriteDrawWidth = DRAWN_CAR_DRAW_PIXELS;
+          this.carSpriteDrawHeight = DRAWN_CAR_DRAW_PIXELS;
           this.dailyCarousel?.refreshPreviews?.();
           this.campaignCarousel?.refreshPreviews?.();
           this.requestRender();
@@ -948,7 +973,7 @@ export const raceEngineMethods = {
     this.skidMarks.clear();
     this.tyreTracks?.clear();
     this.drawnCar?.resetMotion();
-    this.routeTrace.clear();
+    raceEngineMethods.syncCarTrailStyle.call(this, { resetTrace: true, seedTrace: false });
     this.runHistory.clear();
     this.runHistoryTimer = 0;
     this.particles = [];

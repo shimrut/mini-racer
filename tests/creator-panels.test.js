@@ -159,10 +159,12 @@ describe('Creator Campaign Planner', () => {
         ],
     };
 
-    it('adds a free track on the same ground after the live stages, and saves the series', async () => {
+    it('adds a free track on another surface after the live stages, and saves the series', async () => {
         const fetchMock = vi.fn(async (url, options) => {
-            if (options?.method === 'PUT') return jsonResponse({ series: { ...seriesView.series[0], revision: 6 } });
-            return jsonResponse(seriesView);
+            if (options?.method === 'PUT') return jsonResponse({ series: {
+                ...seriesView.series[0], ...JSON.parse(options.body), revision: 6,
+            } });
+            return jsonResponse(structuredClone(seriesView));
         });
         vi.stubGlobal('fetch', fetchMock);
         const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
@@ -170,16 +172,43 @@ describe('Creator Campaign Planner', () => {
 
         const root = document.getElementById('creator-series-view');
         const addSelect = root.querySelector('.creator-adder select');
-        expect([...addSelect.options].map((option) => option.value)).toEqual(['', 'dayLoop']);
-        addSelect.value = 'dayLoop';
+        expect([...addSelect.options].map((option) => option.value)).toEqual(['', 'dayLoop', 'snowLoop']);
+        expect(root.querySelector('.creator-series-fields select')).toBeNull();
+        addSelect.value = 'snowLoop';
         buttonsByText(root, 'Add stage')[0].click();
-        expect(panels.seriesDraft.stages.at(-1)).toEqual({ trackKey: 'dayLoop', laps: 1, requiredMedals: 2 });
+        expect(panels.seriesDraft.stages.at(-1)).toEqual({ trackKey: 'snowLoop', laps: 1, requiredMedals: 2 });
         expect(buttonsByText(root, '✕')[0].disabled).toBe(true);
+        expect(root.querySelector('.creator-series-fields').textContent).toContain('Mixed');
+        expect(root.textContent).not.toContain('Other ground');
+        expect(root.textContent).not.toContain('held back');
 
         await panels.saveSeries();
         const put = fetchMock.mock.calls.find(([, options]) => options?.method === 'PUT');
         expect(put[0]).toBe('/api/creator/series/night-v1');
-        expect(JSON.parse(put[1].body)).toMatchObject({ baseRevision: 5, stages: [{ trackKey: 'nightLoop' }, { trackKey: 'dayLoop' }] });
+        expect(JSON.parse(put[1].body)).toMatchObject({ ground: 'tarmac', baseRevision: 5,
+            stages: [{ trackKey: 'nightLoop' }, { trackKey: 'snowLoop' }] });
+    });
+
+    it('offers every ready free surface and derives the label from the complete draft', async () => {
+        const view = structuredClone(seriesView);
+        view.series[0].ground = 'snow';
+        view.series[0].grounds = ['tarmac'];
+        view.series[0].stages.push({ trackKey: 'snowLoop', laps: 1, requiredMedals: 2 });
+        view.tracks.push(
+            ...['dirt', 'grip', 'water', 'space'].map((ground) => ({
+                key: `${ground}Loop`, name: `${ground} Loop`, ground, ready: true, usedBy: null,
+            })),
+            { key: 'unfinishedSnow', name: 'Unfinished Snow', ground: 'snow', ready: false, usedBy: null },
+        );
+        vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(view)));
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        const root = document.getElementById('creator-series-view');
+        expect([...root.querySelector('.creator-adder select').options].map((option) => option.value))
+            .toEqual(['', 'dayLoop', 'dirtLoop', 'gripLoop', 'spaceLoop', 'waterLoop']);
+        expect(root.querySelector('.creator-series-fields').textContent).toContain('Mixed');
+        expect(root.textContent).not.toContain('Other ground');
+        expect(root.textContent).not.toContain('held back');
     });
 
     it('keeps newer series edits and acknowledges only the sent snapshot', async () => {

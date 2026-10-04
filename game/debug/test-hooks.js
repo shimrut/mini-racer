@@ -13,6 +13,16 @@ export function renderGameToText(engine) {
       overlayReady: engine.startOverlay?.startOverlay?.classList?.contains?.("is-ready") || false,
       interactive: engine.startOverlay?._isInteractive === true,
     },
+    garage: engine.garage?.isGarageOpen?.() ? {
+      tab: engine.garage.activeGarageTab,
+      previewCar: engine.garage.previewSkin?.assetName ?? null,
+      equipped: document.querySelector('.garage-car-select')?.getAttribute('aria-pressed') === 'true',
+      selectedColors: [...document.querySelectorAll('.garage-color-option[data-channel][aria-pressed="true"]')]
+        .map((button) => ({ channel: button.dataset.channel, color: button.dataset.color })),
+      trailCar: engine.garage.trailAssetName,
+      selectedTrail: document.querySelector('.garage-trail-option[aria-pressed="true"]')?.dataset.trailId ?? null,
+      selectedDecalStyle: document.querySelector('.garage-decal-option[aria-pressed="true"]')?.dataset.decalStyle ?? null,
+    } : null,
     track: engine.currentTrackKey,
     player: {
       x: Number(engine.pos.x.toFixed(2)),
@@ -25,6 +35,7 @@ export function renderGameToText(engine) {
       wallImpactCooldownSec: Number((Number(engine.wallImpactCooldownRemaining) || 0).toFixed(3)),
       wallContactActive: Boolean(engine.wallContactActive),
       wallContactReleaseSec: Number((Number(engine.wallContactReleaseRemaining) || 0).toFixed(3)),
+      trailStrokeStyle: engine.routeTraceStrokeStyle,
     },
     lapTime: Number(engine.currentTime.toFixed(3)),
     challenge: engine.currentChallengeRun

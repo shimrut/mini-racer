@@ -151,7 +151,7 @@ describe('player car skin', () => {
     });
 
     it.each([
-        ['grip', 'Circuit cars', 'circuit'],
+        ['grip', 'Track cars', 'circuit'],
         ['water', 'Jet skis', 'jetski'],
         ['space', 'Spaceships', 'spaceship'],
     ])('keeps the %s vehicles drawn in code as %s, and drives the first one by default', (ground, title, model) => {

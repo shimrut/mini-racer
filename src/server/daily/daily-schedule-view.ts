@@ -4,7 +4,7 @@ import { getTrackGround } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { isBuiltInTrackComplete } from '../tracks/track-readiness.js';
 import { readDailySchedule, type DailySchedule } from './daily-schedule-store.js';
-import { listStoredTracks } from '../tracks/track-store.js';
+import { listCreatorTracks } from '../tracks/creator-track-access.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
 import { readSeriesTrackUse } from '../campaign/series-usage.js';
 
@@ -31,11 +31,11 @@ export type CreatorDailyView = {
     tracks: CreatorDailyTrack[];
 };
 
-export async function readCreatorDailyView(): Promise<CreatorDailyView> {
+export async function readCreatorDailyView(username: string): Promise<CreatorDailyView> {
     const [schedule, usage, stored, seriesUse] = await Promise.all([
         readDailySchedule(),
         readTrackUsage(),
-        listStoredTracks(),
+        listCreatorTracks(username),
         readSeriesTrackUse(),
     ]);
     const storedByKey = new Map(stored.map((track) => [track.key, track]));

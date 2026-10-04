@@ -1,10 +1,9 @@
-// Rules for the Campaign series list. This file imports only the live grounds,
-// so the Mapmaker server can use it without watching the series data file.
-import { isLiveGround } from '../track/live-grounds.js';
+// Rules for the Campaign series list. This file has no imports, so the
+// Mapmaker server can use it without watching the series data file.
 
-// A series stays hidden from players until it has this many stages. After that,
-// its stages are fixed, and new stages go after the last one.
-// Formula Mini stays hidden until it has 2 stages.
+// The Creator makes a series live only when it has this many stages. After
+// that, its stages are fixed, and new stages go after the last one.
+// Formula Mini needs 2 stages.
 export const CAMPAIGN_SERIES_MIN_STAGES = 1;
 const FORMULA_MINI_SERIES_ID = 'grip-v1';
 const FORMULA_MINI_MIN_STAGES = 2;
@@ -21,11 +20,14 @@ export function getMaxRequiredMedals(stageIndex) {
     return Math.max(0, stageIndex) * 3;
 }
 
-// A series on a ground that is not live stays hidden, whatever its stage count.
-export function isCampaignSeriesLive(series) {
-    return isLiveGround(series?.ground)
-        && Array.isArray(series?.stages)
-        && series.stages.length >= getCampaignSeriesMinStages(series);
+// Numbers keeps this name for ever: every saved Numbers record and key uses it.
+export const CAMPAIGN_NUMBERS_SERIES_ID = 'numbered-v1';
+
+// A series is live when the Creator makes it live, and only then. Its grounds
+// and stage count do not decide it. In the app data, only Numbers is live;
+// every other app series waits for the Creator.
+export function isAppCampaignSeriesLive(series) {
+    return series?.id === CAMPAIGN_NUMBERS_SERIES_ID;
 }
 
 // Returns an error text, or null when the medal target fits its position.

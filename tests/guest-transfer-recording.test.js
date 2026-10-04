@@ -12,6 +12,12 @@ import { RedisTestDouble } from './redis-test-double.js';
 const redis = new RedisTestDouble();
 
 // Mini Rally is held back from players; these tests need it live.
+// Only Numbers is live from the app data. These tests need a second live
+// series, as if the Creator had made it live.
+vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),
+}));
 vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
 
 vi.mock('@devvit/redis', () => ({
@@ -28,7 +34,7 @@ const { campaignProgressKey } = await import('../src/server/campaign/campaign-pr
 const { recordCompletedRace, recordHeadToHeadWin } = await import('../src/server/player/car-unlock-store.ts');
 const { upsertPlayerProfile } = await import('../src/server/competition/competition-identity.ts');
 const { toCampaignCompetition, toDailyCompetition } = await import('../src/server/competition/competition.ts');
-const { upsertPlayerTrackPersonalBest } = await import('../src/server/competition/pb-ghost-store.ts');
+const { getPlayerTrackPbRecord, upsertPlayerTrackPersonalBest } = await import('../src/server/competition/pb-ghost-store.ts');
 const { racedListKey } = await import('../src/server/player/raced-list.ts');
 const { RACED_LIST_FILL_READY_KEY } = await import('../src/server/player/raced-list-fill.ts');
 const { TRACKS } = await import('../game/track/tracks.js');
@@ -459,6 +465,38 @@ describe('guest transfer recordings', () => {
 
     it('both raced, the guest is faster (a Keep guest request)', async () => {
         expect(await record(CASES['both raced, the guest is faster'], 'guest')).toMatchSnapshot();
+    });
+
+    it.each([
+        [2, 'merge'], [2, 'account'], [3, 'merge'], [3, 'account'],
+    ])('preserves a published %i-lap Daily during %s transfer', async (lapCount, choice) => {
+        const guestPlayerId = 'guest:recorded';
+        const redditPlayerId = 'reddit:recorded';
+        const { playable } = await seedDays();
+        const challenge = {
+            ...playable[5],
+            objectiveType: 'multi_lap_total',
+            objectiveParams: { lapCount },
+        };
+        // Published history keeps its contract even though new days use one lap.
+        const published = JSON.stringify(challenge);
+        await redis.hSet('dailygp:challenges', { [challenge.id]: published });
+        await seedDay(challenge, guestPlayerId, {
+            entryMs: 40000, pbMs: 40000, entryExtra: { completedLaps: lapCount },
+        });
+        await seedDay(challenge, redditPlayerId, {
+            entryMs: 42000, pbMs: 42000, entryExtra: { completedLaps: lapCount },
+        });
+        const run = await runTransfer(guestPlayerId, redditPlayerId, choice);
+        expect(run.replies.at(-1)).toMatchObject({ status: 'completed' });
+        expect(await redis.hGet('dailygp:challenges', challenge.id)).toBe(published);
+        const competition = toDailyCompetition(challenge);
+        const bestTimeMs = choice === 'merge' ? 40000 : 42000;
+        expect(JSON.parse(await redis.hGet(competition.entryHashKey, redditPlayerId)))
+            .toMatchObject({ bestTimeMs, completedLaps: lapCount });
+        expect(await getPlayerTrackPbRecord({
+            playerId: redditPlayerId, competition, track: TRACKS[challenge.trackKey],
+        })).toMatchObject({ bestTimeMs, lapCount, rulesRevision: 1 });
     });
 
     // A transfer that stops at any saved step, and then runs again, must end

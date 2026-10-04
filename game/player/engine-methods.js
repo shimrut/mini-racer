@@ -14,6 +14,15 @@ export const playerProfileEngineMethods = {
         carUnlocks,
         authoritative = true,
     } = {}, { loadCar = true } = {}) {
+        // A transfer can replace progress while keeping the same account owner.
+        // Fence pending requests and drop retained mode state before applying it.
+        this._raceModeProfileRevision = (this._raceModeProfileRevision || 0) + 1;
+        this._raceModeWarmups?.clear();
+        this._campaignBootstrapRequestId = (this._campaignBootstrapRequestId || 0) + 1;
+        this._campaignBootstrapPromise = null;
+        this._campaignBootstrapReady = false;
+        this.campaignBootstrap = null;
+        this.campaignVerifiedBootstrap = null;
         this.hasAnyData = Boolean(hasAnyData);
         this.isReturningPlayer = Boolean(isReturningPlayer);
         this.redditUsername = typeof redditUsername === 'string' && redditUsername.trim()

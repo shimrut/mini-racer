@@ -481,7 +481,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     border-radius: var(--radius-full);
 }
 
-.garage-tabs::before,
 .tracks-tabs::before {
     content: "";
     position: absolute;
@@ -496,13 +495,11 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .garage-tabs::before,
     .tracks-tabs::before {
         transition: none;
     }
 }
 
-.garage-tabs:has(#garage-tab-trails[aria-selected="true"])::before,
 .tracks-tabs:has(#tracks-tab-campaign[aria-selected="true"])::before {
     transform: translateX(100%);
 }
@@ -554,13 +551,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     box-shadow: var(--menu-ring);
 }
 
-.garage-tab-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
 .garage-skin-layout {
     display: flex;
     flex-direction: column;
@@ -593,8 +583,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     padding: .15rem 0 .35rem;
 }
 
-.garage-skin-option,
-.garage-trail-option {
+.garage-skin-option {
     display: flex;
     flex-direction: column;
     border: none;
@@ -612,28 +601,23 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     padding: .5rem .45rem .55rem;
 }
 
-.garage-skin-option:hover,
-.garage-trail-option:hover {
+.garage-skin-option:hover {
     background: #1e293b;
 }
 
-.garage-skin-option.is-selected,
-.garage-trail-option.is-selected {
+.garage-skin-option.is-selected {
     background: #7f1d1d;
 }
 
-.garage-skin-option.is-selected:hover,
-.garage-trail-option.is-selected:hover {
+.garage-skin-option.is-selected:hover {
     background: #991b1b;
 }
 
-.garage-skin-option.is-menu-selected,
-.garage-trail-option.is-menu-selected {
+.garage-skin-option.is-menu-selected {
     box-shadow: var(--menu-ring);
 }
 
-.garage-skin-option.is-selected.is-menu-selected,
-.garage-trail-option.is-selected.is-menu-selected {
+.garage-skin-option.is-selected.is-menu-selected {
     box-shadow: var(--menu-ring);
 }
 
@@ -648,8 +632,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     filter: none;
 }
 
-.garage-skin-option__label,
-.garage-trail-option__label {
+.garage-skin-option__label {
     font-family: var(--mono-font);
     font-weight: 800;
     text-transform: uppercase;
@@ -728,29 +711,20 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     background: rgba(51, 65, 85, .34);
 }
 
-.garage-skin-option.is-selected .garage-skin-option__label,
-.garage-trail-option.is-selected .garage-trail-option__label {
+.garage-skin-option.is-selected .garage-skin-option__label {
     color: #fecaca;
 }
 
-.garage-trail-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
-    gap: .55rem;
-    padding: .15rem 0 .35rem;
-}
-
-.garage-trail-option {
-    align-items: center;
-    gap: .35rem;
-    padding: .45rem .35rem .5rem;
-}
-
-.garage-trail-option__swatch {
-    width: 2.25rem;
-    height: 2.25rem;
+/* Paint and trail choices share one circle; each host only supplies its size/color. */
+.color-swatch {
+    display: block;
+    flex: none;
+    width: var(--color-swatch-size, 2.25rem);
+    height: auto;
+    aspect-ratio: 1;
     border-radius: 50%;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+    background: var(--paint-color, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-swatch-edge, rgba(15, 23, 42, 0.35));
     pointer-events: none;
 }
 
@@ -760,85 +734,6 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
         linear-gradient(135deg, transparent 44%, rgba(248, 113, 113, 0.95) 44%, rgba(248, 113, 113, 0.95) 56%, transparent 56%),
         rgba(15, 23, 42, 0.35);
     box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.2);
-}
-
-.garage-trail-option__label {
-    font-size: .58rem;
-}
-
-#garage-modal #garage-panel {
-    position: static;
-    inset: auto;
-    z-index: auto;
-    width: 100%;
-    max-width: none;
-    max-height: none;
-    height: auto;
-    margin: 0;
-    overflow: hidden;
-    padding: 0 !important;
-    border-radius: 0;
-    background: transparent;
-    flex: 1 1 auto;
-    min-height: 0;
-    gap: 0.9rem;
-}
-
-#garage-modal .runs-header-row.leaderboard-header-row {
-    margin: 0 0 .25rem;
-}
-
-#garage-modal .leaderboard-hero-track {
-    font-size: 1.5rem;
-}
-
-#garage-modal .garage-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: stretch;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    height: 2.5rem;
-    padding: 0.15rem;
-    background: #1e293b;
-    border-radius: var(--radius-full);
-    box-shadow: 0 0 0 0.5rem var(--bg-color);
-}
-
-#garage-modal .garage-tab {
-    min-height: 0;
-    padding: 0 0.5rem;
-    border-radius: var(--radius-full);
-    background: transparent;
-    font-size: 0.88rem;
-    letter-spacing: .05em;
-}
-
-#garage-modal .garage-tab.is-selected,
-#garage-modal .garage-tab.is-selected:hover {
-    background: transparent;
-    color: #ffffff;
-}
-
-#garage-modal .reusable-modal-content::after {
-    display: none;
-}
-
-#garage-modal .garage-tab-panel {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: .1rem 0 .25rem;
-}
-
-#garage-modal .garage-tab-panel::after {
-    content: '';
-    display: block;
-    width: 100%;
-    height: calc(var(--modal-floating-back-height) + var(--modal-floating-back-offset) + 1rem);
-    pointer-events: none;
 }
 
 #garage-modal .garage-skin-layout,
@@ -879,38 +774,18 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     height: 4.35rem;
 }
 
-#garage-modal .garage-skin-option__label,
-#garage-modal .garage-trail-option__label {
+#garage-modal .garage-skin-option__label {
     font-family: var(--header-font);
     font-size: .85rem;
     color: #e2e8f0;
 }
 
-#garage-modal .garage-skin-option.is-selected,
-#garage-modal .garage-trail-option.is-selected {
+#garage-modal .garage-skin-option.is-selected {
     background: var(--accent-color);
 }
 
-#garage-modal .garage-skin-option.is-selected .garage-skin-option__label,
-#garage-modal .garage-trail-option.is-selected .garage-trail-option__label {
+#garage-modal .garage-skin-option.is-selected .garage-skin-option__label {
     color: #ffffff;
-}
-
-#garage-modal .garage-trail-grid {
-    grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr));
-    gap: .75rem;
-    padding: .2rem;
-    box-sizing: border-box;
-}
-
-#garage-modal .garage-trail-option {
-    min-height: 6.85rem;
-    padding: .85rem .55rem .65rem;
-}
-
-#garage-modal .garage-trail-option__swatch {
-    width: 3rem;
-    height: 3rem;
 }
 
 #garage-modal .garage-tab.is-menu-selected,
@@ -918,8 +793,7 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     box-shadow: var(--menu-ring);
 }
 
-#garage-modal .garage-skin-option.is-menu-selected,
-#garage-modal .garage-trail-option.is-menu-selected {
+#garage-modal .garage-skin-option.is-menu-selected {
     box-shadow: var(--menu-ring);
 }
 

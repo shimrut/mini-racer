@@ -25,13 +25,15 @@ export async function creatorRequest(path, { method = 'GET', body } = {}) {
 
 export const creatorApi = {
     listTracks: () => creatorRequest('/api/creator/tracks?full=1'),
-    readTrack: (trackKey) => creatorRequest(`/api/creator/tracks/${encodeURIComponent(trackKey)}`),
+    readTrack: (trackKey, username) => creatorRequest(`/api/creator/tracks/${encodeURIComponent(trackKey)}`
+        + (username ? `?creatorUsername=${encodeURIComponent(username)}` : '')),
     saveTrack: (trackKey, body) => creatorRequest(`/api/creator/tracks/${encodeURIComponent(trackKey)}`, {
         method: 'PUT',
         body,
     }),
-    deleteTrack: (trackKey, baseRevision) => creatorRequest(
-        `/api/creator/tracks/${encodeURIComponent(trackKey)}?baseRevision=${encodeURIComponent(baseRevision)}`,
+    deleteTrack: (trackKey, baseRevision, username) => creatorRequest(
+        `/api/creator/tracks/${encodeURIComponent(trackKey)}?baseRevision=${encodeURIComponent(baseRevision)}`
+            + (username ? `&creatorUsername=${encodeURIComponent(username)}` : ''),
         { method: 'DELETE' },
     ),
     readDaily: () => creatorRequest('/api/creator/daily'),

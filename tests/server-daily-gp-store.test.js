@@ -1141,7 +1141,6 @@ describe('server daily gp store submissions', () => {
             'snowCircuit',
             'sunlitTemple',
             'spaceCircuit',
-            'gripCircuit',
         );
         mockRedis.hGetAll.mockResolvedValue({
             'daily-gp-2030-01-10': JSON.stringify({
@@ -1776,6 +1775,9 @@ describe('server daily gp store submissions', () => {
         } = await import('../src/server/player/player-account-store.ts');
         const playerPreferences = {
             carSkin: 'assets/cars/mr_mr_red.webp',
+            carPaints: { 'drawn/mr_grip_circuit': { main: '#246bff', accent: '#f4f6ff' } },
+            carTrails: { 'drawn/mr_grip_circuit': 'none', 'assets/cars/mr_mr_red.webp': 'gold' },
+            carDecals: { 'drawn/formula-red': 'drawn/formula-red', 'drawn/mr_grip_circuit': 'drawn/mr_grip_circuit-blue' },
             trailId: 'gold',
             musicEnabled: false,
             carAudioEnabled: true,

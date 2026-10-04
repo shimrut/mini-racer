@@ -36,12 +36,16 @@ The sharp outer/inner construction walls stay faintly visible so editable
 corners remain easy to see. Curbs, ground scenery, and finish paint remain
 in Test Drive and the game, not in the schematic.
 
-Mapmaker draws a ghost car at the finished start position using the real race
-collision size (`0.55u` wide × `1.23u` long).
+Mapmaker draws the surface's default vehicle at the finished start position,
+using the shared car artwork and the same visual scale as Test Drive. The
+race collision footprint remains `0.55u` wide × `1.23u` long.
 
-**Road width** under **Shape** has three widths, counted in car-widths:
-**Narrow** (6), **Normal** (6.5) and **Wide** (7, `3.85u`). Draw makes a
-Normal road unless you pick another width before you draw.
+Road widths count pictures of the normal car across. That picture is the
+rear-tire span of the formula car as drawn in the race. The hit box stays
+`0.55u` wide and is not the width Mapmaker draws. **Road width** under
+**Shape** has three widths: **Narrow** (6 cars, `4.113u`), **Normal** (6.5
+cars, `4.455u`) and **Wide** (7 cars, `4.798u`). Draw makes a Normal road
+unless you pick another width before you draw.
 
 **Draw** keeps the full-width road **open** while placing points. The first
 click lands where you click. After that, each new point lands a whole number
@@ -202,6 +206,13 @@ A and D. **Mobile** uses a tall phone screen, the phone camera, and steering
 by holding the left or right half of that screen. A phone or tablet is already
 that view, so those two buttons stay hidden and you steer by tapping the left
 or right side of the screen.
+
+The editor marker and Test Drive use the full default preset for the selected
+surface: Formula on Street, Track on Track, Rally on Dirt, Ice on Snow,
+Jet Ski on Water, and Spaceship on Space. They use the shared car renderer;
+Test Drive also animates its wheels and ground marks. Garage skin, paint,
+decal and trail choices do not affect these authoring views.
+
 Test Drive keeps your
 10 best laps for each layout in the browser. A change to a wall, gate, start
 point, corner or ground starts a new list.
@@ -287,9 +298,13 @@ so maps can be made on a laptop, tablet or phone.
    fingerprint as a subset assertion so adding a track cannot hide changes to
    existing track geometry. The current approved fingerprint includes the
    intentional Mistfall Circuit outer-boundary shape committed in `c4da688`,
-   the reshaped Double Trouble, Monkey Wrench, and Shark Bite, the
-   appended Daily tracks through Anvil Circuit, and Old Mountain (the August
-   Mountain Peak layout, kept off the Daily schedule).
+   the restored original shapes of Mountain Peak, Shark Fin, Twisted Clover,
+   Hook Loop, Crooked Arrow, Winding Road, Lightning Hook and Double Trouble,
+   and the catalog additions through Winding Lane. Mountain Pass, Shark Tail,
+   Hook Bend and Winding Lane preserve the later Mountain Peak, Shark Fin,
+   Hook Loop and Winding Road shapes respectively. Separate race-shape
+   fingerprints pin the eight originals and four preserved variants; the
+   earlier passing historical subset fingerprints remain unchanged.
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 ## Campaign Series
@@ -302,10 +317,14 @@ its own stages. `game/campaign/series.json` holds them, and
   `numbered-v1-03` or `dirt-v1-00`. The Redis keys of a stage use its series
   name. Numbers keeps the name `numbered-v1`, because every saved Numbers
   record uses it. Do not rename a series, and do not change its stage order.
-- A series stays hidden from players until it has 1 stage. Formula Mini stays
-  hidden until it has 2 stages (`getCampaignSeriesMinStages` in
-  `game/campaign/series-rules.js`). Before that, you can add, move and remove
-  its stages freely.
+- A series is live when the Creator makes it live, and only then. Its grounds
+  and stage count do not decide it. Numbers is the only series in
+  `series.json` that is live by itself (`isAppCampaignSeriesLive` in
+  `game/campaign/series-rules.js`). Mini Rally, Formula Mini and the other
+  app series stay hidden until the Creator makes them live.
+- The Creator makes a series live only when it has at least 1 stage (Formula
+  Mini: 2, `getCampaignSeriesMinStages`). Before that, you can add, move and
+  remove its stages freely.
 - A live series is fixed. A track cannot leave it, and its
   position, laps, medal target and medal times cannot change. Players' saved
   results were checked against them. New tracks go after the last stage.
@@ -315,8 +334,15 @@ its own stages. `game/campaign/series.json` holds them, and
   up from stage to stage, and it can be 3 × the stage number at most, so Gold
   on every stage always opens the next one.
 - Medals from every series count toward the Gold and Author car skins.
-- Campaign opens a series screen that lists every series in `series.json`.
-  A series that has not reached its stage count shows there as **Coming soon**.
+- When more than one series is live, Campaign opens a series screen that
+  lists the live series. It lists no other series.
+- A series can have stages on different grounds. Each stage uses the ground of
+  its track. The menus show the ground name when all stages use one ground,
+  and **Mixed** when they use more than one. The `ground` field of a series is
+  only an old theme value. It does not limit the stages.
+- The menus read the stage grounds of an app series from `TRACK_CATALOG`
+  (`game/campaign/series-surfaces.js`), so a catalog entry names the same
+  ground as its track definition.
 
 The Campaign Planner (`tools/campaign-planner.html`) shows one list at a time.
 The left side has a search box, **Not used** and **Daily Challenge** at the
@@ -329,19 +355,34 @@ matching tracks; click a track to open the list it is in.
   **Laps**, **Medal Target**, **Up**, **Down** and **Move to…**. **Add track**
   picks a Not used track, or any track by search.
 - Moving a track into a series, or off the Daily schedule, asks for
-  confirmation first. The confirm step sets **Laps** and **Medal Target** and
-  warns when the track's ground is not the series ground. A track without all
-  four medal times cannot become a stage.
+  confirmation first. The confirm step sets **Laps** and **Medal Target**. A
+  track without all four medal times cannot become a stage.
 - Every change writes `series.json` and the Daily schedule at once.
 
 ## In-game Creator safety
+
+Creator drafts belong to the Reddit account that first saved the track. The
+track picker shows **My draft** for private work and **Shared** for game
+tracks. Opening the Creator loads your newest saved private draft, or a blank
+map when you have none. Other moderators cannot list, open, save, remove or
+assign your private drafts. Saves use the server's Reddit identity; an account
+change requires reopening the Creator.
+
+Adding your draft to the Daily list or a saved Campaign series makes it shared
+with the other moderators. It stays shared if removed later. Copied app tracks
+and raced tracks remain shared. Existing unassigned Creator drafts belong to
+their recorded original author. Track names still produce keys that must be
+unique within the subreddit; choose another name if a key is already used.
+This applies only to the Reddit Creator. Website cloud maps keep their existing
+passcode and shared storage.
 
 The Redis Creator may save incomplete tracks as unassigned drafts. A track
 must have finished walls, passing Checks, and all four valid medal times
 before it can enter the Daily list or a Campaign draft. A track assigned to
 either must stay complete when saved; remove its editable placement first to
-save unfinished work. Daily admission requires a live ground, and Campaign
-stages must match their series ground. Published tracks remain immutable.
+save unfinished work. Daily admission requires a live ground. A Campaign
+series can hold tracks on any ground, and the Creator can make it live on any
+ground. Published tracks remain immutable.
 
 The Copy tab moves app tracks into Redis with three buttons. **Copy
 unplayed** copies the tracks nobody has raced, the Daily list and the hidden
@@ -397,7 +438,7 @@ Each track has one ground for the full lap. Choose it with **Ground** under
   lower and muffled, with a soft gear bang and quiet pops when the car slows
   down. Packed snow crunches under the tyres, louder in a slide. A slide is a
   low whoosh. The snow car is a little louder than the street car.
-- **Circuit** writes `ground: 'grip'`. It is a race-circuit road with three times
+- **Track** writes `ground: 'grip'`. It is a race-circuit road with three times
   the tarmac grip. The car holds its line and almost never slides: in corners,
   it slides about 3.5 degrees (9 degrees on tarmac). On tarmac, the slide makes
   the car's line change smoothly. On grip, the car starts and stops turning
@@ -407,7 +448,7 @@ Each track has one ground for the full lap. Choose it with **Ground** under
   top speed are the same as tarmac. The road is a little darker than tarmac.
 - Dirt and snow each have their own look, tyre tracks, spray, car sound, race
   song and cars. The snow song is a cold B minor synth track. Grip has its own
-  look, car sound, race song and cars. The Circuit car is the Formula car with
+  look, car sound, race song and cars. The Track car is the Formula car with
   a larger rear wing, tall end plates and wider rear tyres. The grip engine is
   a little higher, brighter and cleaner than on tarmac, with more high whine.
   The tyres squeal as on tarmac. The grip song has the tarmac song's driving

@@ -131,3 +131,15 @@ export const FORMULA_CAR = {
     offSec: 0.18,
   },
 };
+
+// The race and Mapmaker draw this car in a square of this many pixels.
+export const DRAWN_CAR_DRAW_PIXELS = 52;
+
+// Width of this picture in world units. The rear tires are the widest part.
+// pixelsPerWorldUnit is the race grid size: that many pixels are one unit.
+export function normalCarPictureWidth(pixelsPerWorldUnit) {
+  const rear = FORMULA_CAR.parts.find((part) => part.id === "rearTire");
+  const tireWidth = rear.settings?.width ?? tire.defaults.width;
+  const artWidth = 2 * (Math.abs(rear.at[1]) + tireWidth / 2);
+  return artWidth / FORMULA_CAR.boxSize * DRAWN_CAR_DRAW_PIXELS / pixelsPerWorldUnit;
+}

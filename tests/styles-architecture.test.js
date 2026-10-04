@@ -46,6 +46,7 @@ const expectedImports = [
     '../styles/result-details.css',
     '../styles/tracks-and-small-screens.css',
     '../styles/standings-and-sharing.css',
+    '../styles/garage-workshop.css',
 ];
 
 describe('game stylesheet architecture', () => {
@@ -559,7 +560,10 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel--lobby \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*grid-area:\s*1 \/ 1;[^}]*position:\s*static;[^}]*inset:\s*auto;[^}]*align-self:\s*center;[^}]*width:\s*2\.5rem;[^}]*height:\s*2\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*grid-area:\s*1 \/ 1;[^}]*position:\s*static;[^}]*inset:\s*auto;[^}]*align-self:\s*center;/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*width:\s*var\(--carousel-arrow-size, 2\.5rem\);[^}]*height:\s*var\(--carousel-arrow-size, 2\.5rem\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby \.track-carousel__nav--prev\s*\{[^}]*justify-self:\s*start;/s,
@@ -677,28 +681,76 @@ describe('game stylesheet architecture', () => {
         );
     });
 
-    it('paints garage Car/Trail with the Settings on/off pill', () => {
+    it('shares the Garage and Tracks tab styling while keeping the two-way Tracks thumb', () => {
         const garageStyles = readFileSync(
             new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        const workshopStyles = readFileSync(
+            new URL('../styles/garage-workshop.css', import.meta.url),
             'utf8',
         );
         expect(garageStyles).toMatch(
             /\.garage-tabs,\s*\.tracks-tabs\s*\{[^}]*grid-template-columns:\s*1fr 1fr;[^}]*background:\s*#1e293b;[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
         expect(garageStyles).toMatch(
-            /\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.tracks-tabs::before\s*\{[^}]*background-color:\s*var\(--accent-color\);[^}]*border-radius:\s*var\(--radius-full\);/s,
         );
-        const pillRule = garageStyles.search(/\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{\s*content/);
+        const pillRule = garageStyles.search(/\.tracks-tabs::before\s*\{\s*content/);
         const reducedPill = garageStyles.search(
-            /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.garage-tabs::before,\s*\.tracks-tabs::before\s*\{\s*transition:\s*none;/,
+            /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.tracks-tabs::before\s*\{\s*transition:\s*none;/,
         );
         expect(reducedPill).toBeGreaterThan(pillRule);
         expect(garageStyles).toMatch(
-            /\.garage-tabs:has\(#garage-tab-trails\[aria-selected="true"\]\)::before,\s*\.tracks-tabs:has\(#tracks-tab-campaign\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
+            /\.tracks-tabs:has\(#tracks-tab-campaign\[aria-selected="true"\]\)::before\s*\{[^}]*transform:\s*translateX\(100%\);/s,
+        );
+        expect(workshopStyles).toMatch(
+            /#garage-modal \.garage-tab\.is-selected,[^{]*\{[^}]*background:\s*var\(--accent-color\);/s,
+        );
+        expect(garageStyles).not.toContain('garage-tab-trails');
+        expect(workshopStyles).not.toMatch(/#garage-modal\s+\.(?:modal-card|reusable-modal-header|reusable-modal-content|leaderboard-hero-track)\s*\{/);
+    });
+
+    it('keeps seven Garage paint choices on one row below their part', () => {
+        const workshopStyles = readFileSync(
+            new URL('../styles/garage-workshop.css', import.meta.url),
+            'utf8',
+        );
+        expect(workshopStyles).toMatch(
+            /#garage-modal \.garage-color-options\s*\{[^}]*grid-column:\s*1 \/ -1;[^}]*grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\);/s,
+        );
+        expect(workshopStyles).toMatch(
+            /#garage-modal \.garage-color-option\s*\{[^}]*width:\s*100%;[^}]*aspect-ratio:\s*1;[^}]*max-width:\s*44px;[^}]*min-width:\s*0;[^}]*min-height:\s*0;/s,
+        );
+        expect(workshopStyles).not.toMatch(/\.garage-part-detail\s*\{[^}]*grid-row:\s*span 2;/);
+    });
+
+    it('reuses circular swatches and keeps arrow styling with the track carousel', () => {
+        const garageStyles = readFileSync(
+            new URL('../styles/lobby-and-garage.css', import.meta.url),
+            'utf8',
+        );
+        const workshopStyles = readFileSync(
+            new URL('../styles/garage-workshop.css', import.meta.url),
+            'utf8',
         );
         expect(garageStyles).toMatch(
-            /#garage-modal \.garage-tabs\s*\{[^}]*height:\s*2\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
+            /\.color-swatch\s*\{[^}]*width:\s*var\(--color-swatch-size, 2\.25rem\);[^}]*height:\s*auto;[^}]*aspect-ratio:\s*1;[^}]*border-radius:\s*50%;/s,
         );
+        expect(workshopStyles).toMatch(
+            /#garage-modal \.garage-color-option\s*\{[^}]*height:\s*auto;[^}]*aspect-ratio:\s*1;/s,
+        );
+        expect(workshopStyles).toMatch(
+            /#garage-modal \.garage-color-option\.is-selected\s*\{[^}]*outline:\s*2px solid var\(--text-color\);/s,
+        );
+        expect(trackCarouselStyles).toMatch(
+            /\.track-carousel__nav svg\s*\{[^}]*fill:\s*currentColor;/s,
+        );
+        expect(trackCarouselStyles).not.toContain('.carousel-arrow');
+        expect(workshopStyles).not.toContain('.garage-color-fill');
+        expect(workshopStyles).not.toContain('.garage-color-ring');
+        expect(workshopStyles).not.toContain('.garage-car-arrow');
+        expect(workshopStyles).not.toContain('.garage-car-dot');
     });
 
 });

@@ -4,7 +4,7 @@ import { creatorUsername, errorResponse } from './track-routes.js';
 export type CreatorSeriesRouteDependencies = {
     resolveCreatorToolSubredditName(): string | null;
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
-    readCreatorSeriesView(): Promise<unknown>;
+    readCreatorSeriesView(username: string): Promise<unknown>;
     readStoredSeries(seriesId: string): Promise<unknown | null>;
     saveStoredSeries(seriesId: unknown, input: unknown, options: { username: string; baseRevision?: unknown }): Promise<unknown>;
     publishStoredSeries(seriesId: unknown, options: { username: string; baseRevision?: unknown }): Promise<unknown>;
@@ -18,8 +18,8 @@ export function registerCreatorSeriesRoutes(
 ): void {
     app.get('/api/creator/series', async (_req, res) => {
         try {
-            await creatorUsername(dependencies);
-            res.json(await dependencies.readCreatorSeriesView());
+            const username = await creatorUsername(dependencies);
+            res.json(await dependencies.readCreatorSeriesView(username));
         } catch (error) {
             errorResponse(res, error);
         }

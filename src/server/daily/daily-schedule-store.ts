@@ -3,7 +3,8 @@ import { TRACK_SCHEDULE_KEYS, hasTrack } from '../../../game/track/catalog.js';
 import { getTrackGround } from '../../../game/track/grounds.js';
 import { isLiveGround } from '../../../game/track/live-grounds.js';
 import { TrackInputError } from '../tracks/track-shape.js';
-import { TrackConflictError } from '../tracks/track-store.js';
+import { TrackConflictError, queueStoredTrackRecord, matchesStoredTrack, readStoredTracksRevision } from '../tracks/track-store.js';
+import { readTracksToShare } from '../tracks/creator-track-access.js';
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-placement-lock.js';
 import { findSeriesUsingTrack as readSeriesUsingTrack } from '../campaign/series-usage.js';
@@ -128,7 +129,7 @@ export async function saveDailySchedule(
         }
         const previous = new Set(current.keys);
         for (const trackKey of keys) {
-            const complete = await readCompleteTrack(trackKey);
+            const complete = await readCompleteTrack(trackKey, username);
             if (previous.has(trackKey)) continue;
             if (!isLiveGround(getTrackGround(complete.track).key)) {
                 throw new TrackInputError(`${complete.track.name} is on a ground that is not live.`);
@@ -147,8 +148,14 @@ export async function saveDailySchedule(
             updatedAt: now.toISOString(),
             updatedBy: username,
         };
+        // Include outgoing placements so older shared tracks stay shared after removal.
+        const sharedTracks = await readTracksToShare([...current.keys, ...keys], now);
+        const trackCacheRevision = await readStoredTracksRevision() + sharedTracks.length;
         return { result: { ...next, source: 'stored' as const },
-            reconcile: async () => await redis.get(SCHEDULE_KEY) === JSON.stringify(next), mutate: async (transaction) => {
+            reconcile: async () => await redis.get(SCHEDULE_KEY) === JSON.stringify(next)
+                && (await Promise.all(sharedTracks.map((track) => matchesStoredTrack(track, trackCacheRevision)))).every(Boolean),
+            mutate: async (transaction) => {
+            for (const track of sharedTracks) await queueStoredTrackRecord(transaction, track);
             await transaction.set(SCHEDULE_KEY, JSON.stringify(next));
         } };
     }));

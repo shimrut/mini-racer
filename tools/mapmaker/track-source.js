@@ -1,10 +1,12 @@
 import { CONFIG } from '../../game/config.js';
+import { normalCarPictureWidth } from '../../game/car/drawn-car/formula.js';
 import { clamp } from '../geometry.js';
 import { getStoredTrackGroundKey } from '../../game/track/grounds.js';
 
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
-const CAR_WIDTH = CONFIG.carRadius * 2;
+// Road widths count pictures of the normal car across, not hit-boxes.
+const CAR_WIDTH = normalCarPictureWidth(CONFIG.gridSize);
 // The road widths of Draw, in cars. Wide is the widest road Draw makes.
 export const ROAD_WIDTHS = Object.freeze([
     { value: 'narrow', label: 'Narrow', cars: 6 },

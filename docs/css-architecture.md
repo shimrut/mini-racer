@@ -52,7 +52,7 @@ top-to-bottom order.
 | 1 | `styles/fonts.css` | Hosted Outfit and JetBrains Mono declarations |
 | 2 | `styles/foundation.css` | Tokens, reset, body, focus and global states |
 | 3 | `styles/race-hud-and-medals.css` | HUD, speed display and shared medal system |
-| 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and garage rules. Garage Car/Trail uses the same sliding pill as Settings on/off: slate track (`#1e293b` so it reads on the garage sheet), red thumb, `--radius-full`, `2.5rem` tall. |
+| 4 | `styles/lobby-and-garage.css` | Game canvas, start menu and the Legacy garage collection/locks. The Garage workshop composition is scoped in the final garage stylesheet. |
 | 5 | `styles/lobby-modes.css` | Home, Daily, Campaign and Challenge lobby composition |
 | 6 | `styles/track-carousel.css` | Shared Daily/Campaign selector rail, cards and medal ladder |
 | 7 | `styles/race-controls-and-feedback.css` | Touch controls, countdown and lap feedback |
@@ -65,6 +65,7 @@ top-to-bottom order.
 | 14 | `styles/result-details.css` | Result details overlay and compact result layout |
 | 15 | `styles/tracks-and-small-screens.css` | Track cards and later small-screen sheet overrides |
 | 16 | `styles/standings-and-sharing.css` | Standings header, shareable rows and share panel |
+| 17 | `styles/garage-workshop.css` | Garage type rail, car stage, decal-style choices, three paint rows and the shared trail-color row inside the modal shell. Does not own modal sizing, headers or content scrolling. |
 
 Some files intentionally span more than one product surface. Those boundaries
 reflect contiguous sections of the original stylesheet and avoid changing which
@@ -359,6 +360,11 @@ for its single handoff rather than added to the general motion band.
 
 ## Change Rules
 
+- The 2026-10-03 cleanup removed obsolete LP selector families (`veil`, `mark`,
+  `btn-play-top`, `hero-subhead`, `play-icon`, `hero-caption`, `slash-accent`,
+  `wrap`), the caption-only LP `--muted` token, Creator's unused `creator-hidden`
+  selector arm, and analytics' unread `--raised` token. Current selectors retain
+  their declarations and order; Creator's `#restore-drafts-dialog` hiding rule stays.
 - Keep `pages/styles.css` as the only game stylesheet linked from HTML.
 - Do not size a full-screen child independently from `dvh`; route usable
   embedded-browser height through `--app-visible-height` and let descendants
@@ -391,3 +397,13 @@ For structural or cross-file changes:
    overlap, at least `5rem` of reported-viewport clearance below the complete
    action row on Reddit-sized mobile viewports, selected-card recentering after
    resize, and synchronized Start/Standings lock state.
+
+## Garage workshop (2026-10-02)
+
+- The Garage uses the supplied dark navy reference: Outfit italic title, red selected type pill and an enlarged car stage. Decal style, Body, Accent, Tertiary and Trail color are open sections separated by thin rules. Section containers and rows have no nested card backgrounds, rounded borders or doubled padding. The seven swatches use a white selection ring; keyboard focus uses the shared menu ring.
+- Street, Circuit and Dirt currently browse the existing drawn-car presets. Snow, Water and Space tab buttons are temporarily hidden; their implementation and saved choices remain available. Legacy keeps the collection previously shown in the Garage, including achievement locks and requirement dialogs. Appearance tabs do not enable held-back race grounds or series.
+- Garage inherits the same modal width, header typography/padding, sheet spacing, safe-area behavior, scrolling content and Back clearance as Settings and Tracks. Shared shell rules remain the sole owners; Garage adds no modal-width or heading overrides and no nested workshop scroller. Its type tabs, car, paint and trail rows flow inside `reusable-modal-content`. The four visible type tabs stay on one horizontally scrollable rail with natural label widths, including Legacy. Native CSS sticky positioning pins that rail below the fixed Garage heading, with an opaque spread shadow shielding content underneath. Native focus scrolls keyboard-selected tabs into view; content controls reserve scroll margin for the rail so they remain visible during Tab and directional navigation. Paint labels sit above their seven swatches so they fit the shared column at every size. Trails reuse the paint panel, row, label, palette and circular-button styles, with eight columns for No Trail plus the seven colors; the old labeled trail tile/grid rules are removed.
+- The car stage trims transparent margins from a Garage-only still rendered by the existing DrawnCar constructor at 9 pixels per unit. Its PNG is cached with the existing prepared artwork; race sprites keep their 3 pixels per unit and animation resolution cap. Detail thumbnails continue to use the cached car. Browsing a type shows its equipped drawn skin, or the first drawn skin when a Legacy car is equipped. Use car or a decal/paint/trail choice equips that preview; entering the tab alone leaves the saved choice intact. Each ground retains its own existing skin choice. Trail controls remain below the active car section and edit the previewed skin (the equipped tarmac skin in Legacy). Accessible labels and titles identify each trail color without a second row of visible labels.
+
+- Paint and trail swatches share `.color-swatch`, with square aspect ratio and a circular CSS selection outline. All seven paint choices stay on one row below each part thumbnail and label, scaling equally to fit the shared modal column with a 44px maximum button size. Do not wrap the palette or widen the modal to force larger targets. The car stage has one centered image with no arrow columns or navigation dots. Decal style is the sole pattern selector. Part canvases keep their native 6:5 ratio and fit at one uniform scale; bounds follow actual preset paint areas, with a component mask excluding nearby tires/frame. Geometry and prepared artwork are cached for unchanged visuals.
+- Decal style reuses the paint panel/row/label and existing skin-choice buttons, images and selected/focus styles. Four Street options and five compatible options for each other drawn type stay on one row. Only compact dimensions and the option-column count are specific to this row; it has no separate shell or scroller. Thumbnails use the current skin's colors, materials and parts with the proposed paired pattern. A style that does not use a color channel retains its saved color but marks the row unused, hides the empty detail and disables that palette. Legacy has no decal row.

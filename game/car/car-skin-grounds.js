@@ -1,4 +1,5 @@
 import { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from './car-unlock-policy.js';
+import { isDrawnCarAsset } from './drawn-car-skins.js';
 
 // Each car skin belongs to one ground. The file name says which:
 // mr_grip_* is a circuit skin, mr_dirt_*.webp a dirt skin, mr_snow_*.webp a
@@ -40,4 +41,10 @@ export function getDefaultCarAssetForGround(ground) {
     const key = normalizeCarSkinGround(ground);
     if (key === 'tarmac') return STOCK_CAR_ASSET_NAME;
     return getCarAssetsForGround(key)[0] ?? null;
+}
+
+// Authoring previews use the first full drawn preset for the ground, including
+// Formula on tarmac, without changing the player's stock/Legacy default.
+export function getDefaultDrawnCarAssetForGround(ground) {
+    return getCarAssetsForGround(ground).find(isDrawnCarAsset) ?? null;
 }

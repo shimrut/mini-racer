@@ -1,7 +1,6 @@
 /* The Creator: the Mapmaker with game tracks, the Daily list, the Campaign
    Planner and the copy of unplayed tracks. It works on desktop and on phones. */
 
-.creator-mode .creator-hidden,
 .creator-mode #restore-drafts-dialog {
     display: none !important;
 }

@@ -237,6 +237,7 @@ function campaignSeriesSummaries(bootstrap) {
         id: series.id,
         name: series.name,
         ground: series.ground,
+        grounds: series.grounds,
         stageCount: series.stages.length,
         medalCount: series.id === seriesId ? countCampaignMedals(results, series.id) : 0,
         finished: series.id === seriesId && isCampaignSeriesFinished(series.id, results),
@@ -477,6 +478,7 @@ export const campaignEngineMethods = {
         });
         this.campaignBootstrap = displayedBootstrap;
         this._campaignBootstrapReady = bootstrapReady;
+        this._campaignBootstrapContextKey = this.getRaceModeWarmupKey?.('campaign');
         this.campaignLobbyState = normalizeCampaignLobbyState({
             ...decorateCampaignState(displayedBootstrap),
             view: this.campaignLobbyView ?? 'stages',
@@ -527,16 +529,18 @@ export const campaignEngineMethods = {
     },
 
     async ensureCampaignBootstrap({ forceRefresh = false } = {}) {
+        const contextKey = this.getRaceModeWarmupKey?.('campaign');
         const hasUsableBootstrap = Boolean(
             this._campaignBootstrapReady
             && this.campaignBootstrap
+            && this._campaignBootstrapContextKey === contextKey
             && this.campaignBootstrap.authoritative !== false
             && this.campaignBootstrap.availability !== 'unavailable'
         );
         if (!forceRefresh && hasUsableBootstrap) {
             return this.campaignBootstrap;
         }
-        if (this._campaignBootstrapPromise) {
+        if (this._campaignBootstrapPromise && this._campaignBootstrapPromiseContextKey === contextKey) {
             return this._campaignBootstrapPromise;
         }
 
@@ -544,8 +548,11 @@ export const campaignEngineMethods = {
         this._campaignBootstrapRequestId = requestId;
         const promise = getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) })
             .then(async (bootstrap) => {
+                const stillCurrent = () => requestId === this._campaignBootstrapRequestId
+                    && contextKey === this.getRaceModeWarmupKey?.('campaign');
+                if (!stillCurrent()) return null;
                 if (bootstrap?.authoritative !== false && bootstrap?.availability !== 'unavailable') {
-                    await this.loadCampaignRaceDefinitions?.();
+                    await (this.loadCampaignRaceDefinitions ?? campaignEngineMethods.loadCampaignRaceDefinitions).call(this);
                 }
                 // Times that waited for the series list can go now.
                 if (
@@ -555,19 +562,19 @@ export const campaignEngineMethods = {
                 ) {
                     this.scheduleVerificationQueueProcessing?.(0);
                 }
-                if (requestId !== this._campaignBootstrapRequestId) {
-                    return this.campaignBootstrap;
-                }
+                if (!stillCurrent()) return null;
                 const hasAuthoritativeBootstrap = Boolean(
                     this._campaignBootstrapReady
                     && this.campaignBootstrap
+                    && this._campaignBootstrapContextKey === contextKey
                     && this.campaignBootstrap.authoritative !== false
                     && this.campaignBootstrap.availability !== 'unavailable'
                 );
                 if (bootstrap?.authoritative === false && hasAuthoritativeBootstrap) {
                     return this.campaignBootstrap;
                 }
-                this.applyCampaignLobbyBootstrap(bootstrap, { paint: true });
+                (this.applyCampaignLobbyBootstrap ?? campaignEngineMethods.applyCampaignLobbyBootstrap)
+                    .call(this, bootstrap, { paint: true });
                 return bootstrap;
             })
             .finally(() => {
@@ -576,6 +583,7 @@ export const campaignEngineMethods = {
                 }
             });
         this._campaignBootstrapPromise = promise;
+        this._campaignBootstrapPromiseContextKey = contextKey;
         return promise;
     },
 
@@ -584,19 +592,27 @@ export const campaignEngineMethods = {
     },
 
     async warmCampaignRaceDefinitions() {
-        const bootstrap = await getCampaignBootstrap({ seriesId: selectedCampaignSeriesId(this) });
-        if (bootstrap?.authoritative === false || bootstrap?.availability === 'unavailable') {
+        const bootstrap = await campaignEngineMethods.ensureCampaignBootstrap.call(this);
+        if (!bootstrap || bootstrap.authoritative === false || bootstrap.availability === 'unavailable') {
             throw new Error('Campaign progress could not load. Try again.');
         }
         await campaignEngineMethods.loadCampaignRaceDefinitions.call(this);
-        const state = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-        const stage = getCampaignStage(getDefaultCampaignLobbyStage(state)?.id);
-        if (!stage?.trackKey) throw new Error('The Campaign has no playable stage.');
-        const prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.CAMPAIGN, {
-            trackKey: stage.trackKey,
-            challenge: toRaceChallenge(stage),
-        });
-        return { bootstrap, stage, prepared };
+        let verified;
+        let stage;
+        let prepared;
+        do {
+            verified = this.campaignVerifiedBootstrap ?? bootstrap;
+            const state = normalizeCampaignLobbyState(decorateCampaignState(this.campaignBootstrap ?? verified));
+            stage = getCampaignStage(getDefaultCampaignLobbyStage(state)?.id);
+            if (!stage?.trackKey) throw new Error('The Campaign has no playable stage.');
+            prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.CAMPAIGN, {
+                trackKey: stage.trackKey,
+                challenge: toRaceChallenge(stage),
+            });
+        } while (this.campaignVerifiedBootstrap && verified !== this.campaignVerifiedBootstrap);
+        // The displayed state can contain provisional results. Retain only the
+        // canonical server bootstrap so re-entry cannot promote that overlay.
+        return { bootstrap: verified, stage, prepared };
     },
 
     async prepareInitialCampaignLaunch({

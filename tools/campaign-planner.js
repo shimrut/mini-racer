@@ -1,10 +1,10 @@
 import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { TRACK_GROUNDS, getTrackGround } from '../game/track/grounds.js';
-import { isLiveGround } from '../game/track/live-grounds.js';
+import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../game/campaign/series-surfaces.js';
 import { TRACKS } from '../game/track/tracks.js';
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
 import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
-import { getCampaignSeriesMinStages, isCampaignSeriesLive } from '../game/campaign/series-rules.js';
+import { isAppCampaignSeriesLive } from '../game/campaign/series-rules.js';
 import {
     applyScheduleDestination,
     applyTrackSeriesUpdate,
@@ -38,7 +38,16 @@ function getTrackName(trackKey) {
 }
 
 function getTrackGroundKey(trackKey) {
-    return getTrackGround(TRACKS[trackKey]).key;
+    const track = TRACKS[trackKey];
+    return track ? getTrackGround(track).key : null;
+}
+
+function seriesSurfaces(series) {
+    return { ...series, grounds: getCampaignSeriesGrounds(series, getTrackGroundKey) };
+}
+
+function seriesIsLive(series) {
+    return isAppCampaignSeriesLive(series);
 }
 
 function groundLabel(ground) {
@@ -58,9 +67,7 @@ function matches(query, text) {
 }
 
 function seriesStateText(series) {
-    if (isCampaignSeriesLive(series)) return 'live';
-    if (!isLiveGround(series.ground)) return 'hidden, ground not live';
-    return `hidden until ${getCampaignSeriesMinStages(series)} stages`;
+    return seriesIsLive(series) ? 'live' : 'not live';
 }
 
 async function postJson(path, body) {
@@ -210,20 +217,16 @@ class CampaignPlannerApp {
         const count = this.getListTrackKeys(list).length;
         const series = this.getSeries(list);
         if (!series) return plural(count, 'track');
-        return `${groundLabel(series.ground)} · ${plural(count, 'stage')} · ${seriesStateText(series)}`;
+        return `${getCampaignSeriesSurfaceLabel(seriesSurfaces(series))} · ${plural(count, 'stage')} · ${seriesStateText(series)}`;
     }
 
     isStageFixed(trackKey) {
         const stage = findTrackStage(this.seriesData, trackKey);
-        return Boolean(stage && isCampaignSeriesLive(stage.series));
+        return Boolean(stage && seriesIsLive(stage.series));
     }
 
-    getTrackWarnings(trackKey, series) {
+    getTrackWarnings(trackKey) {
         const warnings = [];
-        const ground = getTrackGroundKey(trackKey);
-        if (series && ground !== series.ground) {
-            warnings.push(`${groundLabel(ground)} track in a ${groundLabel(series.ground)} campaign.`);
-        }
         if (getMedalRowError(medalTimesFileData[trackKey])) warnings.push('No medal times.');
         return warnings;
     }
@@ -297,7 +300,7 @@ class CampaignPlannerApp {
             [DAILY_DESTINATION]: 'In schedule order. New Daily tracks go at the end.',
         };
         const hint = series
-            ? (isCampaignSeriesLive(series) ? 'Players can see it, so its stages are fixed. New tracks go at the end.' : 'Hidden from players, so you can change anything.')
+            ? (seriesIsLive(series) ? 'Players can see it, so its stages are fixed. New tracks go at the end.' : 'Hidden from players, so you can change anything.')
             : hints[list];
         this.listMeta.textContent = `${this.getListMeta(list)}. ${hint}`;
         this.addTrackBtn.hidden = !series;
@@ -314,14 +317,14 @@ class CampaignPlannerApp {
 
     renderStages(series) {
         if (!series.stages.length) return el('p', 'planner-empty', 'No stages yet. Use Add track.');
-        const live = isCampaignSeriesLive(series);
+        const live = seriesIsLive(series);
         const list = el('ol', 'planner-stages');
         series.stages.forEach((stage, index) => {
             const item = el('li', 'planner-stage');
             item.dataset.trackKey = stage.trackKey;
             const info = el('div', 'planner-stage-info');
             info.append(el('strong', '', getTrackName(stage.trackKey)));
-            const warnings = this.getTrackWarnings(stage.trackKey, series);
+            const warnings = this.getTrackWarnings(stage.trackKey);
             if (warnings.length) info.append(el('span', 'planner-warn', warnings.join(' ')));
             item.append(
                 el('span', 'planner-stage-number', stageNumber(index)),
@@ -395,7 +398,7 @@ class CampaignPlannerApp {
                 getTrackName(trackKey),
                 list === DAILY_DESTINATION ? `#${index + 1} · ${ground}` : ground,
             );
-            const warnings = this.getTrackWarnings(trackKey, null);
+            const warnings = this.getTrackWarnings(trackKey);
             if (warnings.length) card.append(el('span', 'planner-warn', warnings.join(' ')));
             card.append(this.createMoveButton(trackKey));
             grid.appendChild(card);
@@ -447,25 +450,21 @@ class CampaignPlannerApp {
             const lists = [DAILY_DESTINATION, UNUSED_DESTINATION, ...this.seriesData.series.map((series) => seriesDestination(series.id))]
                 .filter((list) => list !== current && matches(query, this.getListName(list)));
             for (const list of lists) {
-                const series = this.getSeries(list);
-                const ground = getTrackGroundKey(trackKey);
                 const button = this.createPickerButton(
                     this.getListName(list),
                     this.getListMeta(list),
-                    series && ground !== series.ground ? `This track is ${groundLabel(ground)}.` : '',
                 );
                 button.dataset.pickList = list;
                 items.push(button);
             }
         } else {
-            const series = this.getSeries(destination);
             if (!query) items.push(el('p', 'field-hint', 'Not used tracks. Search to pick any track.'));
             const trackKeys = (query
                 ? Object.keys(TRACK_CATALOG).filter((key) => matches(query, getTrackName(key)))
                 : this.getUnusedKeys()
             ).filter((key) => this.getTrackDestination(key) !== destination);
             for (const key of trackKeys) {
-                const warnings = this.getTrackWarnings(key, series);
+                const warnings = this.getTrackWarnings(key);
                 const button = this.createPickerButton(getTrackName(key), this.getListName(this.getTrackDestination(key)), warnings.join(' '));
                 button.prepend(this.previews.create(key, 'planner-pick-preview'));
                 button.dataset.pickTrack = key;
@@ -512,12 +511,8 @@ class CampaignPlannerApp {
         const notes = [];
         if (from === DAILY_DESTINATION) notes.push(['', 'It leaves the Daily schedule and will not appear in future Daily GP days.']);
         if (fromSeries) notes.push(['', `It leaves ${fromSeries.name}. The stages after it move up.`]);
-        if (series && isCampaignSeriesLive(series)) {
+        if (series && seriesIsLive(series)) {
             notes.push(['warn', `${series.name} is live. After this, the stage is fixed: its place, laps, medal target and medal times cannot change.`]);
-        }
-        const ground = getTrackGroundKey(trackKey);
-        if (series && ground !== series.ground) {
-            notes.push(['warn', `This track is ${groundLabel(ground)}, but ${series.name} is a ${groundLabel(series.ground)} campaign.`]);
         }
         const missingMedals = Boolean(series) && Boolean(getMedalRowError(medalTimesFileData[trackKey]));
         if (missingMedals) notes.push(['error', 'A campaign stage needs all four medal times. Set them in the Mapmaker first.']);

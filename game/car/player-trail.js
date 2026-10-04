@@ -1,4 +1,7 @@
+import { PLAYER_SELECTABLE_CAR_ASSETS } from './car-unlock-policy.js';
+
 export const PLAYER_TRAIL_STORAGE_KEY = 'MiniRacerPlayerTrail';
+export const PLAYER_CAR_TRAILS_STORAGE_KEY = 'MiniRacerPlayerCarTrails';
 
 export const PLAYER_TRAIL_COLORS = Object.freeze([
     Object.freeze({ id: 'none', label: 'No Trail', strokeStyle: 'rgba(15, 23, 42, 0)', swatch: '#0f172a' }),
@@ -14,13 +17,54 @@ export const PLAYER_TRAIL_COLORS = Object.freeze([
 const DEFAULT_TRAIL_ID = 'sky';
 
 const BY_ID = new Map(PLAYER_TRAIL_COLORS.map((entry) => [entry.id, entry]));
+const CAR_ASSETS = new Set(PLAYER_SELECTABLE_CAR_ASSETS);
+
+export function normalizeCarTrails(value) {
+    const trails = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return trails;
+    for (const assetName of PLAYER_SELECTABLE_CAR_ASSETS) {
+        if (!Object.hasOwn(value, assetName)) continue;
+        const id = typeof value[assetName] === 'string' ? value[assetName].trim() : '';
+        if (BY_ID.has(id)) trails[assetName] = id;
+    }
+    return trails;
+}
+
+export function readPlayerCarTrails() {
+    if (typeof window === 'undefined' || !window.localStorage) return {};
+    try {
+        const raw = window.localStorage.getItem(PLAYER_CAR_TRAILS_STORAGE_KEY);
+        return normalizeCarTrails(raw ? JSON.parse(raw) : null);
+    } catch (error) {
+        console.error('Error reading player car trails:', error);
+        return {};
+    }
+}
+
+export function applyPlayerCarTrails(value) {
+    const trails = normalizeCarTrails(value);
+    if (typeof window === 'undefined' || !window.localStorage) return trails;
+    try {
+        if (Object.keys(trails).length) {
+            window.localStorage.setItem(PLAYER_CAR_TRAILS_STORAGE_KEY, JSON.stringify(trails));
+        } else {
+            window.localStorage.removeItem(PLAYER_CAR_TRAILS_STORAGE_KEY);
+        }
+    } catch (error) {
+        console.error('Error saving player car trails:', error);
+    }
+    return trails;
+}
 
 export function trailStrokeStyleForId(id) {
     if (id === 'none') return null;
     return BY_ID.get(id)?.strokeStyle ?? BY_ID.get(DEFAULT_TRAIL_ID).strokeStyle;
 }
 
-export function readPlayerTrailId() {
+export function readPlayerTrailId(assetName) {
+    const picked = assetName && readPlayerCarTrails()[assetName];
+    if (picked) return picked;
+    // Existing global choices remain the fallback for skins not yet customized.
     if (typeof window === 'undefined' || !window.localStorage) {
         return DEFAULT_TRAIL_ID;
     }
@@ -36,12 +80,17 @@ export function readPlayerTrailId() {
     return DEFAULT_TRAIL_ID;
 }
 
-export function readPlayerTrailStrokeStyle() {
-    return trailStrokeStyleForId(readPlayerTrailId());
+export function readPlayerTrailStrokeStyle(assetName) {
+    return trailStrokeStyleForId(readPlayerTrailId(assetName));
 }
 
-export function writePlayerTrailId(id) {
+export function writePlayerTrailId(id, assetName) {
     const next = BY_ID.has(id) ? id : DEFAULT_TRAIL_ID;
+    if (assetName !== undefined) {
+        if (!CAR_ASSETS.has(assetName)) return readPlayerTrailId();
+        applyPlayerCarTrails({ ...readPlayerCarTrails(), [assetName]: next });
+        return next;
+    }
     if (typeof window !== 'undefined' && window.localStorage) {
         try {
             window.localStorage.setItem(PLAYER_TRAIL_STORAGE_KEY, JSON.stringify(next));

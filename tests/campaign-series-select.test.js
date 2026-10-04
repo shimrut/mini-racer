@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getCampaignBootstrap = vi.fn();
 
 // Two live series: Numbers and a 10-stage test series.
+// Only Numbers is live from the app data. These tests need a second live
+// series, as if the Creator had made it live.
+vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    isAppCampaignSeriesLive: (series) => ['numbered-v1', 'test-v1'].includes(series?.id),
+}));
 vi.mock('../game/campaign/series.json', async () => {
     const { readFileSync } = await import('node:fs');
     const real = JSON.parse(readFileSync(new URL('../game/campaign/series.json', import.meta.url), 'utf8'));

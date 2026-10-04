@@ -6,7 +6,11 @@ import {
 import {
     readPlayerTrailId,
     writePlayerTrailId,
+    readPlayerCarTrails,
+    applyPlayerCarTrails,
 } from '../car/player-trail.js';
+import { applyPlayerCarPaints, readPlayerCarPaints } from '../car/player-car-paint.js';
+import { applyPlayerCarDecals, readPlayerCarDecals } from '../car/player-car-decals.js';
 import {
     API_ROUTES,
 } from '../scoreboard/api-client.js';
@@ -52,6 +56,9 @@ export function readPlayerPreferences() {
     const carSkinSnow = readPlayerGroundCarSkinChoice('snow');
     const carSkinWater = readPlayerGroundCarSkinChoice('water');
     const carSkinSpace = readPlayerGroundCarSkinChoice('space');
+    const carPaints = readPlayerCarPaints();
+    const carTrails = readPlayerCarTrails();
+    const carDecals = readPlayerCarDecals();
     return {
         carSkin: readPlayerCarSkinAssetName(),
         // Sent only once the player picks a skin for that ground.
@@ -60,6 +67,9 @@ export function readPlayerPreferences() {
         ...(carSkinSnow ? { carSkinSnow } : {}),
         ...(carSkinWater ? { carSkinWater } : {}),
         ...(carSkinSpace ? { carSkinSpace } : {}),
+        ...(Object.keys(carPaints).length > 0 ? { carPaints } : {}),
+        ...(Object.keys(carTrails).length > 0 ? { carTrails } : {}),
+        ...(Object.keys(carDecals).length > 0 ? { carDecals } : {}),
         trailId: readPlayerTrailId(),
         musicEnabled: getMusicEnabled(),
         carAudioEnabled: getCarProceduralAudioEnabled(),
@@ -84,7 +94,10 @@ export function applyPlayerPreferences(value) {
     writePlayerCarSkinAssetName(value.carSkinSnow, 'snow');
     writePlayerCarSkinAssetName(value.carSkinWater, 'water');
     writePlayerCarSkinAssetName(value.carSkinSpace, 'space');
+    applyPlayerCarPaints(value.carPaints);
+    applyPlayerCarDecals(value.carDecals);
     writePlayerTrailId(value.trailId);
+    applyPlayerCarTrails(value.carTrails);
     setMusicEnabled(value.musicEnabled);
     setCarProceduralAudioEnabled(value.carAudioEnabled);
     setPbGhostEnabled(value.pbGhostEnabled !== false);

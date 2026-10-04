@@ -24,7 +24,8 @@ import { acquireRedisLock, releaseRedisLock, type RedisLock } from '../redis/red
 import { TrackPlacementRetryError, withTrackPlacementLock, commitTrackPlacement } from './track-placement-lock.js';
 import { getTrackCompletenessError } from './track-readiness.js';
 import { isTrackInDailySchedule } from '../daily/daily-schedule-store.js';
-import { findSeriesUsingTrack, readSeriesGround } from '../campaign/series-usage.js';
+import { findSeriesUsingTrack } from '../campaign/series-usage.js';
+import { assertCreatorTrackAccess, canAccessCreatorTrack, readCreatorTrackPlacements } from './creator-track-access.js';
 
 // Tracks made in the Creator, and copies of built-in tracks that nobody has
 // raced. Each subreddit install has its own Redis, so each has its own list.
@@ -53,6 +54,8 @@ export type StoredTrackRecord = {
     updatedBy: string;
     lockedAt: string | null;
     lockReason: StoredTrackLockReason | null;
+    // Once admitted to Daily/Campaign it stays shared, even if removed later.
+    sharedAt?: string;
 };
 
 export type StoredTrackSummary = Pick<StoredTrackRecord,
@@ -521,6 +524,7 @@ export async function saveStoredTrack(
     return withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
         commitTrackPlacement([placementLock, trackLock], [], async () => {
             const existing = await readStoredTrack(trackKey);
+            await assertCreatorTrackAccess(existing, username);
             const expected = Number(baseRevision ?? 0);
             if ((existing?.revision ?? 0) !== expected) {
                 throw new TrackConflictError('This track changed on another device.');
@@ -543,12 +547,6 @@ export async function saveStoredTrack(
             if (assigned && getTrackCompletenessError(track, draftLoop, medalRow)) {
                 throw new TrackInputError('Take this track out of the Daily list and the Campaign series before saving unfinished work.');
             }
-            if (seriesId) {
-                const ground = await readSeriesGround(seriesId);
-                if (ground && groundKey !== ground) {
-                    throw new TrackInputError('Take this track out of its Campaign series before changing its ground.');
-                }
-            }
             const stamp = now.toISOString();
             const record: StoredTrackRecord = {
                 version: 1,
@@ -568,6 +566,8 @@ export async function saveStoredTrack(
                 updatedBy: username,
                 lockedAt: null,
                 lockReason: null,
+                ...(existing?.sharedAt ? { sharedAt: existing.sharedAt }
+                    : existing && existing.origin !== 'migrated' && assigned ? { sharedAt: stamp } : {}),
             };
             const cacheRevision = await readStoredTracksRevision() + 1;
             return { result: record, reconcile: () => matchesStoredTrack(record, cacheRevision),
@@ -621,6 +621,7 @@ export async function saveLockedTrackCopy(record: StoredTrackRecord): Promise<bo
 }
 
 export type DeleteStoredTrackOptions = {
+    username?: string;
     baseRevision?: unknown;
     isPlaced?: (trackKey: string) => Promise<boolean>;
 };
@@ -629,13 +630,16 @@ export type DeleteStoredTrackOptions = {
 // track, the game then uses the app copy again.
 export async function deleteStoredTrack(
     trackKeyInput: unknown,
-    { baseRevision, isPlaced }: DeleteStoredTrackOptions = {},
+    { username, baseRevision, isPlaced }: DeleteStoredTrackOptions = {},
 ): Promise<boolean> {
     const trackKey = assertTrackKey(trackKeyInput);
     return withTrackPlacementLock((placementLock) => withTrackWriteLock(trackKey, (trackLock) =>
         commitTrackPlacement([placementLock, trackLock], [], async () => {
             const existing = await readStoredTrack(trackKey);
             if (!existing) return { result: false };
+            if (username !== undefined && !canAccessCreatorTrack(existing, username, await readCreatorTrackPlacements())) {
+                return { result: false };
+            }
             if (baseRevision !== undefined && Number(baseRevision) !== existing.revision) {
                 throw new TrackConflictError('This track changed on another device.');
             }

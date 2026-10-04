@@ -600,6 +600,7 @@ function seriesSummaries(progressList: readonly CampaignProgress[]) {
             id: series.id,
             name: series.name,
             ground: series.ground,
+            grounds: series.grounds,
             stageCount: series.stages.length,
             medalCount: countCampaignMedals(results, series.id),
             finished: isCampaignSeriesFinished(series.id, results),

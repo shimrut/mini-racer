@@ -24,7 +24,6 @@
     --bg: #020617;
     --text: #ffffff;
     --text-dim: #8e9cb0;
-    --muted: #64748b;
     --red: #ff3e3e;
     --red-hover: #ff5555;
     --red-glow: rgba(255, 62, 62, 0.45);
@@ -76,7 +75,7 @@ a:focus-visible {
     overflow-x: clip;
 }
 
-/* Full-Bleed Background Track & Atmosphere Veil */
+/* Full-Bleed Background Track */
 
 .track {
     position: absolute;
@@ -89,16 +88,6 @@ a:focus-visible {
     user-select: none;
     z-index: 0;
     transform: translateX(-7%);
-}
-
-.veil {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    background:
-        radial-gradient(ellipse 70% 60% at 50% 50%, rgba(2, 6, 23, 0.05) 0%, rgba(2, 6, 23, 0.35) 65%, rgba(2, 6, 23, 0.85) 100%),
-        linear-gradient(180deg, rgba(2, 6, 23, 0.45) 0%, transparent 18%, transparent 82%, rgba(2, 6, 23, 0.75) 100%);
 }
 
 /* Header & Navbar */
@@ -118,37 +107,6 @@ a:focus-visible {
     justify-content: center;
     gap: 1.5rem;
     width: 100%;
-}
-
-/* Wordmark */
-
-.mark {
-    display: inline-flex;
-    align-items: baseline;
-    font-size: clamp(1.6rem, 2.8vw, 2.3rem);
-    font-weight: 900;
-    font-style: italic;
-    text-transform: uppercase;
-    text-decoration: none;
-    letter-spacing: -0.03em;
-    user-select: none;
-    flex-shrink: 0;
-    order: 1;
-}
-
-.mark span:first-child {
-    color: #ffffff;
-}
-
-.mark span:last-child {
-    color: var(--red);
-    text-shadow: 0 0 20px var(--red-glow);
-    transition: color 150ms ease;
-}
-
-a.mark:hover span:last-child,
-a.mark:focus-visible span:last-child {
-    color: var(--red-hover);
 }
 
 /* Navigation Links */
@@ -178,35 +136,6 @@ a.mark:focus-visible span:last-child {
     text-decoration-color: var(--red);
     text-decoration-thickness: 2px;
     text-underline-offset: 6px;
-}
-
-/* Top Right Play Button */
-
-.btn-play-top {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.65rem 1.75rem;
-    background: var(--red);
-    color: #ffffff;
-    font-size: 0.95rem;
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    border-radius: 999px;
-    box-shadow: 0 4px 20px var(--red-glow);
-    transition: background-color 150ms ease, transform 120ms var(--ease-out);
-    white-space: nowrap;
-    flex-shrink: 0;
-    order: 3;
-}
-
-.btn-play-top:hover,
-.btn-play-top:focus-visible {
-    background: var(--red-hover);
-    box-shadow: 0 6px 26px rgba(255, 62, 62, 0.65);
-    transform: translateY(-2px);
 }
 
 /* Main Hero Stage Overlay */
@@ -293,16 +222,6 @@ a.mark:focus-visible span:last-child {
     animation: slideInRight 0.6s var(--ease-out) 0.1s both;
 }
 
-.hero-subhead {
-    margin: clamp(1.15rem, 2.5vh, 1.85rem) 0 0;
-    font-family: var(--mono);
-    font-size: clamp(0.72rem, 1.2vw, 0.92rem);
-    font-weight: 700;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-}
-
 .play-action-wrap {
     margin-top: clamp(1.5rem, 3vh, 2.5rem);
     display: flex;
@@ -338,20 +257,6 @@ a.mark:focus-visible span:last-child {
     transform: translateY(-2px);
 }
 
-.play-icon {
-    font-size: 0.85em;
-}
-
-.hero-caption {
-    margin: 0;
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-}
-
 /* Spacer: Leaves Center Clear for Full-Bleed Background Track */
 
 .hero-spacer {
@@ -368,17 +273,6 @@ a.mark:focus-visible span:last-child {
     text-align: left;
     padding-right: clamp(0rem, 2vw, 2rem);
     flex-shrink: 0;
-}
-
-.slash-accent {
-    font-family: var(--display);
-    font-size: 2.25rem;
-    font-weight: 900;
-    font-style: italic;
-    color: var(--red);
-    line-height: 1;
-    margin-bottom: 1.25rem;
-    text-shadow: 0 0 16px var(--red-glow);
 }
 
 .callout-stack {
@@ -415,14 +309,6 @@ a.mark:focus-visible span:last-child {
         right: 0;
         z-index: 20;
     }
-}
-
-/* Wrap helper: centered max-width container. */
-
-.wrap {
-    width: min(var(--max-w), 100%);
-    margin: 0 auto;
-    padding-inline: clamp(1.25rem, 4vw, 4rem);
 }
 
 /* Facts (About page) */
@@ -503,21 +389,6 @@ a.mark:focus-visible span:last-child {
         gap: 0.75rem;
     }
 
-    /* Row 1: Logo left, Play button right */
-    .mark {
-        font-size: 1.55rem;
-        order: 1;
-    }
-
-    .btn-play-top {
-        padding: 0.4rem 1rem;
-        font-size: 0.78rem;
-        letter-spacing: 0.03em;
-        white-space: nowrap;
-        order: 2;
-        flex-shrink: 0;
-    }
-
     /* Links span the full bar now the top button is gone */
     .nav-links {
         width: 100%;
@@ -554,12 +425,6 @@ a.mark:focus-visible span:last-child {
         transform-origin: 50% 0%;
     }
 
-    .veil {
-        background:
-            radial-gradient(ellipse 90% 70% at 50% 25%, rgba(2, 6, 23, 0.85) 0%, rgba(2, 6, 23, 0.4) 55%, rgba(2, 6, 23, 0.9) 100%),
-            linear-gradient(180deg, rgba(2, 6, 23, 0.85) 0%, transparent 22%, transparent 75%, rgba(2, 6, 23, 0.85) 100%);
-    }
-
     /* Hero layout on mobile */
     .hero-stage {
         display: flex;
@@ -591,13 +456,6 @@ a.mark:focus-visible span:last-child {
         font-size: clamp(3.1rem, 14.5vw, 4.5rem);
     }
 
-    .hero-subhead {
-        margin-top: 1.15rem;
-        font-size: 0.75rem;
-        letter-spacing: 0.16em;
-        text-shadow: 0 2px 10px rgba(2, 6, 23, 0.95);
-    }
-
     .play-action-wrap {
         margin-top: 0;
         width: auto;
@@ -610,11 +468,6 @@ a.mark:focus-visible span:last-child {
         padding: 0.75rem 1.5rem;
         font-size: 1rem;
         white-space: nowrap;
-    }
-
-    .hero-caption {
-        font-size: 0.62rem;
-        letter-spacing: 0.12em;
     }
 
     .hero-spacer {
@@ -652,11 +505,6 @@ a.mark:focus-visible span:last-child {
     .hero-right .facts p {
         color: #e8edf4;
         text-shadow: 0 2px 10px rgba(2, 6, 23, 0.95);
-    }
-
-    .slash-accent {
-        font-size: 1.75rem;
-        margin-bottom: 0.75rem;
     }
 }
 

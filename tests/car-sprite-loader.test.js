@@ -97,6 +97,26 @@ describe("CarSpriteLoader selection settlement", () => {
     expect(loader.currentAssetKey).toBe("assets/cars/selected.webp");
   });
 
+  it("supersedes an unfinished pick when returning to the already loaded car", async () => {
+    const images = installImageMock();
+    const loader = new CarSpriteLoader();
+    const original = load(loader, "assets/cars/selected.webp");
+    images[0].listeners.load();
+    await original;
+
+    const unfinished = load(loader, "assets/cars/other.webp");
+    await expect(load(loader, "assets/cars/selected.webp")).resolves.toEqual({
+      status: "loaded", image: images[0],
+    });
+    await expect(unfinished).resolves.toEqual({
+      status: "superseded", name: "assets/cars/other.webp",
+    });
+
+    images[1].listeners.load();
+    await Promise.resolve();
+    expect(loader.currentAssetKey).toBe("assets/cars/selected.webp");
+  });
+
   it("reports an ordinary error only after every URL candidate fails", async () => {
     const images = installImageMock();
     const loader = new CarSpriteLoader();

@@ -1,8 +1,7 @@
 // The Creator screens next to the track editor: the Daily list, the Campaign
 // Planner and the copy of unplayed tracks. The server checks every change.
 
-import { TRACK_GROUNDS, TRACK_GROUND_KEYS } from '../../game/track/grounds.js';
-import { isLiveGround } from '../../game/track/live-grounds.js';
+import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../../game/campaign/series-surfaces.js';
 import {
     CAMPAIGN_STAGE_MAX_LAPS,
     getRequiredMedalsError,
@@ -41,10 +40,6 @@ function button(text, onClick, { className, disabled, title } = {}) {
 
 function badge(text, kind = '') {
     return element('span', { className: `pill${kind ? ` pill-${kind}` : ''}`, text });
-}
-
-function groundLabel(ground) {
-    return TRACK_GROUNDS[ground]?.label ?? ground;
 }
 
 function formatDate(value) {
@@ -508,7 +503,7 @@ export class CreatorPanels {
             ...view.appSeries.map((series) => element('li', { className: 'creator-series-app' }, [
                 element('span', { text: series.name }),
                 badge(series.live ? 'Live in the app' : 'In the app'),
-                badge(groundLabel(series.ground)),
+                badge(getCampaignSeriesSurfaceLabel(this.seriesSurfaces(series))),
             ])),
         ]);
         const side = element('div', { className: 'creator-series-side' }, [
@@ -572,9 +567,17 @@ export class CreatorPanels {
     seriesCandidates(draft) {
         const inSeries = new Set(draft.stages.map((stage) => stage.trackKey));
         return this.seriesView.tracks
-            .filter((track) => track.ready && !inSeries.has(track.key) && track.ground === draft.ground
+            .filter((track) => track.ready && !inSeries.has(track.key)
                 && (!track.usedBy || track.usedBy === draft.id))
             .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    seriesSurfaces(series) {
+        const trackByKey = new Map(this.seriesView.tracks.map((track) => [track.key, track]));
+        return {
+            ...series,
+            grounds: getCampaignSeriesGrounds(series, (trackKey) => trackByKey.get(trackKey)?.ground),
+        };
     }
 
     // A rebuild gives focus back to the same field of the same draft.
@@ -675,16 +678,7 @@ export class CreatorPanels {
             draft.idTouched = true;
             this.markSeriesEdited();
         });
-        const groundSelect = element('select', { attrs: { disabled: fixed > 0 } }, TRACK_GROUND_KEYS.map((key) => (
-            element('option', {
-                text: `${groundLabel(key)}${isLiveGround(key) ? '' : ' (held back)'}`,
-                attrs: { value: key, selected: key === draft.ground },
-            })
-        )));
-        groundSelect.addEventListener('change', () => {
-            draft.ground = groundSelect.value;
-            changed();
-        });
+        const surfaces = this.seriesSurfaces(draft);
 
         const stageRefs = [];
         const stageRows = draft.stages.map((stage, index) => {
@@ -728,7 +722,6 @@ export class CreatorPanels {
                 element('span', { className: 'creator-row-badges' }, [
                     locked ? badge('Live', 'ok') : null,
                     !track.ready ? badge('Not ready', 'danger') : null,
-                    track.ground && track.ground !== draft.ground ? badge('Other ground', 'danger') : null,
                 ]),
                 element('label', { className: 'creator-inline-field' }, [laps]),
                 element('label', { className: 'creator-inline-field' }, [
@@ -755,7 +748,7 @@ export class CreatorPanels {
 
         const candidates = this.seriesCandidates(draft);
         const addSelect = element('select', { attrs: { 'aria-label': 'Track to add' } }, [
-            element('option', { text: candidates.length ? 'Choose a track' : 'No free track on this ground', attrs: { value: '' } }),
+            element('option', { text: candidates.length ? 'Choose a track' : 'No free track', attrs: { value: '' } }),
             ...candidates.map((track) => element('option', {
                 text: `${track.name}${track.ready ? '' : ' (not ready)'}`,
                 attrs: { value: track.key },
@@ -802,15 +795,11 @@ export class CreatorPanels {
             element('div', { className: 'creator-series-fields' }, [
                 element('label', { className: 'field' }, [element('span', { text: 'Name' }), nameInput]),
                 element('label', { className: 'field' }, [element('span', { text: 'Key' }), idInput]),
-                element('label', { className: 'field' }, [element('span', { text: 'Ground' }), groundSelect]),
+                element('span', { className: 'pill', text: getCampaignSeriesSurfaceLabel(surfaces) }),
             ]),
             fixed ? element('p', {
                 className: 'field-hint',
                 text: `The first ${fixed} stages are live, so they cannot change. New stages go after them.`,
-            }) : null,
-            !isLiveGround(draft.ground) ? element('p', {
-                className: 'field-hint',
-                text: 'This ground is held back. The series can go live only after an app release.',
             }) : null,
             element('ol', { className: 'creator-list' }, stageRows),
             element('div', { className: 'creator-adder' }, [

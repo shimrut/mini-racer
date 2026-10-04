@@ -174,6 +174,19 @@ function getPostBoundDailyChallengeFromContext() {
     return null;
 }
 
+// A retained mode also contains the seven-day playlist, which rotates at UTC
+// midnight even when the opening post's challenge remains playable longer.
+export function isDailyRaceWarmupCurrent(challenge, loadedAt, nowMs = Date.now()) {
+    if (!challenge || getUtcDayIndex(new Date(loadedAt)) !== getUtcDayIndex(new Date(nowMs))) return false;
+    const postChallenge = getPostBoundDailyChallengeFromContext();
+    if (postChallenge && isChallengeStillUsable(postChallenge)) {
+        return postChallenge.id === challenge.id
+            && postChallenge.trackKey === challenge.trackKey
+            && isChallengeStillUsable(challenge);
+    }
+    return Date.parse(challenge.endsAt || '') > nowMs;
+}
+
 function readActiveDailyCacheStorable() {
     if (typeof window === 'undefined' || !window.localStorage) return null;
     try {

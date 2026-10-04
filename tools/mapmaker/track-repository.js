@@ -23,7 +23,9 @@ import {
     seriesDestination,
     UNUSED_DESTINATION,
 } from './campaign-series.js';
-import { isCampaignSeriesLive } from '../../game/campaign/series-rules.js';
+import { isAppCampaignSeriesLive } from '../../game/campaign/series-rules.js';
+import { getCampaignSeriesGrounds } from '../../game/campaign/series-surfaces.js';
+import { getTrackGround, isTrackGroundKey } from '../../game/track/grounds.js';
 import { getMedalRowError, normalizeMedalRow, sameMedalRow } from './medal-times.js';
 
 const CATALOG_BLOCK_RE = /export const TRACK_CATALOG = \{\n[\s\S]*?\n\};/;
@@ -75,7 +77,7 @@ function applyMedalTimesUpdate(medalTimes, {
     if (medalRow) {
         const error = getMedalRowError(medalRow);
         if (error) throw new Error(error);
-        const liveStage = seriesStage && isCampaignSeriesLive(seriesStage.series);
+        const liveStage = seriesStage && isAppCampaignSeriesLive(seriesStage.series);
         if (liveStage && existing && !sameMedalRow(existing, medalRow)) {
             throw new Error(
                 `${seriesStage.series.name} is live, so the medal times of ${trackKey} are fixed.`,
@@ -97,9 +99,10 @@ export function parseTrackCatalogSource(source) {
     }
 
     const namesByKey = {};
-    const entryRe = /^\s{4}([A-Za-z_$][A-Za-z0-9_$]*): \{ name: (.+) \},$/gm;
+    const groundsByKey = {};
+    const entryRe = /^\s{4}([A-Za-z_$][A-Za-z0-9_$]*): \{ name: ("(?:\\.|[^"\\])*")(?:, ground: ("(?:\\.|[^"\\])*"))? \},$/gm;
     for (const match of catalogMatch[0].matchAll(entryRe)) {
-        const [, trackKey, rawName] = match;
+        const [, trackKey, rawName, rawGround] = match;
         const name = JSON.parse(rawName);
         if (typeof name !== 'string' || !name.trim()) {
             throw new Error(`Catalog track ${trackKey} needs a non-empty name.`);
@@ -108,6 +111,9 @@ export function parseTrackCatalogSource(source) {
             throw new Error(`Catalog track ${trackKey} is duplicated.`);
         }
         namesByKey[trackKey] = name;
+        const ground = rawGround ? JSON.parse(rawGround) : 'tarmac';
+        if (!isTrackGroundKey(ground)) throw new Error(`Catalog track ${trackKey} has an unknown ground.`);
+        groundsByKey[trackKey] = ground;
     }
 
     const scheduleKeys = [...scheduleMatch[0].matchAll(/^\s{4}'([^']+)',$/gm)]
@@ -127,16 +133,18 @@ export function parseTrackCatalogSource(source) {
 
     return {
         namesByKey,
+        groundsByKey,
         catalogKeys: Object.keys(namesByKey),
         scheduleKeys,
     };
 }
 
-function generateCatalogBlock(catalogKeys, namesByKey) {
+function generateCatalogBlock(catalogKeys, namesByKey, groundsByKey = {}) {
     return [
         'export const TRACK_CATALOG = {',
         ...catalogKeys.map((trackKey) => (
-            `    ${trackKey}: { name: ${JSON.stringify(namesByKey[trackKey])} },`
+            `    ${trackKey}: { name: ${JSON.stringify(namesByKey[trackKey])}${groundsByKey[trackKey] && groundsByKey[trackKey] !== 'tarmac'
+                ? `, ground: ${JSON.stringify(groundsByKey[trackKey])}` : ''} },`
         )),
         '};',
     ].join('\n');
@@ -214,6 +222,13 @@ function getTrackDestination(seriesData, scheduleKeys, trackKey) {
     return scheduleKeys.includes(trackKey) ? DAILY_DESTINATION : UNUSED_DESTINATION;
 }
 
+function refreshSeriesGrounds(seriesData, groundsByKey) {
+    for (const series of seriesData.series) {
+        series.grounds = getCampaignSeriesGrounds(series, (key) => groundsByKey[key] ?? null);
+    }
+    return seriesData;
+}
+
 // Saves a track's shape, name and medal times. It never changes where the track
 // is used: a new track starts as not used, and a rename keeps its place.
 export function buildTrackRepositoryUpdate({
@@ -223,6 +238,7 @@ export function buildTrackRepositoryUpdate({
     trackKey,
     originalTrackKey = null,
     trackName,
+    trackGround = null,
     medalRow = null,
 }) {
     assertTrackKey(trackKey);
@@ -237,9 +253,12 @@ export function buildTrackRepositoryUpdate({
 
     const {
         namesByKey,
+        groundsByKey,
         catalogKeys,
         scheduleKeys,
     } = parseTrackCatalogSource(catalogSource);
+    refreshSeriesGrounds(seriesData, groundsByKey);
+    if (trackGround !== null && !isTrackGroundKey(trackGround)) throw new Error('Unknown track ground.');
     const nextCatalogKeys = [...catalogKeys];
     const nextScheduleKeys = [...scheduleKeys];
     const originalExists = originalTrackKey !== null
@@ -266,6 +285,8 @@ export function buildTrackRepositoryUpdate({
             nextScheduleKeys[scheduleIndex] = trackKey;
         }
         delete namesByKey[originalTrackKey];
+        groundsByKey[trackKey] = groundsByKey[originalTrackKey];
+        delete groundsByKey[originalTrackKey];
         removedFilename = getTrackModuleFilename(originalTrackKey);
     } else if (!targetExists) {
         action = 'created';
@@ -290,12 +311,14 @@ export function buildTrackRepositoryUpdate({
         medalRow,
         seriesStage,
     });
+    groundsByKey[trackKey] = trackGround ?? groundsByKey[trackKey] ?? 'tarmac';
+    refreshSeriesGrounds(seriesUpdate.data, groundsByKey);
 
     const orderedNamesByKey = Object.fromEntries(
         nextCatalogKeys.map((key) => [key, namesByKey[key]]),
     );
     const nextCatalogSource = catalogSource
-        .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, orderedNamesByKey))
+        .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, orderedNamesByKey, groundsByKey))
         .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys));
 
     return {
@@ -355,6 +378,7 @@ export function applyTrackRepositoryUpdate({
         trackKey,
         originalTrackKey,
         trackName,
+        trackGround: getTrackGround(track).key,
         medalRow,
     });
     const definitionFilename = getTrackModuleFilename(trackKey);
@@ -420,8 +444,9 @@ export function applyTrackRepositoryUpdate({
 export function applySeriesStageMove({ rootDir, seriesId, trackKey, direction }) {
     assertTrackKey(trackKey);
     const seriesPath = join(resolve(rootDir), SERIES_FILE);
+    const { groundsByKey } = parseTrackCatalogSource(readFileSync(join(resolve(rootDir), 'game/track/catalog.js'), 'utf8'));
     const next = moveSeriesStage(
-        parseCampaignSeriesSource(readFileSync(seriesPath, 'utf8')),
+        refreshSeriesGrounds(parseCampaignSeriesSource(readFileSync(seriesPath, 'utf8')), groundsByKey),
         seriesId,
         trackKey,
         direction,
@@ -444,7 +469,8 @@ export function buildTrackAssignment({
     assertTrackKey(trackKey);
     const seriesData = parseCampaignSeriesSource(seriesSource);
     const parsedDestination = assertDestination(destination, seriesData);
-    const { namesByKey, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    const { namesByKey, groundsByKey, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    refreshSeriesGrounds(seriesData, groundsByKey);
     if (!Object.prototype.hasOwnProperty.call(namesByKey, trackKey)) {
         throw new Error(`Track ${trackKey} is not saved yet. Save it in the Mapmaker first.`);
     }
@@ -456,6 +482,7 @@ export function buildTrackAssignment({
         laps,
         requiredMedals,
     });
+    refreshSeriesGrounds(seriesUpdate.data, groundsByKey);
     if (seriesUpdate.series && getMedalRowError(parseMedalTimesSource(medalsSource)[trackKey])) {
         throw new Error(`A Campaign stage needs all four medal times. Set them for ${trackKey} in the Mapmaker.`);
     }
@@ -498,7 +525,7 @@ export function buildTrackRepositoryRemoval({
     publishedHistorySource,
 }) {
     assertTrackKey(trackKey);
-    const { namesByKey, catalogKeys, scheduleKeys } = parseTrackCatalogSource(catalogSource);
+    const { namesByKey, groundsByKey, catalogKeys, scheduleKeys } = parseTrackCatalogSource(catalogSource);
     if (!Object.prototype.hasOwnProperty.call(namesByKey, trackKey)) {
         throw new Error(`Track ${trackKey} is not present in the catalog.`);
     }
@@ -534,7 +561,7 @@ export function buildTrackRepositoryRemoval({
     return {
         filename,
         catalogSource: catalogSource
-            .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, namesByKey))
+            .replace(CATALOG_BLOCK_RE, generateCatalogBlock(nextCatalogKeys, namesByKey, groundsByKey))
             .replace(SCHEDULE_BLOCK_RE, generateScheduleBlock(nextScheduleKeys)),
         tracksSource: generateTracksRegistrySource(nextCatalogKeys),
         scheduleLength: nextScheduleKeys.length,

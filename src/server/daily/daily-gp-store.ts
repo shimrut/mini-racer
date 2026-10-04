@@ -793,9 +793,7 @@ async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: numbe
             if (dayIndex !== undefined && !isLiveGround(getTrackGround(complete.track).key)) {
                 throw new TrackPlacementRetryError('The Daily track changed. Retry before racing.');
             }
-            const committed = dayIndex === undefined ? challenge : buildDailyGpChallengeForDayIndexWithTrack(
-                dayIndex, trackKey, { authorTime: Number((complete.medalRow as { author: number }).author) },
-            );
+            const committed = dayIndex === undefined ? challenge : buildDailyGpChallengeForDayIndexWithTrack(dayIndex, trackKey);
             const frozen = complete.stored && !complete.stored.lockedAt
                 ? freezeStoredTrack(complete.stored, 'daily', new Date()) : null;
             const cacheRevision = frozen ? await readStoredTracksRevision() + 1 : null;

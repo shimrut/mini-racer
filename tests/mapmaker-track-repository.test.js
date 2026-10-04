@@ -20,6 +20,12 @@ import {
 } from '../tools/mapmaker/track-repository.js';
 
 // Mini Rally is held back from players; these rules need a live dirt series.
+// Only Numbers is live from the app data. These tests need a second live
+// series, as if the Creator had made it live.
+vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),
+}));
 vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
 
 const CATALOG_SOURCE = `export const TRACK_CATALOG = {
@@ -402,13 +408,17 @@ describe('Mapmaker Campaign series rules', () => {
         tenStages(),
     );
     const liveMedals = JSON.stringify({ numberZero: MEDAL_ROW, sunlitTemple: MEDAL_ROW, circuit: MEDAL_ROW });
+    const liveCatalog = CATALOG_SOURCE.replace('    numberZero: { name: "Number Zero" },', [
+        '    numberZero: { name: "Number Zero" },',
+        ...tenStages().slice(1).map((stage) => `    ${stage.trackKey}: { name: "${stage.trackKey}" },`),
+    ].join('\n'));
 
     function buildLive(options) {
-        return buildUpdate({ seriesSource: liveSeries, medalsSource: liveMedals, ...options });
+        return buildUpdate({ catalogSource: liveCatalog, seriesSource: liveSeries, medalsSource: liveMedals, ...options });
     }
 
     function assignLive(options) {
-        return buildAssign({ seriesSource: liveSeries, medalsSource: liveMedals, ...options });
+        return buildAssign({ catalogSource: liveCatalog, seriesSource: liveSeries, medalsSource: liveMedals, ...options });
     }
 
     it('adds a track after the last stage of a live series', () => {
@@ -472,13 +482,18 @@ describe('Mapmaker Campaign series rules', () => {
         vi.resetModules();
         vi.doMock('../game/campaign/series-rules.js', async (importOriginal) => ({
             ...(await importOriginal()),
-            isCampaignSeriesLive: (series) => (series?.stages?.length ?? 0) >= 10,
+            isAppCampaignSeriesLive: (series) => (series?.stages?.length ?? 0) >= 10,
         }));
         try {
             const { applySeriesStageMove: moveStage } = await import('../tools/mapmaker/track-repository.js');
             const root = mkdtempSync(join(tmpdir(), 'dailygp-mapmaker-series-'));
             temporaryRoots.push(root);
             mkdirSync(join(root, 'game/campaign'), { recursive: true });
+            mkdirSync(join(root, 'game/track'), { recursive: true });
+            writeFileSync(join(root, 'game/track/catalog.js'), CATALOG_SOURCE.replace(
+                '    numberZero: { name: "Number Zero" },',
+                '    numberZero: { name: "Number Zero" },\n    numberOne: { name: "Number One" },\n    numberTwo: { name: "Number Two" },',
+            ));
             writeFileSync(join(root, 'game/campaign/series.json'), seriesSource([
                 { trackKey: 'numberZero', laps: 2, requiredMedals: 0 },
                 { trackKey: 'numberOne', laps: 1, requiredMedals: 2 },

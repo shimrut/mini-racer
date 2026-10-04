@@ -5,13 +5,16 @@ import {
     RACE_SCORING_TOTAL_TIME,
 } from '../race/race-spec.js';
 import seriesData from './series.json' with { type: 'json' };
-import { CAMPAIGN_SERIES_MIN_STAGES, isCampaignSeriesLive } from './series-rules.js';
+import {
+    CAMPAIGN_NUMBERS_SERIES_ID,
+    CAMPAIGN_SERIES_MIN_STAGES,
+    isAppCampaignSeriesLive,
+} from './series-rules.js';
 import { getStoredSeriesDefinitions } from './stored-series.js';
+import { TRACK_CATALOG } from '../track/catalog.js';
+import { getCampaignSeriesGrounds } from './series-surfaces.js';
 
-export { CAMPAIGN_SERIES_MIN_STAGES };
-
-// Numbers keeps this name for ever: every saved Numbers record and key uses it.
-export const CAMPAIGN_NUMBERS_SERIES_ID = 'numbered-v1';
+export { CAMPAIGN_NUMBERS_SERIES_ID, CAMPAIGN_SERIES_MIN_STAGES };
 export const CAMPAIGN_RULES_REVISION = 1;
 
 const SERIES_ID_RE = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -20,7 +23,7 @@ function stageNumberFor(index) {
     return String(index).padStart(2, '0');
 }
 
-function buildSeries(definition) {
+function buildSeries(definition, { app = false } = {}) {
     const id = definition?.id;
     if (typeof id !== 'string' || !SERIES_ID_RE.test(id)) {
         throw new Error(`Invalid Campaign series name: ${id}`);
@@ -53,20 +56,26 @@ function buildSeries(definition) {
         });
     }));
     const ground = typeof definition.ground === 'string' ? definition.ground : 'tarmac';
+    const grounds = Object.freeze(getCampaignSeriesGrounds(definition, app
+        ? (trackKey) => Object.hasOwn(TRACK_CATALOG, trackKey)
+            ? TRACK_CATALOG[trackKey].ground ?? 'tarmac' : null
+        : null));
     return Object.freeze({
         id,
         name: typeof definition.name === 'string' && definition.name.trim()
             ? definition.name.trim()
             : id,
         ground,
-        live: isCampaignSeriesLive({ id, ground, stages }),
+        grounds,
+        // The game gets only the series published in the Creator, so a stored series is live.
+        live: app ? isAppCampaignSeriesLive({ id }) : true,
         stages,
     });
 }
 
 // Every series in the data file, also the hidden ones.
 const APP_SERIES = Object.freeze(
-    (Array.isArray(seriesData?.series) ? seriesData.series : []).map(buildSeries),
+    (Array.isArray(seriesData?.series) ? seriesData.series : []).map((definition) => buildSeries(definition, { app: true })),
 );
 
 if (new Set(APP_SERIES.map((series) => series.id)).size !== APP_SERIES.length) {
@@ -146,8 +155,7 @@ function liveList(read) {
     });
 }
 
-// Every series, also the hidden ones. The series screen shows the hidden ones
-// on a live ground as "Coming soon".
+// Every series, also the hidden ones.
 export const CAMPAIGN_ALL_SERIES = liveList(() => currentViews().all);
 
 // The series that players can see.

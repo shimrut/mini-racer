@@ -920,16 +920,12 @@ html.is-lobby-view-transition::view-transition-new(root) {
     transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
 }
 
-.campaign-series-row:not(:disabled):hover {
+.campaign-series-row:hover {
     background: rgba(255, 255, 255, 0.04);
 }
 
 .campaign-series-row.is-menu-selected {
     box-shadow: var(--menu-ring);
-}
-
-.campaign-series-row:disabled {
-    cursor: default;
 }
 
 .campaign-series-row__preview {
@@ -980,15 +976,6 @@ html.is-lobby-view-transition::view-transition-new(root) {
     .campaign-series-row__part + .campaign-series-row__part::before {
         content: none;
     }
-}
-
-.campaign-series-row.is-coming-soon .campaign-series-row__preview,
-.campaign-series-row.is-coming-soon .campaign-series-row__name {
-    opacity: 0.35;
-}
-
-.campaign-series-row.is-coming-soon .campaign-series-row__info {
-    color: var(--text-muted);
 }
 
 /* Standings and Tracks need a stage, so the series screen does not show them. */

@@ -95,13 +95,13 @@ import {
     deleteStoredTrack,
     describePlacedStoredTracks,
     installStoredTrackResolver,
-    listStoredTrackRecords,
     runWithPinnedStoredTracks,
-    listStoredTracks,
     readPlacedStoredTracks,
-    readStoredTrack,
     saveStoredTrack,
 } from './tracks/track-store.js';
+import {
+    creatorTrackRecord, listCreatorTrackRecords, listCreatorTracks, readCreatorTrack,
+} from './tracks/creator-track-access.js';
 import { ensureStoredCatalogLoaded, loadStoredTracks, reloadPinnedCatalog } from './tracks/stored-catalog.js';
 import { readCopyCheck, runCopyCheck } from './tracks/copy-check.js';
 import { readCopyUndoReport, runCopyUndo } from './tracks/copy-undo.js';
@@ -163,10 +163,10 @@ function registerProductionRoutes(app: express.Application): void {
     registerTrackRoutes(app, {
         resolveCreatorToolSubredditName,
         assertModeratorForSubreddit,
-        listStoredTracks,
-        listStoredTrackRecords,
-        readStoredTrack,
-        saveStoredTrack,
+        listStoredTracks: listCreatorTracks,
+        listStoredTrackRecords: listCreatorTrackRecords,
+        readStoredTrack: readCreatorTrack,
+        saveStoredTrack: async (key, input, options) => creatorTrackRecord(await saveStoredTrack(key, input, options)),
         deleteStoredTrack,
         isTrackPlaced,
         readPlacedStoredTracks,

@@ -723,20 +723,35 @@
                             </div>
                         </div>
                         <div class="reusable-modal-content" data-modal-content>
-                        <div class="garage-tabs" role="tablist" aria-label="Garage sections">
-                            <button id="garage-tab-skin" class="garage-tab" type="button" role="tab"
-                                aria-selected="true" aria-controls="garage-panel-skin">Car</button>
-                            <button id="garage-tab-trails" class="garage-tab" type="button" role="tab"
-                                aria-selected="false" aria-controls="garage-panel-trails">Trail</button>
-                        </div>
-                        <div id="garage-panel-skin" class="garage-tab-panel" role="tabpanel"
-                            aria-labelledby="garage-tab-skin">
-                            <div id="garage-skin-grid" class="garage-skin-layout"></div>
-                        </div>
-                        <div id="garage-panel-trails" class="garage-tab-panel" role="tabpanel"
-                            aria-labelledby="garage-tab-trails" hidden>
-                            <div id="garage-trail-grid" class="garage-trail-grid"></div>
-                        </div>
+                            <div class="garage-tabs" role="tablist" aria-label="Car types">
+                                <button id="garage-tab-street" class="garage-tab" type="button" role="tab"
+                                    aria-selected="true" aria-controls="garage-panel-custom">Street</button>
+                                <button id="garage-tab-circuit" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-custom">Track</button>
+                                <button id="garage-tab-dirt" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-custom">Dirt</button>
+                                <button id="garage-tab-snow" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-custom" hidden>Snow</button>
+                                <button id="garage-tab-water" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-custom" hidden>Water</button>
+                                <button id="garage-tab-space" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-custom" hidden>Space</button>
+                                <button id="garage-tab-legacy" class="garage-tab" type="button" role="tab"
+                                    aria-selected="false" aria-controls="garage-panel-skin">Legacy</button>
+                            </div>
+                            <div id="garage-panel-custom" class="garage-custom-panel" role="tabpanel"
+                                aria-labelledby="garage-tab-street"></div>
+                            <div id="garage-panel-skin" class="garage-tab-panel" role="tabpanel"
+                                aria-labelledby="garage-tab-legacy" hidden>
+                                <div id="garage-skin-grid" class="garage-skin-layout"></div>
+                            </div>
+                            <section id="garage-panel-trails" class="garage-paint-panel" aria-labelledby="garage-trails-title">
+                                <div class="garage-paint-row garage-trail-row">
+                                    <h3 id="garage-trails-title" class="garage-paint-label">Trail color</h3>
+                                    <div id="garage-trail-grid" class="garage-color-options" role="group"
+                                        aria-labelledby="garage-trails-title"></div>
+                                </div>
+                            </section>
                         </div>
                         <button id="garage-close-btn" class="combined-action-btn modal-sheet-dismiss" type="button" aria-label="Close" data-modal-close>
                             <span class="combined-action-btn-label">Close</span>

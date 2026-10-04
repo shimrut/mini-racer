@@ -5,6 +5,7 @@ import smallSteps from '../game/track/definitions/small-steps.js';
 const strings = new Map();
 const hashes = new Map();
 const mockContext = { subredditId: 't5_one' };
+const mockLiveGroundKeys = vi.hoisted(() => new Set(['tarmac']));
 const known = {
     get: async (key) => strings.get(key) ?? null,
     set: async (key, value, options) => {
@@ -42,6 +43,10 @@ installTrackRedisTransactions(mockRedis, strings, hashes);
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis, redisCompressed: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ redis: mockRedis, context: mockContext }));
+vi.mock('../game/track/live-grounds.js', () => ({
+    LIVE_GROUND_KEYS: ['tarmac'],
+    isLiveGround: (ground) => mockLiveGroundKeys.has(ground ?? 'tarmac'),
+}));
 
 const series = await import('../src/server/campaign/series-store.ts');
 const tracks = await import('../src/server/tracks/track-store.ts');
@@ -52,8 +57,8 @@ const { setStoredTrackResolver } = await import('../game/track/stored-tracks.js'
 
 const medalRow = { author: 9.1, gold: 9.4, silver: 9.7, bronze: 10.1 };
 
-async function saveTrack(key, name) {
-    await tracks.saveStoredTrack(key, { track: { ...smallSteps, name }, medalRow }, { username: 'ModOne' });
+async function saveTrack(key, name, ground = 'tarmac') {
+    await tracks.saveStoredTrack(key, { track: { ...smallSteps, name, ground }, medalRow }, { username: 'ModOne' });
 }
 
 async function reload() {
@@ -72,6 +77,9 @@ const draft = {
 beforeEach(async () => {
     strings.clear();
     hashes.clear();
+    installTrackRedisTransactions(mockRedis, strings, hashes);
+    mockLiveGroundKeys.clear();
+    mockLiveGroundKeys.add('tarmac');
     tracks.clearStoredTrackCacheForTests();
     series.clearStoredSeriesCacheForTests();
     tracks.installStoredTrackResolver();
@@ -151,7 +159,7 @@ describe('stored Campaign series', () => {
         })).rejects.toThrow('Night Two is used somewhere else');
     });
 
-    it('refuses incomplete stage assignment and publishing on a held-back ground', async () => {
+    it('refuses incomplete stage assignment, and publishes a stage on a held-back ground', async () => {
         await tracks.saveStoredTrack('nightFour', { track: { ...smallSteps, name: 'Night Four' } }, { username: 'ModOne' });
         await reload();
         await expect(series.saveStoredSeries('night-v1', {
@@ -161,8 +169,8 @@ describe('stored Campaign series', () => {
         await tracks.saveStoredTrack('snowNight', { track: { ...smallSteps, name: 'Snow Night', ground: 'snow' }, medalRow }, { username: 'ModOne' });
         await reload();
         await series.saveStoredSeries('snow-night-v1', { ...draft, ground: 'snow', stages: [{ trackKey: 'snowNight', laps: 1, requiredMedals: 0 }] }, { username: 'ModOne' });
-        await expect(series.publishStoredSeries('snow-night-v1', { username: 'ModOne' }))
-            .rejects.toThrow('live ground');
+        expect(await series.publishStoredSeries('snow-night-v1', { username: 'ModOne' }))
+            .toMatchObject({ status: 'published', grounds: ['snow'] });
     });
 
     it('copies each hidden app series once as a draft', async () => {
@@ -175,5 +183,152 @@ describe('stored Campaign series', () => {
         const second = await series.copyAppSeriesDrafts({ dryRun: false, username: 'ModOne' });
         expect(second.copied).toEqual([]);
         expect(second.alreadyStored).toEqual(first.copied);
+    });
+
+    it('makes only Numbers live from the app data, whatever the stage surfaces', () => {
+        expect(series.isLiveAppSeries(series.listAppSeriesDefinitions()
+            .find((definition) => definition.id === 'numbered-v1'))).toBe(true);
+        expect(series.isLiveAppSeries({
+            id: 'test-v1', ground: 'tarmac',
+            stages: [{ trackKey: 'circuit', laps: 1, requiredMedals: 0 }],
+        })).toBe(false);
+        expect(series.isLiveAppSeries({
+            id: 'dirt-v1', ground: 'dirt',
+            stages: [{ trackKey: 'countryRoad', laps: 1, requiredMedals: 0 }],
+        })).toBe(false);
+    });
+
+    it('allows a draft to contain every track surface without freezing it', async () => {
+        const grounds = ['tarmac', 'dirt', 'snow', 'grip', 'water', 'space'];
+        const stages = [];
+        for (const [index, ground] of grounds.entries()) {
+            const trackKey = `mixedTrack${index}`;
+            await saveTrack(trackKey, `Mixed Track ${index}`, ground);
+            stages.push({ trackKey, laps: 1, requiredMedals: index });
+        }
+        await reload();
+        const saved = await series.saveStoredSeries('mixed-v1', {
+            name: 'Mixed', ground: 'tarmac', stages, grounds: ['space'],
+        }, { username: 'ModOne' });
+        expect(saved).toMatchObject({ status: 'draft', publishedStageCount: 0, stages });
+        expect(saved.grounds).toBeUndefined();
+        for (const stage of stages) expect((await tracks.readStoredTrack(stage.trackKey)).lockedAt).toBeNull();
+    });
+
+    it('publishes a series whatever the grounds of its stages', async () => {
+        await saveTrack('dirtNight', 'Dirt Night', 'dirt');
+        await reload();
+        await series.saveStoredSeries('mixed-v1', {
+            ...draft, stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
+        }, { username: 'ModOne' });
+        expect(await series.publishStoredSeries('mixed-v1', { username: 'ModOne' }))
+            .toMatchObject({ status: 'published', publishedStageCount: 2, grounds: ['tarmac', 'dirt'] });
+        await reload();
+        expect(getCampaignSeries('mixed-v1')).toMatchObject({ live: true, grounds: ['tarmac', 'dirt'] });
+        expect((await tracks.readStoredTrack('dirtNight')).lockReason).toBe('series');
+    });
+
+    it('publishes the actual Street track even if legacy series metadata names a held surface', async () => {
+        await series.saveStoredSeries('night-v1', { ...draft, ground: 'snow' }, { username: 'ModOne' });
+        expect(await series.publishStoredSeries('night-v1', { username: 'ModOne' }))
+            .toMatchObject({ ground: 'snow', grounds: ['tarmac'], publishedStageCount: 2 });
+        await reload();
+        expect(getCampaignSeries('night-v1')).toMatchObject({ live: true, grounds: ['tarmac'] });
+    });
+
+    it('publishes and locks mixed stages together on every surface', async () => {
+        const grounds = ['tarmac', 'dirt', 'snow', 'grip', 'water', 'space'];
+        const stages = [];
+        for (const [index, ground] of grounds.entries()) {
+            const trackKey = `mixedTrack${index}`;
+            await saveTrack(trackKey, `Mixed Track ${index}`, ground);
+            stages.push({ trackKey, laps: 1, requiredMedals: index });
+        }
+        await reload();
+        await series.saveStoredSeries('mixed-v1', { name: 'Mixed', ground: 'tarmac', stages }, { username: 'ModOne' });
+        const published = await series.publishStoredSeries('mixed-v1', { username: 'ModOne' });
+        expect(published).toMatchObject({ grounds, publishedStageCount: stages.length });
+        for (const stage of stages) {
+            expect(await tracks.readStoredTrack(stage.trackKey)).toMatchObject({ lockReason: 'series' });
+        }
+        await reload();
+        expect(getCampaignSeries('mixed-v1').grounds).toEqual(grounds);
+        const current = await tracks.readStoredTrack('mixedTrack0');
+        await expect(tracks.saveStoredTrack('mixedTrack0', {
+            track: { ...smallSteps, name: 'Changed', ground: 'dirt' }, medalRow,
+        }, { username: 'ModOne', baseRevision: current.revision })).rejects.toThrow('locked');
+        await expect(series.saveStoredSeries('mixed-v1', {
+            name: 'Mixed', ground: 'tarmac',
+            stages: [...stages].reverse().map((stage, index) => ({ ...stage, requiredMedals: index })),
+        }, { username: 'ModOne', baseRevision: published.revision })).rejects.toThrow('fixed');
+    });
+
+    it('keeps an unpublished tail on another surface out of the published summary until it goes live', async () => {
+        await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
+        const published = await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        await saveTrack('dirtNight', 'Dirt Night', 'dirt');
+        await reload();
+        const appended = await series.saveStoredSeries('night-v1', {
+            ...draft, grounds: ['dirt'],
+            stages: [...draft.stages, { trackKey: 'dirtNight', laps: 1, requiredMedals: 3 }],
+        }, { username: 'ModOne', baseRevision: published.revision });
+        expect(appended).toMatchObject({ grounds: ['tarmac'], publishedStageCount: 2 });
+        await reload();
+        expect(getCampaignSeries('night-v1')).toMatchObject({ live: true, grounds: ['tarmac'] });
+        expect(getCampaignSeries('night-v1').stages).toHaveLength(2);
+        expect((await tracks.readStoredTrack('dirtNight')).lockedAt).toBeNull();
+        const extended = await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        expect(extended).toMatchObject({ grounds: ['tarmac', 'dirt'], publishedStageCount: 3 });
+        expect((await tracks.readStoredTrack('dirtNight')).lockReason).toBe('series');
+    });
+
+    it('allows an assigned editable stage to change surface and publishes its current surface', async () => {
+        await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
+        const current = await tracks.readStoredTrack('nightOne');
+        await tracks.saveStoredTrack('nightOne', {
+            track: { ...smallSteps, name: 'Night One', ground: 'dirt' }, medalRow,
+        }, { username: 'ModOne', baseRevision: current.revision });
+        expect(await series.publishStoredSeries('night-v1', { username: 'ModOne' }))
+            .toMatchObject({ grounds: ['dirt', 'tarmac'] });
+    });
+
+    it('keeps a mixed publication and its track freezes uncommitted when EXEC loses ownership', async () => {
+        await saveTrack('dirtNight', 'Dirt Night', 'dirt');
+        await reload();
+        await series.saveStoredSeries('mixed-v1', {
+            ...draft, stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
+        }, { username: 'ModOne' });
+        const watch = mockRedis.watch.getMockImplementation();
+        mockRedis.watch.mockImplementation(async (...keys) => {
+            const transaction = await watch(...keys);
+            const exec = transaction.exec.getMockImplementation();
+            transaction.exec.mockImplementation(async () => transaction.commands.some(([method, args]) => (
+                method === 'set' && args[0] === 'dailygp:campaign:series:v1:series:mixed-v1'
+                && JSON.parse(args[1]).status === 'published'
+            )) ? [] : exec());
+            return transaction;
+        });
+        await expect(series.publishStoredSeries('mixed-v1', { username: 'ModOne' })).rejects.toThrow('Retry');
+        expect(await series.readStoredSeries('mixed-v1')).toMatchObject({ status: 'draft', publishedStageCount: 0 });
+        expect((await series.readStoredSeries('mixed-v1')).grounds).toBeUndefined();
+        expect((await tracks.readStoredTrack('nightOne')).lockedAt).toBeNull();
+        expect((await tracks.readStoredTrack('dirtNight')).lockedAt).toBeNull();
+    });
+
+    it('keeps an older homogeneous record usable without rewriting its surface metadata', async () => {
+        await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
+        const published = await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        const key = 'dailygp:campaign:series:v1:series:night-v1';
+        const oldRecord = JSON.parse(strings.get(key));
+        delete oldRecord.grounds;
+        strings.set(key, JSON.stringify(oldRecord));
+        const appended = await series.saveStoredSeries('night-v1', {
+            ...draft,
+            stages: [...draft.stages, { trackKey: 'nightThree', laps: 1, requiredMedals: 3 }],
+        }, { username: 'ModOne', baseRevision: published.revision });
+        expect(appended.grounds).toBeUndefined();
+        await reload();
+        expect(getCampaignSeries('night-v1')).toMatchObject({ live: true, grounds: ['tarmac'] });
+        expect(getCampaignSeries('night-v1').stages).toHaveLength(2);
     });
 });

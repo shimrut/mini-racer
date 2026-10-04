@@ -1,4 +1,7 @@
 import { CONFIG } from '../game/config.js';
+import { getDefaultDrawnCarAssetForGround } from '../game/car/car-skin-grounds.js';
+import { DRAWN_CAR_DRAW_PIXELS } from '../game/car/drawn-car/formula.js';
+import { getDrawnCar } from '../game/car/sprite.js';
 import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
@@ -41,7 +44,7 @@ import {
 import { clamp, clonePoint, distance, midpoint, normalizeVector } from './geometry.js';
 import seriesFileData from '../game/campaign/series.json' with { type: 'json' };
 import medalTimesFileData from '../game/medals/medal-times.json' with { type: 'json' };
-import { isCampaignSeriesLive } from '../game/campaign/series-rules.js';
+import { isAppCampaignSeriesLive } from '../game/campaign/series-rules.js';
 import { findTrackStage, normalizeCampaignSeriesData } from './mapmaker/campaign-series.js';
 import {
     averageDraftLap,
@@ -110,7 +113,6 @@ const EDITOR_ROAD_TONES = Object.freeze({
 const EDITOR_EDGE = Object.freeze({ outer: '#ff8ca4', inner: '#c0deff' });
 
 const CAR_RADIUS = CONFIG.carRadius;
-const CAR_HALF_LENGTH = CONFIG.carCollisionHalfLength;
 
 function cloneTracks(source) {
     if (typeof structuredClone === 'function') {
@@ -305,6 +307,7 @@ class MapmakerApp {
         this.creatorDeletingKey = null;
         this.creatorWriteGeneration = 0;
         this.creatorRefreshPending = false;
+        this.creatorUsername = null;
         this.creatorPanels = null;
         // Track key -> the key of its saved cloud map.
         this.cloudKeyByKey = new Map();
@@ -1203,6 +1206,7 @@ class MapmakerApp {
                 const track = this.state.tracks[key];
                 const meta = [
                     getTrackGround(track).label,
+                    this.creatorMode ? (this.creatorRecords.get(key)?.privateDraft !== false ? 'My draft' : 'Shared') : '',
                     this.cloudKeyByKey.has(key) ? 'Cloud' : '',
                     this.state.dirtyTrackKeys.has(key) ? 'Unsaved' : '',
                 ].filter(Boolean).join(' · ');
@@ -1286,7 +1290,7 @@ class MapmakerApp {
     medalTimesFixed(trackKey = this.state.selectedTrackKey) {
         if (this.creatorMode) return this.isCreatorLocked(trackKey);
         const stage = this.getSavedStage(trackKey);
-        return Boolean(stage && isCampaignSeriesLive(stage.series) && this.getSavedMedalRow(trackKey));
+        return Boolean(stage && isAppCampaignSeriesLive(stage.series) && this.getSavedMedalRow(trackKey));
     }
 
     syncMedalTimesPanel() {
@@ -3553,7 +3557,7 @@ class MapmakerApp {
         return generated;
     }
 
-    drawGhostCar(worldPoint, angle, viewport, options = {}) {
+    drawGhostCar(worldPoint, angle, viewport) {
         if (!worldPoint || !Number.isFinite(worldPoint.x) || !Number.isFinite(worldPoint.y)) {
             return;
         }
@@ -3561,37 +3565,18 @@ class MapmakerApp {
             angle = 0;
         }
 
-        const muted = options.muted === true;
         const screen = this.worldToScreen(worldPoint, viewport);
         const radius = CAR_RADIUS * viewport.scale;
-        const halfAxis = CAR_HALF_LENGTH * viewport.scale;
         if (radius < 0.5) {
             return;
         }
 
+        const car = getDrawnCar(getDefaultDrawnCarAssetForGround(getTrackGround(this.track).key));
+        const size = DRAWN_CAR_DRAW_PIXELS * (CONFIG.carSpriteRenderScale ?? 1) / CONFIG.gridSize * viewport.scale;
         this.ctx.save();
         this.ctx.translate(screen.x, screen.y);
         this.ctx.rotate(angle);
-        this.ctx.beginPath();
-        this.ctx.moveTo(-halfAxis, -radius);
-        this.ctx.lineTo(halfAxis, -radius);
-        this.ctx.arc(halfAxis, 0, radius, -Math.PI / 2, Math.PI / 2);
-        this.ctx.lineTo(-halfAxis, radius);
-        this.ctx.arc(-halfAxis, 0, radius, Math.PI / 2, -Math.PI / 2);
-        this.ctx.closePath();
-        this.ctx.fillStyle = muted ? 'rgba(248, 250, 252, 0.10)' : 'rgba(248, 250, 252, 0.22)';
-        this.ctx.fill();
-        this.ctx.strokeStyle = muted ? 'rgba(248, 250, 252, 0.45)' : 'rgba(248, 250, 252, 0.92)';
-        this.ctx.lineWidth = 1.5;
-        this.ctx.stroke();
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(halfAxis + radius * 0.2, 0);
-        this.ctx.lineTo(halfAxis - radius * 0.45, -radius * 0.5);
-        this.ctx.lineTo(halfAxis - radius * 0.45, radius * 0.5);
-        this.ctx.closePath();
-        this.ctx.fillStyle = muted ? 'rgba(251, 191, 36, 0.35)' : 'rgba(251, 191, 36, 0.8)';
-        this.ctx.fill();
+        this.ctx.drawImage(car.sprite, -size / 2, -size / 2, size, size);
         this.ctx.restore();
     }
 
@@ -3714,6 +3699,8 @@ class MapmakerApp {
         const key = this.state.selectedTrackKey;
         const record = this.creatorRecords.get(key);
         const editable = this.creatorLoaded && !record?.lockedAt && !this.creatorDeletingKey;
+        const draftNote = document.getElementById('creator-draft-note');
+        if (draftNote) draftNote.hidden = !this.creatorLoaded || record?.privateDraft === false;
         this.trackPickerBtn.disabled = Boolean(this.creatorDeletingKey);
         this.newTrackBtn.disabled = !this.creatorLoaded || Boolean(this.creatorDeletingKey);
         this.setCreatorEditable(editable);
@@ -3741,7 +3728,8 @@ class MapmakerApp {
         } else if (this.state.dirtyTrackKeys.has(key)) {
             this.setCreatorSaveStatus('Unsaved changes', 'unsaved');
         } else if (record) {
-            this.setCreatorSaveStatus(record.checksPassed ? 'Saved' : 'Saved · checks fail', record.checksPassed ? 'saved' : 'unsaved');
+            const savedLabel = record.privateDraft ? 'Saved · private draft' : 'Saved · shared';
+            this.setCreatorSaveStatus(record.checksPassed ? savedLabel : `${savedLabel} · checks fail`, record.checksPassed ? 'saved' : 'unsaved');
         } else {
             this.setCreatorSaveStatus('Not saved yet', 'unsaved');
         }
@@ -3755,6 +3743,7 @@ class MapmakerApp {
             lockedAt: record.lockedAt,
             lockReason: record.lockReason,
             origin: record.origin,
+            privateDraft: record.privateDraft === true,
             checksPassed: record.checksPassed,
             checkError: record.checkError,
             updatedAt: record.updatedAt,
@@ -3820,7 +3809,7 @@ class MapmakerApp {
         }
         try {
             // Every tab loads here, so switching tabs never waits for the server.
-            const [{ tracks }, daily, seriesView, copyView] = await Promise.all([
+            const [{ tracks, username }, daily, seriesView, copyView] = await Promise.all([
                 creatorApi.listTracks().then(step),
                 creatorApi.readDaily().then(step),
                 creatorApi.readSeries().then(step),
@@ -3830,6 +3819,14 @@ class MapmakerApp {
                 this.creatorRefreshPending = true;
                 return;
             }
+            if (typeof username !== 'string' || !username.trim()) {
+                throw new Error('Your Reddit account could not be identified. Try again.');
+            }
+            if (this.creatorUsername && username.trim().toLowerCase() !== this.creatorUsername.toLowerCase()) {
+                this.creatorLoaded = false;
+                throw new Error('The Reddit account changed. Reopen the Creator to load your drafts.');
+            }
+            this.creatorUsername = username.trim();
             const previousKey = this.state.selectedTrackKey;
             const unsaved = captureUnsavedCreatorWork(this);
             this.state.tracks = {};
@@ -3846,7 +3843,7 @@ class MapmakerApp {
             document.getElementById('creator-retry-btn').hidden = true;
             let openKey = keepSelection && this.state.tracks[previousKey]
                 ? previousKey
-                : Object.keys(this.state.tracks).at(-1);
+                : tracks.find((record) => record.privateDraft)?.key;
             if (!openKey) {
                 openKey = 'newTrack';
                 this.state.tracks.newTrack = createBlankTrack();
@@ -3932,8 +3929,8 @@ class MapmakerApp {
     discardCreatorTrack(key) {
         const wasOpen = this.state.selectedTrackKey === key;
         const keys = Object.keys(this.state.tracks);
-        const index = keys.indexOf(key);
-        let nextKey = keys[index + 1] || keys[index - 1];
+        let nextKey = keys.findLast((candidate) => candidate !== key
+            && (this.creatorRecords.get(candidate)?.privateDraft || this.state.dirtyTrackKeys.has(candidate)));
         delete this.state.tracks[key];
         this.creatorRecords.delete(key);
         this.editHistories.delete(key);
@@ -4009,7 +4006,7 @@ class MapmakerApp {
         this.syncCreatorTrackState();
         try {
             if (record) {
-                await creatorApi.deleteTrack(key, record.revision);
+                await creatorApi.deleteTrack(key, record.revision, this.creatorUsername);
                 this.creatorPanels.refreshAll();
             }
             this.creatorDeletingKey = null;

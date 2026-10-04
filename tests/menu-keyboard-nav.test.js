@@ -7,6 +7,7 @@ import {
     findSpatialMenuIndex,
     getMenuNavDirection,
     handleMenuListKeydown,
+    isNativeActionTarget,
     resetMenuKeyboardState,
 } from '../game/ui/menu-keyboard-nav.js';
 
@@ -208,6 +209,79 @@ describe('menu keyboard nav helper', () => {
 
         expect(buttons[1].click).toHaveBeenCalled();
         expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it.each([false, true])('activates native focus instead of the remembered item with cue=%s', (keyboardNavActive) => {
+        const buttons = [makeButton('street'), makeButton('blue-paint')];
+        const state = { keyboardNavActive, selectedIndex: 0 };
+        if (keyboardNavActive) applyMenuSelection(buttons, 0);
+
+        expect(handleMenuListKeydown(makeEvent('Enter', { target: buttons[1] }), {
+            buttons, state, getActiveElement: () => buttons[1],
+        })).toBe(true);
+
+        expect(buttons[0].click).not.toHaveBeenCalled();
+        expect(buttons[1].click).toHaveBeenCalledOnce();
+        expect(state.selectedIndex).toBe(1);
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+        expect(buttons[1].classList.contains(MENU_SELECTED_CLASS)).toBe(keyboardNavActive);
+    });
+
+    it.each([false, true])('moves from native focus instead of the remembered row with cue=%s', (keyboardNavActive) => {
+        const buttons = [
+            makeButton('street', { rect: { left: 0, top: 0, width: 40, height: 40 } }),
+            makeButton('blue-paint', { rect: { left: 0, top: 80, width: 40, height: 40 } }),
+            makeButton('next-paint', { rect: { left: 60, top: 80, width: 40, height: 40 } }),
+            makeButton('circuit', { rect: { left: 60, top: 0, width: 40, height: 40 } }),
+        ];
+        const state = { keyboardNavActive, selectedIndex: 0 };
+        if (keyboardNavActive) applyMenuSelection(buttons, 0);
+
+        expect(handleMenuListKeydown(makeEvent('ArrowRight', { target: buttons[1] }), {
+            buttons, state, getActiveElement: () => buttons[1],
+        })).toBe(true);
+
+        expect(state.selectedIndex).toBe(2);
+        expect(buttons[2].focus).toHaveBeenCalledOnce();
+        expect(buttons[3].focus).not.toHaveBeenCalled();
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+    });
+
+    it('clears a previous arrow cue for native Tab without consuming Tab', () => {
+        const buttons = [makeButton('street'), makeButton('blue-paint')];
+        const state = { keyboardNavActive: true, selectedIndex: 0 };
+        applyMenuSelection(buttons, 0);
+        const event = makeEvent('Tab');
+
+        expect(handleMenuListKeydown(event, {
+            buttons, state, getActiveElement: () => buttons[0],
+        })).toBe(false);
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(state.keyboardNavActive).toBe(false);
+        expect(buttons[0].classList.contains(MENU_SELECTED_CLASS)).toBe(false);
+
+        handleMenuListKeydown(makeEvent('Enter', { target: buttons[1] }), {
+            buttons, state, getActiveElement: () => buttons[1],
+        });
+        expect(buttons[1].click).toHaveBeenCalledOnce();
+        expect(buttons[0].click).not.toHaveBeenCalled();
+    });
+
+    it.each(['button', 'link'])('leaves a focused native %s outside the menu list to its own handler', (kind) => {
+        const buttons = [makeButton('street')];
+        const back = { matches: () => true, click: vi.fn(), tagName: kind === 'button' ? 'BUTTON' : 'A' };
+        const state = { keyboardNavActive: false, selectedIndex: 0 };
+        const event = makeEvent('Enter', { target: back });
+
+        expect(handleMenuListKeydown(event, { buttons, state, getActiveElement: () => back })).toBe(false);
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(buttons[0].click).not.toHaveBeenCalled();
+        expect(back.click).not.toHaveBeenCalled();
+    });
+
+    it('does not assume a role-button element has native Enter activation', () => {
+        const roleButton = { matches: (selector) => selector.includes('[role="button"]') };
+        expect(isNativeActionTarget(roleButton)).toBe(false);
     });
 
     it('clears the cue on reset while keeping a preferred index', () => {

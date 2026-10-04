@@ -25,6 +25,7 @@ import {
     dismissMenuKeyboardCue,
     filterVisibleMenuItems,
     handleMenuListKeydown,
+    isNativeActionTarget,
     resetMenuKeyboardState,
 } from '../ui/menu-keyboard-nav.js';
 import { copyTextToClipboard, scheduleAfterModalPaint } from '../ui/dom.js';
@@ -169,31 +170,21 @@ export class ModalShell {
                 requireLaidOut: false,
             });
         }
-        const tabSkin = document.getElementById('garage-tab-skin');
-        const tabTrails = document.getElementById('garage-tab-trails');
-        const skinPanel = document.getElementById('garage-panel-skin');
-        const trailsPanel = document.getElementById('garage-panel-trails');
-        const activePanel = skinPanel && !skinPanel.hidden
-            ? skinPanel
-            : trailsPanel;
-        const options = activePanel
-            ? collectVisibleActionButtons(
-                activePanel,
-                '.garage-skin-option, .garage-trail-option',
-                { requireLaidOut: false },
-            )
-            : [];
-        return filterVisibleMenuItems(
-            [tabSkin, tabTrails, ...options],
-            { requireLaidOut: false },
-        );
+        const panel = document.getElementById('garage-panel');
+        return collectVisibleActionButtons(panel, 'button', {
+            requireLaidOut: false,
+        }).filter((item) => (
+            item.id !== 'garage-close-btn'
+            && !item.closest?.('[hidden], [aria-hidden="true"]')
+        ));
     }
 
     resetGarageMenuKeyboardNav({ keepCue = false, preferredElement = null } = {}) {
         const items = this.getGarageMenuItems();
         const container = this.getGarageMenuContainer();
         const firstOptionIndex = items.findIndex((item) => (
-            item.classList?.contains?.('garage-skin-option')
+            item.classList?.contains?.('garage-car-select')
+            || item.classList?.contains?.('garage-skin-option')
             || item.classList?.contains?.('garage-trail-option')
         ));
         const preferredElementIndex = preferredElement
@@ -201,7 +192,7 @@ export class ModalShell {
             : -1;
 
         if (keepCue && this._garageMenuKeyboardState?.keyboardNavActive) {
-            const index = firstOptionIndex >= 0 ? firstOptionIndex : 0;
+            const index = preferredElementIndex >= 0 ? preferredElementIndex : firstOptionIndex >= 0 ? firstOptionIndex : 0;
             this._garageMenuKeyboardState.selectedIndex = index;
             this._garageMenuKeyboardState.keyboardNavActive = true;
             applyMenuSelection(items, index, { container });
@@ -218,6 +209,7 @@ export class ModalShell {
     onGarageTabChangedForKeyboardNav() {
         this.resetGarageMenuKeyboardNav({
             keepCue: Boolean(this._garageMenuKeyboardState?.keyboardNavActive),
+            preferredElement: document.activeElement,
         });
     }
 
@@ -2181,6 +2173,9 @@ export class ModalShell {
         }
 
         if (event.key === 'Enter' || event.code === 'Enter') {
+            const focused = globalThis.document?.activeElement;
+            if (isNativeActionTarget(focused) && !focused.disabled
+                && this._activeTrapModal.contains?.(focused)) return;
             event.preventDefault();
             event.stopPropagation();
             return;

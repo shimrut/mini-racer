@@ -4,6 +4,7 @@ import { validateTrackQuality } from '../../../game/track/authoring/track-qualit
 import { getMedalRowError } from '../../../game/track/authoring/medal-rules.js';
 import { readStoredTrack } from './track-store.js';
 import { TrackInputError, type TrackShape, type Point } from './track-shape.js';
+import { assertCreatorTrackAccess } from './creator-track-access.js';
 
 export function getTrackCompletenessError(track: TrackShape, draftLoop: readonly Point[], medalRow: unknown): string | null {
     if (draftLoop.length || track.outer.length < 3 || track.inner.length < 3) return 'Finish the road.';
@@ -20,8 +21,9 @@ export function isBuiltInTrackComplete(trackKey: string): boolean {
 
 // Admission uses the current record, rather than the request's cached overlay
 // or the migration's trusted checks flag. All four raw medal times are needed.
-export async function readCompleteTrack(trackKey: string) {
+export async function readCompleteTrack(trackKey: string, username?: string) {
     const stored = await readStoredTrack(trackKey);
+    if (username !== undefined) await assertCreatorTrackAccess(stored, username);
     const track = stored?.track ?? BUILT_IN_TRACKS[trackKey as keyof typeof BUILT_IN_TRACKS];
     if (!track) throw new TrackInputError(`The game has no track called ${trackKey}.`);
     const medalRow = stored ? stored.medalRow : (medalTimes as Record<string, unknown>)[trackKey];

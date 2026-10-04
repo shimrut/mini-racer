@@ -1,19 +1,15 @@
-import { TRACK_GROUNDS } from '../track/grounds.js';
 import { resolveTrackPresentation } from '../track/presentation.js';
+import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../campaign/series-surfaces.js';
 
 // The series choice on the Campaign screen. It sits where the Daily screen shows
 // the selected track. In the list, each series has a kerb mark in the colours of
-// its ground: red and white tarmac, clay and cream dirt, blue and white snow.
+// its first stage: red and white tarmac, clay and cream dirt, blue and white snow.
 
 const MEDALS_PER_STAGE = 4;
 
 export function getSeriesKerbColors(ground) {
     const look = resolveTrackPresentation(null, { ground });
     return { a: look.curbRed, b: look.curbWhite };
-}
-
-export function getSeriesGroundLabel(ground) {
-    return TRACK_GROUNDS[ground]?.label ?? TRACK_GROUNDS.tarmac.label;
 }
 
 // "12/64": the medals a player holds in a series, of the most it can give.
@@ -102,7 +98,7 @@ export class CampaignSeriesPicker {
             option.setAttribute('aria-selected', String(series.id === this.currentId));
             option.tabIndex = -1;
             option.dataset.seriesId = series.id;
-            setKerbColors(option, series.ground);
+            setKerbColors(option, getCampaignSeriesGrounds(series)[0]);
 
             const kerb = document.createElement('span');
             kerb.className = 'campaign-series__kerb';
@@ -115,7 +111,7 @@ export class CampaignSeriesPicker {
             name.textContent = series.name;
             const ground = document.createElement('span');
             ground.className = 'campaign-series__option-ground';
-            ground.textContent = `${getSeriesGroundLabel(series.ground)} · ${series.stageCount} stages`;
+            ground.textContent = `${getCampaignSeriesSurfaceLabel(series)} · ${series.stageCount} stages`;
             text.append(name, ground);
 
             const medals = document.createElement('span');

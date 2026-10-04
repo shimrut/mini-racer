@@ -78,8 +78,8 @@ describe('stored track store', () => {
         const second = await store.saveStoredTrack('nightCut', {
             track: { ...shape, name: 'Night Cut II' },
             medalRow: null,
-        }, { username: 'ModTwo', baseRevision: 1 });
-        expect(second).toMatchObject({ revision: 2, createdBy: 'ModOne', updatedBy: 'ModTwo', medalRow: null });
+        }, { username: 'ModOne', baseRevision: 1 });
+        expect(second).toMatchObject({ revision: 2, createdBy: 'ModOne', updatedBy: 'ModOne', medalRow: null });
         expect((await store.listStoredTracks()).map((track) => track.name)).toEqual(['Night Cut II']);
     });
 

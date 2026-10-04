@@ -1,5 +1,8 @@
 import type { DailyGpPlayerPreferences } from '../daily/daily-gp-model.js';
 import { readPlayerProfile, upsertPlayerProfile } from '../competition/competition-identity.js';
+import { normalizeCarPaints } from '../../../game/car/car-paint.js';
+import { normalizeCarTrails } from '../../../game/car/player-trail.js';
+import { normalizeCarDecals } from '../../../game/car/car-decals.js';
 
 export type TransferSettingsChoice = 'account' | 'merge';
 
@@ -25,6 +28,16 @@ export function transferredSettings(
     for (const field of GROUND_SKIN_FIELDS) {
         if (merged[field] === undefined && guest[field] !== undefined) merged[field] = guest[field];
     }
+    const carPaints: NonNullable<DailyGpPlayerPreferences['carPaints']> = normalizeCarPaints(guest.carPaints);
+    const accountPaints: NonNullable<DailyGpPlayerPreferences['carPaints']> = normalizeCarPaints(account.carPaints);
+    for (const [assetName, paint] of Object.entries(accountPaints)) {
+        carPaints[assetName] = { ...carPaints[assetName], ...paint };
+    }
+    if (Object.keys(carPaints).length > 0) merged.carPaints = carPaints;
+    const carTrails = { ...normalizeCarTrails(guest.carTrails), ...normalizeCarTrails(account.carTrails) };
+    if (Object.keys(carTrails).length > 0) merged.carTrails = carTrails;
+    const carDecals = { ...normalizeCarDecals(guest.carDecals), ...normalizeCarDecals(account.carDecals) };
+    if (Object.keys(carDecals).length > 0) merged.carDecals = carDecals;
     return merged;
 }
 

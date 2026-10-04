@@ -9,6 +9,9 @@ import {
 import { mintGuestPlayerToken, verifyGuestPlayerToken } from '../player/player-token.js';
 import { resolveGuestIdentityStatus, type GuestIdentityStatus } from '../player/guest-retirement.js';
 import { STOCK_CAR_ASSET_NAME } from '../../../game/car/car-unlock-policy.js';
+import { normalizeCarPaints } from '../../../game/car/car-paint.js';
+import { normalizeCarTrails } from '../../../game/car/player-trail.js';
+import { normalizeCarDecals } from '../../../game/car/car-decals.js';
 import {
     DEFAULT_PAUSE_PLACEMENT,
     PAUSE_PLACEMENT_SEPARATE,
@@ -68,6 +71,18 @@ function withGroundCarSkins(fields: {
     };
 }
 
+function withCarPaints(carPaints: DailyGpPlayerPreferences['carPaints']) {
+    return Object.keys(carPaints).length > 0 ? { carPaints } : {};
+}
+
+function withCarTrails(carTrails: DailyGpPlayerPreferences['carTrails']) {
+    return Object.keys(carTrails).length > 0 ? { carTrails } : {};
+}
+
+function withCarDecals(carDecals: DailyGpPlayerPreferences['carDecals']) {
+    return Object.keys(carDecals).length > 0 ? { carDecals } : {};
+}
+
 function readTrailIdPreference(value: unknown): string | null {
     const trailId = typeof value === 'string' ? value.trim() : '';
     return trailId && trailId.length <= MAX_TRAIL_ID_LENGTH ? trailId : null;
@@ -113,6 +128,9 @@ function readPlayerPreferenceFields(value: unknown): {
     carSkinSnow: string | null;
     carSkinWater: string | null;
     carSkinSpace: string | null;
+    carPaints: DailyGpPlayerPreferences['carPaints'];
+    carTrails: DailyGpPlayerPreferences['carTrails'];
+    carDecals: DailyGpPlayerPreferences['carDecals'];
     trailId: string | null;
     musicEnabled: boolean | null;
     carAudioEnabled: boolean | null;
@@ -135,6 +153,9 @@ function readPlayerPreferenceFields(value: unknown): {
         carSkinSnow: readCarSkinPreference(preferences.carSkinSnow),
         carSkinWater: readCarSkinPreference(preferences.carSkinWater),
         carSkinSpace: readCarSkinPreference(preferences.carSkinSpace),
+        carPaints: normalizeCarPaints(preferences.carPaints),
+        carTrails: normalizeCarTrails(preferences.carTrails),
+        carDecals: normalizeCarDecals(preferences.carDecals),
         trailId: readTrailIdPreference(preferences.trailId),
         musicEnabled: readBooleanPreference(preferences.musicEnabled),
         carAudioEnabled: readBooleanPreference(preferences.carAudioEnabled),
@@ -197,6 +218,9 @@ export function normalizePlayerPreferences(value: unknown): DailyGpPlayerPrefere
     return {
         carSkin,
         ...withGroundCarSkins(fields),
+        ...withCarPaints(fields.carPaints),
+        ...withCarTrails(fields.carTrails),
+        ...withCarDecals(fields.carDecals),
         trailId,
         musicEnabled,
         carAudioEnabled,
@@ -217,6 +241,9 @@ export function salvagePlayerPreferences(value: unknown): DailyGpPlayerPreferenc
     return {
         carSkin: fields.carSkin ?? DEFAULT_PLAYER_PREFERENCES.carSkin,
         ...withGroundCarSkins(fields),
+        ...withCarPaints(fields.carPaints),
+        ...withCarTrails(fields.carTrails),
+        ...withCarDecals(fields.carDecals),
         trailId: fields.trailId ?? DEFAULT_PLAYER_PREFERENCES.trailId,
         musicEnabled: fields.musicEnabled ?? DEFAULT_PLAYER_PREFERENCES.musicEnabled,
         carAudioEnabled: fields.carAudioEnabled ?? DEFAULT_PLAYER_PREFERENCES.carAudioEnabled,

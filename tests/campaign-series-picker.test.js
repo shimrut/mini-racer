@@ -84,6 +84,20 @@ describe('Campaign series picker', () => {
         expect(document.activeElement).toBe(options[0]);
     });
 
+    it('labels mixed stages and takes kerb art from the first actual surface', () => {
+        picker.sync({ seriesId: 'mixed-v1', series: [SERIES[0], {
+            id: 'mixed-v1', name: 'Mixed Races', ground: 'snow', grounds: ['dirt', 'tarmac'],
+            stageCount: 2, medalCount: 3,
+        }] });
+        picker.open();
+        const option = document.querySelector('[data-series-id="mixed-v1"]');
+        expect(option.querySelector('.campaign-series__option-ground').textContent).toBe('Mixed · 2 stages');
+        const colours = getSeriesKerbColors('dirt');
+        expect(option.style.getPropertyValue('--series-kerb-a')).toBe(colours.a);
+        expect(option.style.getPropertyValue('--series-kerb-b')).toBe(colours.b);
+        expect(document.activeElement).toBe(option);
+    });
+
     it('chooses a series with the keyboard and gives focus back to the button', () => {
         picker.sync({ seriesId: 'numbered-v1', series: SERIES });
         picker.open();

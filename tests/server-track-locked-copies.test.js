@@ -182,7 +182,7 @@ describe('copy of the live Campaign', () => {
         const report = await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
         expect(report).toMatchObject({ copied: ['numbered-v1'], tracks: stageKeys, failed: [] });
         const copy = await series.readStoredSeries('numbered-v1');
-        expect(copy).toMatchObject({ status: 'published', publishedStageCount: numbers.stages.length, origin: 'migrated' });
+        expect(copy).toMatchObject({ status: 'published', grounds: ['tarmac'], publishedStageCount: numbers.stages.length, origin: 'migrated' });
         expect(copy.stages).toEqual(numbers.stages);
         for (const trackKey of stageKeys) {
             const track = await tracks.readStoredTrack(trackKey);

@@ -27,8 +27,7 @@ export async function readTrackUsage(): Promise<TrackUsage> {
 
 // Whether players can meet a track now, read from the records in Redis, not
 // from the request's series list. A safety check under the placement lock
-// uses it: a publication takes the same lock, so the answer is current. A
-// published stage on a ground that is not live counts too, which is safe.
+// uses it: a publication takes the same lock, so the answer is current.
 export async function isTrackPlayedNow(trackKey: string): Promise<boolean> {
     if (Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE).some((key) => String(key) === trackKey)) return true;
     const inLiveAppSeries = listAppSeriesDefinitions().some((series) => (

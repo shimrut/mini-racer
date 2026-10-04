@@ -1196,14 +1196,40 @@ describe("guest transfer cost and recovery", () => {
       const guestPlayerId = `guest:settings-${choice}`;
       const redditPlayerId = `reddit:settings-${choice}`;
       await seedCampaignStage(NUMBERS_STAGES[0], guestPlayerId);
-      await upsertPlayerProfile({ playerId: guestPlayerId, preferences: { ...baseSettings, musicEnabled: true } });
-      await upsertPlayerProfile({ playerId: redditPlayerId, preferences: { ...baseSettings, trailId: "none" } });
+      await upsertPlayerProfile({ playerId: guestPlayerId, preferences: {
+        ...baseSettings,
+        musicEnabled: true,
+        carPaints: { "drawn/mr_grip_circuit": { main: "#ff303e", accent: "#ffe34a" } },
+        carTrails: { "drawn/mr_grip_circuit": "coral", "drawn/mr_dirt_rally": "gold" },
+        carDecals: { "drawn/formula-red": "drawn/formula-gold", "drawn/mr_grip_circuit": "drawn/mr_grip_circuit-blue" },
+      } });
+      await upsertPlayerProfile({ playerId: redditPlayerId, preferences: {
+        ...baseSettings,
+        trailId: "none",
+        carPaints: { "drawn/mr_grip_circuit": { main: "#246bff" } },
+        carTrails: { "drawn/mr_grip_circuit": "none" },
+        carDecals: { "drawn/formula-red": "drawn/formula-red" },
+      } });
 
       await selectGuestProgress({ guestPlayerId, redditPlayerId, choice });
 
       // Keep guest runs as Merge; Merge and Keep account keep the account's settings.
       const settings = (await readPlayerProfile(redditPlayerId)).preferences;
       expect(settings).toMatchObject({ musicEnabled: false, trailId: "none" });
+      expect(settings.carPaints).toEqual({
+        "drawn/mr_grip_circuit": {
+          main: "#246bff",
+          ...(choice === "account" ? {} : { accent: "#ffe34a" }),
+        },
+      });
+      expect(settings.carTrails).toEqual({
+        "drawn/mr_grip_circuit": "none",
+        ...(choice === "account" ? {} : { "drawn/mr_dirt_rally": "gold" }),
+      });
+      expect(settings.carDecals).toEqual({
+        "drawn/formula-red": "drawn/formula-red",
+        ...(choice === "account" ? {} : { "drawn/mr_grip_circuit": "drawn/mr_grip_circuit-blue" }),
+      });
     });
   }
 

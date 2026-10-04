@@ -154,13 +154,17 @@ import dirtSnake from './definitions/dirt-snake.js';
 import wildCrest from './definitions/wild-crest.js';
 import dirtValley from './definitions/dirt-valley.js';
 import warpedLoop from './definitions/warped-loop.js';
-import oldMountain from './definitions/old-mountain.js';
 import budapestRun from './definitions/budapest-run.js';
 import bucharestScramble from './definitions/bucharest-scramble.js';
 import babylonRace from './definitions/babylon-race.js';
 import centralDistrict from './definitions/central-district.js';
 import smallSteps from './definitions/small-steps.js';
 import lapinLoop from './definitions/lapin-loop.js';
+import mountainPass from './definitions/mountain-pass.js';
+import sharkTail from './definitions/shark-tail.js';
+import hookBend from './definitions/hook-bend.js';
+import windingLane from './definitions/winding-lane.js';
+import grandSlam from './definitions/grand-slam.js';
 import { TRACK_CATALOG } from './catalog.js';
 import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
 
@@ -321,13 +325,17 @@ const TRACK_GEOMETRY = {
     wildCrest,
     dirtValley,
     warpedLoop,
-    oldMountain,
     budapestRun,
     bucharestScramble,
     babylonRace,
     centralDistrict,
     smallSteps,
     lapinLoop,
+    mountainPass,
+    sharkTail,
+    hookBend,
+    windingLane,
+    grandSlam,
 };
 
 // The tracks in the app, without the stored tracks.

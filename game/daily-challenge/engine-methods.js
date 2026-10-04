@@ -523,8 +523,8 @@ export const dailyChallengeEngineMethods = {
     return challenges;
   },
 
-  async warmDailyRaceDefinitions() {
-    const challenge = await getActiveDailyChallenge();
+  async warmDailyRaceDefinitions({ challenge: cachedChallenge = null } = {}) {
+    const challenge = cachedChallenge ?? await getActiveDailyChallenge();
     if (!challenge?.trackKey) throw new Error('The Daily has no playable track.');
     const playlist = await dailyChallengeEngineMethods.loadDailyRaceDefinitions.call(this, challenge);
     const prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.DAILY, {

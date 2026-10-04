@@ -1584,31 +1584,44 @@ describe('Campaign lobby and shared modal adapters', () => {
         );
     });
 
-    it('binds every lobby Garage entry point to the shared Garage modal', () => {
+    it('binds every lobby Garage entry point and each car category tab', () => {
+        const originalDocument = global.document;
         const buttons = [
             createElement('button'),
             createElement('button'),
             createElement('button'),
         ];
+        const tabIds = ['street', 'circuit', 'dirt', 'snow', 'water', 'space', 'legacy'];
+        const tabs = new Map(tabIds.map((id) => [`garage-tab-${id}`, createElement('button')]));
         const togglePanel = vi.fn();
+        const setGarageTab = vi.fn();
+        global.document = {
+            getElementById: (id) => tabs.get(id) || null,
+        };
 
-        GarageUi.prototype.bind.call({
-            buildSkinGrid: vi.fn(),
-            buildTrailGrid: vi.fn(),
-            syncSkinSelection: vi.fn(),
-            syncTrailSelection: vi.fn(),
-            setGarageTab: vi.fn(),
-            garageModal: null,
-            garageToggleButtons: buttons,
-            togglePanel,
-            tabSkin: null,
-            tabTrails: null,
-        });
+        try {
+            GarageUi.prototype.bind.call({
+                activeGarageTab: 'street',
+                setGarageTab,
+                garageModal: null,
+                garageToggleButtons: buttons,
+                togglePanel,
+            });
+            expect(setGarageTab).toHaveBeenCalledWith('street', { focusTab: false });
+            setGarageTab.mockClear();
 
-        for (const button of buttons) {
-            button.listeners.get('click')();
+            for (const button of buttons) {
+                button.listeners.get('click')();
+            }
+            expect(togglePanel).toHaveBeenCalledTimes(buttons.length);
+            for (const id of tabIds) {
+                tabs.get(`garage-tab-${id}`).listeners.get('click')();
+                expect(setGarageTab).toHaveBeenLastCalledWith(id);
+            }
+            expect(setGarageTab).toHaveBeenCalledTimes(tabIds.length);
+        } finally {
+            global.document = originalDocument;
         }
-        expect(togglePanel).toHaveBeenCalledTimes(buttons.length);
     });
 
     it('routes each pane Back icon through the active lobby mode', () => {

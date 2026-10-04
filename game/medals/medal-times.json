@@ -576,52 +576,52 @@
     "bronze": 14.15
   },
   "mountainPeak": {
-    "author": 10.37,
-    "gold": 10.69,
-    "silver": 10.91,
-    "bronze": 11.24
+    "author": 9.18,
+    "gold": 9.54,
+    "silver": 10.02,
+    "bronze": 10.61
   },
   "sharkFin": {
-    "author": 11.71,
-    "gold": 12,
-    "silver": 12.35,
-    "bronze": 12.74
+    "author": 15.71,
+    "gold": 16.09,
+    "silver": 16.48,
+    "bronze": 16.82
   },
   "twistedClover": {
-    "author": 7.62,
-    "gold": 7.79,
-    "silver": 7.91,
-    "bronze": 8.07
+    "author": 7.75,
+    "gold": 7.99,
+    "silver": 8.23,
+    "bronze": 8.51
   },
   "hookLoop": {
-    "author": 7.39,
-    "gold": 7.57,
-    "silver": 7.8,
-    "bronze": 8.04
+    "author": 6.85,
+    "gold": 7.06,
+    "silver": 7.25,
+    "bronze": 7.51
   },
   "crookedArrow": {
-    "author": 10.5,
-    "gold": 10.69,
-    "silver": 10.87,
-    "bronze": 11.12
+    "author": 10.87,
+    "gold": 11.08,
+    "silver": 11.37,
+    "bronze": 11.72
   },
   "windingRoad": {
-    "author": 9.45,
-    "gold": 9.69,
-    "silver": 9.92,
-    "bronze": 10.14
+    "author": 8.89,
+    "gold": 9.18,
+    "silver": 9.31,
+    "bronze": 9.62
   },
   "lightningHook": {
-    "author": 12.2,
-    "gold": 12.37,
-    "silver": 12.58,
-    "bronze": 12.95
+    "author": 12.7,
+    "gold": 12.95,
+    "silver": 13.21,
+    "bronze": 13.55
   },
   "doubleTrouble": {
-    "author": 11.29,
-    "gold": 11.52,
-    "silver": 11.75,
-    "bronze": 12.01
+    "author": 11.34,
+    "gold": 11.61,
+    "silver": 11.87,
+    "bronze": 12.05
   },
   "brokenWing": {
     "author": 11.41,
@@ -935,12 +935,6 @@
     "silver": 8.1,
     "bronze": 8.35
   },
-  "oldMountain": {
-    "author": 9.18,
-    "gold": 9.54,
-    "silver": 10.02,
-    "bronze": 10.61
-  },
   "budapestRun": {
     "author": 10.33,
     "gold": 10.48,
@@ -964,5 +958,35 @@
     "gold": 7.31,
     "silver": 7.52,
     "bronze": 7.76
+  },
+  "mountainPass": {
+    "author": 10.37,
+    "gold": 10.69,
+    "silver": 10.91,
+    "bronze": 11.24
+  },
+  "sharkTail": {
+    "author": 11.71,
+    "gold": 12,
+    "silver": 12.35,
+    "bronze": 12.74
+  },
+  "hookBend": {
+    "author": 7.39,
+    "gold": 7.57,
+    "silver": 7.8,
+    "bronze": 8.04
+  },
+  "windingLane": {
+    "author": 9.45,
+    "gold": 9.69,
+    "silver": 9.92,
+    "bronze": 10.14
+  },
+  "grandSlam": {
+    "author": 12.66,
+    "gold": 12.98,
+    "silver": 13.36,
+    "bronze": 13.77
   }
 }

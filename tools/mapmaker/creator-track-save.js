@@ -48,7 +48,13 @@ export function restoreUnsavedCreatorWork(editor, unsaved) {
     for (const { key, content, history, record, pending } of unsaved) {
         editor.state.tracks[key] = withRoadLine(content.track, content.roadLine);
         editor.editHistories.set(key, history ?? createEditHistory(editor.state.tracks[key]));
-        if (record && !editor.isCreatorLocked(key)) editor.creatorRecords.set(key, record);
+        if (record && !editor.isCreatorLocked(key)) {
+            const current = editor.creatorRecords.get(key);
+            editor.creatorRecords.set(key, {
+                ...record,
+                ...(typeof current?.privateDraft === 'boolean' ? { privateDraft: current.privateDraft } : {}),
+            });
+        }
         if (content.medalRow) editor.medalRowByKey.set(key, content.medalRow);
         if (content.draftLoop.length) editor.draftLoopsByKey.set(key, content.draftLoop);
         else editor.draftLoopsByKey.delete(key);
@@ -160,7 +166,10 @@ async function sendCreatorTrack(editor, key, geometrySignature) {
     editor.setCreatorSaveStatus('Saving…', 'saving');
     editor.syncActionButtons();
     try {
-        const saved = readSavedTrack(await creatorApi.saveTrack(key, { ...wire, baseRevision }), key);
+        const saved = readSavedTrack(await creatorApi.saveTrack(key, {
+            ...wire, baseRevision,
+            ...(editor.creatorUsername ? { creatorUsername: editor.creatorUsername } : {}),
+        }), key);
         // Typed medal text that is not in the row yet is a newer change too.
         const unchanged = Boolean(editor.state.tracks[key])
             && JSON.stringify(creatorTrackContent(editor, key)) === JSON.stringify(snapshot)
@@ -205,7 +214,7 @@ async function readServerTrack(editor, key) {
     editor.busy = true;
     editor.syncCreatorTrackState();
     try {
-        return (await creatorApi.readTrack(key)).track ?? null;
+        return (await creatorApi.readTrack(key, editor.creatorUsername)).track ?? null;
     } catch (error) {
         if (error?.status === 404) return null;
         editor.creatorSaveErrors.set(key, `Save failed: ${error.message}`);

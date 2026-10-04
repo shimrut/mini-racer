@@ -4,7 +4,9 @@
     padding: 0
 }
 
-#settings-modal .modal-card-section--sheet {
+#settings-modal .modal-card-section--sheet,
+#daily-playlist-modal .modal-card-section--sheet,
+#garage-modal .modal-card-section--sheet {
     gap: 0.85rem;
 }
 
@@ -347,10 +349,6 @@
     letter-spacing: 0.15em;
     font-size: 0.85rem;
     font-weight: 800;
-}
-
-#daily-playlist-modal .modal-card-section--sheet {
-    gap: 0.85rem;
 }
 
 #daily-playlist-modal .reusable-modal-content {

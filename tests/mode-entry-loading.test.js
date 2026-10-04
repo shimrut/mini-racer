@@ -104,7 +104,10 @@ describe('mode entry definition loading', () => {
         expect(warm).toHaveBeenCalledTimes(1);
         expect(warm.mock.instances[0]).toBe(racer);
         expect(racer.installModeRuntime).not.toHaveBeenCalled();
-        pending.resolve({ challenge: { id: 'today' } });
+        pending.resolve({ challenge: {
+            id: 'today', trackKey: 'circuit',
+            endsAt: new Date(Date.now() + 3_600_000).toISOString(),
+        } });
         await first;
         expect(racer.activeRaceMode).toBe('challenge');
         expect(racer.currentChallengeRun).toEqual({ id: 'active-attempt' });

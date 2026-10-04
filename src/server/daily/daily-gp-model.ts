@@ -1,4 +1,3 @@
-import { getAuthorMedalSeconds } from '../../../game/medals/medal-timing.js';
 import { objectiveTypeForLapCount } from '../../../game/race/race-spec.js';
 import * as utcDay from '../../../game/shared/utc-day.js';
 
@@ -6,13 +5,9 @@ export const DAY_MS: number = utcDay.DAY_MS;
 const DEFAULT_OBJECTIVE_TYPE = 'single_lap_fastest';
 export const DAILY_GP_RULES_REVISION = 1;
 export const DAILY_GP_LEGACY_RULES_REVISION = 0;
-export const DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS = 10;
 
 export type DailyGpLapCount = 1 | 2 | 3;
 export type DailyGpRulesRevision = typeof DAILY_GP_LEGACY_RULES_REVISION | typeof DAILY_GP_RULES_REVISION;
-
-const DAILY_GP_ONE_LAP_COUNTS = Object.freeze([1] as const);
-const DAILY_GP_ONE_OR_TWO_LAP_COUNTS = Object.freeze([1, 2] as const);
 
 export type DailyGpRaceContract = Pick<
     DailyGpChallenge,
@@ -156,6 +151,9 @@ export type DailyGpPlayerPreferences = {
     carSkinSnow?: string;
     carSkinWater?: string;
     carSkinSpace?: string;
+    carPaints?: Record<string, Partial<Record<'main' | 'accent' | 'tertiary', string>>>;
+    carTrails?: Record<string, string>;
+    carDecals?: Record<string, string>;
     trailId: string;
     musicEnabled: boolean;
     carAudioEnabled: boolean;
@@ -176,39 +174,9 @@ export function createDailyChallengeId(challengeDate: string): string {
     return `daily-gp-${challengeDate}`;
 }
 
-function deterministicSeedIndex(seed: string, length: number): number {
-    let hash = 0x811c9dc5;
-    for (let index = 0; index < seed.length; index += 1) {
-        hash ^= seed.charCodeAt(index);
-        hash = Math.imul(hash, 0x01000193);
-    }
-    return (hash >>> 0) % length;
-}
-
-export function getDailyGpEligibleLapCounts(trackKey: string, authorTime = getAuthorMedalSeconds(trackKey)): readonly DailyGpLapCount[] {
-    if (!Number.isFinite(authorTime) || authorTime >= DAILY_GP_TWO_LAP_AUTHOR_TIME_SECONDS) {
-        return DAILY_GP_ONE_LAP_COUNTS;
-    }
-    return DAILY_GP_ONE_OR_TWO_LAP_COUNTS;
-}
-
-export function selectDailyGpLapCount(
-    challengeId: string,
-    trackKey: string,
-    rulesRevision = DAILY_GP_RULES_REVISION,
-    authorTime?: number | null,
-): DailyGpLapCount {
-    const eligible = getDailyGpEligibleLapCounts(trackKey, authorTime);
-    return eligible[deterministicSeedIndex(
-        `${challengeId}:${trackKey}:${rulesRevision}`,
-        eligible.length,
-    )] ?? 1;
-}
-
 export function buildDailyGpChallengeForDayIndexWithTrack(
     dayIndex: number,
     trackKey: string,
-    { authorTime }: { authorTime?: number | null } = {},
 ): DailyGpChallenge {
     const startsAt = getUtcDayStart(dayIndex);
     const challengeDate = formatUtcChallengeDate(startsAt);
@@ -216,7 +184,8 @@ export function buildDailyGpChallengeForDayIndexWithTrack(
     const availableUntil = new Date(startsAt.getTime() + DAILY_GP_PLAYLIST_DAYS * DAY_MS);
 
     const id = createDailyChallengeId(challengeDate);
-    const lapCount = selectDailyGpLapCount(id, trackKey, DAILY_GP_RULES_REVISION, authorTime);
+    // Every new Daily is one lap. Published days keep their stored lap count.
+    const lapCount = 1;
 
     return {
         id,

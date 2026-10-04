@@ -6,7 +6,6 @@ import {
     DAY_MS,
     formatUtcChallengeDate,
     getUtcDayIndex,
-    selectDailyGpLapCount,
 } from '../src/server/daily/daily-gp-model.ts';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 
@@ -141,8 +140,8 @@ describe('mergeGuestDailyProgress', () => {
     it('moves a faster guest Daily time while retaining the source for transfer retry', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
-        // The day's own lap count: a time with another lap count does not fit it.
-        const dayLaps = selectDailyGpLapCount(challengeId, trackKey);
+        // A new Daily is one lap: a time with another lap count does not fit it.
+        const dayLaps = 1;
         const guestPlayerId = 'guest:daily-guest-merge';
         const redditPlayerId = 'reddit:daily-claimed';
         const entryHashKey = `dailygp:leaderboard:${challengeId}:entries`;
@@ -205,8 +204,8 @@ describe('mergeGuestDailyProgress', () => {
     it('retains a slower guest row without overwriting a faster Reddit time', async () => {
         const challengeId = getTodayChallengeIdForTest();
         const trackKey = TRACK_SCHEDULE_KEYS[0];
-        // The day's own lap count: a time with another lap count does not fit it.
-        const dayLaps = selectDailyGpLapCount(challengeId, trackKey);
+        // A new Daily is one lap: a time with another lap count does not fit it.
+        const dayLaps = 1;
         const guestPlayerId = 'guest:daily-guest-slow';
         const redditPlayerId = 'reddit:daily-fast';
         const entryHashKey = `dailygp:leaderboard:${challengeId}:entries`;

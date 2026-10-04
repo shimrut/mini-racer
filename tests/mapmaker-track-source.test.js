@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../game/config.js';
+import { normalCarPictureWidth } from '../game/car/drawn-car/formula.js';
 import {
     DEFAULT_DRAW_WIDTH,
     LINE_BUILD_CAR_UNITS,
@@ -40,13 +41,15 @@ const TRACK = {
 };
 
 describe('Mapmaker track source serializer', () => {
-    it('makes Narrow, Normal and Wide roads of 6, 6.5 and 7 car-widths', () => {
-        const carWidth = CONFIG.carRadius * 2;
+    it('makes Narrow, Normal and Wide roads of 6, 6.5 and 7 pictures of the normal car', () => {
+        const pictureWidth = normalCarPictureWidth(CONFIG.gridSize);
         expect(ROAD_WIDTHS.map(({ label, cars }) => [label, cars])).toEqual([['Narrow', 6], ['Normal', 6.5], ['Wide', 7]]);
-        ROAD_WIDTHS.forEach(({ width, cars }) => expect(width).toBeCloseTo(cars * carWidth, 9));
+        ROAD_WIDTHS.forEach(({ width, cars }) => expect(width).toBeCloseTo(cars * pictureWidth, 9));
         expect(LINE_BUILD_CAR_UNITS).toBe(6.5);
-        expect(DEFAULT_DRAW_WIDTH).toBe(LINE_BUILD_CAR_UNITS * carWidth);
-        expect(formatTrackNumber(WIDE_ROAD_WIDTH)).toBe('3.85');
+        expect(DEFAULT_DRAW_WIDTH).toBe(LINE_BUILD_CAR_UNITS * pictureWidth);
+        expect(formatTrackNumber(DEFAULT_DRAW_WIDTH)).toBe('4.455');
+        expect(formatTrackNumber(WIDE_ROAD_WIDTH)).toBe('4.798');
+        expect(pictureWidth).toBeGreaterThan(CONFIG.carRadius * 2);
     });
 
     it('formats stable compact coordinate values', () => {

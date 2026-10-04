@@ -143,6 +143,34 @@ describe('modal escape key', () => {
             global.document = originalDocument;
         }
     });
+
+    it('closes the Garage unlock details before its parent on escape', () => {
+        const closeDetails = { click: vi.fn() };
+        const closeGarage = { click: vi.fn() };
+        const originalDocument = global.document;
+        global.document = {
+            querySelector: () => ({ querySelector: () => closeDetails }),
+            getElementById: () => closeGarage,
+        };
+        const event = {
+            key: 'Escape',
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+        };
+
+        try {
+            handleModalTrapKeydown.call({
+                _activeTrapModal: { id: 'garage-modal' },
+                isPauseEscapeTarget: () => false,
+            }, event);
+
+            expect(closeDetails.click).toHaveBeenCalledOnce();
+            expect(closeGarage.click).not.toHaveBeenCalled();
+            expect(event.preventDefault).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
 });
 
 describe('modal activation key', () => {
@@ -161,6 +189,45 @@ describe('modal activation key', () => {
 
         expect(event.preventDefault).toHaveBeenCalled();
         expect(event.stopPropagation).toHaveBeenCalled();
+    });
+
+    it.each(['button', 'link'])('allows native Enter on a focused %s outside the Garage menu list', (kind) => {
+        const street = { click: vi.fn() };
+        const back = { matches: () => true, disabled: false, tagName: kind === 'button' ? 'BUTTON' : 'A' };
+        const event = { key: 'Enter', target: back, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+        const originalDocument = global.document;
+        global.document = { activeElement: back, querySelector: () => null };
+        try {
+            handleModalTrapKeydown.call({
+                _activeTrapModal: { id: 'garage-modal', contains: (node) => node === back },
+                _garageMenuKeyboardState: { keyboardNavActive: false, selectedIndex: 0 },
+                getGarageMenuItems: () => [street],
+                getGarageMenuContainer: () => null,
+                getActiveMenuActionsRoot: () => null,
+            }, event);
+            expect(street.click).not.toHaveBeenCalled();
+            expect(event.preventDefault).not.toHaveBeenCalled();
+            expect(event.stopPropagation).not.toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it.each(['disabled', 'outside'])('consumes Enter for a focused action that is %s', (reason) => {
+        const focused = { matches: () => true, disabled: reason === 'disabled' };
+        const event = { key: 'Enter', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+        const originalDocument = global.document;
+        global.document = { activeElement: focused };
+        try {
+            handleModalTrapKeydown.call({
+                _activeTrapModal: { id: 'modal-without-actions', contains: () => reason !== 'outside' },
+                getActiveMenuActionsRoot: () => null,
+            }, event);
+            expect(event.preventDefault).toHaveBeenCalledOnce();
+            expect(event.stopPropagation).toHaveBeenCalledOnce();
+        } finally {
+            global.document = originalDocument;
+        }
     });
 });
 
@@ -453,15 +520,13 @@ describe('modal pause/finish menu keyboard nav', () => {
     });
 
     it('excludes modal dismiss buttons and the settings meter from navigation', () => {
-        const skinTab = makeMenuButton('garage-tab-skin');
-        const trailsTab = makeMenuButton('garage-tab-trails');
+        const streetTab = makeMenuButton('garage-tab-street');
+        const legacyTab = makeMenuButton('garage-tab-legacy');
         const skinOption = makeMenuButton('skin-option');
         const garageBack = makeMenuButton('garage-close-btn');
-        const skinPanel = {
-            hidden: false,
-            querySelectorAll: () => [skinOption],
+        const garagePanel = {
+            querySelectorAll: () => [streetTab, legacyTab, skinOption, garageBack],
         };
-        const trailsPanel = { hidden: true };
 
         const settingSwitch = makeMenuButton('settings-car-audio-switch');
         const minus = makeMenuButton('settings-collision-restart-delay-minus');
@@ -469,11 +534,8 @@ describe('modal pause/finish menu keyboard nav', () => {
         const plus = makeMenuButton('settings-collision-restart-delay-plus');
         const settingsBack = makeMenuButton('settings-back-btn');
         const elements = new Map([
-            ['garage-tab-skin', skinTab],
-            ['garage-tab-trails', trailsTab],
+            ['garage-panel', garagePanel],
             ['garage-close-btn', garageBack],
-            ['garage-panel-skin', skinPanel],
-            ['garage-panel-trails', trailsPanel],
             ['settings-car-audio-switch', settingSwitch],
             ['settings-collision-restart-delay-minus', minus],
             ['settings-collision-restart-delay-meter', meter],
@@ -487,13 +549,114 @@ describe('modal pause/finish menu keyboard nav', () => {
 
         try {
             const garageItems = ModalShell.prototype.getGarageMenuItems.call({});
-            expect(garageItems).toEqual([skinTab, trailsTab, skinOption]);
+            expect(garageItems).toEqual([streetTab, legacyTab, skinOption]);
             expect(garageItems).not.toContain(garageBack);
 
             const settingsItems = ModalShell.prototype.getSettingsMenuItems.call({});
             expect(settingsItems).toEqual([settingSwitch, minus, plus]);
             expect(settingsItems).not.toContain(meter);
             expect(settingsItems).not.toContain(settingsBack);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('includes car types, preview, paints and shared trails from only the visible Garage panels', () => {
+        const tabs = ['street', 'circuit', 'dirt', 'snow', 'water', 'space', 'legacy']
+            .map((type) => makeMenuButton(`garage-tab-${type}`));
+        const carSelect = makeMenuButton('select-car');
+        carSelect.classList.add('garage-car-select');
+        const paint = makeMenuButton('body-red');
+        const disabledPaint = makeMenuButton('body-disabled');
+        disabledPaint.disabled = true;
+        const legacyCar = makeMenuButton('legacy-car');
+        legacyCar.classList.add('garage-skin-option');
+        const trail = makeMenuButton('trail-red');
+        trail.classList.add('garage-trail-option');
+        const back = makeMenuButton('garage-close-btn');
+        const customPanel = { hidden: false };
+        const legacyPanel = { hidden: true };
+        const customControls = [carSelect, paint, disabledPaint];
+        for (const control of customControls) {
+            control.closest = () => customPanel.hidden ? customPanel : null;
+        }
+        legacyCar.closest = () => legacyPanel.hidden ? legacyPanel : null;
+        const panel = {
+            classList: { add: vi.fn(), remove: vi.fn() },
+            querySelectorAll: () => [...tabs, ...customControls, legacyCar, trail, back],
+        };
+        const originalDocument = global.document;
+        global.document = {
+            getElementById: (id) => id === 'garage-panel' ? panel : null,
+        };
+
+        try {
+            const context = {
+                _garageMenuKeyboardState: { keyboardNavActive: true, selectedIndex: 0 },
+                getGarageMenuItems: ModalShell.prototype.getGarageMenuItems,
+                getGarageMenuContainer: ModalShell.prototype.getGarageMenuContainer,
+            };
+            expect(context.getGarageMenuItems()).toEqual([
+                ...tabs, carSelect, paint, trail,
+            ]);
+            ModalShell.prototype.resetGarageMenuKeyboardNav.call(context, { keepCue: true });
+            expect(carSelect.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(carSelect.focus).toHaveBeenCalled();
+
+            customPanel.hidden = true;
+            legacyPanel.hidden = false;
+            expect(context.getGarageMenuItems()).toEqual([...tabs, legacyCar, trail]);
+            ModalShell.prototype.resetGarageMenuKeyboardNav.call(context, { keepCue: true });
+            expect(legacyCar.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(legacyCar.focus).toHaveBeenCalled();
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it.each([false, true])('keeps the selected Garage tab focused on refresh with cue=%s', (keyboardNavActive) => {
+        const street = makeMenuButton('garage-tab-street');
+        const space = makeMenuButton('garage-tab-space');
+        const carSelect = makeMenuButton('select-car');
+        carSelect.classList.add('garage-car-select');
+        const state = { keyboardNavActive, selectedIndex: 0 };
+        const context = {
+            _garageMenuKeyboardState: state,
+            getGarageMenuItems: () => [street, space, carSelect],
+            getGarageMenuContainer: () => null,
+            resetGarageMenuKeyboardNav: ModalShell.prototype.resetGarageMenuKeyboardNav,
+        };
+        const originalDocument = global.document;
+        global.document = { activeElement: space };
+
+        try {
+            ModalShell.prototype.onGarageTabChangedForKeyboardNav.call(context);
+            expect(state.selectedIndex).toBe(1);
+            expect(state.keyboardNavActive).toBe(keyboardNavActive);
+            expect(space.focus).toHaveBeenCalledOnce();
+            expect(street.focus).not.toHaveBeenCalled();
+            expect(carSelect.focus).not.toHaveBeenCalled();
+            expect(space.classList.contains(MENU_SELECTED_CLASS)).toBe(keyboardNavActive);
+        } finally {
+            global.document = originalDocument;
+        }
+    });
+
+    it('restricts Garage navigation to the nested unlock panel while it is open', () => {
+        const closeDetails = makeMenuButton('unlock-details-back');
+        const panel = {
+            querySelectorAll: () => [closeDetails],
+        };
+        const originalDocument = global.document;
+        global.document = {
+            querySelector: () => panel,
+            getElementById: vi.fn(),
+        };
+
+        try {
+            expect(ModalShell.prototype.getGarageMenuItems.call({})).toEqual([closeDetails]);
+            expect(ModalShell.prototype.getGarageMenuContainer.call({})).toBe(panel);
+            expect(global.document.getElementById).not.toHaveBeenCalled();
         } finally {
             global.document = originalDocument;
         }

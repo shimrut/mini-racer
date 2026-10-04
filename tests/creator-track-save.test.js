@@ -53,6 +53,27 @@ function delaySave() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Creator track save acknowledgements', () => {
+    it('keeps the server sharing status when refresh restores a newer unsaved private edit', () => {
+        const editor = editorState();
+        editor.creatorRecords.set('firstTrack', { revision: 3, privateDraft: true });
+        const unsaved = captureUnsavedCreatorWork(editor);
+        editor.creatorRecords.set('firstTrack', { revision: 4, privateDraft: false });
+        editor.isCreatorLocked = () => false;
+        restoreUnsavedCreatorWork(editor, unsaved);
+        expect(editor.creatorRecords.get('firstTrack')).toMatchObject({ revision: 3, privateDraft: false });
+        expect(editor.state.dirtyTrackKeys.has('firstTrack')).toBe(true);
+    });
+
+    it('binds a private draft save to the Reddit account that loaded the editor', async () => {
+        const editor = editorState();
+        editor.creatorUsername = 'RaceMod';
+        const request = delaySave();
+        const saving = saveCreatorTrackSnapshot(editor, 'firstTrack', JSON.stringify);
+        const sent = request.acknowledge();
+        expect(sent.creatorUsername).toBe('RaceMod');
+        expect(await saving).toBe(true);
+    });
+
     it('acknowledges the submitted key after selecting another unsaved track', async () => {
         const editor = editorState();
         const request = delaySave();
