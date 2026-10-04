@@ -197,7 +197,6 @@ describe('ground feel settings', () => {
     it('turns every new setting off on tarmac', () => {
         expect(TRACK_GROUNDS.tarmac.yawCarry).toBe(0);
         expect(TRACK_GROUNDS.tarmac.slideScrub).toBe(0);
-        expect(TRACK_GROUNDS.tarmac.slideCarry).toBe(0);
         expect(TRACK_GROUNDS.tarmac.highSpeedSteerTrim).toBe(1);
     });
 
@@ -207,85 +206,6 @@ describe('ground feel settings', () => {
 
     it('takes more speed in a slide, with slide scrub', () => {
         expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap(dirt).lostKph + 5);
-    });
-
-    it('keeps more speed in a slide, with slide carry', () => {
-        expect(tap({ ...dirt, slideCarry: 0.7 }).lostKph).toBeLessThan(tap({ ...dirt, slideCarry: 0 }).lostKph - 5);
-    });
-
-    it('never adds speed with slide carry', () => {
-        // Reaches top speed, turns the car 30 degrees away from its path,
-        // and coasts with no engine. Returns the speed at each frame.
-        const coast = (slideCarry) => {
-            const ground = { ...dirt, slideCarry };
-            const { state, collisionSegments } = createReplaySimulationState(OPEN);
-            const step = (g) => updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, g);
-            for (let frame = 0; frame < 600; frame++) step(ground);
-            state.angle += Math.PI / 6;
-            const speeds = [state.cachedSpeed];
-            for (let frame = 0; frame < 60; frame++) {
-                step({ ...ground, accel: 0 });
-                speeds.push(state.cachedSpeed);
-            }
-            return speeds;
-        };
-        const full = coast(1);
-        for (const speed of full) expect(speed).toBeCloseTo(full[0], 9);
-        const none = coast(0);
-        expect(none[none.length - 1]).toBeLessThan(none[0] * 0.9);
-    });
-
-    it('never lets the engine gain more speed in a slide, with slide carry', () => {
-        // Takes one step from a slide at many speeds and slide angles, with
-        // and without carry. The carry may only keep speed.
-        const stepFrom = (kph, slideDeg, slideCarry) => {
-            const { state, collisionSegments } = createReplaySimulationState(OPEN);
-            const speed = kph / KPH_PER_WORLD_UNIT;
-            const slide = (slideDeg * Math.PI) / 180;
-            state.angle = 0;
-            state.velocity = { x: speed * Math.cos(slide), y: speed * Math.sin(slide) };
-            state.keys.right = true;
-            updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, slideCarry });
-            return Math.hypot(state.velocity.x, state.velocity.y);
-        };
-        let kept = 0;
-        for (const kph of [60, 120, 180, 240, 268]) {
-            for (const slideDeg of [5, 20, 40, 70]) {
-                const start = kph / KPH_PER_WORLD_UNIT;
-                const withCarry = stepFrom(kph, slideDeg, 0.7);
-                const without = stepFrom(kph, slideDeg, 0);
-                expect(withCarry).toBeLessThanOrEqual(Math.max(start, without) + 1e-12);
-                if (withCarry > without + 1e-6) kept += 1;
-            }
-        }
-        expect(kept).toBeGreaterThan(0);
-    });
-
-    // Takes one engine step from a slide, steering into it. Returns the
-    // speed before and after the step.
-    const slideStep = (kph, slideDeg) => {
-        const { state, collisionSegments } = createReplaySimulationState(OPEN);
-        const speed = kph / KPH_PER_WORLD_UNIT;
-        const slide = (slideDeg * Math.PI) / 180;
-        state.angle = 0;
-        state.velocity = { x: speed * Math.cos(slide), y: speed * Math.sin(slide) };
-        state.keys.right = true;
-        updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, dirt);
-        return { before: speed, after: Math.hypot(state.velocity.x, state.velocity.y) };
-    };
-
-    it('adds no speed in a slide at speed, with slide carry', () => {
-        for (const kph of [160, 200, 240]) {
-            for (const slideDeg of [8, 20, 40]) {
-                const { before, after } = slideStep(kph, slideDeg);
-                expect(after, `${kph} km/h, ${slideDeg} degrees`).toBeLessThanOrEqual(before);
-            }
-        }
-    });
-
-    it('still speeds up a slow car in a slide, with slide carry', () => {
-        const { before, after } = slideStep(60, 20);
-        expect(after).toBeGreaterThan(before);
     });
 
     // Reaches top speed, then steers right for the given number of frames.
