@@ -1,3 +1,5 @@
+- On Dirt, the tyres grip harder in a big slide while you steer. Long corners slide less wide and keep more speed. Taps and small slides do not change.
+
 - A Campaign series is live when it is made live in the Creator, whatever the grounds of its stages. Mini Rally and Formula Mini stay hidden until they are made live there. The series screen no longer shows **Coming soon**.
 
 - Tracks on Dirt and Track can go in the Daily list.

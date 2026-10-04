@@ -197,6 +197,7 @@ describe('ground feel settings', () => {
     it('turns every new setting off on tarmac', () => {
         expect(TRACK_GROUNDS.tarmac.yawCarry).toBe(0);
         expect(TRACK_GROUNDS.tarmac.slideScrub).toBe(0);
+        expect(TRACK_GROUNDS.tarmac.slideGrip).toBe(0);
         expect(TRACK_GROUNDS.tarmac.highSpeedSteerTrim).toBe(1);
     });
 
@@ -206,6 +207,33 @@ describe('ground feel settings', () => {
 
     it('takes more speed in a slide, with slide scrub', () => {
         expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap(dirt).lostKph + 5);
+    });
+
+    it('keeps a held slide smaller and faster, with slide grip', () => {
+        const toDegrees = (radians) => (radians * 180) / Math.PI;
+        expect(toDegrees(holdTurn({ ...dirt, slideGrip: 1 }, 90).widestSlide)).toBeLessThan(40);
+        expect(toDegrees(holdTurn({ ...dirt, slideGrip: 0 }, 90).widestSlide)).toBeGreaterThan(50);
+        const speedAfterHold = (slideGrip) => {
+            const { state, collisionSegments } = createReplaySimulationState(OPEN);
+            for (let frame = 0; frame < 690; frame++) {
+                state.keys.right = frame >= 600;
+                updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, slideGrip });
+            }
+            return state.cachedSpeed;
+        };
+        expect(speedAfterHold(1)).toBeGreaterThan(speedAfterHold(0) * 1.2);
+    });
+
+    it('moves the car the same in taps and small slides, with slide grip', () => {
+        const run = (slideGrip) => {
+            const { state, collisionSegments } = createReplaySimulationState(OPEN);
+            for (let frame = 0; frame < 660; frame++) {
+                state.keys.right = frame >= 600 && (frame - 600) % 18 < 9;
+                updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, slideGrip });
+            }
+            return [state.pos.x, state.pos.y, state.angle, state.velocity.x, state.velocity.y];
+        };
+        expect(run(1)).toEqual(run(0));
     });
 
     // Reaches top speed, then steers right for the given number of frames.
