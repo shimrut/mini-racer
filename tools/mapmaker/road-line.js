@@ -9,11 +9,17 @@ const MIN_ROAD_LINE_WIDTH = 1.5;
 const MAX_ROAD_LINE_WIDTH = 20;
 const MAX_CORNER_RADIUS = 20;
 
-// A bend can keep its own corner rounding.
+function isValidWidth(width) {
+    return Number.isFinite(width) && width >= MIN_ROAD_LINE_WIDTH && width <= MAX_ROAD_LINE_WIDTH;
+}
+
+// A bend can keep its own corner rounding, and its own road width up to the
+// next bend.
 function isValidBend(point) {
     return isFinitePoint(point)
         && (point.cornerRadius === undefined
-            || (Number.isFinite(point.cornerRadius) && point.cornerRadius >= 0 && point.cornerRadius <= MAX_CORNER_RADIUS));
+            || (Number.isFinite(point.cornerRadius) && point.cornerRadius >= 0 && point.cornerRadius <= MAX_CORNER_RADIUS))
+        && (point.width === undefined || isValidWidth(point.width));
 }
 
 export function isValidRoadLine(roadLine) {
@@ -21,8 +27,7 @@ export function isValidRoadLine(roadLine) {
         && Array.isArray(roadLine.points)
         && roadLine.points.length >= 3 && roadLine.points.length <= MAX_ROAD_LINE_POINTS
         && roadLine.points.every(isValidBend)
-        && Number.isFinite(roadLine.width)
-        && roadLine.width >= MIN_ROAD_LINE_WIDTH && roadLine.width <= MAX_ROAD_LINE_WIDTH;
+        && isValidWidth(roadLine.width);
 }
 
 // The drawn points, moved by the same offset as the walls they built.

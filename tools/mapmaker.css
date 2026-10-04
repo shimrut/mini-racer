@@ -305,6 +305,11 @@ summary:focus-visible,
     position: relative;
 }
 
+.segmented input:disabled + span {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .segmented input {
     position: absolute;
     width: 1px;

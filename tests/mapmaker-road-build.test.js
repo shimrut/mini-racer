@@ -6,8 +6,9 @@ import {
     normalizeTrackLayout,
     startOnLoop,
 } from '../tools/mapmaker/road-build.js';
+import { buildRibbonWallsFromCenterline } from '../tools/mapmaker/ribbon-walls.js';
 import { buildRoadLine } from '../tools/mapmaker/road-line.js';
-import { DEFAULT_DRAW_WIDTH } from '../tools/mapmaker/track-source.js';
+import { DEFAULT_DRAW_WIDTH, ROAD_WIDTHS } from '../tools/mapmaker/track-source.js';
 
 // An L-shaped road, as Draw gets it: the points you place, in order.
 const drawn = [
@@ -38,6 +39,54 @@ function largestGap(first, second) {
 
 function midpointOf(gate) {
     return { x: (gate.p1.x + gate.p2.x) / 2, y: (gate.p1.y + gate.p2.y) / 2 };
+}
+
+function gapToWall(point, wall) {
+    return Math.min(...wall.map((a, index) => {
+        const b = wall[(index + 1) % wall.length];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+        return Math.hypot(point.x - a.x - dx * t, point.y - a.y - dy * t);
+    }));
+}
+
+function nearestOnLine(point, line) {
+    let best = null;
+    line.forEach((a, index) => {
+        const b = line[(index + 1) % line.length];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+        const at = { x: a.x + dx * t, y: a.y + dy * t };
+        if (!best || Math.hypot(point.x - at.x, point.y - at.y) < Math.hypot(point.x - best.x, point.y - best.y)) best = at;
+    });
+    return best;
+}
+
+function roadWidthAt(road, point) {
+    return gapToWall(point, road.outer) + gapToWall(point, road.inner);
+}
+
+// The road width across the middle of the section from one bend to the next.
+function sectionWidth(road, line, index) {
+    const a = line.points[index];
+    const b = line.points[(index + 1) % line.points.length];
+    return roadWidthAt(road, nearestOnLine({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, road.centerline));
+}
+
+// The largest change of road width between two points 0.25 apart along the road.
+function largestWidthStep(road) {
+    const points = road.centerline.flatMap((a, index) => {
+        const b = road.centerline[(index + 1) % road.centerline.length];
+        const length = Math.hypot(b.x - a.x, b.y - a.y);
+        return Array.from({ length: Math.ceil(length / 0.25) }, (_, step) => ({
+            x: a.x + ((b.x - a.x) * step * 0.25) / length,
+            y: a.y + ((b.y - a.y) * step * 0.25) / length,
+        }));
+    });
+    const widths = points.map((point) => roadWidthAt(road, point));
+    return Math.max(...widths.slice(1).map((width, index) => Math.abs(width - widths[index])));
 }
 
 describe('road built from a saved road line', () => {
@@ -126,5 +175,42 @@ describe('road built from a saved road line', () => {
         expect(forward.direction).toBe(-backward.direction);
         expect(forward.startDistance).toBeCloseTo(backward.startDistance);
         expect(startOnLoop(built.centerline, null, 0)).toBeNull();
+    });
+
+    it('gives a section its own width, from its bend to the next one', () => {
+        const track = drawTrack();
+        const [narrow, , wide] = ROAD_WIDTHS;
+        const line = { ...track.roadLine, width: wide.width };
+        const plain = rebuild(track, line);
+        const points = line.points.map((point, index) => (index === 0 ? { ...point, width: narrow.width } : point));
+        const built = rebuild(track, { ...line, points });
+        expect(sectionWidth(plain, line, 0)).toBeCloseTo(wide.width, 1);
+        expect(sectionWidth(built, line, 0)).toBeCloseTo(narrow.width, 1);
+        // The other sections keep the road width.
+        for (const index of [2, 4]) {
+            expect(sectionWidth(built, line, index)).toBeCloseTo(sectionWidth(plain, line, index), 6);
+        }
+        const issues = validateTrackQuality({ ...track, ...built }).issues.filter((issue) => issue.severity === 'error');
+        expect(issues).toEqual([]);
+    });
+
+    it('changes the width smoothly where two sections meet', () => {
+        const track = drawTrack();
+        const [narrow, , wide] = ROAD_WIDTHS;
+        const line = { ...track.roadLine, width: wide.width };
+        const points = line.points.map((point, index) => (index === 0 ? { ...point, width: narrow.width } : point));
+        const plain = rebuild(track, line);
+        const built = rebuild(track, { ...line, points });
+        // The width change makes no larger step than the corners of a road of one width.
+        expect(largestWidthStep(built)).toBeLessThanOrEqual(largestWidthStep(plain) + 0.01);
+        expect(largestWidthStep(built)).toBeLessThan((wide.width - narrow.width) / 2);
+    });
+
+    it('builds the same walls from one width or from equal section widths', () => {
+        const centerline = [{ x: 0, y: 0 }, { x: 30, y: 0 }, { x: 30, y: 20 }, { x: 0, y: 20 }];
+        const one = buildRibbonWallsFromCenterline(centerline, 2);
+        const each = buildRibbonWallsFromCenterline(centerline, [2, 2, 2, 2]);
+        expect(each).toEqual(one);
+        expect(buildRibbonWallsFromCenterline(centerline, [2, 2, 2])).toBeNull();
     });
 });

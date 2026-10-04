@@ -54,6 +54,9 @@ describe('road line helpers', () => {
         expect(isValidRoadLine(rounded(5))).toBe(true);
         expect(isValidRoadLine(rounded(21))).toBe(false);
         expect(isValidRoadLine(rounded(-1))).toBe(false);
+        const widened = (width) => ({ ...roadLine, points: [{ ...roadLine.points[0], width }, ...roadLine.points.slice(1)] });
+        expect(isValidRoadLine(widened(4.1))).toBe(true);
+        expect(isValidRoadLine(widened(1))).toBe(false);
     });
 
     it('takes the line off the track, and puts it back', () => {
@@ -93,6 +96,9 @@ describe('Creator road line', () => {
         expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(false);
         delete editor.state.tracks.firstTrack.roadLine.points[2].cornerRadius;
         expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(true);
+        editor.state.tracks.firstTrack.roadLine.points[3].width = 4.1;
+        expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(false);
+        delete editor.state.tracks.firstTrack.roadLine.points[3].width;
         editor.state.tracks.firstTrack.roadLine.width = 6;
         expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(false);
         expect(sameTrackContent({ ...saved, roadLine: null }, { ...saved, roadLine: undefined })).toBe(true);

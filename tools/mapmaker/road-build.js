@@ -109,7 +109,8 @@ export function normalizeTrackLayout(layout, padding = 4) {
     return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
 }
 
-// Each kept bend of the smoothed line, with the rounding of its drawn point.
+// Each kept bend of the smoothed line, with the rounding of its drawn point
+// and the width of the road from it to the next bend.
 function lineBends(rawPoints, kept, centerline) {
     let from = 0;
     return kept.map((point, index) => {
@@ -118,8 +119,13 @@ function lineBends(rawPoints, kept, centerline) {
             from += 1;
         }
         const radius = rawPoints[from]?.cornerRadius;
+        const width = rawPoints[from]?.width;
         from += 1;
-        return { at: centerline[index], radius: Number.isFinite(radius) ? radius : null };
+        return {
+            at: centerline[index],
+            radius: Number.isFinite(radius) ? radius : null,
+            width: Number.isFinite(width) && width > 0 ? width : null,
+        };
     });
 }
 
@@ -148,14 +154,17 @@ export function buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius) {
         return null;
     }
 
-    const walls = buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
+    const bends = lineBends(rawPoints, filtered, centerline);
+    const halfWidths = bends.map((bend) => (bend.width ?? trackWidth) / 2);
+    const widest = Math.max(...halfWidths) * 2;
+    const walls = buildRibbonWallsFromCenterline(centerline, halfWidths);
     if (!walls) {
         return null;
     }
-    giveBendRoundings(walls, lineBends(rawPoints, filtered, centerline), trackWidth);
+    giveBendRoundings(walls, bends, widest);
     return {
         ...walls,
-        ...fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, trackWidth),
+        ...fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, widest),
     };
 }
 

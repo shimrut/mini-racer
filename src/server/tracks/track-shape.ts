@@ -13,7 +13,8 @@ export type TrackShape = {
     cornerRadius?: number;
     ground?: string;
 };
-export type RoadLine = { points: Point[]; width: number };
+export type RoadLinePoint = Point & { width?: number };
+export type RoadLine = { points: RoadLinePoint[]; width: number };
 
 // A bad track from an editor. The routes answer it with status 400.
 export class TrackInputError extends Error {}
@@ -116,23 +117,32 @@ export function normalizeDraftLoop(value: unknown): Point[] {
     return points(value ?? [], MAX_DRAFT_POINTS, 'Unfinished road');
 }
 
+function roadLineWidth(value: unknown, message: string): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)
+        || value < MIN_ROAD_LINE_WIDTH || value > MAX_ROAD_LINE_WIDTH) {
+        throw new TrackInputError(message);
+    }
+    return value;
+}
+
 // The closed line and the road width that Draw built the walls from. A bend
-// can keep its own corner rounding. Only the Creator reads it. The game and
-// the race check use the walls.
+// can keep its own corner rounding, and its own road width up to the next
+// bend. Only the Creator reads it. The game and the race check use the walls.
 export function normalizeRoadLine(value: unknown): RoadLine | null {
     if (value === undefined || value === null) return null;
     if (typeof value !== 'object' || Array.isArray(value)) {
         throw new TrackInputError('The road line must be an object.');
     }
     const input = value as Record<string, unknown>;
-    const linePoints = points(input.points, MAX_DRAFT_POINTS, 'The road line');
+    const linePoints: RoadLinePoint[] = points(input.points, MAX_DRAFT_POINTS, 'The road line');
     if (linePoints.length < 3) {
         throw new TrackInputError('The road line must contain at least 3 points.');
     }
-    const width = input.width;
-    if (typeof width !== 'number' || !Number.isFinite(width)
-        || width < MIN_ROAD_LINE_WIDTH || width > MAX_ROAD_LINE_WIDTH) {
-        throw new TrackInputError('The road line width is out of range.');
-    }
+    (input.points as Record<string, unknown>[]).forEach((bend, index) => {
+        if (bend.width !== undefined) {
+            linePoints[index].width = roadLineWidth(bend.width, 'A road width is out of range.');
+        }
+    });
+    const width = roadLineWidth(input.width, 'The road line width is out of range.');
     return { points: linePoints, width };
 }

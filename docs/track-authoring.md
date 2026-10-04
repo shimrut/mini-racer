@@ -39,7 +39,9 @@ in Test Drive and the game, not in the schematic.
 Mapmaker draws a ghost car at the finished start position using the real race
 collision size (`0.55u` wide × `1.23u` long).
 
-The road is always **7 car-widths** (`3.85u`).
+**Road width** under **Shape** has three widths, counted in car-widths:
+**Narrow** (6), **Normal** (6.5) and **Wide** (7, `3.85u`). Draw makes a
+Normal road unless you pick another width before you draw.
 
 **Draw** keeps the full-width road **open** while placing points. The first
 click lands where you click. After that, each new point lands a whole number
@@ -72,6 +74,12 @@ the selected bend. A road keeps at least 3 bends. When a bend cannot make a
 road, it does not move. The checkpoints follow the road, so you cannot select,
 add or delete them. **Selected corner** sets the rounding of the selected
 bend, and the road line keeps it. **Whole track** removes these bend settings.
+
+**Road width** works the same way. **Whole track** sets the width of the whole
+road and removes the width of each section. Select a bend to set the road from
+that bend to the next one (**Selected bend**). The width changes smoothly where
+two sections meet. A new bend keeps the width of the section that it splits.
+On a track without a road line, Road width is off.
 
 A track without a road line keeps the wall point tools below. Tracks made
 before the road line have none, and the Mapmaker's track files do not store

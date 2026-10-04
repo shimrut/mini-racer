@@ -33,6 +33,8 @@ import { snapStartPose } from './mapmaker/start-pose.js';
 import { fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
 import {
     DEFAULT_DRAW_WIDTH,
+    ROAD_WIDTHS,
+    WIDE_ROAD_WIDTH,
     isValidTrackKey,
     trackKeyFromName
 } from './mapmaker/track-source.js';
@@ -202,6 +204,9 @@ class MapmakerApp {
         this.cornerRadiusScope = document.getElementById('corner-radius-scope');
         this.cornerRadiusHint = document.getElementById('corner-radius-hint');
         this.groundOptions = document.getElementById('ground-options');
+        this.roadWidthOptions = document.getElementById('road-width-options');
+        this.roadWidthScope = document.getElementById('road-width-scope');
+        this.roadWidthHint = document.getElementById('road-width-hint');
         this.saveTrackBtn = document.getElementById('save-track-btn');
         this.creatorSaveStatus = document.getElementById('creator-save-status');
         this.creatorLockNote = document.getElementById('creator-lock-note');
@@ -237,6 +242,9 @@ class MapmakerApp {
             selectedHandle: null,
             selectedCorner: null,
             radiusScope: 'track',
+            widthScope: 'track',
+            // The road width of the next Draw.
+            drawWidth: DEFAULT_DRAW_WIDTH,
             hoverHandle: null,
             hoverSegment: null,
             drag: null,
@@ -314,6 +322,7 @@ class MapmakerApp {
             document.querySelectorAll('.local-only').forEach((element) => { element.hidden = true; });
         }
         this.buildOptionGroup(this.cornerRadiusOptions, 'corner-radius', CORNER_RADIUS_PRESETS);
+        if (this.roadWidthOptions) this.buildOptionGroup(this.roadWidthOptions, 'road-width', ROAD_WIDTHS);
         this.buildOptionGroup(this.groundOptions, 'ground', TRACK_GROUND_KEYS.map((key) => ({
             value: key,
             label: TRACK_GROUNDS[key].label,
@@ -801,6 +810,69 @@ class MapmakerApp {
         this.cornerRadiusHint.textContent = this.state.radiusScope === 'corner'
             ? 'Applies to the selected bend. Other corners keep their setting.'
             : 'Applies to every corner on this track.';
+        this.syncRoadWidthControl();
+    }
+
+    // Road width works on a road made with Draw. Before Draw, it picks the
+    // width that Draw makes.
+    syncRoadWidthControl() {
+        if (!this.roadWidthOptions) return;
+        const line = this.hasRoadLine() ? this.track.roadLine : null;
+        const bendIndex = this.getSelectedBendIndex();
+        if (bendIndex === null) this.state.widthScope = 'track';
+        const editable = Boolean(line) || !(this.track && this.hasTrackGeometry());
+        const value = !line ? this.state.drawWidth
+            : this.state.widthScope === 'section' ? line.points[bendIndex].width ?? line.width : line.width;
+        const nearest = ROAD_WIDTHS.reduce((best, preset) => (
+            Math.abs(preset.width - value) < Math.abs(best.width - value) ? preset : best
+        ));
+        this.checkOption(this.roadWidthOptions, nearest.value);
+        for (const input of this.roadWidthOptions.querySelectorAll('input')) {
+            input.disabled = !editable;
+            if (!editable) input.checked = false;
+        }
+        for (const button of this.roadWidthScope.querySelectorAll('button')) {
+            const active = button.dataset.scope === this.state.widthScope;
+            button.dataset.active = String(active);
+            button.setAttribute('aria-pressed', String(active));
+            if (button.dataset.scope === 'section') button.disabled = bendIndex === null;
+        }
+        this.roadWidthHint.textContent = !editable ? 'Only for roads made with Draw.'
+            : !line ? 'Draw makes the road this wide.'
+                : this.state.widthScope === 'section' ? 'Applies from the selected bend to the next one.'
+                    : 'Applies to the whole road.';
+    }
+
+    // Whole track sets the road width and clears each section's own width.
+    // Selected bend sets the road from that bend to the next one.
+    setRoadWidth(value) {
+        const preset = ROAD_WIDTHS.find((entry) => entry.value === value);
+        if (!preset) return;
+        if (!this.hasTrackGeometry()) {
+            this.state.drawWidth = preset.width;
+            this.syncRoadWidthControl();
+            this.setStatus(`Draw makes a ${preset.label.toLowerCase()} road.`);
+            this.draw();
+            return;
+        }
+        if (!this.hasRoadLine()) return;
+        const line = this.track.roadLine;
+        const bendIndex = this.state.widthScope === 'section' ? this.getSelectedBendIndex() : null;
+        const points = line.points.map((point, at) => {
+            const { width: _, ...bend } = point;
+            if (bendIndex === null) return bend;
+            if (at !== bendIndex) return point;
+            return preset.width === line.width ? bend : { ...bend, width: preset.width };
+        });
+        const width = bendIndex === null ? preset.width : line.width;
+        if (!this.rebuildRoad({ ...line, points, width })) {
+            this.syncRoadWidthControl();
+            this.setStatus('The road cannot be this wide here.', true);
+            return;
+        }
+        this.normalizeRoadTrack();
+        this.syncRoadWidthControl();
+        this.markDirty(`Set ${bendIndex === null ? 'whole road' : 'selected section'} to ${preset.label}.`);
     }
 
     setCornerRadius(value, options = {}) {
@@ -830,7 +902,7 @@ class MapmakerApp {
             }
         }
         if (this.hasTrackGeometry()) {
-            const walls = fitCurvesToCorners(this.track.outer, this.track.inner, this.getCornerRadius(), DEFAULT_DRAW_WIDTH);
+            const walls = fitCurvesToCorners(this.track.outer, this.track.inner, this.getCornerRadius(), WIDE_ROAD_WIDTH);
             const handle = this.state.selectedHandle;
             if (handle?.kind === 'polygon' && walls[handle.path].length !== this.track[handle.path].length) {
                 this.state.selectedHandle = null;
@@ -843,7 +915,7 @@ class MapmakerApp {
                 const index = points.reduce((best, point, at) => (
                     distance(point, cornerPoint) < distance(points[best], cornerPoint) ? at : best
                 ), 0);
-                this.state.selectedCorner = selectCorner(this.track, cornerPoint.path, index, DEFAULT_DRAW_WIDTH);
+                this.state.selectedCorner = selectCorner(this.track, cornerPoint.path, index, WIDE_ROAD_WIDTH);
             }
         }
         this.syncCornerRadiusControl();
@@ -875,7 +947,7 @@ class MapmakerApp {
         const path = closed
             ? smoothLoopPoints(dedupeStrokePoints(points, 0.35))
             : smoothOpenPoints(points);
-        return measureStraights(path, { closed, halfWidth: DEFAULT_DRAW_WIDTH / 2 })
+        return measureStraights(path, { closed, halfWidth: this.state.drawWidth / 2 })
             .map((run) => ({ ...run, path }));
     }
 
@@ -979,6 +1051,17 @@ class MapmakerApp {
             if (!scope || (scope === 'corner' && !hasCorner)) return;
             this.state.radiusScope = scope;
             this.syncCornerRadiusControl();
+        });
+
+        this.roadWidthOptions?.addEventListener('change', (event) => {
+            this.setRoadWidth(event.target.value);
+        });
+        this.roadWidthScope?.addEventListener('click', (event) => {
+            const scope = event.target.closest('button[data-scope]')?.dataset.scope;
+            if (!scope || (scope === 'section' && this.getSelectedBendIndex() === null)) return;
+            this.state.widthScope = scope;
+            this.syncRoadWidthControl();
+            this.draw();
         });
 
         this.groundOptions.addEventListener('change', (event) => {
@@ -1704,7 +1787,7 @@ class MapmakerApp {
         const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
         if (!guide || guide.manualGates) return null;
         if (guide.wallSignature !== JSON.stringify([this.track.outer, this.track.inner])) return null;
-        return { centerline: guide.centerline, width: DEFAULT_DRAW_WIDTH };
+        return { centerline: guide.centerline, width: guide.width ?? WIDE_ROAD_WIDTH };
     }
 
     hasTrackGeometry() {
@@ -1762,7 +1845,11 @@ class MapmakerApp {
             return;
         }
         const next = points[(afterIndex + 1) % points.length];
-        const at = distanceToSegment(worldPoint, points[afterIndex], next).closest;
+        // The new bend keeps the width of the section that it splits.
+        const at = {
+            ...distanceToSegment(worldPoint, points[afterIndex], next).closest,
+            ...(points[afterIndex].width !== undefined ? { width: points[afterIndex].width } : {}),
+        };
         const changed = [...points.slice(0, afterIndex + 1), at, ...points.slice(afterIndex + 1)];
         if (!this.changeRoadLine(changed)) {
             this.setStatus('The road cannot bend there.', true);
@@ -2205,9 +2292,11 @@ class MapmakerApp {
         if (!handle) {
             return;
         }
-        // A bend keeps the open tool. In Corner, Shape then sets its rounding.
+        // A bend keeps the open tool. Road width then sets its section, and in
+        // Corner, Wall corners sets its rounding.
         if (handle.kind === 'bend') {
             this.state.selectedHandle = { kind: 'bend', index: handle.index };
+            this.state.widthScope = 'section';
             if (this.state.tool === 'corner') this.state.radiusScope = 'corner';
             this.syncCornerRadiusControl();
             this.updateCanvasHint();
@@ -2218,7 +2307,7 @@ class MapmakerApp {
     }
 
     selectCornerAt(path, index) {
-        this.state.selectedCorner = selectCorner(this.track, path, index, DEFAULT_DRAW_WIDTH);
+        this.state.selectedCorner = selectCorner(this.track, path, index, WIDE_ROAD_WIDTH);
         this.state.selectedHandle = null;
         this.state.radiusScope = 'corner';
         this.syncCornerRadiusControl();
@@ -2322,7 +2411,7 @@ class MapmakerApp {
 
     commitDraftLoop(points) {
         const cornerRadius = this.getCornerRadius();
-        const generated = buildTrackFromLoop(points, DEFAULT_DRAW_WIDTH, cornerRadius);
+        const generated = buildTrackFromLoop(points, this.state.drawWidth, cornerRadius);
         if (!generated) {
             this.setStatus('Draft loop is not usable yet. Add cleaner spacing and close it again.', true);
             this.draw();
@@ -2346,13 +2435,14 @@ class MapmakerApp {
         delete this.track.lineSmoothing;
         delete this.track.drawWidth;
         // The Creator saves this line beside the track, for later road edits.
-        const roadLine = buildRoadLine(points, generated.normalizationOffset, DEFAULT_DRAW_WIDTH);
+        const roadLine = buildRoadLine(points, generated.normalizationOffset, this.state.drawWidth);
         if (roadLine) this.track.roadLine = roadLine;
         else delete this.track.roadLine;
         this.autoRoadGuideByKey.set(this.state.selectedTrackKey, {
             centerline: generated.centerline,
             wallSignature: JSON.stringify([generated.outer, generated.inner]),
             manualGates: false,
+            width: this.state.drawWidth,
         });
         this.syncCornerRadiusControl();
         this.state.draftLoop = [];
@@ -3303,6 +3393,19 @@ class MapmakerApp {
         this.ctx.strokeStyle = 'rgba(248, 250, 252, 0.45)';
         this.ctx.lineWidth = 1.5;
         this.ctx.stroke();
+        // The section that Road width sets.
+        const bendIndex = this.state.widthScope === 'section' ? this.getSelectedBendIndex() : null;
+        if (bendIndex !== null) {
+            const from = this.worldToScreen(points[bendIndex], viewport);
+            const to = this.worldToScreen(points[(bendIndex + 1) % points.length], viewport);
+            this.ctx.setLineDash([]);
+            this.ctx.beginPath();
+            this.ctx.moveTo(from.x, from.y);
+            this.ctx.lineTo(to.x, to.y);
+            this.ctx.strokeStyle = 'rgba(248, 250, 252, 0.9)';
+            this.ctx.lineWidth = 3;
+            this.ctx.stroke();
+        }
         this.ctx.restore();
     }
 
@@ -3359,10 +3462,10 @@ class MapmakerApp {
             this.ctx.lineJoin = 'round';
             this.ctx.lineCap = 'round';
             this.ctx.strokeStyle = '#fbbf24';
-            this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale + 4;
+            this.ctx.lineWidth = this.state.drawWidth * viewport.scale + 4;
             this.ctx.stroke(openPath);
             this.ctx.strokeStyle = '#2d3b4d';
-            this.ctx.lineWidth = DEFAULT_DRAW_WIDTH * viewport.scale;
+            this.ctx.lineWidth = this.state.drawWidth * viewport.scale;
             this.ctx.stroke(openPath);
         }
         this.drawLongStraights(roadPreview ? points : previewPoints, Boolean(roadPreview), viewport);
@@ -3411,7 +3514,7 @@ class MapmakerApp {
             const tanHalf = Math.tan(turn / 2);
             const maxTrim = Math.min(distance(prev, curr), distance(curr, next)) * 0.45;
             const radius = tanHalf > 1e-6
-                ? Math.min(DEFAULT_DRAW_WIDTH / 2, maxTrim / tanHalf)
+                ? Math.min(this.state.drawWidth / 2, maxTrim / tanHalf)
                 : 0;
             const corner = this.worldToScreen(curr, viewport);
             if (!Number.isFinite(radius) || radius < 0.001) {
@@ -3429,7 +3532,7 @@ class MapmakerApp {
     }
 
     getDraftRoadPreview(points) {
-        const width = DEFAULT_DRAW_WIDTH;
+        const width = this.state.drawWidth;
         const cornerRadius = this.getCornerRadius();
         const cached = this.draftRoadPreview;
         const cacheMatches = cached?.points === points

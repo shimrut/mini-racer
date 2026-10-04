@@ -4,8 +4,18 @@ import { getStoredTrackGroundKey } from '../../game/track/grounds.js';
 
 const MIN_DRAW_WIDTH = 1.5;
 const MAX_DRAW_WIDTH = 20;
-export const LINE_BUILD_CAR_UNITS = 7;
-export const DEFAULT_DRAW_WIDTH = LINE_BUILD_CAR_UNITS * CONFIG.carRadius * 2;
+const CAR_WIDTH = CONFIG.carRadius * 2;
+// The road widths of Draw, in cars. Wide is the widest road Draw makes.
+export const ROAD_WIDTHS = Object.freeze([
+    { value: 'narrow', label: 'Narrow', cars: 6 },
+    { value: 'normal', label: 'Normal', cars: 6.5 },
+    { value: 'wide', label: 'Wide', cars: 7 },
+].map((preset) => Object.freeze({ ...preset, width: preset.cars * CAR_WIDTH })));
+export const LINE_BUILD_CAR_UNITS = 6.5;
+export const DEFAULT_DRAW_WIDTH = LINE_BUILD_CAR_UNITS * CAR_WIDTH;
+// Before road widths, Draw made every road this wide. The wall point tools
+// still take it as the road width.
+export const WIDE_ROAD_WIDTH = ROAD_WIDTHS.at(-1).width;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
 const TRACK_KEY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -127,7 +137,7 @@ export function generateTrackGeometrySource(track, indent = '') {
     }
     if (track.drawWidth !== undefined) {
         const drawWidth = clamp(
-            Number(track.drawWidth) || DEFAULT_DRAW_WIDTH,
+            Number(track.drawWidth) || WIDE_ROAD_WIDTH,
             MIN_DRAW_WIDTH,
             MAX_DRAW_WIDTH
         );

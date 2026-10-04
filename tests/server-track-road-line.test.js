@@ -80,8 +80,10 @@ describe('road line check', () => {
             extra: 'dropped',
         };
         input.points[1].cornerRadius = 5;
+        input.points[2].width = 4.1;
         const expected = structuredClone(roadLine);
         expected.points[1].cornerRadius = 5;
+        expected.points[2].width = 4.1;
         expect(normalizeRoadLine(input)).toEqual(expected);
     });
 
@@ -96,6 +98,8 @@ describe('road line check', () => {
             { points: [...roadLine.points.slice(0, 3), { x: 2000, y: 0 }], width: 4.8 },
             { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, cornerRadius: 21 }], width: 4.8 },
             { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, cornerRadius: -1 }], width: 4.8 },
+            { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, width: 1 }], width: 4.8 },
+            { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, width: '4' }], width: 4.8 },
         ];
         for (const value of bad) {
             expect(() => normalizeRoadLine(value)).toThrow(TrackInputError);

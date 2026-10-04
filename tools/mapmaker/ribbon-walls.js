@@ -17,6 +17,9 @@ const CURVE_FIT_PASSES = 10;
 const CURVE_CHECK_SAMPLES = 32;
 const CURVE_MATCH_TOLERANCE = 0.05;
 const EPSILON = 1e-6;
+// Where two road sections of other widths meet, the width changes over this
+// many half widths of the wider road on each side of the meeting point.
+const WIDTH_BLEND_HALF_WIDTHS = 1.5;
 
 function signedArea(points) {
     if (!points || points.length < 3) {
@@ -109,8 +112,11 @@ function deltaAngle(start, end, ccw) {
     return sweep;
 }
 
+// minRadius is one radius for every point, or a radius for each point.
 export function inflateTightBends(points, minRadius) {
-    if (!points || points.length < 3 || !(minRadius > 0)) {
+    const radiusAt = Array.isArray(minRadius) ? (index) => minRadius[index] : () => minRadius;
+    const anyRadius = Array.isArray(minRadius) ? minRadius.some((radius) => radius > 0) : minRadius > 0;
+    if (!points || points.length < 3 || !anyRadius) {
         return (points || []).map(clonePoint);
     }
 
@@ -124,7 +130,8 @@ export function inflateTightBends(points, minRadius) {
             const curr = result[index];
             const following = result[(index + 1) % len];
             const radius = localBendRadius(prev, curr, following);
-            if (!(radius < minRadius)) {
+            const needed = radiusAt(index);
+            if (!(needed > 0) || !(radius < needed)) {
                 continue;
             }
             const center = circumcenter(prev, curr, following);
@@ -135,7 +142,7 @@ export function inflateTightBends(points, minRadius) {
             if (Math.abs(radial.x) < 1e-9 && Math.abs(radial.y) < 1e-9) {
                 continue;
             }
-            next[index] = add(center, scale(radial, minRadius));
+            next[index] = add(center, scale(radial, needed));
             moved = true;
         }
         result = next;
@@ -278,26 +285,128 @@ export function filletCenterline(points, filletRadius) {
     return samples;
 }
 
+// Where a point lies along a closed line: the section (from line point
+// `section` to the next) and how far along that section.
+function locateOnLoop(points, target) {
+    let best = null;
+    for (let index = 0; index < points.length; index += 1) {
+        const a = points[index];
+        const b = points[(index + 1) % points.length];
+        const edge = subtract(b, a);
+        const lengthSq = dot(edge, edge);
+        const t = lengthSq > 0 ? clamp(dot(subtract(target, a), edge) / lengthSq, 0, 1) : 0;
+        const gap = distance(target, add(a, scale(edge, t)));
+        if (!best || gap < best.gap) {
+            best = { section: index, along: Math.sqrt(lengthSq) * t, gap };
+        }
+    }
+    return best;
+}
+
+function smoothStep(t) {
+    return t * t * (3 - 2 * t);
+}
+
+// The half width of each sample. Each section of the line has its own width.
+// Near a line point the width changes smoothly from one section to the next.
+// Straight stretches get extra samples there, so the walls follow the change.
+function sectionHalfWidths(line, halfWidths, samples) {
+    const count = line.length;
+    const lengths = line.map((point, index) => distance(point, line[(index + 1) % count]));
+    const widest = Math.max(...halfWidths);
+    const blendAt = line.map((_, index) => {
+        const before = (index - 1 + count) % count;
+        if (halfWidths[before] === halfWidths[index]) return 0;
+        return Math.min(widest * WIDTH_BLEND_HALF_WIDTHS, lengths[before] / 2, lengths[index] / 2);
+    });
+    const halfAt = (section, along) => {
+        const next = (section + 1) % count;
+        const toEnd = lengths[section] - along;
+        const start = blendAt[section];
+        const end = blendAt[next];
+        if (start > 0 && along < start) {
+            const before = halfWidths[(section - 1 + count) % count];
+            return before + (halfWidths[section] - before) * smoothStep((along + start) / (2 * start));
+        }
+        if (end > 0 && toEnd < end) {
+            return halfWidths[section] + (halfWidths[next] - halfWidths[section]) * smoothStep((end - toEnd) / (2 * end));
+        }
+        return halfWidths[section];
+    };
+    const located = samples.map((sample) => ({ ...sample, ...locateOnLoop(line, sample.point) }));
+    const expanded = [];
+    located.forEach((sample, index) => {
+        expanded.push(sample);
+        const following = located[(index + 1) % located.length];
+        const straight = sample.section === following.section
+            && dot(sample.tangent, following.tangent) > 0.9999
+            && following.along > sample.along;
+        if (!straight) return;
+        const section = sample.section;
+        const start = blendAt[section];
+        const end = blendAt[(section + 1) % count];
+        const stops = [
+            ...(start > 0 ? [start / 2, start] : []),
+            ...(end > 0 ? [lengths[section] - end, lengths[section] - end / 2] : []),
+        ].filter((along) => along > sample.along + MERGE_DISTANCE && along < following.along - MERGE_DISTANCE)
+            .sort((a, b) => a - b);
+        for (const along of stops) {
+            const t = (along - sample.along) / (following.along - sample.along);
+            expanded.push({
+                point: add(sample.point, scale(subtract(following.point, sample.point), t)),
+                tangent: { ...sample.tangent },
+                section,
+                along,
+            });
+        }
+    });
+    return {
+        samples: expanded.map(({ point, tangent }) => ({ point, tangent })),
+        halfWidths: expanded.map(({ section, along }) => halfAt(section, along)),
+    };
+}
+
+// halfWidth is one half width for the whole road, or one for each section of
+// the centerline: from each centerline point to the next.
 export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadii = null) {
-    if (!centerline || centerline.length < 3 || !(halfWidth > 0)) {
+    const sectionHalves = Array.isArray(halfWidth) ? halfWidth : null;
+    if (!centerline || centerline.length < 3
+        || (sectionHalves && (sectionHalves.length !== centerline.length || !sectionHalves.every((half) => half > 0)))) {
         return null;
     }
+    const uniform = !sectionHalves || sectionHalves.every((half) => half === sectionHalves[0]);
+    if (uniform && sectionHalves) {
+        return buildRibbonWallsFromCenterline(centerline, sectionHalves[0], filletRadii);
+    }
+    if (uniform && !(halfWidth > 0)) {
+        return null;
+    }
+    // A corner joins the section before it and the section after it.
+    const cornerHalves = uniform ? null : sectionHalves.map((half, index) => (
+        Math.max(half, sectionHalves[(index - 1 + sectionHalves.length) % sectionHalves.length])
+    ));
+    const cornerHalf = (index) => (uniform ? halfWidth : cornerHalves[index]);
 
-    const inflated = inflateTightBends(centerline, halfWidth);
+    const inflated = inflateTightBends(centerline, uniform ? halfWidth : cornerHalves);
     const loopCcw = signedArea(inflated) > 0;
     const radii = Array.isArray(filletRadii) && filletRadii.length === inflated.length
-        ? filletRadii.map((value) => {
+        ? filletRadii.map((value, index) => {
             const radius = Number(value);
             if (!(radius > 0)) {
                 return 0;
             }
-            return Math.max(halfWidth, radius);
+            return Math.max(cornerHalf(index), radius);
         })
-        : halfWidth;
-    const samples = filletCenterline(inflated, radii);
+        : uniform ? halfWidth : cornerHalves;
+    let samples = filletCenterline(inflated, radii);
     if (samples.length < 3) {
         return null;
     }
+    let sampleHalves = null;
+    if (!uniform) {
+        ({ samples, halfWidths: sampleHalves } = sectionHalfWidths(inflated, sectionHalves, samples));
+    }
+    const halfAt = (index) => (uniform ? halfWidth : sampleHalves[index]);
 
     const outer = [];
     const inner = [];
@@ -310,18 +419,19 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadi
         const towardInner = loopCcw ? left : scale(left, -1);
         const towardOuter = scale(towardInner, -1);
 
-        pushUnique(outer, add(curr.point, scale(towardOuter, halfWidth)));
+        const half = halfAt(index);
+        pushUnique(outer, add(curr.point, scale(towardOuter, half)));
 
         const bendRadius = localBendRadius(prev.point, curr.point, next.point);
         const frame = cornerFrame(prev.point, curr.point, next.point);
         const turningInward =
             (loopCcw && frame.turnAngle > 0) || (!loopCcw && frame.turnAngle < 0);
 
-        if (turningInward && bendRadius <= halfWidth * 1.05) {
+        if (turningInward && bendRadius <= half * 1.05) {
             const center = circumcenter(prev.point, curr.point, next.point);
-            pushUnique(inner, center || add(curr.point, scale(towardInner, halfWidth)));
+            pushUnique(inner, center || add(curr.point, scale(towardInner, half)));
         } else {
-            pushUnique(inner, add(curr.point, scale(towardInner, halfWidth)));
+            pushUnique(inner, add(curr.point, scale(towardInner, half)));
         }
     }
 
@@ -332,7 +442,7 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadi
         inner.pop();
     }
 
-    collapsePointClusters(inner, halfWidth * 0.15);
+    collapsePointClusters(inner, (uniform ? halfWidth : Math.min(...sectionHalves)) * 0.15);
 
     if (outer.length < 3 || inner.length < 3) {
         return null;
