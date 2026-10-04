@@ -116,8 +116,9 @@ export function normalizeDraftLoop(value: unknown): Point[] {
     return points(value ?? [], MAX_DRAFT_POINTS, 'Unfinished road');
 }
 
-// The closed line and the road width that Draw built the walls from. Only the
-// Creator reads it. The game and the race check use the walls.
+// The closed line and the road width that Draw built the walls from. A bend
+// can keep its own corner rounding. Only the Creator reads it. The game and
+// the race check use the walls.
 export function normalizeRoadLine(value: unknown): RoadLine | null {
     if (value === undefined || value === null) return null;
     if (typeof value !== 'object' || Array.isArray(value)) {
@@ -133,5 +134,5 @@ export function normalizeRoadLine(value: unknown): RoadLine | null {
         || width < MIN_ROAD_LINE_WIDTH || width > MAX_ROAD_LINE_WIDTH) {
         throw new TrackInputError('The road line width is out of range.');
     }
-    return { points: linePoints.map(({ x, y }) => ({ x, y })), width };
+    return { points: linePoints, width };
 }

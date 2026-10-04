@@ -50,6 +50,10 @@ describe('road line helpers', () => {
         expect(buildRoadLine(roadLine.points.slice(0, 2), { x: 0, y: 0 }, 4.8)).toBeNull();
         expect(buildRoadLine(roadLine.points, { x: 0, y: 0 }, 25)).toBeNull();
         expect(isValidRoadLine({ points: roadLine.points, width: 4.8 })).toBe(true);
+        const rounded = (cornerRadius) => ({ ...roadLine, points: [{ ...roadLine.points[0], cornerRadius }, ...roadLine.points.slice(1)] });
+        expect(isValidRoadLine(rounded(5))).toBe(true);
+        expect(isValidRoadLine(rounded(21))).toBe(false);
+        expect(isValidRoadLine(rounded(-1))).toBe(false);
     });
 
     it('takes the line off the track, and puts it back', () => {
@@ -84,6 +88,10 @@ describe('Creator road line', () => {
     it('sees a changed road line as unsaved work', () => {
         const editor = editorState();
         const saved = { key: 'firstTrack', ...creatorTrackContent(editor, 'firstTrack') };
+        expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(true);
+        editor.state.tracks.firstTrack.roadLine.points[2].cornerRadius = 5;
+        expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(false);
+        delete editor.state.tracks.firstTrack.roadLine.points[2].cornerRadius;
         expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(true);
         editor.state.tracks.firstTrack.roadLine.width = 6;
         expect(sameTrackContent(saved, creatorTrackContent(editor, 'firstTrack'))).toBe(false);

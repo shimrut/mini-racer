@@ -32,7 +32,7 @@ function medalRowContent(row) {
 
 function roadLineContent(roadLine) {
     if (!roadLine) return null;
-    return { points: (roadLine.points ?? []).map(({ x, y }) => ({ x, y })), width: roadLine.width };
+    return { points: (roadLine.points ?? []).map(point), width: roadLine.width };
 }
 
 // The track, its unfinished road, its medal row and its road line as the

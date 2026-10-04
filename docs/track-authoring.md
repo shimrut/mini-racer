@@ -59,11 +59,23 @@ half the lane are widened first so the inside wall cannot cross itself.
 That keeps the road the same width through corners. It does not rewrite
 the sketch: a square stays a square.
 
-In the Creator, Draw also keeps the points you placed and the road width.
-Save stores them beside the track, as the road line. The game, the race check
-and the track fingerprint never read the road line. Nothing uses it yet. Edits
-by hand and Wall Corners do not change it, so it shows the road as Draw built
-it. The Mapmaker's track files do not store it.
+Draw also keeps the points that you placed and the road width. This is the
+road line. The Creator saves it beside the track. The game, the race check and
+the track fingerprint do not read it.
+
+On a track with a road line, you edit the bends, not the walls. **Edit** and
+**Corner** show a white handle on each bend and a dashed line between the
+bends. Drag a bend, or move it with the arrow keys. Mapmaker then builds the
+walls, the start line and the checkpoints again, as Draw does. The start stays
+near its old place. Shift+click the dashed line to add a bend. Delete removes
+the selected bend. A road keeps at least 3 bends. When a bend cannot make a
+road, it does not move. The checkpoints follow the road, so you cannot select,
+add or delete them. **Selected corner** sets the rounding of the selected
+bend, and the road line keeps it. **Whole track** removes these bend settings.
+
+A track without a road line keeps the wall point tools below. Tracks made
+before the road line have none, and the Mapmaker's track files do not store
+it.
 
 Existing saved tracks are unchanged until you redraw them with Draw.
 Saving an older track without changing its road preserves its legacy

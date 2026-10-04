@@ -4,15 +4,23 @@ import { isFinitePoint } from '../geometry.js';
 // Creator keeps it on the open track, and saves it beside the track. The game
 // and the race check never read it: they use the walls.
 // These limits match the server. A line out of them is not saved.
-const MAX_ROAD_LINE_POINTS = 160;
+export const MAX_ROAD_LINE_POINTS = 160;
 const MIN_ROAD_LINE_WIDTH = 1.5;
 const MAX_ROAD_LINE_WIDTH = 20;
+const MAX_CORNER_RADIUS = 20;
+
+// A bend can keep its own corner rounding.
+function isValidBend(point) {
+    return isFinitePoint(point)
+        && (point.cornerRadius === undefined
+            || (Number.isFinite(point.cornerRadius) && point.cornerRadius >= 0 && point.cornerRadius <= MAX_CORNER_RADIUS));
+}
 
 export function isValidRoadLine(roadLine) {
     return Boolean(roadLine) && typeof roadLine === 'object'
         && Array.isArray(roadLine.points)
         && roadLine.points.length >= 3 && roadLine.points.length <= MAX_ROAD_LINE_POINTS
-        && roadLine.points.every(isFinitePoint)
+        && roadLine.points.every(isValidBend)
         && Number.isFinite(roadLine.width)
         && roadLine.width >= MIN_ROAD_LINE_WIDTH && roadLine.width <= MAX_ROAD_LINE_WIDTH;
 }

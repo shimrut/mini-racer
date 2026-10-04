@@ -73,13 +73,16 @@ describe('road line check', () => {
         expect(normalizeRoadLine(null)).toBeNull();
     });
 
-    it('keeps only the points and the width', () => {
+    it('keeps only the points, the width and the rounding of each bend', () => {
         const input = {
-            points: roadLine.points.map((point) => ({ ...point, cornerRadius: 2, extra: true })),
+            points: roadLine.points.map((point) => ({ ...point, extra: true })),
             width: 4.8,
             extra: 'dropped',
         };
-        expect(normalizeRoadLine(input)).toEqual(roadLine);
+        input.points[1].cornerRadius = 5;
+        const expected = structuredClone(roadLine);
+        expected.points[1].cornerRadius = 5;
+        expect(normalizeRoadLine(input)).toEqual(expected);
     });
 
     it('refuses a road line out of range', () => {
@@ -91,6 +94,8 @@ describe('road line check', () => {
             { points: roadLine.points, width: 21 },
             { points: roadLine.points, width: Number.NaN },
             { points: [...roadLine.points.slice(0, 3), { x: 2000, y: 0 }], width: 4.8 },
+            { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, cornerRadius: 21 }], width: 4.8 },
+            { points: [...roadLine.points.slice(0, 3), { x: 10, y: 30, cornerRadius: -1 }], width: 4.8 },
         ];
         for (const value of bad) {
             expect(() => normalizeRoadLine(value)).toThrow(TrackInputError);

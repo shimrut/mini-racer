@@ -6,7 +6,7 @@ import { TRACKS } from '../game/track/tracks.js';
 import {
     buildPerpendicularLaneGate,
 } from './mapmaker/lane-gate.js';
-import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './mapmaker/auto-gates.js';
+import { buildAutoGates } from './mapmaker/auto-gates.js';
 import { placeCheckpointInLongestGap, validateTrackQuality } from './mapmaker/track-quality.js';
 import { analyzeTrackFlow, FLOW_DRAW_GUIDE, measureStraights } from './mapmaker/track-flow.js';
 import {
@@ -17,10 +17,20 @@ import {
 } from './mapmaker/edit-history.js';
 import { snapLineBuildPoint } from './mapmaker/line-build.js';
 import { moveCorner, selectCorner } from './mapmaker/corner-edit.js';
-import { buildRoadLine, withRoadLine } from './mapmaker/road-line.js';
+import { buildRoadLine, isValidRoadLine, MAX_ROAD_LINE_POINTS, withRoadLine } from './mapmaker/road-line.js';
+import {
+    buildRoadFromLine,
+    buildRoadWallsFromLoop,
+    buildTrackFromLoop,
+    dedupeStrokePoints,
+    normalizeTrackLayout,
+    smoothLoopPoints,
+    smoothOpenPoints,
+    startOnLoop,
+} from './mapmaker/road-build.js';
 import { wallContinuations } from './mapmaker/wall-continuation.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
-import { buildRibbonWallsFromCenterline, fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
+import { fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
 import {
     DEFAULT_DRAW_WIDTH,
     isValidTrackKey,
@@ -77,7 +87,6 @@ const CLOUD_CARD_PREFIX = 'cloud:';
 // A finger that moves less than this many pixels is a tap, not a pan.
 const TOUCH_TAP_SLOP = 8;
 const BLANK_VIEW_BOUNDS = { minX: -40, maxX: 40, minY: -30, maxY: 30 };
-const DEFAULT_LINE_SMOOTHING = 0.35;
 const DEFAULT_CORNER_RADIUS = 3;
 const CORNER_RADIUS_PRESETS = [
     { value: 0, label: 'Sharp' },
@@ -126,140 +135,6 @@ function geometrySignature(track) {
         track.checkpoints,
         track.cornerRadius,
     ]);
-}
-
-function dedupeStrokePoints(points, minimumDistance) {
-    if (!points.length) {
-        return [];
-    }
-    const filtered = [clonePoint(points[0])];
-    for (let index = 1; index < points.length; index += 1) {
-        if (distance(points[index], filtered[filtered.length - 1]) >= minimumDistance) {
-            filtered.push(clonePoint(points[index]));
-        }
-    }
-    if (filtered.length === 1 && points.length > 1) {
-        filtered.push(clonePoint(points[points.length - 1]));
-    }
-    return filtered;
-}
-
-function smoothLoopPoints(points) {
-    const smoothing = DEFAULT_LINE_SMOOTHING;
-    if (points.length < 3 || smoothing <= 0) {
-        return points.map(clonePoint);
-    }
-
-    const neighborWeight = smoothing * 0.2;
-    const pointWeight = 1 - neighborWeight * 2;
-    return points.map((point, index) => {
-        const prev = points[(index - 1 + points.length) % points.length];
-        const next = points[(index + 1) % points.length];
-        return {
-            x: prev.x * neighborWeight + point.x * pointWeight + next.x * neighborWeight,
-            y: prev.y * neighborWeight + point.y * pointWeight + next.y * neighborWeight
-        };
-    });
-}
-
-function smoothOpenPoints(points) {
-    const smoothing = DEFAULT_LINE_SMOOTHING;
-    if (points.length < 3 || smoothing <= 0) return points.map(clonePoint);
-    const neighborWeight = smoothing * 0.2;
-    const pointWeight = 1 - neighborWeight * 2;
-    return points.map((point, index) => {
-        if (index === 0 || index === points.length - 1) return clonePoint(point);
-        const prev = points[index - 1];
-        const next = points[index + 1];
-        return {
-            x: prev.x * neighborWeight + point.x * pointWeight + next.x * neighborWeight,
-            y: prev.y * neighborWeight + point.y * pointWeight + next.y * neighborWeight,
-        };
-    });
-}
-
-function offsetTrackLayout(layout, offsetX, offsetY) {
-    const movePoint = (point) => ({
-        x: point.x + offsetX,
-        y: point.y + offsetY
-    });
-    return {
-        ...layout,
-        outer: layout.outer.map(movePoint),
-        inner: layout.inner.map(movePoint),
-        startLine: {
-            p1: movePoint(layout.startLine.p1),
-            p2: movePoint(layout.startLine.p2)
-        },
-        startPos: movePoint(layout.startPos),
-        checkpoints: layout.checkpoints.map((checkpoint) => ({
-            p1: movePoint(checkpoint.p1),
-            p2: movePoint(checkpoint.p2)
-        })),
-        centerline: layout.centerline?.map(movePoint),
-    };
-}
-
-function normalizeTrackLayout(layout, padding = 4) {
-    const points = [
-        ...layout.outer,
-        ...layout.inner,
-        layout.startLine.p1,
-        layout.startLine.p2,
-        layout.startPos,
-        ...layout.checkpoints.flatMap((checkpoint) => [checkpoint.p1, checkpoint.p2])
-    ];
-    let minX = Infinity;
-    let minY = Infinity;
-    points.forEach((point) => {
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-    });
-    const offsetX = minX < padding ? padding - minX : 0;
-    const offsetY = minY < padding ? padding - minY : 0;
-    const normalized = offsetX === 0 && offsetY === 0
-        ? layout
-        : offsetTrackLayout(layout, offsetX, offsetY);
-    return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
-}
-
-function buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius) {
-    const filtered = dedupeStrokePoints(rawPoints, 0.35);
-    if (filtered.length < 3) {
-        return null;
-    }
-
-    const centerline = smoothLoopPoints(filtered);
-    const loopLength = closedLoopLength(centerline);
-    if (loopLength < trackWidth * 5) {
-        return null;
-    }
-
-    const walls = buildRibbonWallsFromCenterline(centerline, trackWidth / 2);
-    return walls && {
-        ...walls,
-        ...fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, trackWidth),
-    };
-}
-
-function buildTrackFromLoop(rawPoints, trackWidth, cornerRadius) {
-    const walls = buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius);
-    if (!walls) {
-        return null;
-    }
-    const { outer, inner } = walls;
-    const gates = buildAutoGates(walls.centerline, outer, inner, trackWidth, { cornerRadius });
-    if (!gates) return null;
-    return normalizeTrackLayout({
-        outer: outer.map(clonePoint),
-        inner: inner.map(clonePoint),
-        startLine: gates.startLine,
-        startPos: gates.startPos,
-        startAngle: gates.startAngle,
-        checkpoints: gates.checkpoints,
-        centerline: walls.centerline.map(clonePoint),
-        cornerRadius
-    });
 }
 
 function distanceToSegment(point, a, b) {
@@ -340,6 +215,7 @@ class MapmakerApp {
         this.checkpointCount = document.getElementById('checkpoint-count');
         this.addCheckpointBtn = document.getElementById('add-checkpoint-btn');
         this.deleteCheckpointBtn = document.getElementById('delete-checkpoint-btn');
+        this.checkpointHint = document.getElementById('checkpoint-hint');
         this.confirmDialog = document.getElementById('confirm-dialog');
         this.confirmDialogTitle = document.getElementById('confirm-dialog-title');
         this.confirmDialogMessage = document.getElementById('confirm-dialog-message');
@@ -906,9 +782,13 @@ class MapmakerApp {
     }
 
     syncCornerRadiusControl() {
-        const corner = this.state.selectedCorner;
-        const selectedPoint = corner?.radiusPoints[0];
-        const override = selectedPoint && this.track[selectedPoint.path][selectedPoint.index]?.cornerRadius;
+        const bendIndex = this.getSelectedBendIndex();
+        const corner = bendIndex === null ? this.state.selectedCorner : { bendIndex };
+        if (!corner) this.state.radiusScope = 'track';
+        const selectedPoint = corner?.radiusPoints?.[0];
+        const override = bendIndex !== null
+            ? this.track.roadLine.points[bendIndex].cornerRadius
+            : selectedPoint && this.track[selectedPoint.path][selectedPoint.index]?.cornerRadius;
         const value = this.state.radiusScope === 'corner' && Number.isFinite(override)
             ? override : this.getCornerRadius();
         this.checkOption(this.cornerRadiusOptions, this.nearestCornerRadiusPreset(value));
@@ -925,6 +805,10 @@ class MapmakerApp {
 
     setCornerRadius(value, options = {}) {
         const nextRadius = this.nearestCornerRadiusPreset(value);
+        if (this.hasRoadLine()) {
+            this.setRoadCornerRadius(nextRadius, options);
+            return;
+        }
         const corner = this.state.radiusScope === 'corner' ? this.state.selectedCorner : null;
         if (this.state.radiusScope === 'corner' && !corner) return;
         const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
@@ -1091,7 +975,8 @@ class MapmakerApp {
         });
         this.cornerRadiusScope.addEventListener('click', (event) => {
             const scope = event.target.closest('button[data-scope]')?.dataset.scope;
-            if (!scope || (scope === 'corner' && !this.state.selectedCorner)) return;
+            const hasCorner = Boolean(this.state.selectedCorner) || this.getSelectedBendIndex() !== null;
+            if (!scope || (scope === 'corner' && !hasCorner)) return;
             this.state.radiusScope = scope;
             this.syncCornerRadiusControl();
         });
@@ -1278,7 +1163,7 @@ class MapmakerApp {
         } else if (arguments.length > 1) {
             this.state.selectedHandle = selectedHandle ? { ...selectedHandle } : null;
             this.state.selectedCorner = null;
-        } else if (!this.state.selectedHandle && this.hasTrackGeometry()) {
+        } else if (!this.state.selectedHandle && this.hasTrackGeometry() && !this.hasRoadLine()) {
             this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
             this.state.selectedCorner = null;
         }
@@ -1481,7 +1366,7 @@ class MapmakerApp {
             this.state.selectedHandle = null;
         } else {
             this.state.tool = 'edit';
-            this.state.selectedHandle = { kind: 'polygon', path: 'outer', index: 0 };
+            this.state.selectedHandle = this.hasRoadLine() ? null : { kind: 'polygon', path: 'outer', index: 0 };
         }
         this.updateStageText();
         this.syncActionButtons();
@@ -1794,27 +1679,162 @@ class MapmakerApp {
     }
 
     reflowAutoCheckpoints() {
-        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
-        if (!guide || guide.manualGates) return;
-        if (guide.wallSignature !== JSON.stringify([this.track.outer, this.track.inner])) return;
-        const startMid = midpoint(this.track.startLine.p1, this.track.startLine.p2);
-        const nearest = nearestDistanceAlongLoop(guide.centerline, startMid);
-        if (!nearest) return;
-        const heading = { x: Math.cos(this.track.startAngle), y: Math.sin(this.track.startAngle) };
-        const direction = heading.x * nearest.tangent.x + heading.y * nearest.tangent.y < 0 ? -1 : 1;
+        const road = this.autoCheckpointRoad();
+        if (!road) return;
+        const start = startOnLoop(road.centerline, this.track.startLine, this.track.startAngle);
+        if (!start) return;
         const generated = buildAutoGates(
-            guide.centerline,
+            road.centerline,
             this.track.outer,
             this.track.inner,
-            DEFAULT_DRAW_WIDTH,
-            { startDistance: nearest.distance, direction, cornerRadius: this.getCornerRadius() },
+            road.width,
+            { ...start, cornerRadius: this.getCornerRadius() },
         );
         if (!generated) return;
         this.track.checkpoints = generated.checkpoints;
     }
 
+    // The middle of the road that automatic checkpoints follow, and its width.
+    autoCheckpointRoad() {
+        if (this.hasRoadLine()) {
+            const { points, width } = this.track.roadLine;
+            const walls = buildRoadWallsFromLoop(points, width, this.getCornerRadius());
+            return walls ? { centerline: walls.centerline, width } : null;
+        }
+        const guide = this.autoRoadGuideByKey.get(this.state.selectedTrackKey);
+        if (!guide || guide.manualGates) return null;
+        if (guide.wallSignature !== JSON.stringify([this.track.outer, this.track.inner])) return null;
+        return { centerline: guide.centerline, width: DEFAULT_DRAW_WIDTH };
+    }
+
     hasTrackGeometry() {
         return this.track.outer.length >= 3 && this.track.inner.length >= 3;
+    }
+
+    // A track drawn with Draw keeps its road line. Its bends are what you edit:
+    // the walls, the start and the checkpoints are built from them.
+    hasRoadLine() {
+        return Boolean(this.track) && this.hasTrackGeometry() && isValidRoadLine(this.track.roadLine);
+    }
+
+    getSelectedBendIndex() {
+        const handle = this.state.selectedHandle;
+        return handle?.kind === 'bend' && this.hasRoadLine() && this.track.roadLine.points[handle.index]
+            ? handle.index : null;
+    }
+
+    // Builds the road again from the line. The start stays near where it was.
+    // Nothing changes when the line cannot make a road.
+    rebuildRoad(roadLine = this.track.roadLine) {
+        const built = buildRoadFromLine(roadLine, {
+            cornerRadius: this.getCornerRadius(),
+            startLine: this.track.startLine,
+            startAngle: this.track.startAngle,
+        });
+        if (!built) return false;
+        this.track.roadLine = roadLine;
+        this.track.outer = built.outer;
+        this.track.inner = built.inner;
+        this.track.startLine = built.startLine;
+        this.track.startPos = built.startPos;
+        this.track.startAngle = built.startAngle;
+        this.track.checkpoints = built.checkpoints;
+        return true;
+    }
+
+    changeRoadLine(points) {
+        return this.rebuildRoad({ ...this.track.roadLine, points });
+    }
+
+    moveBend(index, worldPoint) {
+        const points = this.track.roadLine.points.map((point, at) => (
+            at === index ? { ...point, x: worldPoint.x, y: worldPoint.y } : point
+        ));
+        if (this.changeRoadLine(points)) return true;
+        this.setStatus('The road cannot bend there.', true);
+        return false;
+    }
+
+    insertBend(afterIndex, worldPoint) {
+        const points = this.track.roadLine.points;
+        if (points.length >= MAX_ROAD_LINE_POINTS) {
+            this.setStatus(`A road can have at most ${MAX_ROAD_LINE_POINTS} bends.`, true);
+            return;
+        }
+        const next = points[(afterIndex + 1) % points.length];
+        const at = distanceToSegment(worldPoint, points[afterIndex], next).closest;
+        const changed = [...points.slice(0, afterIndex + 1), at, ...points.slice(afterIndex + 1)];
+        if (!this.changeRoadLine(changed)) {
+            this.setStatus('The road cannot bend there.', true);
+            return;
+        }
+        this.normalizeRoadTrack();
+        this.state.selectedHandle = { kind: 'bend', index: afterIndex + 1 };
+        this.syncCornerRadiusControl();
+        this.markDirty('Added bend.');
+    }
+
+    deleteBend(index) {
+        const points = this.track.roadLine.points;
+        if (points.length <= 3) {
+            this.setStatus('A road needs at least 3 bends.', true);
+            return;
+        }
+        if (!this.changeRoadLine(points.filter((_, at) => at !== index))) {
+            this.setStatus('The road needs this bend.', true);
+            return;
+        }
+        this.normalizeRoadTrack();
+        this.state.selectedHandle = { kind: 'bend', index: Math.max(0, index - 1) };
+        this.syncCornerRadiusControl();
+        this.markDirty('Deleted bend.');
+    }
+
+    // Whole track sets every corner and clears each bend's own setting.
+    // Selected corner sets only the selected bend.
+    setRoadCornerRadius(nextRadius, options = {}) {
+        const bendIndex = this.state.radiusScope === 'corner' ? this.getSelectedBendIndex() : null;
+        if (this.state.radiusScope === 'corner' && bendIndex === null) return;
+        const before = { cornerRadius: this.track.cornerRadius, roadLine: this.track.roadLine };
+        const points = this.track.roadLine.points.map((point, at) => {
+            const { cornerRadius: _, ...bend } = point;
+            if (bendIndex === null) return bend;
+            if (at !== bendIndex) return point;
+            return nextRadius === this.getCornerRadius() ? bend : { ...bend, cornerRadius: nextRadius };
+        });
+        if (bendIndex === null) this.track.cornerRadius = nextRadius;
+        if (!this.changeRoadLine(points)) {
+            this.track.cornerRadius = before.cornerRadius;
+            this.track.roadLine = before.roadLine;
+            this.syncCornerRadiusControl();
+            this.setStatus('The road cannot take this corner setting.', true);
+            return;
+        }
+        this.normalizeRoadTrack();
+        this.syncCornerRadiusControl();
+        if (options.markDirty !== false) {
+            const preset = CORNER_RADIUS_PRESETS.find((entry) => entry.value === nextRadius);
+            this.markDirty(
+                options.status ?? `Set ${bendIndex === null ? 'whole track' : 'selected corner'} to ${preset?.label ?? 'Rounded'}.`,
+                options.updateStatus !== false,
+            );
+        }
+    }
+
+    // A rebuilt road can reach past the top or the left edge. Then the whole
+    // track moves back, as after Draw, and the view keeps it in place.
+    normalizeRoadTrack() {
+        const normalized = normalizeTrackLayout(this.track);
+        const offset = normalized.normalizationOffset;
+        if (!offset.x && !offset.y) return;
+        if (this.state.view.frozenBounds) {
+            const viewport = this.getViewport();
+            this.state.view.panX -= offset.x * viewport.scale;
+            this.state.view.panY -= offset.y * viewport.scale;
+        }
+        for (const key of ['outer', 'inner', 'startLine', 'startPos', 'checkpoints', 'roadLine']) {
+            this.track[key] = normalized[key];
+        }
     }
 
     getCanvasHint() {
@@ -1834,6 +1854,16 @@ class MapmakerApp {
         }
         if (!this.hasTrackGeometry()) {
             return 'No road yet. Use Draw.';
+        }
+        if (this.hasRoadLine() && !['startPos', 'startLine'].includes(this.state.selectedHandle?.kind)) {
+            if (this.state.tool === 'corner') {
+                return this.getSelectedBendIndex() !== null
+                    ? 'Drag the bend to move the road. Set its roundness under Shape.'
+                    : 'Select a bend, then drag it. The line from bend to bend is the straight shot. Green fits the car. Red leaves the road.';
+            }
+            return this.touchInput
+                ? 'Drag a bend to move the road. Pinch to zoom.'
+                : 'Drag a bend to move the road. Shift+click the line adds a bend. Delete removes it. Cmd+Z undoes.';
         }
         if (this.state.tool === 'corner') {
             return this.state.selectedCorner
@@ -2020,6 +2050,14 @@ class MapmakerApp {
         if (!this.hasTrackGeometry()) {
             return [];
         }
+        if (this.hasRoadLine()) {
+            return [
+                ...this.track.roadLine.points.map((point, index) => ({ kind: 'bend', index, point })),
+                { kind: 'startLine', endpoint: 'p1', point: this.track.startLine.p1 },
+                { kind: 'startLine', endpoint: 'p2', point: this.track.startLine.p2 },
+                { kind: 'startPos', point: this.track.startPos },
+            ];
+        }
         const handles = ['outer', 'inner'].flatMap((path) => this.track[path].map((point, index) => ({
             kind: 'polygon',
             path,
@@ -2043,6 +2081,15 @@ class MapmakerApp {
     getSelectableSegments() {
         if (!this.hasTrackGeometry()) {
             return [];
+        }
+        if (this.hasRoadLine()) {
+            const points = this.track.roadLine.points;
+            return [
+                ...points.map((point, index) => ({
+                    kind: 'lineSegment', index, a: point, b: points[(index + 1) % points.length],
+                })),
+                { kind: 'startLineSegment', a: this.track.startLine.p1, b: this.track.startLine.p2 },
+            ];
         }
         const segments = [];
 
@@ -2083,6 +2130,9 @@ class MapmakerApp {
         }
         if (a.kind === 'polygon') {
             return a.path === b.path && a.index === b.index;
+        }
+        if (a.kind === 'bend') {
+            return a.index === b.index;
         }
         if (a.kind === 'startLine') {
             return true;
@@ -2155,6 +2205,15 @@ class MapmakerApp {
         if (!handle) {
             return;
         }
+        // A bend keeps the open tool. In Corner, Shape then sets its rounding.
+        if (handle.kind === 'bend') {
+            this.state.selectedHandle = { kind: 'bend', index: handle.index };
+            if (this.state.tool === 'corner') this.state.radiusScope = 'corner';
+            this.syncCornerRadiusControl();
+            this.updateCanvasHint();
+            this.draw();
+            return;
+        }
         this.setTool('edit', handle);
     }
 
@@ -2180,6 +2239,12 @@ class MapmakerApp {
             const nextIndex = (segment.index + 1) % this.track[segment.path].length;
             const index = nearestEndpoint === 'p1' ? segment.index : nextIndex;
             this.selectHandle({ kind: 'polygon', path: segment.path, index });
+            return true;
+        }
+
+        if (segment.kind === 'lineSegment') {
+            const count = this.track.roadLine.points.length;
+            this.selectHandle({ kind: 'bend', index: nearestEndpoint === 'p1' ? segment.index : (segment.index + 1) % count });
             return true;
         }
 
@@ -2294,7 +2359,7 @@ class MapmakerApp {
         this.state.draftCursor = null;
         this.state.draftCloseHover = false;
         this.draftLoopsByKey.delete(this.state.selectedTrackKey);
-        this.setTool('edit', { kind: 'polygon', path: 'outer', index: 0 });
+        this.setTool('edit', this.hasRoadLine() ? null : { kind: 'polygon', path: 'outer', index: 0 });
         this.markDirty('Built walls from closed line loop.');
         return true;
     }
@@ -2374,7 +2439,7 @@ class MapmakerApp {
             return;
         }
 
-        if (this.state.tool === 'corner') {
+        if (this.state.tool === 'corner' && !this.hasRoadLine()) {
             if (event.button !== 0) return;
             this.canvas.setPointerCapture(event.pointerId);
             const marker = this.state.selectedCorner
@@ -2439,6 +2504,10 @@ class MapmakerApp {
                 this.insertPointOnSegment(segmentHit.path, segmentHit.index, worldPoint);
                 return;
             }
+            if (event.shiftKey && segmentHit.kind === 'lineSegment') {
+                this.insertBend(segmentHit.index, worldPoint);
+                return;
+            }
             this.selectSegment(segmentHit, canvasPoint, viewport);
             if (
                 segmentHit.kind === 'startLineSegment'
@@ -2479,7 +2548,9 @@ class MapmakerApp {
         }
 
         this.state.selectedHandle = null;
+        this.syncCornerRadiusControl();
         if (this.touchInput) this.startPan(event, canvasPoint, false);
+        this.updateCanvasHint();
         this.draw();
     }
 
@@ -2532,7 +2603,7 @@ class MapmakerApp {
             return;
         }
 
-        if (this.state.tool === 'corner') {
+        if (this.state.tool === 'corner' && !this.hasRoadLine()) {
             this.state.hoverHandle = this.hitTest(
                 canvasPoint, viewport, this.getAllHandles().filter((item) => item.kind === 'polygon'),
             );
@@ -2542,6 +2613,13 @@ class MapmakerApp {
 
         if (this.state.drag?.type === 'handle') {
             const handle = this.state.drag.handle;
+            if (handle?.kind === 'bend') {
+                if (this.hasRoadLine() && this.moveBend(handle.index, worldPoint)) {
+                    this.state.drag.moved = true;
+                    this.markDirty('Moved bend.', false);
+                }
+                return;
+            }
             if (handle?.kind === 'startLine' || handle?.kind === 'checkpoint') {
                 this.snapSelectedLaneGate(worldPoint, {
                     status: handle.kind === 'checkpoint'
@@ -2630,6 +2708,10 @@ class MapmakerApp {
         if (this.state.drag?.type !== 'pan') {
             this.state.skipDrawClick = false;
         }
+        if (this.state.drag?.handle?.kind === 'bend' && this.state.drag.moved && this.hasRoadLine()) {
+            this.normalizeRoadTrack();
+            this.markDirty('Moved bend.');
+        }
         if (['handle', 'laneGate', 'corner'].includes(this.state.drag?.type)) {
             this.releaseViewBounds({ keepCameraSteady: true });
         }
@@ -2698,7 +2780,7 @@ class MapmakerApp {
             return;
         }
 
-        if (this.state.tool === 'corner') {
+        if (this.state.tool === 'corner' && !this.hasRoadLine()) {
             const selection = this.state.selectedCorner;
             if (!selection) return;
             const step = event.shiftKey ? 1 : 0.25;
@@ -2722,6 +2804,24 @@ class MapmakerApp {
         if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
             this.deleteSelectedPoint();
+            return;
+        }
+
+        const bendIndex = this.getSelectedBendIndex();
+        if (bendIndex !== null) {
+            const step = event.shiftKey ? 1 : 0.25;
+            const bend = this.track.roadLine.points[bendIndex];
+            const delta = {
+                x: event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0,
+                y: event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0,
+            };
+            if (delta.x || delta.y) {
+                event.preventDefault();
+                if (this.moveBend(bendIndex, { x: bend.x + delta.x, y: bend.y + delta.y })) {
+                    this.normalizeRoadTrack();
+                    this.markDirty('Nudged bend.');
+                }
+            }
             return;
         }
 
@@ -2831,6 +2931,16 @@ class MapmakerApp {
     // The touch Add point button: a new wall point halfway to the next one.
     insertPointAfterSelected() {
         const handle = this.state.selectedHandle;
+        const bendIndex = this.getSelectedBendIndex();
+        if (bendIndex !== null) {
+            const points = this.track.roadLine.points;
+            this.insertBend(bendIndex, midpoint(points[bendIndex], points[(bendIndex + 1) % points.length]));
+            return;
+        }
+        if (this.hasRoadLine()) {
+            this.setStatus('Select a bend first.', true);
+            return;
+        }
         if (handle?.kind !== 'polygon') {
             this.setStatus('Select a wall point first.', true);
             return;
@@ -2842,6 +2952,15 @@ class MapmakerApp {
 
     deleteSelectedPoint() {
         const handle = this.state.selectedHandle;
+        const bendIndex = this.getSelectedBendIndex();
+        if (bendIndex !== null) {
+            this.deleteBend(bendIndex);
+            return;
+        }
+        if (this.hasRoadLine()) {
+            this.setStatus('Select a bend first.', true);
+            return;
+        }
         if (handle?.kind === 'checkpoint') {
             this.deleteCheckpoint();
             return;
@@ -2899,8 +3018,13 @@ class MapmakerApp {
     syncCheckpointPanel() {
         const count = String(this.track.checkpoints.length);
         if (this.checkpointCount.textContent !== count) this.checkpointCount.textContent = count;
-        this.addCheckpointBtn.disabled = !this.hasTrackGeometry();
+        const automatic = this.hasRoadLine();
+        this.addCheckpointBtn.disabled = !this.hasTrackGeometry() || automatic;
         this.deleteCheckpointBtn.disabled = this.state.selectedHandle?.kind !== 'checkpoint';
+        if (this.checkpointHint) {
+            const hint = automatic ? 'They follow the road.' : 'Select one on the map to delete it.';
+            if (this.checkpointHint.textContent !== hint) this.checkpointHint.textContent = hint;
+        }
     }
 
     setStatus(message, isError = false) {
@@ -3113,9 +3237,11 @@ class MapmakerApp {
         const screen = this.worldToScreen(point, viewport);
         const isSelected = this.handleMatches(this.state.selectedHandle, handle);
         const isHovered = this.handleMatches(this.state.hoverHandle, handle);
-        const radius = isSelected ? 8 : isHovered ? 7 : 4.5;
+        const radius = isSelected ? 8 : isHovered ? 7 : handle.kind === 'bend' ? 6 : 4.5;
         let fill = '#f8fafc';
-        if (handle.kind === 'polygon') {
+        if (handle.kind === 'bend') {
+            fill = '#f8fafc';
+        } else if (handle.kind === 'polygon') {
             fill = handle.path === 'outer' ? EDITOR_EDGE.outer : '#79b7ff';
         } else if (handle.kind === 'checkpoint') {
             fill = '#58dfa5';
@@ -3160,6 +3286,24 @@ class MapmakerApp {
         this.ctx.closePath();
         this.ctx.fillStyle = fillStyle;
         this.ctx.fill();
+    }
+
+    // The saved road line, from bend to bend.
+    drawRoadLine(viewport) {
+        const points = this.track.roadLine.points;
+        this.ctx.save();
+        this.ctx.setLineDash([6, 6]);
+        this.ctx.beginPath();
+        points.forEach((point, index) => {
+            const screen = this.worldToScreen(point, viewport);
+            if (index === 0) this.ctx.moveTo(screen.x, screen.y);
+            else this.ctx.lineTo(screen.x, screen.y);
+        });
+        this.ctx.closePath();
+        this.ctx.strokeStyle = 'rgba(248, 250, 252, 0.45)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 
     drawCornerSelection(viewport) {
@@ -3421,11 +3565,15 @@ class MapmakerApp {
 
         this.drawDraftLoop(viewport);
 
+        const roadLine = this.hasRoadLine() && this.state.tool !== 'draw';
         if (this.state.tool === 'corner') {
             this.drawWallContinuations(viewport);
-            this.drawCornerSelection(viewport);
-            return;
+            if (!roadLine) {
+                this.drawCornerSelection(viewport);
+                return;
+            }
         }
+        if (roadLine) this.drawRoadLine(viewport);
 
         const handles = this.getAllHandles().sort((a, b) => {
             const aPriority = Number(this.handleMatches(this.state.selectedHandle, a)) * 2
