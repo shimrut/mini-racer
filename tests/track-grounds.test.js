@@ -197,6 +197,7 @@ describe('ground feel settings', () => {
     it('turns every new setting off on tarmac', () => {
         expect(TRACK_GROUNDS.tarmac.yawCarry).toBe(0);
         expect(TRACK_GROUNDS.tarmac.slideScrub).toBe(0);
+        expect(TRACK_GROUNDS.tarmac.driftAngle).toBe(0);
         expect(TRACK_GROUNDS.tarmac.highSpeedSteerTrim).toBe(1);
     });
 
@@ -206,6 +207,38 @@ describe('ground feel settings', () => {
 
     it('takes more speed in a slide, with slide scrub', () => {
         expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap(dirt).lostKph + 5);
+    });
+
+    it('holds a long slide near the drift angle', () => {
+        const toDegrees = (radians) => (radians * 180) / Math.PI;
+        const held = holdTurn({ ...dirt, driftAngle: 30 }, 90);
+        expect(toDegrees(held.widestSlide)).toBeLessThan(33);
+        expect(toDegrees(holdTurn({ ...dirt, driftAngle: 0 }, 90).widestSlide)).toBeGreaterThan(45);
+    });
+
+    it('keeps more speed in a long slide, with a drift angle', () => {
+        expect(tap({ ...dirt, driftAngle: 30 }).lostKph).toBeLessThanOrEqual(tap({ ...dirt, driftAngle: 0 }).lostKph);
+        const longSlide = (driftAngle) => {
+            const { state, collisionSegments } = createReplaySimulationState(OPEN);
+            for (let frame = 0; frame < 690; frame++) {
+                state.keys.right = frame >= 600;
+                updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, driftAngle });
+            }
+            return state.cachedSpeed;
+        };
+        expect(longSlide(30)).toBeGreaterThan(longSlide(0) * 1.3);
+    });
+
+    it('turns a short slide as before, with a drift angle', () => {
+        const run = (driftAngle) => {
+            const { state, collisionSegments } = createReplaySimulationState(OPEN);
+            for (let frame = 0; frame < 640; frame++) {
+                state.keys.right = frame >= 600 && frame < 612;
+                updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, driftAngle });
+            }
+            return [state.angle, state.velocity.x, state.velocity.y];
+        };
+        expect(run(40)).toEqual(run(0));
     });
 
     // Reaches top speed, then steers right for the given number of frames.
