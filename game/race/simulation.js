@@ -505,6 +505,34 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
 
 const SKID_MARK_MIN_SPEED = 2.5;
 
+// On a ground with slide carry, the engine adds no speed in a slide.
+// The sideways share of the car's speed (the sine of the slide angle) where
+// the engine starts to push less (2 degrees), and where it stops (6 degrees).
+// Written as numbers, so the game and the server get the same bits.
+const SLIDE_ENGINE_FADE_START = 0.03489949670250097;
+const SLIDE_ENGINE_FADE_END = 0.10452846326765346;
+// The share of top speed where the slide starts to stop the engine, and
+// where it stops it fully. Below that, the engine always pushes, so a slow
+// car (after a wall hit) can get going again.
+const SLIDE_ENGINE_CUT_FROM_SPEED = 0.3;
+const SLIDE_ENGINE_CUT_FULL_SPEED = 0.55;
+
+function getSlideEnginePush(sidewaysSpeed, speed, speedRatio) {
+    if (speed <= 0.001) return 1;
+    const sidewaysShare = sidewaysSpeed / speed;
+    const slidePush = clamp(
+        (SLIDE_ENGINE_FADE_END - sidewaysShare) / (SLIDE_ENGINE_FADE_END - SLIDE_ENGINE_FADE_START),
+        0,
+        1
+    );
+    const speedCut = clamp(
+        (speedRatio - SLIDE_ENGINE_CUT_FROM_SPEED) / (SLIDE_ENGINE_CUT_FULL_SPEED - SLIDE_ENGINE_CUT_FROM_SPEED),
+        0,
+        1
+    );
+    return 1 - speedCut * (1 - slidePush);
+}
+
 export {
     CONTACT_EPSILON,
     createSegment,
@@ -632,7 +660,13 @@ export function updateSimulation(
             ));
             if (accel > 0 && currentSpeed < safeMaxSpeed && forwardSpeed < longitudinalLimit) {
                 const dragFactor = 1 - speedRatio ** 2;
-                forwardSpeed += ((accel / KPH_PER_WORLD_UNIT) * dragFactor) * dt;
+                // On a ground with slide carry, a slide holds the speed: the
+                // engine pushes less as the car turns sideways, and not at
+                // all once it slides.
+                const enginePush = ground.slideCarry > 0
+                    ? getSlideEnginePush(Math.abs(latBeforeGrip), currentSpeed, speedRatio)
+                    : 1;
+                forwardSpeed += ((accel / KPH_PER_WORLD_UNIT) * dragFactor * enginePush) * dt;
             }
 
             if (forwardSpeed < 0) {
@@ -656,9 +690,8 @@ export function updateSimulation(
             lateralSpeed *= Math.exp(-activeGrip * dt);
             // A ground with slide carry keeps part of the sideways speed that
             // the grip takes, as forward speed. The car's path then swings
-            // toward the nose. The carry only keeps speed: with the engine,
-            // it never takes the car above its speed before this step.
-            // Tarmac has none.
+            // toward the nose. The carry only keeps speed: it never takes
+            // the car above its speed before this step. Tarmac has none.
             if (ground.slideCarry > 0 && forwardSpeed > 0) {
                 const sidewaysTaken = latBeforeGrip * latBeforeGrip - lateralSpeed * lateralSpeed;
                 const lateralSq = lateralSpeed * lateralSpeed;

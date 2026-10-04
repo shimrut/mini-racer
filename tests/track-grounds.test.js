@@ -261,6 +261,33 @@ describe('ground feel settings', () => {
         expect(kept).toBeGreaterThan(0);
     });
 
+    // Takes one engine step from a slide, steering into it. Returns the
+    // speed before and after the step.
+    const slideStep = (kph, slideDeg) => {
+        const { state, collisionSegments } = createReplaySimulationState(OPEN);
+        const speed = kph / KPH_PER_WORLD_UNIT;
+        const slide = (slideDeg * Math.PI) / 180;
+        state.angle = 0;
+        state.velocity = { x: speed * Math.cos(slide), y: speed * Math.sin(slide) };
+        state.keys.right = true;
+        updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, dirt);
+        return { before: speed, after: Math.hypot(state.velocity.x, state.velocity.y) };
+    };
+
+    it('adds no speed in a slide at speed, with slide carry', () => {
+        for (const kph of [160, 200, 240]) {
+            for (const slideDeg of [8, 20, 40]) {
+                const { before, after } = slideStep(kph, slideDeg);
+                expect(after, `${kph} km/h, ${slideDeg} degrees`).toBeLessThanOrEqual(before);
+            }
+        }
+    });
+
+    it('still speeds up a slow car in a slide, with slide carry', () => {
+        const { before, after } = slideStep(60, 20);
+        expect(after).toBeGreaterThan(before);
+    });
+
     // Reaches top speed, then steers right for the given number of frames.
     // Returns the widest slide angle, and how far the car goes to the side.
     function holdTurn(ground, frames) {

@@ -51,7 +51,7 @@ export const TRACK_GROUNDS = Object.freeze({
         highSpeedSteerTrim: 1.0,
         yawCarry: 0.1,
         slideScrub: 0,
-        slideCarry: 0.7,
+        slideCarry: 0.85,
         skidMarkMinSlipRatio: 0.4
     }),
     snow: Object.freeze({
