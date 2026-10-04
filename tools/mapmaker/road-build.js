@@ -129,10 +129,18 @@ function lineBends(rawPoints, kept, centerline) {
     });
 }
 
-// A bend with its own rounding gives it to the sharp wall point of its corner:
-// the corner point that is nearest to that bend.
+// A bend with its own rounding gives it to the sharp wall point of its corner.
+// A road of other widths names that point. Otherwise it is the corner point
+// that is nearest to the bend.
 function giveBendRoundings(walls, bends, trackWidth) {
     if (!bends.some((bend) => bend.radius !== null)) return;
+    if (walls.pivots) {
+        for (const { index, point } of walls.pivots) {
+            const radius = bends[index]?.radius;
+            if (radius !== null && radius !== undefined) point.cornerRadius = radius;
+        }
+        return;
+    }
     for (const { pivot } of findCornerWallGroups(walls.outer, walls.inner, trackWidth)) {
         const point = walls[pivot.path][pivot.index];
         const nearest = bends.reduce((best, bend) => (
@@ -163,7 +171,7 @@ export function buildRoadWallsFromLoop(rawPoints, trackWidth, cornerRadius) {
     }
     giveBendRoundings(walls, bends, widest);
     return {
-        ...walls,
+        centerline: walls.centerline,
         ...fitCurvesToCorners(walls.outer, walls.inner, cornerRadius, widest),
     };
 }

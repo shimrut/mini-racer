@@ -213,4 +213,42 @@ describe('road built from a saved road line', () => {
         expect(each).toEqual(one);
         expect(buildRibbonWallsFromCenterline(centerline, [2, 2, 2])).toBeNull();
     });
+
+    it('keeps a corner between two widths as round as a corner of one width', () => {
+        const track = drawTrack();
+        const [narrow, normal, wide] = ROAD_WIDTHS;
+        const line = { ...track.roadLine, width: wide.width };
+        // Wall points where the wall turns: the race rounds each one by the
+        // corner setting, but never past 1/2.5 of the wall on either side.
+        const cornerWalls = (road) => [road.outer, road.inner].flatMap((wall) => wall.flatMap((point, index) => {
+            const prev = wall[(index - 1 + wall.length) % wall.length];
+            const next = wall[(index + 1) % wall.length];
+            const turn = Math.abs(Math.atan2(
+                (point.x - prev.x) * (next.y - point.y) - (point.y - prev.y) * (next.x - point.x),
+                (point.x - prev.x) * (next.x - point.x) + (point.y - prev.y) * (next.y - point.y),
+            ));
+            return turn > Math.PI / 6 ? [Math.min(
+                Math.hypot(point.x - prev.x, point.y - prev.y),
+                Math.hypot(next.x - point.x, next.y - point.y),
+            )] : [];
+        }));
+        const plain = Math.min(...cornerWalls(rebuild(track, line)));
+        for (const width of [narrow.width, normal.width]) {
+            const points = line.points.map((point, index) => (index === 1 ? { ...point, width } : point));
+            const built = rebuild(track, { ...line, points });
+            expect(built).not.toBeNull();
+            expect(Math.min(...cornerWalls(built))).toBeGreaterThan(plain - 0.5);
+        }
+    });
+
+    it('gives a bend its own rounding where two widths meet', () => {
+        const track = drawTrack();
+        const [narrow, , wide] = ROAD_WIDTHS;
+        const points = track.roadLine.points.map((point, index) => (
+            index === 1 ? { ...point, width: narrow.width, cornerRadius: 5 } : point
+        ));
+        const built = rebuild(track, { ...track.roadLine, width: wide.width, points });
+        const rounded = [...built.outer, ...built.inner].filter((point) => point.cornerRadius === 5);
+        expect(rounded).toHaveLength(1);
+    });
 });
