@@ -13,8 +13,10 @@ import { createTrackFingerprint } from '../competition/pb-ghost-trace.js';
 import {
     TrackInputError,
     normalizeDraftLoop,
+    normalizeRoadLine,
     normalizeTrackShape,
     type Point,
+    type RoadLine,
     type TrackShape,
 } from './track-shape.js';
 
@@ -37,6 +39,8 @@ export type StoredTrackRecord = {
     key: string;
     track: TrackShape;
     draftLoop: Point[];
+    // Only the Creator reads it. An older record has none.
+    roadLine?: RoadLine;
     medalRow: AuthoredMedalRow | null;
     checksPassed: boolean;
     checkError: string | null;
@@ -499,6 +503,7 @@ export async function saveStoredTrack(
     const track = normalizeTrackShape(payload.track, { maxNameLength: MAX_TRACK_NAME_LENGTH });
     if (!track.name) throw new TrackInputError('Give the track a name.');
     const draftLoop = normalizeDraftLoop(payload.draftLoop);
+    const roadLine = normalizeRoadLine(payload.roadLine);
     let medalRow: AuthoredMedalRow | null = null;
     if (payload.medalRow !== null && payload.medalRow !== undefined) {
         if (trusted) {
@@ -550,6 +555,7 @@ export async function saveStoredTrack(
                 key: trackKey,
                 track,
                 draftLoop,
+                ...(roadLine ? { roadLine } : {}),
                 medalRow,
                 checksPassed,
                 checkError,

@@ -3,6 +3,7 @@ import { getMedalRowError, normalizeMedalRow } from './medal-times.js';
 import { validateTrackQuality } from './track-quality.js';
 import { copyPendingMedalText, hasPendingMedalText, movePendingMedalText } from './pending-medal-text.js';
 import { createEditHistory } from './edit-history.js';
+import { splitRoadLine, withRoadLine } from './road-line.js';
 import {
     copyTrackName,
     isUncertain,
@@ -14,13 +15,16 @@ import {
 
 // Read the named track, even when another track is selected by the time a
 // request finishes. The open drawing lives separately from its wall shape.
+// The road line lives on the open track, and goes to the server beside it.
 export function creatorTrackContent(editor, key) {
     const medalRow = editor.medalRowByKey.get(key) ?? editor.medalTimes[key] ?? null;
+    const { track, roadLine } = splitRoadLine(editor.state.tracks[key]);
     return structuredClone({
-        track: editor.state.tracks[key],
+        track,
         draftLoop: key === editor.state.selectedTrackKey
             ? editor.state.draftLoop : editor.draftLoopsByKey.get(key) ?? [],
         medalRow,
+        roadLine,
     });
 }
 
@@ -42,8 +46,8 @@ export function captureUnsavedCreatorWork(editor) {
 // now keeps its new record, so it opens read-only.
 export function restoreUnsavedCreatorWork(editor, unsaved) {
     for (const { key, content, history, record, pending } of unsaved) {
-        editor.state.tracks[key] = content.track;
-        editor.editHistories.set(key, history ?? createEditHistory(content.track));
+        editor.state.tracks[key] = withRoadLine(content.track, content.roadLine);
+        editor.editHistories.set(key, history ?? createEditHistory(editor.state.tracks[key]));
         if (record && !editor.isCreatorLocked(key)) editor.creatorRecords.set(key, record);
         if (content.medalRow) editor.medalRowByKey.set(key, content.medalRow);
         if (content.draftLoop.length) editor.draftLoopsByKey.set(key, content.draftLoop);
@@ -67,6 +71,7 @@ export function rememberSavedCreatorContent(editor, record) {
             track: record.track,
             draftLoop: record.draftLoop ?? [],
             medalRow: record.medalRow ?? null,
+            roadLine: record.roadLine ?? null,
         }),
     });
 }

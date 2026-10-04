@@ -30,8 +30,14 @@ function medalRowContent(row) {
     return Object.fromEntries(MEDAL_TIERS.map((tier) => [tier, centiseconds(row[tier])]));
 }
 
-// The track, its unfinished road and its medal row as the server keeps them.
-export function trackContent({ track, draftLoop, medalRow }) {
+function roadLineContent(roadLine) {
+    if (!roadLine) return null;
+    return { points: (roadLine.points ?? []).map(({ x, y }) => ({ x, y })), width: roadLine.width };
+}
+
+// The track, its unfinished road, its medal row and its road line as the
+// server keeps them.
+export function trackContent({ track, draftLoop, medalRow, roadLine }) {
     const shape = {
         name: String(track?.name ?? '').trim(),
         outer: (track?.outer ?? []).map(point),
@@ -47,6 +53,7 @@ export function trackContent({ track, draftLoop, medalRow }) {
         track: shape,
         draftLoop: (draftLoop ?? []).map(point),
         medalRow: medalRowContent(medalRow),
+        roadLine: roadLineContent(roadLine),
     });
 }
 

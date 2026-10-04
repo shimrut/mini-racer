@@ -13,6 +13,7 @@ export type TrackShape = {
     cornerRadius?: number;
     ground?: string;
 };
+export type RoadLine = { points: Point[]; width: number };
 
 // A bad track from an editor. The routes answer it with status 400.
 export class TrackInputError extends Error {}
@@ -23,6 +24,9 @@ const MAX_DRAFT_POINTS = 160;
 const MAX_CHECKPOINTS = 12;
 const MAX_COORDINATE = 1_000;
 const MAX_CORNER_RADIUS = 20;
+// The Mapmaker's limits for a drawn road width.
+const MIN_ROAD_LINE_WIDTH = 1.5;
+const MAX_ROAD_LINE_WIDTH = 20;
 
 function object(value: unknown): Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -110,4 +114,24 @@ export function normalizeTrackShape(value: unknown, { maxNameLength = 80 } = {})
 
 export function normalizeDraftLoop(value: unknown): Point[] {
     return points(value ?? [], MAX_DRAFT_POINTS, 'Unfinished road');
+}
+
+// The closed line and the road width that Draw built the walls from. Only the
+// Creator reads it. The game and the race check use the walls.
+export function normalizeRoadLine(value: unknown): RoadLine | null {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new TrackInputError('The road line must be an object.');
+    }
+    const input = value as Record<string, unknown>;
+    const linePoints = points(input.points, MAX_DRAFT_POINTS, 'The road line');
+    if (linePoints.length < 3) {
+        throw new TrackInputError('The road line must contain at least 3 points.');
+    }
+    const width = input.width;
+    if (typeof width !== 'number' || !Number.isFinite(width)
+        || width < MIN_ROAD_LINE_WIDTH || width > MAX_ROAD_LINE_WIDTH) {
+        throw new TrackInputError('The road line width is out of range.');
+    }
+    return { points: linePoints.map(({ x, y }) => ({ x, y })), width };
 }

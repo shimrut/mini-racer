@@ -59,6 +59,12 @@ half the lane are widened first so the inside wall cannot cross itself.
 That keeps the road the same width through corners. It does not rewrite
 the sketch: a square stays a square.
 
+In the Creator, Draw also keeps the points you placed and the road width.
+Save stores them beside the track, as the road line. The game, the race check
+and the track fingerprint never read the road line. Nothing uses it yet. Edits
+by hand and Wall Corners do not change it, so it shows the road as Draw built
+it. The Mapmaker's track files do not store it.
+
 Existing saved tracks are unchanged until you redraw them with Draw.
 Saving an older track without changing its road preserves its legacy
 `drawWidth` and `lineSmoothing` fields in the definition. Those fields do not

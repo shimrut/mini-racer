@@ -17,6 +17,7 @@ import {
 } from './mapmaker/edit-history.js';
 import { snapLineBuildPoint } from './mapmaker/line-build.js';
 import { moveCorner, selectCorner } from './mapmaker/corner-edit.js';
+import { buildRoadLine, withRoadLine } from './mapmaker/road-line.js';
 import { wallContinuations } from './mapmaker/wall-continuation.js';
 import { snapStartPose } from './mapmaker/start-pose.js';
 import { buildRibbonWallsFromCenterline, fitCurvesToCorners } from './mapmaker/ribbon-walls.js';
@@ -2279,6 +2280,10 @@ class MapmakerApp {
         this.track.cornerRadius = generated.cornerRadius;
         delete this.track.lineSmoothing;
         delete this.track.drawWidth;
+        // The Creator saves this line beside the track, for later road edits.
+        const roadLine = buildRoadLine(points, generated.normalizationOffset, DEFAULT_DRAW_WIDTH);
+        if (roadLine) this.track.roadLine = roadLine;
+        else delete this.track.roadLine;
         this.autoRoadGuideByKey.set(this.state.selectedTrackKey, {
             centerline: generated.centerline,
             wallSignature: JSON.stringify([generated.outer, generated.inner]),
@@ -3507,7 +3512,7 @@ class MapmakerApp {
 
     addCreatorRecord(record) {
         const key = record.key;
-        const track = cloneTracks(record.track);
+        const track = cloneTracks(withRoadLine(record.track, record.roadLine));
         this.state.tracks[key] = track;
         this.creatorRecords.set(key, this.creatorRecordMeta(record));
         rememberSavedCreatorContent(this, record);
