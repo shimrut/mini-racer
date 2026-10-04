@@ -235,6 +235,32 @@ describe('ground feel settings', () => {
         expect(none[none.length - 1]).toBeLessThan(none[0] * 0.9);
     });
 
+    it('never lets the engine gain more speed in a slide, with slide carry', () => {
+        // Takes one step from a slide at many speeds and slide angles, with
+        // and without carry. The carry may only keep speed.
+        const stepFrom = (kph, slideDeg, slideCarry) => {
+            const { state, collisionSegments } = createReplaySimulationState(OPEN);
+            const speed = kph / KPH_PER_WORLD_UNIT;
+            const slide = (slideDeg * Math.PI) / 180;
+            state.angle = 0;
+            state.velocity = { x: speed * Math.cos(slide), y: speed * Math.sin(slide) };
+            state.keys.right = true;
+            updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, { ...dirt, slideCarry });
+            return Math.hypot(state.velocity.x, state.velocity.y);
+        };
+        let kept = 0;
+        for (const kph of [60, 120, 180, 240, 268]) {
+            for (const slideDeg of [5, 20, 40, 70]) {
+                const start = kph / KPH_PER_WORLD_UNIT;
+                const withCarry = stepFrom(kph, slideDeg, 0.7);
+                const without = stepFrom(kph, slideDeg, 0);
+                expect(withCarry).toBeLessThanOrEqual(Math.max(start, without) + 1e-12);
+                if (withCarry > without + 1e-6) kept += 1;
+            }
+        }
+        expect(kept).toBeGreaterThan(0);
+    });
+
     // Reaches top speed, then steers right for the given number of frames.
     // Returns the widest slide angle, and how far the car goes to the side.
     function holdTurn(ground, frames) {
