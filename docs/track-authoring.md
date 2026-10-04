@@ -423,10 +423,8 @@ Each track has one ground for the full lap. Choose it with **Ground** under
   a tarmac track.
 - **Dirt** writes `ground: 'dirt'` in the definition file. On dirt, the car has
   less grip, a lower top speed and less acceleration. It starts and stops
-  turning more slowly, and it turns a little less sharply. In a big slide
-  (more than 25 degrees sideways) the tyres grip harder while the player
-  steers, so a long corner stays near 35 degrees and keeps more speed. A dirt
-  lap is about 25% slower than tarmac. The road is clay with soft patches, loose soil at the
+  turning more slowly, and it turns a little less sharply. A dirt lap is about
+  25% slower than tarmac. The road is clay with soft patches, loose soil at the
   edges and small stones, with cream and clay kerbs. The lobby shows "Dirt"
   after the lap count. The dirt engine is lower and rougher than the circuit
   car, with a hard bang and a bigger rev drop on each gear change. It crackles

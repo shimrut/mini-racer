@@ -505,23 +505,6 @@ function getCollisionCandidates(p1, p2, collisionData, collisionExtent) {
 
 const SKID_MARK_MIN_SPEED = 2.5;
 
-// The sideways share of the car's speed (the sine of the slide angle) where
-// a big slide starts to grip harder (25 degrees), and where it gets the full
-// slide grip (45 degrees). Written as numbers, so the game and the server
-// get the same bits.
-const BIG_SLIDE_GRIP_FROM = 0.42261826174069944;
-const BIG_SLIDE_GRIP_FULL = 0.7071067811865475;
-
-function getBigSlideGripScale(sidewaysSpeed, speed, slideGrip) {
-    if (speed <= 0.001) return 1;
-    const t = clamp(
-        (sidewaysSpeed / speed - BIG_SLIDE_GRIP_FROM) / (BIG_SLIDE_GRIP_FULL - BIG_SLIDE_GRIP_FROM),
-        0,
-        1
-    );
-    return 1 + slideGrip * t * t * (3 - 2 * t);
-}
-
 export {
     CONTACT_EPSILON,
     createSegment,
@@ -669,12 +652,7 @@ export function updateSimulation(
             const steerGripScale = Number.isFinite(Number(config.steerGripScale))
                 ? clamp(Number(config.steerGripScale) * ground.steerGripScale, 0.05, 1.5)
                 : 0.45 * ground.steerGripScale;
-            let activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
-            // A ground with slide grip grips harder in a big slide while the
-            // player steers. Smaller slides do not change. Tarmac has none.
-            if (ground.slideGrip > 0 && steerInput !== 0) {
-                activeGrip *= getBigSlideGripScale(Math.abs(latBeforeGrip), currentSpeed, ground.slideGrip);
-            }
+            const activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
             lateralSpeed *= Math.exp(-activeGrip * dt);
             // A ground with slide scrub takes forward speed while the car
             // slides. Tarmac has none.
