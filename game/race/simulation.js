@@ -654,6 +654,16 @@ export function updateSimulation(
                 : 0.45 * ground.steerGripScale;
             const activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
             lateralSpeed *= Math.exp(-activeGrip * dt);
+            // A ground with slide carry keeps part of the sideways speed that
+            // the grip takes, as forward speed. The car's path then swings
+            // toward the nose, and the total speed does not go up. Tarmac
+            // has none.
+            if (ground.slideCarry > 0 && forwardSpeed > 0) {
+                const sidewaysTaken = latBeforeGrip * latBeforeGrip - lateralSpeed * lateralSpeed;
+                forwardSpeed = Math.sqrt(
+                    forwardSpeed * forwardSpeed + ground.slideCarry * Math.max(0, sidewaysTaken)
+                );
+            }
             // A ground with slide scrub takes forward speed while the car
             // slides. Tarmac has none.
             if (ground.slideScrub > 0 && currentSpeed > 0.001) {
