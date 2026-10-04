@@ -378,6 +378,210 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.modal.showModal.mock.calls[0][3].nextRace).toBe(null);
     });
 
+    function campaignMedalResults(stages, lastMedal = null) {
+        const resultsByRaceId = {};
+        stages.forEach((stage, index) => {
+            const isLast = index === stages.length - 1;
+            if (isLast && !lastMedal) return;
+            resultsByRaceId[stage.raceId] = {
+                bestTimeMs: 20000,
+                medal: isLast ? lastMedal : 'bronze',
+            };
+        });
+        return resultsByRaceId;
+    }
+
+    function finishConfirmationContext(overrides = {}) {
+        const lastStage = NUMBERS_STAGES.at(-1);
+        return createCampaignFinishContext({
+            status: 'won',
+            activeRaceMode: 'campaign',
+            activeCampaignStage: {
+                raceId: lastStage.raceId,
+                seriesId: CAMPAIGN_NUMBERS_SERIES_ID,
+                trackKey: lastStage.trackKey,
+                lapCount: lastStage.lapCount,
+                rulesRevision: lastStage.rulesRevision,
+            },
+            campaignVerifiedBootstrap: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                ranked: true,
+                signedIn: true,
+                progress: {
+                    campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                    resultsByRaceId: campaignMedalResults(NUMBERS_STAGES),
+                },
+            },
+            showCampaignLobby: vi.fn(),
+            startCampaignStage: vi.fn(),
+            modal: {
+                modalMsg: { style: {}, textContent: '' },
+                showModal: vi.fn(),
+                showCampaignFinished: vi.fn(),
+                updateModalScoreboardSnapshot: vi.fn(),
+                matchesModalScoreboardContext: vi.fn(() => true),
+                isModalActive: vi.fn(() => true),
+                isPauseModalActive: vi.fn(() => false),
+                isRunsViewActive: vi.fn(() => false),
+                setCombinedWinMedal: vi.fn(),
+                setCombinedNextRaceEnabled: vi.fn(),
+            },
+            ...overrides,
+        });
+    }
+
+    async function confirmCampaignRun(context, raceId, body) {
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({ ok: false });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false });
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({ ok: true, body });
+        await context.processCampaignVerificationEntry({
+            raceId,
+            bestTime: 20,
+            replay: { revision: 1, segments: [] },
+            ownerPlayerId: 'player-a',
+        });
+    }
+
+    it('shows the finished screen when the saved run completes the series', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        const lastStage = NUMBERS_STAGES.at(-1);
+
+        await confirmCampaignRun(context, lastStage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            },
+        });
+
+        expect(context.modal.showCampaignFinished).toHaveBeenCalledWith(
+            expect.objectContaining({
+                seriesId: CAMPAIGN_NUMBERS_SERIES_ID,
+                title: 'Numbers',
+                facts: expect.arrayContaining([
+                    { label: 'Stages', value: '16' },
+                    { label: 'Medals', value: '16/64' },
+                    { label: 'Surface', value: 'Street' },
+                ]),
+            }),
+            expect.objectContaining({
+                primaryActionLabel: 'Campaign',
+                secondaryActionLabel: 'Improve',
+            }),
+        );
+        const actions = context.modal.showCampaignFinished.mock.calls[0][1];
+        actions.primaryAction();
+        actions.secondaryAction();
+        expect(context.showCampaignLobby).toHaveBeenCalled();
+        expect(context.startCampaignStage).toHaveBeenCalledWith(context.activeCampaignStage);
+        clearActivePlayerOwnerId();
+    });
+
+    it('does not show the finished screen for an earlier stage, a repeat, or a ghost retry', async () => {
+        setActivePlayerOwnerId('player-a');
+        const firstStage = NUMBERS_STAGES[0];
+        const early = finishConfirmationContext({
+            activeCampaignStage: {
+                raceId: firstStage.raceId,
+                seriesId: CAMPAIGN_NUMBERS_SERIES_ID,
+                trackKey: firstStage.trackKey,
+                lapCount: firstStage.lapCount,
+                rulesRevision: firstStage.rulesRevision,
+            },
+        });
+        await confirmCampaignRun(early, firstStage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: {
+                    [firstStage.raceId]: { bestTimeMs: 20000, medal: 'bronze' },
+                },
+            },
+        });
+        expect(early.modal.showCampaignFinished).not.toHaveBeenCalled();
+
+        const repeat = finishConfirmationContext({
+            campaignVerifiedBootstrap: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                progress: {
+                    resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+                },
+            },
+        });
+        await confirmCampaignRun(repeat, NUMBERS_STAGES.at(-1).raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'gold'),
+            },
+        });
+        expect(repeat.modal.showCampaignFinished).not.toHaveBeenCalled();
+
+        const retry = finishConfirmationContext();
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({ ok: false });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false });
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: true,
+            body: {
+                accepted: true,
+                progress: {
+                    campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                    resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+                },
+            },
+        });
+        await retry.processCampaignVerificationEntry({
+            raceId: NUMBERS_STAGES.at(-1).raceId,
+            bestTime: 20,
+            replay: { revision: 1, segments: [] },
+            ownerPlayerId: 'player-a',
+            progressConfirmed: true,
+        });
+        expect(retry.modal.showCampaignFinished).not.toHaveBeenCalled();
+        clearActivePlayerOwnerId();
+    });
+
+    it('waits while standings are open, and skips a left finish or another player', async () => {
+        setActivePlayerOwnerId('player-a');
+        const lastStage = NUMBERS_STAGES.at(-1);
+        const waiting = finishConfirmationContext();
+        waiting.modal.isRunsViewActive.mockReturnValue(true);
+        await confirmCampaignRun(waiting, lastStage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            },
+        });
+        expect(waiting.modal.showCampaignFinished).not.toHaveBeenCalled();
+        waiting.modal.onFinishViewRestored();
+        expect(waiting.modal.showCampaignFinished).toHaveBeenCalledTimes(1);
+
+        const left = finishConfirmationContext();
+        left.modal.isModalActive.mockReturnValue(false);
+        await confirmCampaignRun(left, lastStage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            },
+        });
+        expect(left.modal.showCampaignFinished).not.toHaveBeenCalled();
+
+        const otherPlayer = finishConfirmationContext();
+        setActivePlayerOwnerId('player-b');
+        await confirmCampaignRun(otherPlayer, lastStage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            },
+        });
+        expect(otherPlayer.modal.showCampaignFinished).not.toHaveBeenCalled();
+        clearActivePlayerOwnerId();
+    });
+
     it('closes the stage again when the server refuses the run that opened it', async () => {
         const context = createCampaignFinishContext({
             campaignBootstrap: { ranked: false, signedIn: false, progress: {} },

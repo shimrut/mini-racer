@@ -359,6 +359,9 @@ export class ModalShell {
         if (this._modalKind === 'win' && this.modalCombinedView?.classList.contains('active-view')) {
             return this.modalCombinedView.querySelector('.combined-actions');
         }
+        if (this._modalKind === 'campaign-finished' && this.modalCampaignFinishedView?.classList.contains('active-view')) {
+            return this.modalCampaignFinishedView.querySelector('.campaign-finished__actions');
+        }
         return null;
     }
 
@@ -380,9 +383,11 @@ export class ModalShell {
             : this.combinedRestartBtn;
         const preferred = this._modalKind === 'pause'
             ? this.modalResumeBtn
-            : this._modalKind === 'win'
-                ? winPreferred
-                : null;
+            : this._modalKind === 'campaign-finished'
+                ? this.campaignFinishedPrimaryBtn
+                : this._modalKind === 'win'
+                    ? winPreferred
+                    : null;
         if (!preferred || !buttons?.length) return null;
         const preferredIndex = buttons.indexOf(preferred);
         return preferredIndex >= 0 ? preferredIndex : null;
@@ -451,7 +456,7 @@ export class ModalShell {
     }
 
     _setActiveView(view) {
-        for (const v of [this.modalMainView, this.modalRunsView, this.modalCombinedView, this.modalPauseView]) {
+        for (const v of [this.modalMainView, this.modalRunsView, this.modalCombinedView, this.modalPauseView, this.modalCampaignFinishedView]) {
             v?.classList.remove('active-view');
         }
         view?.classList.add('active-view');
@@ -520,6 +525,9 @@ export class ModalShell {
     get modalMenuBtn() { return document.getElementById('modal-menu-btn'); }
     get modalCombinedView() { return document.getElementById('modal-combined-view'); }
     get modalPauseView() { return document.getElementById('modal-pause-view'); }
+    get modalCampaignFinishedView() { return document.getElementById('modal-campaign-finished-view'); }
+    get campaignFinishedPrimaryBtn() { return document.getElementById('campaign-finished-primary'); }
+    get campaignFinishedSecondaryBtn() { return document.getElementById('campaign-finished-secondary'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedNextBtn() { return document.getElementById('combined-next-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
@@ -1278,6 +1286,7 @@ export class ModalShell {
             this._hidePauseTrackPreview();
         }
         this.modalTitle.textContent = title;
+        this.modal.setAttribute('aria-labelledby', 'modal-title');
         this._modalKind = modalKind;
         this.modal.classList.toggle('modal--win', this._modalKind === 'win');
         this.modal.classList.toggle('modal--pause', this._modalKind === 'pause');
@@ -1315,6 +1324,60 @@ export class ModalShell {
         }
 
         this.showMainResults(options);
+    }
+
+    showCampaignFinished(screen, options = {}) {
+        if (!this.modal || !this.modalCampaignFinishedView || !screen) return;
+
+        this.cancelPendingModalClose();
+        this._closeSharePanel?.({ restoreScroll: false });
+        this._hidePauseTrackPreview();
+        this._modalKind = 'campaign-finished';
+        this._modalRunsPayload = null;
+        this.modal.classList.remove('modal--win', 'modal--pause');
+        this.modal.setAttribute('aria-labelledby', 'campaign-finished-title');
+
+        const eyebrow = document.getElementById('campaign-finished-eyebrow');
+        const title = document.getElementById('campaign-finished-title');
+        const summary = document.getElementById('campaign-finished-summary');
+        const facts = document.getElementById('campaign-finished-facts');
+        const kerb = document.getElementById('campaign-finished-kerb');
+        if (eyebrow) eyebrow.textContent = screen.eyebrow || '';
+        if (title) title.textContent = screen.title || '';
+        if (summary) summary.textContent = screen.summary || '';
+        if (kerb) {
+            kerb.style.setProperty('--series-kerb-a', screen.kerb?.a || '');
+            kerb.style.setProperty('--series-kerb-b', screen.kerb?.b || '');
+        }
+        if (facts) {
+            facts.replaceChildren();
+            for (const fact of screen.facts || []) {
+                const row = document.createElement('div');
+                row.className = 'campaign-finished__fact';
+                const label = document.createElement('dt');
+                label.textContent = fact.label;
+                const value = document.createElement('dd');
+                value.textContent = fact.value;
+                row.append(label, value);
+                facts.append(row);
+            }
+        }
+
+        const syncAction = (button, label, action) => {
+            if (!button) return;
+            const visible = typeof action === 'function';
+            button.hidden = !visible;
+            if (!visible) return;
+            this._setShareButtonLabel(button, label);
+            button.setAttribute('aria-label', label);
+            this._bindClickAction(button, action);
+        };
+        syncAction(this.campaignFinishedPrimaryBtn, options.primaryActionLabel || 'Campaign', options.primaryAction);
+        syncAction(this.campaignFinishedSecondaryBtn, options.secondaryActionLabel || 'Improve', options.secondaryAction);
+
+        this._setActiveView(this.modalCampaignFinishedView);
+        openModalElement(this.modal, () => this.modal.classList.add('active'));
+        scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
     }
 
     showPauseResults(options = {}) {
@@ -1834,6 +1897,7 @@ export class ModalShell {
             modal.classList.remove('modal--pause');
             modal.classList.remove('modal--quick-pause');
             modal.classList.remove('modal--win');
+            modal.setAttribute('aria-labelledby', 'modal-title');
             this._hidePauseTrackPreview();
             this._setActiveView(null);
             this._modalKind = null;
@@ -1906,6 +1970,9 @@ export class ModalShell {
         } else {
             this._setActiveView(this.modalMainView);
         }
+        const restored = this.onFinishViewRestored;
+        this.onFinishViewRestored = null;
+        restored?.();
     }
 
     isStandaloneRunsViewActive() {
@@ -1949,6 +2016,9 @@ export class ModalShell {
     getModalPreferredFocusTarget() {
         if (this._modalKind === 'pause' && this.modalResumeBtn?.offsetParent !== null) {
             return this.modalResumeBtn;
+        }
+        if (this._modalKind === 'campaign-finished' && this.campaignFinishedPrimaryBtn?.offsetParent !== null) {
+            return this.campaignFinishedPrimaryBtn;
         }
         if (this._modalKind === 'win') {
             const winFocusCandidates = [

@@ -1,3 +1,115 @@
+.modal-view#modal-campaign-finished-view {
+    width: 100%;
+    max-width: 440px;
+    min-height: 85vh;
+    justify-content: center;
+    margin: auto;
+}
+
+.campaign-finished {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+    width: 100%;
+    padding: 2rem 1.25rem;
+    text-align: center;
+}
+
+.campaign-finished__kerb {
+    width: 0.55rem;
+    height: 4.5rem;
+    border-radius: var(--radius-full);
+    background: repeating-linear-gradient(
+        180deg,
+        var(--series-kerb-a, var(--accent-color)) 0 0.45rem,
+        var(--series-kerb-b, var(--text-color)) 0.45rem 0.9rem
+    );
+}
+
+.result-modal .campaign-finished__eyebrow {
+    margin: 0;
+    color: var(--accent-color);
+    font-family: var(--mono-font);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.campaign-finished__title {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: clamp(2rem, 8vw, 3.25rem);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    line-height: 0.95;
+    text-transform: uppercase;
+}
+
+.result-modal .campaign-finished__summary {
+    max-width: 22rem;
+    margin: 0;
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+    text-transform: none;
+}
+
+.campaign-finished__facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 22rem;
+    margin: 0;
+}
+
+.campaign-finished__fact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.campaign-finished__fact dt {
+    color: var(--text-dim);
+    font-family: var(--mono-font);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.campaign-finished__fact dd {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: 1.05rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.campaign-finished__actions {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.campaign-finished__actions .combined-action-btn {
+    width: 100%;
+    background: rgba(51, 65, 85, 0.8);
+}
+
+.campaign-finished__actions .combined-action-btn--primary {
+    background: var(--accent-color);
+}
+
 .modal-view#modal-combined-view {
     position: relative;
     width: 100%;

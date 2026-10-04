@@ -1,5 +1,9 @@
 # Campaign finished screen investigation — 2026-10-04
 
+The screen described here is now in the game. `game/campaign/finished-screen.js`
+builds it from the series that was just finished, and the Campaign finish flow
+opens it after the server confirms that finishing medal.
+
 ## Conclusion
 
 A basic Campaign finished screen is a small frontend change. The game already

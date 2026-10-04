@@ -335,7 +335,14 @@ flowchart LR
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same
-  pattern as Daily), then confirm in the background. Challenge finishes do not
+  pattern as Daily), then confirm in the background. When that confirmation is
+  the first saved medal on the series' last stage, the result sheet becomes
+  one Campaign finished screen (`game/campaign/finished-screen.js`). The raced
+  series fills its name, surface, stage count and medal total, so Creator
+  series use the same screen. It does not appear for an already finished
+  series, a ghost retry, a rejected run, another player, or a reply that
+  arrives after that finish sheet has gone. If standings are open, it waits
+  until the player comes back to the finish. Challenge finishes do not
   stamp YOU WON from the phone: a claimed beat stays pending until the first
   submit body, which is the official beat / not beat and can turn Brag on. A
   local loss or tie can still settle on that sheet immediately. Origin place

@@ -1,4 +1,5 @@
 import { getMedalForRaceTime, isStandardMedalTier } from '../medals/medal-timing.js';
+import { getActivePlayerOwnerId } from '../player/active-owner.js';
 import { runAfterPlayerIdentityReady } from '../player/identity-recovery.js';
 import { normalizeCampaignLobbyState } from '../lobby/service.js';
 import { normalizeScoreboardSnapshot } from '../scoreboard/snapshot.js';
@@ -36,6 +37,7 @@ import {
     isCampaignSeriesId,
 } from './manifest.js';
 import { buildCampaignCarouselCards } from './carousel-model.js';
+import { buildCampaignFinishedScreen } from './finished-screen.js';
 import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 import {
     deferLobbyWorkUntilAfterPaint,
@@ -184,6 +186,20 @@ function requestCampaignLeaderboardSessionRefresh(raceId, refreshSession) {
     });
     refreshSession.inFlightByRaceId.set(raceId, requestPromise);
     return requestPromise;
+}
+
+function campaignFinishOwnerStillMatches(ownerPlayerId) {
+    if (!ownerPlayerId) return true;
+    return getActivePlayerOwnerId() === ownerPlayerId;
+}
+
+function campaignFinishViewIsOpen(engine, raceId) {
+    return engine.activeRaceMode === 'campaign'
+        && engine.status === 'won'
+        && engine.activeCampaignStage?.raceId === raceId
+        && engine.modal?.isModalActive?.() === true
+        && engine.modal?.isPauseModalActive?.() !== true
+        && engine.modal?.matchesModalScoreboardContext?.({ challengeId: raceId }) === true;
 }
 
 function getCampaignNextStageTarget(engine, stage) {
@@ -1181,6 +1197,43 @@ export const campaignEngineMethods = {
         this.prepareCampaignNextTrack?.(stage, nextTarget);
     },
 
+    presentCampaignFinishedScreen(seriesId, resultsByRaceId, { raceId, ownerPlayerId = null } = {}) {
+        if (!campaignFinishOwnerStillMatches(ownerPlayerId)) return;
+        if (this._campaignFinishedCelebratedSeriesId === seriesId) return;
+        const screen = buildCampaignFinishedScreen(seriesId, resultsByRaceId);
+        if (!screen || !campaignFinishViewIsOpen(this, raceId)) return;
+        this._campaignFinishedCelebratedSeriesId = seriesId;
+        if (this.modal.isRunsViewActive?.()) {
+            this._pendingCampaignFinished = { seriesId, raceId, ownerPlayerId };
+            this.modal.onFinishViewRestored = () => this.showPendingCampaignFinished();
+            return;
+        }
+        this._pendingCampaignFinished = null;
+        this.showCampaignFinishedNow(screen);
+    },
+
+    showPendingCampaignFinished() {
+        const pending = this._pendingCampaignFinished;
+        this._pendingCampaignFinished = null;
+        if (!pending || !campaignFinishOwnerStillMatches(pending.ownerPlayerId)) return;
+        if (this.activeRaceMode !== 'campaign' || this.status !== 'won') return;
+        if (this.activeCampaignStage?.raceId !== pending.raceId) return;
+        if (this.modal?.isModalActive?.() !== true) return;
+        const results = this.campaignVerifiedBootstrap?.progress?.resultsByRaceId;
+        const screen = buildCampaignFinishedScreen(pending.seriesId, results);
+        if (screen) this.showCampaignFinishedNow(screen);
+    },
+
+    showCampaignFinishedNow(screen) {
+        const stage = this.activeCampaignStage;
+        this.modal.showCampaignFinished?.(screen, {
+            primaryActionLabel: 'Campaign',
+            primaryAction: () => this.showCampaignLobby(),
+            secondaryActionLabel: 'Improve',
+            secondaryAction: stage ? () => void this.startCampaignStage(stage) : null,
+        });
+    },
+
     // Next stays disabled until the next stage's track is prepared. A failed
     // preparation enables Next again, and its press prepares once more.
     prepareCampaignNextTrack(finishedStage, nextTarget) {
@@ -1459,10 +1512,20 @@ export const campaignEngineMethods = {
             }
             this.applyCarUnlockSnapshot?.(response.body.carUnlocks);
             const ghostRecovery = this.settleCampaignGhostPersistence(raceId, response);
+            const confirmed = response.body.progress;
+            const seriesId = stage.seriesId;
+            const verifiedBefore = this.campaignVerifiedBootstrap;
+            const confirmsThisSeries = Boolean(
+                verifiedBefore
+                && (verifiedBefore.campaignId ?? CAMPAIGN_ID) === seriesId
+                && (confirmed?.campaignId ?? CAMPAIGN_ID) === seriesId
+            );
+            const wasFinished = confirmsThisSeries
+                && isCampaignSeriesFinished(seriesId, verifiedBefore.progress?.resultsByRaceId);
             // A run in another series than the one on screen does not change this screen.
-            const sameSeries = (response.body.progress?.campaignId ?? CAMPAIGN_ID)
-                === (this.campaignVerifiedBootstrap?.campaignId ?? CAMPAIGN_ID);
-            if (this.campaignVerifiedBootstrap && response.body.progress && sameSeries) {
+            const sameSeries = (confirmed?.campaignId ?? CAMPAIGN_ID)
+                === (verifiedBefore?.campaignId ?? CAMPAIGN_ID);
+            if (verifiedBefore && confirmed && sameSeries) {
                 this.applyCampaignLobbyBootstrap({
                     ...this.campaignVerifiedBootstrap,
                     progress: response.body.progress,
@@ -1470,6 +1533,17 @@ export const campaignEngineMethods = {
                 }, { paint: true });
             } else {
                 this.refreshCampaignVerificationOverlay?.();
+            }
+            if (
+                !entry.progressConfirmed
+                && confirmsThisSeries
+                && !wasFinished
+                && isCampaignSeriesFinished(seriesId, confirmed.resultsByRaceId)
+            ) {
+                this.presentCampaignFinishedScreen(seriesId, confirmed.resultsByRaceId, {
+                    raceId,
+                    ownerPlayerId: entry.ownerPlayerId ?? null,
+                });
             }
             if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
                 const nextTarget = getCampaignNextStageTarget(this, stage);
