@@ -28,6 +28,9 @@ function dependencies(overrides = {}) {
         getRequestUsername: () => 'RaceFan',
         getRequestRateLimitIdentity: () => 'trusted-request',
         getServerCampaignBootstrap: vi.fn(async () => ({ status: 200, body: { campaignId: 'numbered-v1' } })),
+        getServerCampaignPoster: vi.fn(async () => ({
+            status: 200, body: { seriesId: 'hahah', trackKey: 'finalRoad', ground: 'tarmac', grounds: ['tarmac', 'dirt'] },
+        })),
         startServerCampaignRace: vi.fn(async () => ({ status: 200, body: { race: {} } })),
         getServerCampaignSnapshot: vi.fn(async () => ({ status: 200, body: { rows: [] } })),
         getServerCampaignAggregate: vi.fn(async () => ({ status: 200, body: { ready: true, totalTimeMs: 12345 } })),
@@ -42,6 +45,49 @@ function dependencies(overrides = {}) {
 }
 
 describe('Campaign route contracts', () => {
+    it('loads only the final public track for anonymous poster recovery without gameplay work', async () => {
+        const storedTracks = [{ key: 'finalRoad', track: { name: 'Final Road' } }];
+        const deps = dependencies({
+            getRequestUsername: vi.fn(() => null),
+            refreshStoredCatalog: vi.fn(async () => {}),
+            loadStoredTracks: vi.fn(async () => {}),
+            describeStoredTracks: vi.fn(() => storedTracks),
+            describeStoredSeries: vi.fn(),
+        });
+        const baseUrl = await startApp(deps);
+        const response = await fetch(`${baseUrl}/api/campaign/poster?seriesId=hahah&trackKey=privateDraft&playerId=other&redditUsername=spoofed`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            seriesId: 'hahah', trackKey: 'finalRoad', ground: 'tarmac', grounds: ['tarmac', 'dirt'], storedTracks,
+        });
+        expect(deps.refreshStoredCatalog).toHaveBeenCalledOnce();
+        expect(deps.getServerCampaignPoster).toHaveBeenCalledWith({ seriesId: 'hahah' });
+        expect(deps.refreshStoredCatalog.mock.invocationCallOrder[0]).toBeLessThan(deps.getServerCampaignPoster.mock.invocationCallOrder[0]);
+        expect(deps.loadStoredTracks).toHaveBeenCalledWith(['finalRoad']);
+        expect(deps.describeStoredTracks).toHaveBeenCalledWith(['finalRoad']);
+        expect(deps.describeStoredSeries).not.toHaveBeenCalled();
+        expect(deps.getRequestUsername).not.toHaveBeenCalled();
+        expect(deps.getServerCampaignBootstrap).not.toHaveBeenCalled();
+        expect(deps.getServerCampaignSnapshot).not.toHaveBeenCalled();
+        expect(deps.getServerCampaignAggregate).not.toHaveBeenCalled();
+        expect(deps.refreshServerCampaignResultsShare).not.toHaveBeenCalled();
+    });
+
+    it('keeps unavailable poster series unavailable and loads no requested private track', async () => {
+        const deps = dependencies({
+            getServerCampaignPoster: vi.fn(async () => ({ status: 404, body: { error: 'This Campaign is unavailable.' } })),
+            refreshStoredCatalog: vi.fn(async () => {}),
+            loadStoredTracks: vi.fn(async () => {}),
+            describeStoredTracks: vi.fn(),
+        });
+        const baseUrl = await startApp(deps);
+        const response = await fetch(`${baseUrl}/api/campaign/poster?seriesId=privateDraft&trackKey=privateTrack`);
+        expect(response.status).toBe(404);
+        expect(await response.json()).toEqual({ error: 'This Campaign is unavailable.' });
+        expect(deps.loadStoredTracks).not.toHaveBeenCalled();
+        expect(deps.describeStoredTracks).not.toHaveBeenCalled();
+    });
+
     it('loads aggregate standings using authenticated identity and parsed paging, ignoring supplied totals', async () => {
         const deps = dependencies();
         const baseUrl = await startApp(deps);

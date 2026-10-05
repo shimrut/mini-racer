@@ -11,7 +11,9 @@ import {
     shouldCelebrateMedalTier,
     renderChallengeFinishHero,
 } from '../medals/medals.js';
-import { createMedalIconSvg } from '../medals/medal-icon.js';
+import { getCampaignSeries } from '../campaign/manifest.js';
+import { formatCampaignTotalTime } from '../campaign/aggregate.js';
+import { campaignCompletionAccent, campaignPosterTime, campaignPosterPlace } from '../campaign/completion-presentation.js';
 import { applyAvatar } from '../ui/avatar.js';
 import {
     closeModalElement,
@@ -38,7 +40,6 @@ function isButtonElement(node) {
 
 const LEADERBOARD_SWIPE_MIN_DISTANCE_PX = 56;
 const LEADERBOARD_SWIPE_AXIS_RATIO = 1.25;
-const CAMPAIGN_FINISHED_MEDAL_TIERS = ['bronze', 'silver', 'gold', 'author'];
 
 function getSingleTouchPoint(touches) {
     if (!touches || touches.length !== 1) return null;
@@ -1217,7 +1218,7 @@ export class ModalShell {
             const copy = document.createElement('blockquote');
             copy.className = 'result-share-panel__copy';
             copy.textContent = isCampaignFinished
-                ? [body.title, body.medalSummary, body.placeSummary].filter(Boolean).join('\n')
+                ? [body.title, body.medalSummary, body.placeSummary, body.timeSummary].filter(Boolean).join('\n')
                 : isChallenge
                     ? (body.title || 'Create a verified Head to Head.')
                     : body.commentText;
@@ -1378,7 +1379,8 @@ export class ModalShell {
 
         const series = document.getElementById('campaign-finished-series');
         const status = document.getElementById('campaign-finished-status');
-        const medals = document.getElementById('campaign-finished-medals');
+        this.modalCampaignFinishedView.style.setProperty('--campaign-completion-accent',
+            campaignCompletionAccent(getCampaignSeries(screen.seriesId)));
         const total = document.getElementById('campaign-finished-total');
         const playerName = document.getElementById('campaign-finished-player-name');
         if (playerName) playerName.textContent = options.playerUsername || 'Guest racer';
@@ -1386,21 +1388,6 @@ export class ModalShell {
         if (series) series.textContent = screen.title || '';
         if (status) status.textContent = screen.status || '';
         if (total) total.textContent = screen.medalTotal || '';
-        if (medals) {
-            medals.parentElement?.style.setProperty('--campaign-finished-medal-count', String(CAMPAIGN_FINISHED_MEDAL_TIERS.length));
-            medals.replaceChildren(...CAMPAIGN_FINISHED_MEDAL_TIERS.map((tier, index) => {
-                const count = screen.medalDistribution?.[tier] ?? 0;
-                const item = document.createElement('li');
-                item.className = 'campaign-finished__medal';
-                item.dataset.campaignMedal = tier;
-                item.setAttribute('aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`);
-                item.style.setProperty('--campaign-finished-medal-index', String(index));
-                const icon = createMedalIconSvg(tier, { centerText: String(count), showEmblem: false });
-                icon.setAttribute('aria-hidden', 'true');
-                item.append(icon);
-                return item;
-            }));
-        }
         if (screen.bestTier && options.celebrate !== false) this.playUnlockSound?.(screen.bestTier);
 
         const syncAction = (button, label, action) => {
@@ -1412,8 +1399,8 @@ export class ModalShell {
             button.setAttribute('aria-label', label);
             this._bindClickAction(button, action);
         };
-        syncAction(this.campaignFinishedPrimaryBtn, options.primaryActionLabel || 'View Campaign', options.primaryAction);
-        syncAction(this.campaignFinishedSecondaryBtn, options.secondaryActionLabel || 'View Series', options.secondaryAction);
+        syncAction(this.campaignFinishedPrimaryBtn, options.primaryActionLabel || 'Home', options.primaryAction);
+        syncAction(this.campaignFinishedSecondaryBtn, options.secondaryActionLabel || 'Tracks', options.secondaryAction);
         this._bindClickAction(this.campaignFinishedRankBtn, options.leaderboardAction);
         this.updateCampaignFinishedAggregate(null, { isLoading: typeof options.leaderboardAction === 'function' });
         const shareButton = this.campaignFinishedShareBtn;
@@ -1440,11 +1427,20 @@ export class ModalShell {
         const time = document.getElementById('campaign-finished-time');
         const rank = document.getElementById('campaign-finished-rank');
         const totalMs = Number(snapshot?.totalTimeMs ?? screen.totalTimeMs);
-        if (time) time.textContent = totalMs > 0
-            ? this.content.formatTime(totalMs / 1000) : '—';
+        if (time) {
+            time.textContent = campaignPosterTime(totalMs) || '—';
+            time.parentElement?.setAttribute('aria-label', `Total best time ${formatCampaignTotalTime(totalMs) || 'unavailable'}`);
+        }
         if (rank) {
+            const place = campaignPosterPlace({ rank: snapshot?.playerRank, total: snapshot?.totalCount });
             rank.textContent = isLoading || snapshot?.ready === false ? 'Loading…' : failed ? 'Unavailable'
-                    : snapshot?.playerRank > 0 ? `#${snapshot.playerRank} / ${snapshot.totalCount}` : '—';
+                : place?.headline || '—';
+            const caption = document.getElementById('campaign-finished-rank-caption');
+            if (caption) caption.textContent = !isLoading && !failed && snapshot?.ready !== false && place
+                ? place.caption : 'Overall place';
+            this.campaignFinishedRankBtn?.setAttribute('aria-label', place
+                ? `View Campaign leaderboard, overall place ${snapshot.playerRank} of ${snapshot.totalCount}`
+                : 'View Campaign leaderboard');
             rank.setAttribute('aria-busy', String(isLoading || snapshot?.ready === false));
         }
         const button = this.campaignFinishedRankBtn;

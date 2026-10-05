@@ -53,8 +53,9 @@ describe('Campaign aggregate results', () => {
         const { engine, modal, sound, screen } = mount();
         engine.showCampaignFinishedNow(screen);
         await engine._campaignAggregateSession.inFlight;
-        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2 / 3');
-        expect(document.getElementById('campaign-finished-time').textContent).toBe('02:50.017');
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2');
+        expect(document.getElementById('campaign-finished-time').textContent).toBe('2:50');
+        expect(document.getElementById('campaign-finished-rank-caption').textContent).toBe('out of 3');
         expect(document.querySelectorAll('.campaign-finished__actions > button')).toHaveLength(3);
         expect(document.querySelector('.campaign-finished__actions').textContent).not.toMatch(/Leaderboard|Refresh|Retry/);
         document.getElementById('campaign-finished-rank-button').click();
@@ -72,6 +73,17 @@ describe('Campaign aggregate results', () => {
         expect(modal.isModalActive()).toBe(false);
     });
 
+    it('shows a compact percentile and retains exact rank/time for assistive text', () => {
+        const { modal, screen } = mount();
+        modal.showCampaignFinished(screen, { leaderboardAction: vi.fn() });
+        modal.updateCampaignFinishedAggregate({ ready: true, playerRank: 1235, totalCount: 50431, totalTimeMs: 4328123 });
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('Top 3%');
+        expect(document.getElementById('campaign-finished-rank-caption').textContent).toBe('out of 50.4K');
+        expect(document.getElementById('campaign-finished-rank-button').getAttribute('aria-label')).toContain('1235 of 50431');
+        expect(document.getElementById('campaign-finished-time').textContent).toBe('1:12:08');
+        expect(document.getElementById('campaign-finished-time').parentElement.getAttribute('aria-label')).toBe('Total best time 1:12:08.123');
+    });
+
     it('preserves completion and retries failed rank requests automatically without an extra action', async () => {
         vi.useFakeTimers();
         api.getCampaignAggregate.mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce(reply());
@@ -83,7 +95,7 @@ describe('Campaign aggregate results', () => {
         expect(document.getElementById('campaign-finished-rank-button').disabled).toBe(true);
         expect(document.querySelector('.campaign-finished__actions').textContent).not.toMatch(/Leaderboard|Refresh|Retry/);
         await vi.advanceTimersByTimeAsync(2000);
-        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2 / 3');
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2');
         expect(modal.isCampaignFinishedViewActive()).toBe(true);
     });
 
@@ -115,7 +127,7 @@ describe('Campaign aggregate results', () => {
         expect(document.getElementById('campaign-finished-rank-button').disabled).toBe(true);
         await vi.advanceTimersByTimeAsync(2000);
         expect(api.getCampaignAggregate).toHaveBeenCalledTimes(3);
-        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#1 / 3');
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#1');
     });
 
     it('withholds incomplete backfill places, then refreshes while the summary remains open', async () => {
@@ -128,7 +140,7 @@ describe('Campaign aggregate results', () => {
         await engine._campaignAggregateSession.inFlight;
         expect(document.getElementById('campaign-finished-rank').textContent).toBe('Loading…');
         await vi.advanceTimersByTimeAsync(2000);
-        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2 / 3');
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#2');
         expect(api.getCampaignAggregate).toHaveBeenCalledTimes(2);
     });
 
@@ -153,8 +165,8 @@ describe('Campaign aggregate results', () => {
         expect(modal._modalRunsPayload.scoreboardSnapshot.playerRank).toBe(1);
         expect(modal._modalRunsPayload.scoreboardSnapshot.topRows).toHaveLength(1);
         modal.dismissRunsView();
-        expect(document.getElementById('campaign-finished-time').textContent).toBe('02:40.000');
-        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#1 / 3');
+        expect(document.getElementById('campaign-finished-time').textContent).toBe('2:40');
+        expect(document.getElementById('campaign-finished-rank').textContent).toBe('#1');
     });
 
     it('paginates with the shared rows and ignores a page arriving after Back', async () => {

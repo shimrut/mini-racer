@@ -157,7 +157,7 @@ describe('the Campaign finished screen', () => {
         expect(action).toHaveBeenCalledOnce();
     });
 
-    it('shows each tier’s best-stage medal count and the existing medal total', () => {
+    it('shows a compact medal total without a per-tier breakdown', () => {
         const { shell, playUnlockSound } = mountShell();
         const screen = buildCampaignFinishedScreen(
             CAMPAIGN_NUMBERS_SERIES_ID,
@@ -173,22 +173,30 @@ describe('the Campaign finished screen', () => {
         expect(view.classList.contains('active-view')).toBe(true);
         expect(document.getElementById('campaign-finished-title').textContent.replace(/\s+/g, ' ').trim())
             .toBe('Numbers Complete');
-        const medals = [...document.querySelectorAll('#campaign-finished-medals .medal-svg')];
-        expect(medals.map((medal) => medal.dataset.tier)).toEqual(['bronze', 'silver', 'gold', 'author']);
-        expect(medals.map((medal) => medal.querySelector('.medal-svg__center-time').textContent))
-            .toEqual(['0', '0', String(NUMBERS_STAGES.length - 1), '1']);
-        expect(medals.every((medal) => medal.getAttribute('aria-hidden') === 'true')).toBe(true);
-        expect(medals[3].parentElement.getAttribute('aria-label')).toBe('1 author medal');
-        expect(medals[2].parentElement.getAttribute('aria-label')).toBe(`${NUMBERS_STAGES.length - 1} gold medals`);
+        expect(document.getElementById('campaign-finished-medals')).toBeNull();
+        expect(view.style.getPropertyValue('--campaign-completion-accent')).toBe('#ff4659');
         expect(document.getElementById('campaign-finished-total').textContent).toBe(screen.medalTotal);
         expect(document.getElementById('campaign-finished-primary').hidden).toBe(false);
         expect(document.getElementById('campaign-finished-secondary').hidden).toBe(false);
-        expect(document.getElementById('campaign-finished-primary').textContent.trim()).toBe('VIEW CAMPAIGN');
-        expect(document.getElementById('campaign-finished-primary').getAttribute('aria-label')).toBe('View Campaign');
-        expect(document.getElementById('campaign-finished-secondary').textContent.trim()).toBe('VIEW SERIES');
-        expect(document.getElementById('campaign-finished-secondary').getAttribute('aria-label')).toBe('View Series');
+        expect(document.getElementById('campaign-finished-primary').textContent.trim()).toBe('HOME');
+        expect(document.getElementById('campaign-finished-primary').getAttribute('aria-label')).toBe('Home');
+        expect(document.getElementById('campaign-finished-secondary').textContent.trim()).toBe('TRACKS');
+        expect(document.getElementById('campaign-finished-secondary').getAttribute('aria-label')).toBe('Tracks');
         expect(playUnlockSound).toHaveBeenCalledOnce();
         expect(playUnlockSound).toHaveBeenCalledWith('author');
+    });
+
+    it.each([
+        ['tarmac', ['tarmac'], '#ff4659'], ['dirt', ['dirt'], '#f8c44c'],
+        ['snow', ['snow'], '#76cbf8'], ['grip', ['grip'], '#d854eb'],
+        ['tarmac', ['tarmac', 'dirt'], '#c7cdd5'],
+    ])('uses the shared completion color for %s / %j', (ground, grounds, accent) => {
+        const { shell } = mountShell();
+        const id = 'color-fixture';
+        registerStoredSeries([{ id, name: 'Color Fixture', ground, grounds, finalStageId: `${id}-00`,
+            stages: [{ trackKey: 'numberZero', laps: 1, requiredMedals: 0 }] }]);
+        shell.showCampaignFinished(buildCampaignFinishedScreen(id, resultsFor(getCampaignSeriesStages(id))));
+        expect(document.getElementById('modal-campaign-finished-view').style.getPropertyValue('--campaign-completion-accent')).toBe(accent);
     });
 
     it('hides Home for pending and confirmed Results, then restores it for replays', () => {
@@ -227,6 +235,7 @@ describe('the Campaign finished screen', () => {
         status: 'ready', username: 'racer_one', shareToken: 'campaign-token',
         title: 'I finished the Numbers campaign', medalSummary: 'Gold: 1 · Bronze: 16',
         placeSummary: 'Overall place #2 / 17',
+        timeSummary: 'Total best time 4:28.123',
     } };
 
     it('previews results and the posting account, and Cancel never publishes', async () => {
@@ -242,6 +251,7 @@ describe('the Campaign finished screen', () => {
         expect(previewShare).toHaveBeenCalledWith(shareRequest);
         expect(document.querySelector('.result-share-panel__copy').textContent).toContain('Gold: 1 · Bronze: 16');
         expect(document.querySelector('.result-share-panel__copy').textContent).toContain('Overall place #2 / 17');
+        expect(document.querySelector('.result-share-panel__copy').textContent).toContain('Total best time 4:28.123');
         expect(document.querySelector('.result-share-panel__status').textContent).toBe('Post these results as u/racer_one?');
         expect(confirmShare).not.toHaveBeenCalled();
         document.querySelector('.result-share-panel__button--dismiss').click();
@@ -324,23 +334,14 @@ describe('the Campaign finished screen', () => {
         expect(button.textContent.trim()).toBe('SHARE RESULTS');
     });
 
-    it('keeps four tier counts for both a single-stage and a long campaign', () => {
+    it('keeps the same compact totals for short and long campaigns', () => {
         const { shell } = mountShell();
         for (const count of [1, 50]) {
-            shell.showCampaignFinished({
-                title: 'Test',
-                status: 'Complete',
-                medals: Array.from({ length: count }, (_value, index) => ({
-                    stageNumber: String(index).padStart(2, '0'),
-                    tier: 'gold',
-                })),
-                medalDistribution: { bronze: 0, silver: 0, gold: count, author: 0 },
-                medalTotal: '',
-            });
-            const medals = document.getElementById('campaign-finished-medals');
-            expect(medals.children).toHaveLength(4);
-            expect(medals.querySelector('[data-campaign-medal="gold"] .medal-svg__center-time').textContent)
-                .toBe(String(count));
+            shell.showCampaignFinished({ title: 'Test', status: 'Complete',
+                stageCount: count, medalDistribution: { gold: count }, medalTotal: `${count * 3}/${count * 4}` });
+            expect(document.getElementById('campaign-finished-medals')).toBeNull();
+            expect(document.getElementById('campaign-finished-total').textContent).toBe(`${count * 3}/${count * 4}`);
+            expect(document.querySelectorAll('.campaign-finished__aggregate > *')).toHaveLength(3);
         }
     });
 });

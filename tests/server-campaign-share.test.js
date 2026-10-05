@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCampaignFinalStage, getCampaignSeriesStages } from '../game/campaign/manifest.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
 
 const { values, mockRedis, mockReddit, mockResults, mockIdentity, mockAvatar, mockPending } = vi.hoisted(() => {
     const values = new Map();
@@ -42,7 +43,7 @@ vi.mock('../src/server/competition/competition-identity.js', () => ({ resolveAut
 vi.mock('../src/server/player/reddit-avatar.js', () => ({ resolveRedditAvatarUrl: mockAvatar }));
 vi.mock('../src/server/player/guest-retirement.js', () => ({ isProgressTransferPending: mockPending }));
 
-const { previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } = await import('../src/server/campaign/campaign-share.ts');
+const { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } = await import('../src/server/campaign/campaign-share.ts');
 const { campaignAggregateKeys } = await import('../src/server/campaign/campaign-aggregate-store.ts');
 const stages = getCampaignSeriesStages('numbered-v1');
 function rankBoard(rank, total) {
@@ -54,6 +55,18 @@ const input = { seriesId: 'numbered-v1', redditUsername: 'RaceFan', subredditNam
 const completedResults = () => Object.fromEntries(stages.map((stage, index) => [stage.raceId, {
     medal: ['author', 'gold', 'silver', 'bronze'][index % 4],
 }]));
+const timedResults = (timeMs = 10_000) => Object.fromEntries(stages.map((stage, index) => [stage.raceId, {
+    medal: ['author', 'gold', 'silver', 'bronze'][index % 4],
+    bestTimeMs: timeMs,
+}]));
+const mixedSeries = {
+    id: 'mixed-v1', name: 'Mixed Laps', ground: 'tarmac', grounds: ['tarmac', 'dirt'], finalStageId: 'mixed-v1-01',
+    stages: [
+        { trackKey: 'numberZero', laps: 1, requiredMedals: 0 },
+        { trackKey: 'countryRoad', laps: 1, requiredMedals: 1 },
+    ],
+};
+afterEach(() => clearStoredSeriesForTests());
 const publishedPost = (overrides = {}) => ({
     id: 't3_finished',
     url: 'https://reddit.com/r/MiniRacer/comments/finished',
@@ -119,11 +132,131 @@ describe('Campaign result sharing', () => {
         expect(options.expiration).toEqual(new Date(preview.body.expiresAt));
     });
 
+    it('returns only published poster metadata without player or ranking work', async () => {
+        registerStoredSeries([mixedSeries]);
+        expect(await getServerCampaignPoster({ seriesId: mixedSeries.id })).toEqual({
+            status: 200,
+            body: { seriesId: 'mixed-v1', trackKey: 'countryRoad', ground: 'tarmac', grounds: ['tarmac', 'dirt'] },
+        });
+        expect(mockIdentity).not.toHaveBeenCalled();
+        expect(mockResults).not.toHaveBeenCalled();
+        expect(mockPending).not.toHaveBeenCalled();
+        expect(mockRedis.get).not.toHaveBeenCalled();
+        expect(mockRedis.set).not.toHaveBeenCalled();
+        expect(mockRedis.zRank).not.toHaveBeenCalled();
+        expect(mockReddit.getPostById).not.toHaveBeenCalled();
+    });
+
+    it.each([undefined, 'missing-v1', 'dirt-v1', ['numbered-v1']])('does not substitute a Campaign for unknown or hidden poster ID %j', async (seriesId) => {
+        expect(await getServerCampaignPoster({ seriesId })).toMatchObject({ status: 404 });
+        expect(mockIdentity).not.toHaveBeenCalled();
+        expect(mockResults).not.toHaveBeenCalled();
+    });
+
+    it.each([null, 'mixed-v1-02'])('withholds artwork until the designated final stage is published: %j', async (finalStageId) => {
+        registerStoredSeries([{ ...mixedSeries, finalStageId }]);
+        expect(await getServerCampaignPoster({ seriesId: mixedSeries.id })).toMatchObject({ status: 404 });
+    });
+
+    it('preserves actual published surfaces when the legacy series ground is homogeneous', async () => {
+        registerStoredSeries([mixedSeries]);
+        mockResults.mockResolvedValue(Object.fromEntries(getCampaignSeriesStages(mixedSeries.id).map((stage) => [
+            stage.raceId, { medal: 'gold', bestTimeMs: 10_000 },
+        ])));
+        const request = { ...input, seriesId: mixedSeries.id };
+        const preview = await previewServerCampaignResultsShare(request);
+        expect(preview.body).toMatchObject({ trackKey: 'countryRoad', ground: 'tarmac', grounds: ['tarmac', 'dirt'] });
+        expect(await confirmServerCampaignResultsShare({ ...request, shareToken: preview.body.shareToken, grounds: ['snow'] }))
+            .toMatchObject({ body: { status: 'shared' } });
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].postData.grounds).toEqual(['tarmac', 'dirt']);
+    });
+
     it('requires an unexpired preview token before it can publish', async () => {
         expect(await confirmServerCampaignResultsShare(input)).toMatchObject({ body: { status: 'preview_expired' } });
         const preview = await previewServerCampaignResultsShare(input);
         const key = `campaign:share-preview:${preview.body.shareToken}`;
         values.set(key, JSON.stringify({ ...JSON.parse(values.get(key)), expiresAt: '2020-01-01T00:00:00.000Z' }));
+        expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
+            .toMatchObject({ body: { status: 'preview_expired' } });
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('previews canonical full-race PB time and final-stage artwork', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const preview = await previewServerCampaignResultsShare(input);
+        const totalTimeMs = stages.length * 10_000;
+        expect(preview.body).toMatchObject({
+            totalTimeMs,
+            timeSummary: 'Total best time 2:50.000',
+            trackKey: getCampaignFinalStage(input.seriesId).trackKey,
+            ground: 'tarmac',
+            grounds: ['tarmac'],
+        });
+    });
+
+    it('publishes the approved total time even after a later PB, ignoring confirm edits', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const preview = await previewServerCampaignResultsShare(input);
+        mockResults.mockResolvedValue(timedResults(9_000));
+        const confirmed = await confirmServerCampaignResultsShare({
+            ...input, shareToken: preview.body.shareToken, totalTimeMs: 1, trackKey: 'forged', ground: 'snow',
+        });
+        expect(confirmed.body.status).toBe('shared');
+        const submitted = mockReddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted.postData).toMatchObject({
+            totalTimeMs: stages.length * 10_000,
+            trackKey: getCampaignFinalStage(input.seriesId).trackKey,
+            ground: 'tarmac',
+        });
+        expect(submitted.textFallback.text).toContain(preview.body.timeSummary);
+    });
+
+    it.each([0, -1, 10.5, Number.MAX_SAFE_INTEGER + 1, '10000'])('rejects an invalid stored preview time: %j', async (totalTimeMs) => {
+        const preview = await previewServerCampaignResultsShare(input);
+        const key = `campaign:share-preview:${preview.body.shareToken}`;
+        values.set(key, JSON.stringify({ ...JSON.parse(values.get(key)), totalTimeMs }));
+        expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
+            .toMatchObject({ body: { status: 'preview_expired' } });
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('keeps old preview tokens usable with canonical artwork and no unpreviewed time', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const preview = await previewServerCampaignResultsShare(input);
+        const key = `campaign:share-preview:${preview.body.shareToken}`;
+        const oldPreview = JSON.parse(values.get(key));
+        delete oldPreview.totalTimeMs;
+        delete oldPreview.trackKey;
+        delete oldPreview.ground;
+        delete oldPreview.grounds;
+        values.set(key, JSON.stringify(oldPreview));
+        expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
+            .toMatchObject({ body: { status: 'shared' } });
+        const submitted = mockReddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted.postData).toMatchObject({
+            totalTimeMs: null,
+            trackKey: getCampaignFinalStage(input.seriesId).trackKey,
+            ground: 'tarmac',
+            grounds: ['tarmac'],
+        });
+        expect(submitted.textFallback.text).not.toContain('Total best time');
+    });
+
+    it('withholds a total when any saved stage time is missing', async () => {
+        const results = timedResults();
+        delete results[stages[0].raceId].bestTimeMs;
+        mockResults.mockResolvedValue(results);
+        const preview = await previewServerCampaignResultsShare(input);
+        expect(preview.body).toMatchObject({ totalTimeMs: null, timeSummary: '' });
+        expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
+            .toMatchObject({ body: { status: 'shared' } });
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].textFallback.text).not.toContain('Total best time');
+    });
+
+    it.each(['tarmac', ['mixed'], [null]])('rejects malformed stored surface summaries: %j', async (grounds) => {
+        const preview = await previewServerCampaignResultsShare(input);
+        const key = `campaign:share-preview:${preview.body.shareToken}`;
+        values.set(key, JSON.stringify({ ...JSON.parse(values.get(key)), grounds }));
         expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
             .toMatchObject({ body: { status: 'preview_expired' } });
         expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
@@ -284,11 +417,59 @@ describe('Campaign result sharing', () => {
         expect(post.setTextFallback).toHaveBeenCalledOnce();
     });
 
-    it('does not write a post for a faster time with unchanged medals', async () => {
+    it('does not write a post when the saved poster data is unchanged', async () => {
         const post = await publishedFixture();
         await refreshServerCampaignResultsShare(refreshInput);
         expect(post.mergePostData).not.toHaveBeenCalled();
         expect(post.setTextFallback).not.toHaveBeenCalled();
+    });
+
+    it('updates a faster total time on the same post when medals and place stay unchanged', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const post = await publishedFixture();
+        const results = timedResults();
+        results[stages[0].raceId].bestTimeMs = 9_000;
+        mockResults.mockResolvedValue(results);
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledWith({ totalTimeMs: stages.length * 10_000 - 1_000 });
+        expect(post.setTextFallback).toHaveBeenCalledWith({ text: expect.stringContaining('Total best time 2:49.000') });
+        expect(mockReddit.submitCustomPost).toHaveBeenCalledOnce();
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledOnce();
+    });
+
+    it('fills missing artwork and total on an existing legacy post without republishing', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const post = await publishedFixture();
+        const oldData = { ...mockReddit.submitCustomPost.mock.calls[0][0].postData };
+        delete oldData.trackKey;
+        delete oldData.ground;
+        delete oldData.totalTimeMs;
+        delete oldData.grounds;
+        post.getPostData.mockResolvedValue(oldData);
+        post.mergePostData.mockImplementation(async (updates) => { Object.assign(oldData, updates); });
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledWith({
+            totalTimeMs: stages.length * 10_000,
+            trackKey: getCampaignFinalStage(input.seriesId).trackKey,
+            ground: 'tarmac',
+            grounds: ['tarmac'],
+        });
+        expect(mockReddit.submitCustomPost).toHaveBeenCalledOnce();
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledOnce();
+    });
+
+    it('updates missing surfaces even when an existing post already has its final track and ground', async () => {
+        const post = await publishedFixture();
+        const oldData = { ...mockReddit.submitCustomPost.mock.calls[0][0].postData };
+        delete oldData.grounds;
+        post.getPostData.mockResolvedValue(oldData);
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledWith({
+            trackKey: getCampaignFinalStage(input.seriesId).trackKey, ground: 'tarmac', grounds: ['tarmac'],
+        });
+        expect(mockReddit.submitCustomPost).toHaveBeenCalledOnce();
     });
 
     it.each([{ redditUsername: 'OtherRacer' }, { subredditName: 'OtherCommunity' }])('keeps updates scoped to the owner and community: %j', async (other) => {

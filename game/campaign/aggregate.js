@@ -28,3 +28,14 @@ export function readCampaignPlace(value) {
 export function formatCampaignPlace(place) {
     return place ? `#${place.rank} / ${place.total}` : '';
 }
+
+export function formatCampaignTotalTime(timeMs) {
+    if (!Number.isSafeInteger(timeMs) || timeMs <= 0) return '';
+    const milliseconds = String(timeMs % 1000).padStart(3, '0');
+    const seconds = String(Math.floor(timeMs / 1000) % 60).padStart(2, '0');
+    const minutes = Math.floor(timeMs / 60_000);
+    const hours = Math.floor(minutes / 60);
+    return hours > 0
+        ? `${hours}:${String(minutes % 60).padStart(2, '0')}:${seconds}.${milliseconds}`
+        : `${minutes}:${seconds}.${milliseconds}`;
+}

@@ -72,7 +72,7 @@ describe('Campaign with one live series', () => {
         expect(context.lobbyUi.showCampaign.mock.calls.at(-1)[0].view).toBe('stages');
     });
 
-    it('opens the series list from View Campaign even with only one live series', () => {
+    it('opens the series list from Home even with only one live series', () => {
         const context = createContext();
         context.modal = { showCampaignFinished: vi.fn() };
         context.showCampaignFinishedNow({ title: 'Numbers', seriesId: 'numbered-v1' });
@@ -80,7 +80,7 @@ describe('Campaign with one live series', () => {
 
         actions.primaryAction();
 
-        expect(actions.primaryActionLabel).toBe('View Campaign');
+        expect(actions.primaryActionLabel).toBe('Home');
         expect(context.lobbyUi.showCampaign.mock.calls.at(-1)[0].view).toBe('series');
     });
 

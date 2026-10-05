@@ -1,9 +1,10 @@
 import { redis } from '@devvit/redis';
 import { reddit } from '@devvit/web/server';
 import { randomUUID } from 'node:crypto';
-import { formatCampaignPlace, readCampaignPlace } from '../../../game/campaign/aggregate.js';
+import { formatCampaignPlace, formatCampaignTotalTime, readCampaignPlace } from '../../../game/campaign/aggregate.js';
 import { buildCampaignFinishedScreen } from '../../../game/campaign/finished-screen.js';
 import { getCampaignFinalStage, getCampaignSeries, getCampaignStage } from '../../../game/campaign/manifest.js';
+import { isTrackGroundKey } from '../../../game/track/grounds.js';
 import { sanitizeRedditUsername } from '../../../game/shared/leaderboard-identity.js';
 import { resolveAuthorizedPlayerIdentity } from '../competition/competition-identity.js';
 import { resolveRedditAvatarUrl } from '../player/reddit-avatar.js';
@@ -34,6 +35,10 @@ type CampaignSharePreview = {
     medalDistribution: { author: number; gold: number; silver: number; bronze: number };
     stageCount: number;
     medalSummary: string;
+    totalTimeMs?: number | null;
+    trackKey?: string;
+    ground?: string;
+    grounds?: string[];
     place: { rank: number; total: number } | null;
     expiresAt: string;
 };
@@ -47,19 +52,35 @@ function failure(status: number, reason: string, error: string) {
     return { status, body: { status: reason, error } };
 }
 
+// Public artwork metadata comes only from the published manifest. Reading a
+// completion poster never needs the viewer's progress, identity or standings.
+export async function getServerCampaignPoster({ seriesId }: { seriesId?: unknown } = {}) {
+    const series = getCampaignSeries(seriesId);
+    const finalStage = series ? getCampaignFinalStage(series.id) : null;
+    if (!series || !finalStage) return failure(404, 'campaign_unavailable', 'This Campaign is unavailable.');
+    return {
+        status: 200,
+        body: { seriesId: series.id, trackKey: finalStage.trackKey, ground: series.ground, grounds: [...series.grounds] },
+    };
+}
+
 const unconfirmed = () => failure(409, 'share_unconfirmed', 'Reddit has not confirmed this post yet. Check your profile before trying again.');
 
 function campaignShareCopy(
     title: string,
     medalDistribution: CampaignSharePreview['medalDistribution'],
     place: CampaignSharePreview['place'],
+    totalTimeMs: CampaignSharePreview['totalTimeMs'] = null,
 ) {
     const medalSummary = Object.entries(medalDistribution).map(([tier, count]) => `${count} ${tier}`).join(' · ');
     const placeSummary = place ? `Overall place ${formatCampaignPlace(place)}` : '';
-    const details = [medalSummary, placeSummary].filter(Boolean).join('\n');
+    const time = formatCampaignTotalTime(totalTimeMs);
+    const timeSummary = time ? `Total best time ${time}` : '';
+    const details = [medalSummary, timeSummary, placeSummary].filter(Boolean).join('\n');
     return {
         medalSummary,
         placeSummary,
+        timeSummary,
         text: `${title}.\n\n${details}\n\nOpen this post on Reddit and select Play Campaign to race this Campaign.`,
     };
 }
@@ -213,21 +234,43 @@ export async function refreshServerCampaignResultsShare({
         const counts = data.medalDistribution as Record<string, unknown> | undefined;
         const medalsMatch = data.stageCount === screen.stageCount
             && Object.entries(screen.medalDistribution).every(([tier, count]) => counts?.[tier] === count);
+        const totalTimeChanged = data.totalTimeMs !== screen.totalTimeMs;
+        const trackKey = getCampaignFinalStage(series.id)?.trackKey;
+        const grounds = [...series.grounds];
+        const postedGrounds = data.grounds;
+        const groundsMatch = Array.isArray(postedGrounds) && postedGrounds.length === grounds.length
+            && grounds.every((ground) => postedGrounds.includes(ground));
+        const artChanged = data.trackKey !== trackKey || data.ground !== series.ground || !groundsMatch;
         const livePlace = await readCampaignSharePlace(series.id, canonicalPlayerId);
         const postedPlace = readCampaignPlace(data.place);
         const placeChanged = livePlace !== null
             && (postedPlace?.rank !== livePlace.rank || postedPlace?.total !== livePlace.total);
-        if (medalsMatch && !placeChanged && current.refreshPending !== true) return;
+        if (medalsMatch && !totalTimeChanged && !artChanged && !placeChanged && current.refreshPending !== true) return;
         if (!await isRedisLockOwned(lock, redis)) throw new Error('Campaign post refresh lost its lock.');
         const copy = campaignShareCopy(
             `I finished the ${screen.title} campaign`,
             screen.medalDistribution,
             livePlace ?? postedPlace,
+            screen.totalTimeMs,
         );
-        const updates: { medalDistribution?: typeof screen.medalDistribution; stageCount?: number; place?: NonNullable<CampaignSharePreview['place']> } = {};
+        const updates: {
+            medalDistribution?: typeof screen.medalDistribution;
+            stageCount?: number;
+            totalTimeMs?: number | null;
+            trackKey?: string;
+            ground?: string;
+            grounds?: string[];
+            place?: NonNullable<CampaignSharePreview['place']>;
+        } = {};
         if (!medalsMatch) {
             updates.medalDistribution = screen.medalDistribution;
             updates.stageCount = screen.stageCount;
+        }
+        if (totalTimeChanged) updates.totalTimeMs = screen.totalTimeMs;
+        if (artChanged) {
+            updates.trackKey = trackKey;
+            updates.ground = series.ground;
+            updates.grounds = grounds;
         }
         if (placeChanged && livePlace) updates.place = livePlace;
         if (Object.keys(updates).length > 0) await post.mergePostData(updates);
@@ -260,7 +303,7 @@ export async function previewServerCampaignResultsShare({
     if (!screen) return failure(409, 'campaign_incomplete', 'Finish this Campaign before sharing your results.');
     const title = `I finished the ${screen.title} campaign`;
     const place = await readCampaignSharePlace(series.id, canonicalPlayerId);
-    const copy = campaignShareCopy(title, screen.medalDistribution, place);
+    const copy = campaignShareCopy(title, screen.medalDistribution, place, screen.totalTimeMs);
     const preview: CampaignSharePreview = {
         username,
         subredditName: request.subredditName,
@@ -269,6 +312,10 @@ export async function previewServerCampaignResultsShare({
         title,
         medalDistribution: screen.medalDistribution,
         stageCount: screen.stageCount,
+        totalTimeMs: screen.totalTimeMs,
+        trackKey: getCampaignFinalStage(series.id)?.trackKey,
+        ground: series.ground,
+        grounds: [...series.grounds],
         medalSummary: copy.medalSummary,
         place,
         expiresAt: new Date(Date.now() + SHARE_PREVIEW_TTL_SECONDS * 1000).toISOString(),
@@ -281,6 +328,11 @@ export async function previewServerCampaignResultsShare({
             status: 'ready', shareToken, title: preview.title, username,
             medalDistribution: preview.medalDistribution, stageCount: preview.stageCount,
             medalSummary: preview.medalSummary,
+            totalTimeMs: preview.totalTimeMs,
+            timeSummary: copy.timeSummary,
+            trackKey: preview.trackKey,
+            ground: preview.ground,
+            grounds: preview.grounds,
             ...(place ? { place, placeSummary: copy.placeSummary } : {}),
             expiresAt: preview.expiresAt,
         },
@@ -296,6 +348,10 @@ async function readPreview(token: unknown): Promise<CampaignSharePreview | null>
         if (typeof preview?.username !== 'string' || typeof preview.subredditName !== 'string'
             || typeof preview.seriesId !== 'string' || typeof preview.seriesName !== 'string'
             || typeof preview.title !== 'string' || typeof preview.medalSummary !== 'string'
+            || (preview.totalTimeMs != null && (!Number.isSafeInteger(preview.totalTimeMs) || preview.totalTimeMs <= 0))
+            || (preview.trackKey != null && (typeof preview.trackKey !== 'string' || !preview.trackKey))
+            || (preview.ground != null && (typeof preview.ground !== 'string' || !preview.ground))
+            || (preview.grounds != null && (!Array.isArray(preview.grounds) || !preview.grounds.every(isTrackGroundKey)))
             || (preview.place != null && !readCampaignPlace(preview.place))
             || !Number.isInteger(preview.stageCount) || preview.stageCount <= 0
             || !preview.medalDistribution
@@ -357,6 +413,10 @@ export async function confirmServerCampaignResultsShare({
             playerAvatarUrl,
             medalDistribution: preview.medalDistribution,
             stageCount: preview.stageCount,
+            totalTimeMs: preview.totalTimeMs ?? null,
+            trackKey: preview.trackKey ?? getCampaignFinalStage(series.id)?.trackKey,
+            ground: preview.ground ?? series.ground,
+            grounds: preview.grounds ?? [...series.grounds],
             ...(preview.place ? { place: preview.place } : {}),
         };
         const claim: ShareRecord = { createdAt: new Date().toISOString() };
@@ -370,7 +430,7 @@ export async function confirmServerCampaignResultsShare({
                 title,
                 entry: 'campaign',
                 postData,
-                textFallback: { text: campaignShareCopy(title, preview.medalDistribution, preview.place).text },
+                textFallback: { text: campaignShareCopy(title, preview.medalDistribution, preview.place, preview.totalTimeMs).text },
                 runAs: 'USER',
                 userGeneratedContent: { text: title },
             });

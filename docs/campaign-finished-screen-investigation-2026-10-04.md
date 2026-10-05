@@ -1,5 +1,37 @@
 # Campaign finished screen investigation — 2026-10-04
 
+## Simplified completion summary — 2026-10-06
+
+The completion screen now removes the four medal-type icons/counts and keeps
+weighted Medals, Best total and Overall place in one compact row. Username
+precedes Snoovatar above the campaign title. COMPLETE and the avatar frame use
+the poster's surface colors: Street red, Dirt yellow, Snow light blue, Grip
+purple and Mixed gray. The shared completion-presentation helper keeps both
+screens' colors, compact clocks, K totals and Top X% placement consistent;
+exact milliseconds and ranks remain in data and accessible labels.
+
+Home replaces View Campaign and still opens all live series. Tracks replaces
+View Series and still opens the completed series. All three buttons stack at
+full equal width, with Share Results last. The simplified summary preserves
+explicit completion navigation, quiet revisits, rank loading/recovery and
+sharing preview/confirmation. No API or persistence change is needed for this
+summary revision. The medal-count composition below is historical and
+superseded by this row.
+
+Validation: 257 focused tests pass, including completion ownership, late
+confirmation, aggregate loading/recovery, navigation and sharing controls.
+Typecheck and production build pass. Eleven local browser cases cover small
+phones, desktop, landscape, all surface colors, a large rank and a 50-stage
+campaign with a long title. All three buttons occupy the complete action-column
+width and remain visible in the tested sizes; Home/Tracks keyboard navigation
+and sharing cancellation/confirmation work. The shared-helper extraction also
+passed 22 poster cases and two ordinary launcher layouts. Local screenshots and
+standard game-client screenshot/state were inspected. This is local validation;
+no deployment or hosted/device validation was performed.
+
+The final pre-commit run passed 332 tests across 12 focused files, including
+the Campaign route and share-service tests with local loopback access.
+
 ## Compact medal counts — 2026-10-05
 
 The user replaced the proposed medal stacks with one count per Bronze, Silver,
@@ -99,8 +131,18 @@ Revised after the player-facing design and sharing review.
   the approved snapshot. Client title/medal edits have no authority. The former
   direct publishing endpoint is removed.
 - The Campaign entrypoint renders the completion poster with player identity,
-  medal counts, **Overall place** when the ranking is ready, and **Play Campaign**.
-  The place uses the same `#rank / finishers` figure as the finish screen. A
+  **Campaign Complete!**, the series name, H2H-style final-track schematic/car,
+  completed track count, weighted medal progress, compact **Best total**, **Overall place** when the ranking is ready, and **Play Campaign**.
+  The 2026-10-06 redesign uses series/surface color accents and H2H responsive
+  placements. Time is the sum of saved race PBs, including every required lap;
+  there is no Campaign cups/stars or elapsed-playtime model. The sharing preview
+  discloses this time and the token freezes it for confirmation. New posts carry
+  the final track/ground and canonical published surfaces. Legacy Creator posts
+  recover missing final-track/surface metadata through a public metadata-only
+  read; unavailable time stays omitted until the existing refresh upgrades it. Same-medal PB improvements also refresh the total.
+  The place uses the same rank/finisher data as the finish screen. The poster
+  presents `#rank` above `out of total`, using K for totals over 1,000 and a
+  rounded-up whole `Top X%` for ranks from 1,000. A
   later saved race updates that figure on the existing post when it changes.
   Sharing before the ranking is ready leaves the place off until a later save
   can add it. The exact series ID reaches expanded
@@ -115,7 +157,25 @@ Revised after the player-facing design and sharing review.
 - Shared-dialog regressions cover Escape cancellation, blocked dismissal during
   posting, and an old Head-to-Head Concede being unable to hijack Campaign success.
 
-Validation of this revision: the six focused Campaign/modal suites pass **233
+Poster redesign validation (2026-10-06): **220 focused tests passed** across the
+Campaign poster/aggregate/share/route/finish and shared modal/style/H2H suites.
+Typecheck and production build passed; the existing JSON import-attribute warning
+remains. Chromium fixtures passed six phone/desktop/landscape sizes, all five
+themes, legacy and ordinary launchers, native keyboard Play Campaign targeting,
+reduced motion and resize, with no runtime errors or overflow. The standard game
+client screenshot and text state were inspected. Hosted Reddit/Redis publication
+and physical devices were not exercised; no deployment was made.
+
+Poster correction validation (2026-10-06): **242 focused tests passed**. Typecheck
+and production build passed. Fourteen Chromium cases covered the requested five
+surface palettes, readable equal-column medals, delayed legacy Creator artwork
+recovery, resize, already complete metadata and failed recovery, across six
+viewport sizes. Posted results remain visible during metadata loading; no viewer
+bootstrap or gameplay mutation is requested. Full-page screenshots and the
+standard game-client screenshot/text state were inspected. These are local
+fixtures; hosted publication and physical-device checks remain unperformed.
+
+Prior validation: the six focused Campaign/modal suites pass **233
 checks**; preview/confirmation server/client and route suites pass separately.
 The full serial suite reports **4,374 passed / two existing failures** in
 `medals.test.js` and `track-grounds.test.js` for missing medal thresholds.
@@ -305,3 +365,33 @@ final-stage medal, medal-free/pending/rejected results, duplicate and ghost retr
 responses, dismissal/navigation/owner changes, and designated endpoint publication,
 plus visual and keyboard checks of the new screen. Hosted Reddit/Redis and a
 physical-device finish were not exercised in this investigation.
+
+Poster refinement (2026-10-06): Mixed uses a neutral gray accent/glow. Medal counts
+are white alongside their icons, centered as one row above each tier caption.
+Placement is split into two lines; 1,235 of 50,431 displays Top 3% / out of 50.4K.
+Validation: 61 launcher/style tests, typecheck and build pass. Eighteen local
+Chromium cases pass; full-page phone/desktop, large-rank and Mixed screenshots
+and standard game-client screenshot/text state were inspected. No deployment.
+
+Poster simplification (2026-10-06): the shared poster omits the per-tier medal
+breakdown and shows only weighted Medals earned/maximum. Completed track count
+has no denominator because sharing requires a finished Campaign.
+Validation: 61 focused tests, typecheck/build and 18 local Chromium cases pass;
+phone/desktop full-page and standard game-client screenshot/text were inspected.
+
+Poster rhythm revision (2026-10-06): Mini/Racer and player identity share one
+header line. Desktop series/headline/results form one vertically centered brief
+with a common left edge and a fixed headline-to-stats gap. Time occupies one
+column of the shared stats row, formatted m:ss or h:mm:ss with the same display
+font as tracks/medals/place, labeled Best total. No separate time block/divider.
+Exact milliseconds remain in stored data, sharing preview and accessible label.
+Validation: 66 targeted tests, typecheck/build, 21 local poster cases and two
+ordinary launcher sizes pass. Full-page supplied-viewport/phone/desktop and
+standard game-client screenshot/text state inspected. No deployment.
+
+Mobile spacing refinement (2026-10-06): username precedes Snoovatar on both
+layouts. Portrait centers headline/track/stats in one group, using fixed gaps and
+a bounded track row so the artwork no longer reserves all spare viewport height.
+Validation: 66 targeted tests, build and 22 local poster cases plus two ordinary
+launcher sizes pass. Full-page screenshots and standard game-client screenshot
+and text state inspected. No deployment.

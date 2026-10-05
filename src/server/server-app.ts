@@ -128,7 +128,7 @@ import {
     submitServerCampaignRun,
 } from './campaign/campaign-store.js';
 import { createHeadToHeadService } from './head-to-head/head-to-head-service.js';
-import { previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } from './campaign/campaign-share.js';
+import { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } from './campaign/campaign-share.js';
 import {
     confirmHeadToHeadBrag,
     previewHeadToHeadBrag,
@@ -254,6 +254,7 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         getRequestRateLimitIdentity,
         getServerCampaignBootstrap: (input) => getServerCampaignBootstrap(input),
+        getServerCampaignPoster: (input) => getServerCampaignPoster(input),
         startServerCampaignRace: (input) => startServerCampaignRace(input),
         getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
         getServerCampaignAggregate: (input) => getServerCampaignAggregate(input),

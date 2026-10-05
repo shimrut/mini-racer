@@ -379,12 +379,14 @@ flowchart LR
   stays visible until the player presses it to open the Campaign finished screen
   (`game/campaign/finished-screen.js`). A late confirmation can also add Results to
   an open retry result for that stage. The raced
-  series fills its name, four best-stage medal counts (Bronze, Silver, Gold and
-  Author) and the existing weighted medal total, with a
-  centered player portrait/name from existing player/Devvit identity, so
-  Creator series use the same screen. Its View Campaign opens the Campaign
-  series list even with one live series. View Series opens the completed series
-  in Tracks. The same **Results** label reopens the saved summary from a replay
+  series fills its name and one compact results row: weighted Medals, Best total
+  and Overall place. Username precedes Snoovatar in a small horizontal row;
+  existing player/Devvit identity and fallback cover Creator series too.
+  COMPLETE uses the poster's canonical surface palette through
+  `game/campaign/completion-presentation.js`: Street red, Dirt yellow, Snow light
+  blue, Grip purple and Mixed gray. Home opens the Campaign series list even
+  with one live series. Tracks opens the completed series. The same **Results**
+  label reopens the saved summary from a replay
   of an already completed final stage, without replaying its celebration;
   earlier-stage replays keep their ordinary actions.
   A pending valid final-stage queue entry also reserves Results on a retry.
@@ -393,9 +395,11 @@ flowchart LR
   open, Results is updated on the underlying result; returning never opens the
   celebration automatically. Pressing Results rechecks the owner, open finish
   context and current published endpoint, and consumes the ready action.
-  The summary includes **Total best time** and clickable **Overall place**, its
-  only aggregate leaderboard entry. The action column retains View Campaign,
-  View Series and Share Results without a refresh/retry button. `game/campaign/aggregate.js` sums saved
+  **Best total** uses a compact clock without milliseconds; **Overall place** is
+  the only aggregate leaderboard entry and shares the poster's rank, K-total
+  and Top X% formatting. Accessible labels retain exact values. Home, Tracks
+  and Share Results stack at full equal width without a refresh/retry button.
+  `game/campaign/aggregate.js` sums saved
   full-race PB milliseconds across every stage, requiring the final-stage medal
   and valid times throughout. Required laps are already included in each PB.
   The shared standings view uses the series title, pagination and player
@@ -408,14 +412,35 @@ flowchart LR
   The red **Share Results** action sits last and uses the shared preview/confirmation
   dialog. `POST /api/campaign/share/preview` reads the signed-in player's saved
   progress and reuses the finished-screen model for the name and highest-medal
-  distribution. Its ten-minute token binds the shown title/medals to the player
+  distribution and exact total best time. Its ten-minute token binds the shown title/medals/time to the player
   and community. `POST /api/campaign/share/confirm` accepts only that token,
   rechecks completion, and publishes the approved snapshot.
   `src/server/campaign/campaign-share.ts` publishes
   a player-authored `campaign-finished` post through the existing Campaign
-  entrypoint. The poster includes **Overall place** (`#rank / finishers`) when
-  the aggregate board is ready at preview time. An accepted race refreshes that
-  post's medal counts, place and plain-text backup from the same finished-screen
+  entrypoint. `pages/campaign.js` / `pages/campaign.css` use the H2H brand,
+  responsive brief/track placement and Play Campaign footer for completed posts.
+  The final-stage track and ground default car reuse the H2H schematic renderer
+  and car entrance. Series/surface color accents accompany **Campaign Complete!**,
+  player identity, the completed track count and weighted medal progress. The
+  poster omits per-tier medal counts and the redundant completed-track denominator.
+  The poster header aligns Mini/Racer with username then Snoovatar. Portrait
+  headline/track/results form a centered group with fixed gaps and a bounded
+  track row. Its desktop brief
+  groups series/headline with one stats row, aligned beside the track. **Best total**
+  (sum of saved full-race PBs) shares the other stats' type scale and displays
+  m:ss or h:mm:ss; the accessible label and stored value retain milliseconds. It also shows
+  **Overall place** when the aggregate board is ready at preview time. The poster
+  splits `#rank` and `out of finishers` into two lines, compacts totals over 1,000
+  with K, and shows a rounded-up `Top X%` for ranks from 1,000. The exact rank/total
+  remain in the accessible label and post snapshot. Campaign has no cups, stars or elapsed-playtime metric.
+  New tokens/posts carry server-authored `totalTimeMs`, `trackKey`, `ground` and
+  canonical `grounds`. Street is red, Dirt yellow, Snow light blue, Grip purple
+  and multiple published surfaces gray. Old tokens remain valid. Legacy posts
+  recover missing final-track/surface metadata through public `GET /api/campaign/poster`,
+  which loads only the published final track and does not read or change viewer
+  progress, identity or standings. Unavailable time/artwork remains omitted. An accepted
+  race refreshes that post's medal counts, PB total (including same-tier improvements),
+  artwork metadata, place and plain-text backup from the same finished-screen
   tally and the current board. A place is left unchanged while ranking is not
   ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
   saved race still stands; opening that Campaign again tries the same post, as

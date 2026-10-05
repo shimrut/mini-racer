@@ -10,6 +10,7 @@ export type CampaignRouteDependencies = {
     getRequestUsername(): string | null;
     getRequestRateLimitIdentity(): string | null;
     getServerCampaignBootstrap(input: Record<string, unknown>): Promise<ServiceResult>;
+    getServerCampaignPoster(input: Record<string, unknown>): Promise<ServiceResult>;
     startServerCampaignRace(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignSnapshot(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignAggregate(input: Record<string, unknown>): Promise<ServiceResult>;
@@ -62,6 +63,27 @@ export function registerCampaignRoutes(
     app: Application,
     dependencies: CampaignRouteDependencies,
 ): void {
+    app.get('/api/campaign/poster', async (req, res) => {
+        try {
+            await dependencies.refreshStoredCatalog?.();
+            const result = await dependencies.getServerCampaignPoster({ seriesId: req.query?.seriesId });
+            const trackKey = result.status === 200 && result.body && typeof result.body === 'object'
+                ? (result.body as { trackKey?: unknown }).trackKey : null;
+            if (typeof trackKey !== 'string' || !trackKey) {
+                send(res, result);
+                return;
+            }
+            await dependencies.loadStoredTracks?.([trackKey]);
+            send(res, {
+                ...result,
+                body: { ...(result.body as object), storedTracks: dependencies.describeStoredTracks?.([trackKey]) ?? [] },
+            });
+        } catch (error) {
+            console.error('Failed to load Mini Racer Campaign poster:', error);
+            sendFailure(res, error, { error: 'Campaign poster failed' });
+        }
+    });
+
     app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
             const { playerId, guestToken, seriesId } = req.query ?? {};

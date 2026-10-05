@@ -8,44 +8,42 @@
 }
 
 .campaign-finished {
-    --campaign-finished-step: min(60ms, calc(900ms / var(--campaign-finished-medal-count, 15)));
-    --campaign-finished-medals-at: 0.45s;
     display: flex;
     isolation: isolate;
     flex-direction: column;
     align-items: center;
+    gap: 1.75rem;
     width: 100%;
     max-width: 360px;
-    min-height: min(42rem, calc(100svh - 4rem));
     margin: auto;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
     box-sizing: border-box;
 }
 
-/* The racer anchors the victory lockup, with the same gold as their medals. */
 .campaign-finished__player {
     display: flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 0.75rem;
-    width: 100%;
-    margin-bottom: 1.5rem;
-    font-family: var(--header-font);
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1.2;
-    text-align: center;
-    overflow-wrap: anywhere;
+    max-width: 100%;
+    font: 700 1rem / 1.2 var(--header-font);
+}
+
+#campaign-finished-player-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .campaign-finished__avatar {
-    width: 4.5rem;
-    height: 4.5rem;
-    border: 2px solid var(--medal-gold);
+    flex: none;
+    width: 3rem;
+    height: 3rem;
+    border: 1px solid var(--campaign-completion-accent, var(--accent-color));
     border-radius: 50%;
     background: var(--bg-surface);
-    object-fit: cover;
-    box-shadow: 0 0 0 6px rgba(232, 184, 74, 0.09);
+    object-fit: contain;
 }
 
 .result-modal .campaign-finished__title {
@@ -55,12 +53,8 @@
     gap: 0.15em;
     width: 100%;
     margin: 0;
-    font-family: var(--header-font);
-    font-size: clamp(2.4rem, 10vw, 3.2rem);
-    font-style: italic;
-    font-weight: 900;
+    font: italic 900 clamp(2.2rem, 10vw, 3.2rem) / 0.95 var(--header-font);
     letter-spacing: -0.05em;
-    line-height: 0.9;
     text-align: center;
     text-transform: uppercase;
 }
@@ -74,84 +68,13 @@
 
 .campaign-finished__status {
     padding-right: 0.08em;
-    color: var(--medal-gold);
-}
-
-.campaign-finished__medals {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 4.75rem));
-    justify-content: center;
-    width: 100%;
-    gap: 0;
-    margin: 1.5rem 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.campaign-finished__medal {
-    min-width: 0;
-}
-
-.campaign-finished__medal::after {
-    display: block;
-    content: attr(data-campaign-medal);
-    color: var(--text-dim);
-    font-family: var(--header-font);
-    font-size: 0.6rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-align: center;
-    text-transform: uppercase;
-}
-
-.campaign-finished__medal .medal-svg {
-    width: 100%;
-    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
-}
-
-.campaign-finished__medal .medal-svg__center-time {
-    font-size: 240px;
-    fill: var(--text-color);
-}
-
-.campaign-finished__total {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 0.6rem;
-    width: 100%;
-    margin: 1rem 0 1.75rem;
-    font-family: var(--header-font);
-    font-size: 1.1rem;
-    font-weight: 800;
-}
-
-.campaign-finished__total-label {
-    color: var(--text-dim);
-    font-size: 0.7rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-}
-
-.campaign-finished__total-value {
-    color: var(--medal-gold);
-    font-variant-numeric: tabular-nums;
-}
-
-.campaign-finished__actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem;
-    width: 100%;
-    margin-top: auto;
+    color: var(--campaign-completion-accent, var(--accent-color));
 }
 
 .campaign-finished__aggregate {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
-    margin: 0 0 1.25rem;
     text-align: center;
 }
 
@@ -159,28 +82,43 @@
 .campaign-finished__aggregate > .modal-stat-stack {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    justify-content: center;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.25rem;
+    border-radius: 0;
+}
+
+.campaign-finished__aggregate > :not(:first-child) {
+    border-left: 1px solid rgba(248, 250, 252, 0.18);
 }
 
 .campaign-finished__aggregate-value {
-    font-family: var(--header-font);
-    font-size: 1rem;
-    font-weight: 700;
+    color: var(--text-color);
+    font: 800 clamp(1rem, 4.5vw, 1.25rem) / 1.1 var(--header-font);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.035em;
 }
 
-#modal-campaign-finished-view.campaign-finished--quiet :is(
-    .campaign-finished__series, .campaign-finished__status,
-    .campaign-finished__medal, .campaign-finished__total
-) {
-    animation: none;
+.campaign-finished__total-label {
+    color: var(--text-dim);
+    font: 600 0.6rem / 1.3 var(--header-font);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.campaign-finished__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+    width: 100%;
 }
 
 #modal-campaign-finished-view .combined-action-btn {
     min-height: 3rem;
     width: 100%;
     padding: 0.7rem 0.4rem;
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-style: italic;
     font-weight: 800;
     letter-spacing: 0.01em;
@@ -198,58 +136,25 @@
     animation: slideInRight 0.6s var(--ease-glide) calc(0.1s + var(--dur-finish-headline)) both;
 }
 
-#modal-campaign-finished-view.active-view .campaign-finished__medal {
-    animation: medal-entrance-pop 0.38s var(--ease-settle) both;
-    animation-delay: calc(var(--campaign-finished-medals-at) + var(--campaign-finished-medal-index, 0) * var(--campaign-finished-step));
-}
-
-#modal-campaign-finished-view.active-view .campaign-finished__total {
-    animation: opacityIn 0.3s ease both;
-    animation-delay: calc(var(--campaign-finished-medals-at) + var(--campaign-finished-medal-count, 15) * var(--campaign-finished-step));
-}
+#modal-campaign-finished-view.campaign-finished--quiet :is(
+    .campaign-finished__series, .campaign-finished__status
+) { animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
     #modal-campaign-finished-view.active-view :is(
-        .campaign-finished__series,
-        .campaign-finished__status,
-        .campaign-finished__medal,
-        .campaign-finished__total
-    ) {
-        animation: none;
-    }
+        .campaign-finished__series, .campaign-finished__status
+    ) { animation: none; }
 }
 
 @media (max-height: 640px) {
-    .campaign-finished__player {
-        gap: 0.5rem;
-        margin-bottom: 0.75rem;
-    }
+    .campaign-finished { gap: 1.1rem; padding-block: 0.35rem; }
+    .campaign-finished__avatar { width: 2.5rem; height: 2.5rem; }
+    .result-modal .campaign-finished__title { font-size: 2.3rem; }
+    .campaign-finished__actions { gap: 0.5rem; }
+}
 
-    .campaign-finished__avatar {
-        width: 3rem;
-        height: 3rem;
-    }
-
-    .result-modal .campaign-finished__title {
-        font-size: 2.4rem;
-    }
-
-    .campaign-finished__medals {
-        margin-top: 1rem;
-        grid-template-columns: repeat(4, minmax(0, 3.75rem));
-    }
-
-    .campaign-finished__total {
-        margin: 0.5rem 0 0.75rem;
-    }
-
-    .campaign-finished__aggregate {
-        margin-bottom: 0.75rem;
-    }
-
-    .campaign-finished__actions {
-        gap: 0.5rem;
-    }
+@media (max-height: 480px) {
+    .campaign-finished { gap: 0.75rem; padding-block: 0.25rem; }
 }
 
 .modal-view#modal-combined-view {

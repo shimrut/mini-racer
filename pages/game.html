@@ -453,34 +453,33 @@
                 <div id="modal-campaign-finished-view" class="modal-view">
                     <section class="campaign-finished" aria-labelledby="campaign-finished-title">
                         <div class="campaign-finished__player">
-                            <img id="campaign-finished-avatar" class="campaign-finished__avatar" alt="">
                             <span id="campaign-finished-player-name"></span>
+                            <img id="campaign-finished-avatar" class="campaign-finished__avatar" alt="">
                         </div>
                         <h2 id="campaign-finished-title" class="campaign-finished__title">
                             <span id="campaign-finished-series" class="campaign-finished__series"></span>
                             <span id="campaign-finished-status" class="campaign-finished__status"></span>
                         </h2>
-                        <ol id="campaign-finished-medals" class="campaign-finished__medals" aria-label="Best stage medals by tier"></ol>
-                        <div class="campaign-finished__total">
-                            <span class="campaign-finished__total-label">Medals</span>
-                            <span id="campaign-finished-total" class="campaign-finished__total-value"></span>
-                        </div>
                         <div class="campaign-finished__aggregate">
                             <div>
-                                <span class="campaign-finished__total-label">Total best time</span>
+                                <span id="campaign-finished-total" class="campaign-finished__aggregate-value"></span>
+                                <span class="campaign-finished__total-label">Medals</span>
+                            </div>
+                            <div>
                                 <span id="campaign-finished-time" class="campaign-finished__aggregate-value"></span>
+                                <span class="campaign-finished__total-label">Best total</span>
                             </div>
                             <button id="campaign-finished-rank-button" class="modal-stat-stack modal-stat-button" type="button" aria-label="View Campaign leaderboard" disabled>
-                                <span class="campaign-finished__total-label">Overall place</span>
-                                <span id="campaign-finished-rank" class="campaign-finished__aggregate-value modal-stat-value--rank" role="status" aria-live="polite"></span>
+                                <span id="campaign-finished-rank" class="campaign-finished__aggregate-value" role="status" aria-live="polite"></span>
+                                <span id="campaign-finished-rank-caption" class="campaign-finished__total-label">Overall place</span>
                             </button>
                         </div>
                         <div class="campaign-finished__actions">
                             <button id="campaign-finished-primary" class="combined-action-btn" type="button">
-                                <span class="combined-action-btn-label">View Campaign</span>
+                                <span class="combined-action-btn-label">Home</span>
                             </button>
                             <button id="campaign-finished-secondary" class="combined-action-btn" type="button">
-                                <span class="combined-action-btn-label">View Series</span>
+                                <span class="combined-action-btn-label">Tracks</span>
                             </button>
                             <button id="campaign-finished-share" class="combined-action-btn combined-action-btn--primary" type="button">
                                 <span class="combined-action-btn-label">Share Results</span>

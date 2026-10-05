@@ -79,39 +79,64 @@ rows, and buttons use the same 320px width and 0.35rem padding, and the rows
 sit 2.75rem below the hero. Mode only changes the content in those slots.
 
 The Campaign completion view (`#modal-campaign-finished-view` in
-`styles/results.css`) centers the player portrait and name above the series name
-and gold COMPLETE lockup. The portrait uses the existing avatar fallback and a
-circular gold frame. Four medal icons show the saved best-stage counts for
-Bronze, Silver, Gold and Author, including zero counts, using the existing SVG
-center-text option. Tier names sit below the icons; the row stays the same size
-for short and long series. The existing weighted medal total follows it.
-Individual stage results remain in View Series. The completion composition
-keeps animated headings below the shared dialog in its own stacking context.
-All three actions stack vertically at equal width with shared 1.25rem typography;
-the red
-Share Results button is last, at the bottom of the completion column, and takes
-initial keyboard focus. Short-height spacing and reduced-motion rules keep the
-shared shell usable.
+`styles/results.css`) uses a compact horizontal player row with username followed
+by Snoovatar, the series name and COMPLETE lockup, and one three-column results
+row: weighted Medals, Best total and clickable Overall place. It omits medal-type
+icons and counts; individual stage results remain in Tracks. The completion
+accent and avatar frame use the same canonical surface palette as the poster:
+Street red, Dirt yellow, Snow light blue, Grip purple and Mixed gray.
+`game/campaign/completion-presentation.js` shares colors, compact clocks and
+placement formatting between the summary and poster. Exact times and ranks
+remain accessible; the displayed clock omits milliseconds, large totals use K
+and ranks from 1,000 show Top X%.
+All three actions stack vertically at full equal width: Home, Tracks, then the
+red Share Results button, which takes initial keyboard focus. Home opens the
+Campaign series list; Tracks opens the completed series. Short-height spacing
+and reduced-motion rules keep the shared shell usable. Animated headings stay
+below the shared dialog in their own stacking context.
 The first valid final-stage result reserves the Finished action immediately,
 with Home hidden while confirmation is pending. Canonical acceptance enables
 that same button; rejection restores Home. Replays of the completed final stage show Results; earlier-stage replays retain their existing actions.
 Share Results uses the existing result-share-panel preview, account disclosure,
 confirmation, retry and success controls. Escape cancels preparation/preview
 and restores the trigger; posting stays open until the response settles.
-The completion summary also uses two metric columns for Total best time and
-Overall place. Overall place reuses the shared `modal-stat-stack` and
-`modal-stat-button` interaction to open the aggregate board; there is no extra
-leaderboard/refresh/retry action. The board reuses the shared standings shell.
-Back restores the same summary and focuses Overall place; the quiet view class suppresses another medal/title
-animation. The existing 640px-height compaction also tightens medal sizing and
-vertical gaps so the added metrics/action leave the player avatar and all three
-actions visible on the tested 360x640 screen.
+Overall place reuses the shared `modal-stat-stack` and `modal-stat-button`
+interaction to open the aggregate board; there is no extra leaderboard,
+refresh or retry action. The board reuses the shared standings shell. Back
+restores the same summary and focuses Overall place; the quiet view class
+suppresses another title animation. The existing 640px-height compaction
+tightens the profile, title and vertical gaps so all three stacked actions
+remain visible on the tested small phones.
 
-The completion poster keeps the Campaign launcher shell. Its reading stack uses
-the same step as the Head to Head poster: player, “Campaign finished”, the
-series name, the rank figure, then the medals. The repeated “I finished…” line
-stays available to screen readers and is not shown. The track rings stay on the
-right. Play Campaign stays in the footer.
+The completion poster uses the Head to Head visual language: Mini/Racer at the
+left of one header line and username followed by Snoovatar at the right, the series above
+**Campaign Complete!**, the final track's schematic with the same ground-default
+car entrance, and a full-width **Play Campaign** footer. On desktop the headline
+and stats form one vertically centered brief with a fixed gap and common left
+edge; the track occupies the adjacent hero column.
+Portrait layouts center headline/artwork/results as one group with consistent
+gaps and a bounded track row (26vh, capped at 280px), leaving spare height around
+the group instead of within the track slot. Wide/short
+layouts put it to the right of the reading column. Published surfaces decide both
+the completion accent and background glow: Street red (including Numbers), Dirt
+yellow, Snow light blue, Grip purple and Mixed gray. Multiple canonical `grounds`
+mean Mixed; the series name does not override the palette. The shared brand/action
+remain red. The results show completed track count above Tracks, weighted Medals
+earned/maximum, optional **Best total** and optional Overall place in one equal
+column row. Best total displays the saved PB sum as m:ss or h:mm:ss, without
+milliseconds or a separate block/divider; the accessible label retains exact
+precision. Hidden time/place cells leave the other columns evenly distributed.
+Sharing requires completion, so the track count has no denominator. The poster
+omits per-tier medal icons/counts. These totals use the
+server post snapshot. Placement uses `#rank` above `out of total`; totals over
+1,000 use one decimal at most and a K suffix. Ranks from 1,000 use `Top X%`,
+rounded up to a whole percent, so rank 1,235 of 50,431 is Top 3% / out of 50.4K.
+The accessible label retains the exact rank and total. Campaign has no cups/stars or elapsed-playtime metric.
+The repeated “I finished…” line stays available to screen readers. Legacy Creator
+posts recover the published final track and surfaces through the public metadata
+endpoint; unavailable artwork/time/place stay hidden. The CTA still targets the
+post's own series. Small-screen labels have minimum readable sizes, and the H2H
+car entrance respects reduced motion. Ordinary launchers retain their own layout.
 
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same

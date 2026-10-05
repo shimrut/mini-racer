@@ -577,8 +577,8 @@ describe('Campaign lobby and shared modal adapters', () => {
                 medalTotal: `${NUMBERS_STAGES.length}/${NUMBERS_STAGES.length * 4}`,
             }),
             expect.objectContaining({
-                primaryActionLabel: 'View Campaign',
-                secondaryActionLabel: 'View Series',
+                primaryActionLabel: 'Home',
+                secondaryActionLabel: 'Tracks',
                 shareRequest: { kind: 'campaign-finished', seriesId: CAMPAIGN_NUMBERS_SERIES_ID, ownerPlayerId: 'player-a' },
             }),
         );

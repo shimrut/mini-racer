@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatCampaignPlace, getCampaignAggregateTotalTimeMs, readCampaignPlace } from '../game/campaign/aggregate.js';
+import { formatCampaignPlace, formatCampaignTotalTime, getCampaignAggregateTotalTimeMs, readCampaignPlace } from '../game/campaign/aggregate.js';
 import { getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
 
@@ -19,6 +19,15 @@ function savedResults() {
 afterEach(clearStoredSeriesForTests);
 
 describe('Campaign total best time', () => {
+    it('formats exact PB totals with milliseconds across minute and hour boundaries', () => {
+        expect(formatCampaignTotalTime(1)).toBe('0:00.001');
+        expect(formatCampaignTotalTime(59_999)).toBe('0:59.999');
+        expect(formatCampaignTotalTime(60_000)).toBe('1:00.000');
+        expect(formatCampaignTotalTime(3_600_001)).toBe('1:00:00.001');
+        for (const value of [undefined, null, 0, -1, 12.5, Infinity, '12345', Number.MAX_SAFE_INTEGER + 1]) {
+            expect(formatCampaignTotalTime(value)).toBe('');
+        }
+    });
     it('sums the full saved race times exactly once, including different lap counts', () => {
         expect(getCampaignAggregateTotalTimeMs(series.id, savedResults())).toBe(24_691);
     });

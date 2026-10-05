@@ -1276,7 +1276,7 @@ export const campaignEngineMethods = {
         this.showCampaignFinishedNow(screen, { celebrate: !ready.revisit });
     },
 
-    // View Campaign opens all live series; View Series opens this series' Tracks.
+    // Home opens all live series; Tracks opens this series' stage results.
     showCampaignFinishedNow(screen, { celebrate = true } = {}) {
         const ownerPlayerId = getActivePlayerOwnerId();
         clearTimeout(this._campaignAggregateSession?.timer);
@@ -1287,9 +1287,9 @@ export const campaignEngineMethods = {
             playerUsername: this.redditUsername || globalThis.devvit?.context?.username || 'Guest racer',
             playerAvatarUrl: globalThis.devvit?.context?.snoovatar,
             shareRequest: { kind: 'campaign-finished', seriesId: screen.seriesId, ownerPlayerId },
-            primaryActionLabel: 'View Campaign',
+            primaryActionLabel: 'Home',
             primaryAction: () => this.showCampaignLobby({ view: 'series', forceSeriesView: true }),
-            secondaryActionLabel: 'View Series',
+            secondaryActionLabel: 'Tracks',
             secondaryAction: () => this.openCampaignTracks(),
             leaderboardAction: () => this.openCampaignAggregateStandings(session),
         });
