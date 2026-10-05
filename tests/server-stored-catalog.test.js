@@ -152,6 +152,32 @@ describe('the stored catalog', () => {
         expect(TRACKS.nightOne.name).toBe('Night One');
     });
 
+    it('loads only challenge page tracks before reading their stored names on a cold server', async () => {
+        await saveTrack('countryRoad', 'Stored Country Road', { origin: 'migrated' });
+        await saveTrack('safariCircuit', 'Stored Safari Circuit', { origin: 'migrated' });
+        await saveTrack('nightOne', 'Not On This Page');
+        coldCache();
+        await catalog.ensureStoredCatalogLoaded();
+        expect(() => TRACKS.countryRoad).toThrow(tracks.StoredTrackNotLoadedError);
+
+        const { getChallengeAnalyticsPage } = await import('../src/server/moderator/challenge-analytics-store.ts');
+        const { challengeAnalyticsMigrationKeys } = await import('../src/server/moderator/challenge-analytics-migration.ts');
+        await known.set(challengeAnalyticsMigrationKeys('MiniRacer').complete, '1');
+        vi.spyOn(known, 'zRange').mockResolvedValueOnce([
+            { member: 'countryRoad', score: 0 }, { member: 'safariCircuit', score: 0 },
+        ]);
+        known.mGet.mockClear();
+
+        const page = await tracks.runWithPinnedStoredTracks(() => getChallengeAnalyticsPage('MiniRacer', 0));
+        expect(page.items.map((item) => item.trackName)).toEqual([
+            'Stored Country Road', 'Stored Safari Circuit',
+        ]);
+        expect(known.mGet.mock.calls).toEqual([[[
+            trackRecordKey('countryRoad'), trackRecordKey('safariCircuit'),
+        ]]]);
+        expect(() => TRACKS.nightOne).toThrow(tracks.StoredTrackNotLoadedError);
+    });
+
     it('initializes an empty install, then reads only the two revisions', async () => {
         await catalog.ensureStoredCatalogLoaded();
         expect(tracks.readStoredTrackCacheRevision('t5_one')).toBe('0');

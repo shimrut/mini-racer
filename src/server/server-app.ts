@@ -53,6 +53,7 @@ import {
 import { ensureMiniRacerLauncherPostForSubreddit } from './posts/launcher-post-service.js';
 import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator/moderator-access.js';
 import { recordAnalyticsPodiumEvent } from './moderator/analytics-store.js';
+import { getChallengeAnalyticsPage, recordChallengeAnalyticsEvent } from './moderator/challenge-analytics-store.js';
 import { getModeratorAnalyticsSummary } from './moderator/moderator-analytics-summary.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
@@ -223,6 +224,8 @@ function registerProductionRoutes(app: express.Application): void {
         getRequestUsername,
         recordRaceStart: (input) => recordServerRaceStart(input),
         recordPodiumEvent: (input) => recordAnalyticsPodiumEvent(input),
+        recordChallengeEvent: recordChallengeAnalyticsEvent,
+        getChallengeAnalyticsPage,
     });
     registerPlayerRoutes(app, {
         getRequestUsername,
@@ -334,6 +337,7 @@ function registerProductionRoutes(app: express.Application): void {
 const CATALOG_FREE_ROUTES = new Set([
     'POST /api/analytics/race-start',
     'POST /api/analytics/podium',
+    'POST /api/analytics/challenge',
     // Reads its own index fields and records, and checks that they agree.
     'GET /api/tracks/stored',
 ]);

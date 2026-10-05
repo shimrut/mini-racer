@@ -525,6 +525,103 @@ h1 {
     box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.analytics-challenges__note {
+    margin-bottom: 0.8rem;
+}
+
+.analytics-table--challenges thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--panel);
+}
+
+.analytics-table--challenges .analytics-challenge-track {
+    min-width: 10rem;
+    max-width: 24rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.analytics-periods {
+    display: flex;
+    flex: none;
+    margin-left: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    overflow: hidden;
+}
+
+.analytics-period {
+    padding: 0.4rem 0.65rem;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: 600 0.76rem var(--display);
+    cursor: pointer;
+}
+
+.analytics-period[aria-pressed="true"] {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--ink);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.analytics-period:hover {
+    color: var(--ink);
+}
+
+.analytics-challenges__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.7rem;
+}
+
+.analytics-challenges__actions .analytics-status {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.analytics-button {
+    flex: none;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    background: var(--night);
+    color: var(--ink);
+    font: 600 0.76rem var(--display);
+    cursor: pointer;
+}
+
+.analytics-challenges__actions .analytics-button:first-of-type {
+    margin-left: auto;
+}
+
+.analytics-button:hover {
+    border-color: var(--muted);
+}
+
+.analytics-button:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.analytics-button:focus-visible,
+.analytics-table-wrap:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.analytics-period:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
 @media (max-width: 980px) {
     .analytics-summary {
         grid-template-columns: repeat(3, minmax(0, 1fr));

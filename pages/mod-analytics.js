@@ -1,5 +1,6 @@
 import { setText } from '../game/ui/dom.js';
 const SUMMARY_URL = '/api/analytics/summary';
+const CHALLENGES_URL = '/api/analytics/challenges';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SECTION_IDS = [
@@ -7,6 +8,7 @@ const SECTION_IDS = [
     'analytics-main',
     'analytics-trend',
     'analytics-modes',
+    'analytics-challenges',
     'analytics-cohorts',
     'analytics-months',
     'analytics-storage',
@@ -595,6 +597,191 @@ function renderDailyTable(doc, days) {
     return wrap;
 }
 
+function challengeDate(value) {
+    if (typeof value !== 'string' || !value) return null;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return null;
+    const isoDate = date.toISOString().slice(0, 10);
+    return { isoDate, label: `${formatShortDate(isoDate)}, ${isoDate.slice(0, 4)}` };
+}
+
+function challengeTrackRow(doc, item, period) {
+    const row = element(doc, 'tr');
+    const track = element(doc, 'th', 'analytics-challenge-track', item?.trackName || item?.trackKey || 'Unknown track');
+    track.scope = 'row';
+    const tracked = challengeDate(item?.trackingStartedAt);
+    track.title = tracked ? `Tracking since ${tracked.label}` : 'No events recorded yet';
+    const counts = item?.[period] ?? {};
+    const clicks = element(doc, 'td', undefined, formatCount(counts.clicks));
+    clicks.title = `${formatCount(counts.acceptClicks)} Accept Challenge · ${formatCount(counts.ownOpens)} Open Mini Racer`;
+    row.append(
+        track,
+        element(doc, 'td', undefined, formatCount(counts.views)),
+        element(doc, 'td', undefined, formatCount(counts.uniqueViewers)),
+        clicks,
+    );
+    return row;
+}
+
+export function renderChallengeAnalytics(root, {
+    items = [], date = null, period = 'today', loading = false, loaded = false,
+    error = null, nextOffset = null, onLoadMore, onRefresh, onPeriodChange,
+} = {}) {
+    const section = root.getElementById('analytics-challenges');
+    if (!section) return;
+    const selectedPeriod = period === 'lifetime' ? 'lifetime' : 'today';
+    const heading = cardHeading(root, 'Challenges by track');
+    const periods = element(root, 'div', 'analytics-periods');
+    periods.setAttribute('role', 'group');
+    periods.setAttribute('aria-label', 'Challenge count period');
+    for (const [key, label] of [['today', 'Today'], ['lifetime', 'Lifetime']]) {
+        const button = element(root, 'button', 'analytics-period', label);
+        button.type = 'button';
+        button.setAttribute('aria-pressed', String(key === selectedPeriod));
+        button.addEventListener('click', () => onPeriodChange?.(key));
+        periods.append(button);
+    }
+    heading.append(periods);
+    const nodes = [
+        heading,
+        element(root, 'p', 'analytics-note analytics-challenges__note', selectedPeriod === 'today'
+            ? (date ? `Today · ${date} UTC` : 'Today · UTC')
+            : 'Lifetime · includes today'),
+    ];
+    if (items.length > 0) {
+        const table = element(root, 'table', 'analytics-table analytics-table--challenges');
+        const head = element(root, 'thead');
+        const labels = element(root, 'tr');
+        for (const [label, hint] of [
+            ['Track', 'Activity across all issued challenges for each track'],
+            ['Views', 'Poster views, including repeat visits'],
+            ['Unique viewers', 'Known viewer identities across this track and period; signed-out identities are approximate and unidentified views are excluded'],
+            ['Clicks', 'Accept Challenge and Open Mini Racer taps, including repeats'],
+        ]) {
+            const cell = element(root, 'th', undefined, label);
+            cell.scope = 'col';
+            cell.title = hint;
+            labels.append(cell);
+        }
+        head.append(labels);
+        const body = element(root, 'tbody');
+        for (const item of items) body.append(challengeTrackRow(root, item, selectedPeriod));
+        table.append(head, body);
+        const wrap = element(root, 'div', 'analytics-table-wrap');
+        wrap.tabIndex = 0;
+        wrap.setAttribute('role', 'region');
+        wrap.setAttribute('aria-label', 'Challenge counts by track');
+        wrap.append(table);
+        nodes.push(wrap);
+    } else if (loaded && !error && !loading) {
+        nodes.push(element(root, 'p', 'analytics-note', 'No challenge activity yet'));
+    }
+
+    const actions = element(root, 'div', 'analytics-challenges__actions');
+    const status = element(root, 'p', 'analytics-status');
+    status.setAttribute('role', 'status');
+    if (loading) status.textContent = 'Loading challenges…';
+    if (error) {
+        status.textContent = error;
+        status.dataset.state = 'error';
+    }
+    actions.append(status);
+    if (loaded) {
+        const refresh = element(root, 'button', 'analytics-button', 'Refresh');
+        refresh.type = 'button';
+        refresh.disabled = loading;
+        refresh.addEventListener('click', () => { void onRefresh?.(); });
+        actions.append(refresh);
+    }
+    if (error || nextOffset !== null) {
+        const button = element(root, 'button', 'analytics-button', error ? 'Retry' : 'Load more');
+        button.type = 'button';
+        button.disabled = loading;
+        button.addEventListener('click', () => { void onLoadMore?.(); });
+        actions.append(button);
+    }
+    nodes.push(actions);
+    section.replaceChildren(...nodes);
+    section.hidden = false;
+    section.setAttribute('aria-busy', String(loading));
+}
+
+export async function loadChallengeAnalyticsPage(fetchImpl = fetch, offset = 0) {
+    const response = await fetchImpl(`${CHALLENGES_URL}?offset=${offset}`);
+    if (response.status === 403) return { error: 'Moderator access required.' };
+    if (response.status === 400) return { error: 'Challenge counts need a subreddit context.' };
+    if (!response.ok) return { error: 'Could not load challenge counts.' };
+    const page = await response.json();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(page?.date ?? '') || !Array.isArray(page?.items)
+        || (page.nextOffset != null && (!Number.isSafeInteger(page.nextOffset) || page.nextOffset <= offset))) {
+        return { error: 'Could not load challenge counts.' };
+    }
+    return { date: page.date, items: page.items, nextOffset: page.nextOffset ?? null };
+}
+
+export function createChallengeAnalyticsController(root, fetchImpl = fetch) {
+    let items = [];
+    let date = null;
+    let period = 'today';
+    let nextOffset = null;
+    let loaded = false;
+    let loading = false;
+    let error = null;
+    let pending = null;
+    let retryReset = false;
+    const render = () => renderChallengeAnalytics(root, {
+        items, date, period, nextOffset, loaded, loading, error,
+        onLoadMore: loadMore, onRefresh: refresh,
+        onPeriodChange: (value) => { period = value; render(); },
+    });
+    function request(reset) {
+        if (loading) return pending;
+        if (!reset && loaded && nextOffset === null && !error) return Promise.resolve();
+        const offset = reset || !loaded ? 0 : nextOffset;
+        loading = true;
+        error = null;
+        render();
+        pending = (async () => {
+            try {
+                let page = await loadChallengeAnalyticsPage(fetchImpl, offset);
+                // Pages on a new UTC day cannot append to the previous day's rows.
+                if (!page.error && offset > 0 && page.date !== date) {
+                    reset = true;
+                    page = await loadChallengeAnalyticsPage(fetchImpl, 0);
+                }
+                if (page.error) {
+                    error = page.error;
+                    retryReset = reset;
+                    return;
+                }
+                const previous = reset || offset === 0 ? [] : items;
+                const seen = new Set(previous.map((item) => item?.trackKey));
+                const fresh = page.items.filter((item) => {
+                    if (item?.trackKey && seen.has(item.trackKey)) return false;
+                    if (item?.trackKey) seen.add(item.trackKey);
+                    return true;
+                });
+                items = [...previous, ...fresh];
+                date = page.date;
+                nextOffset = page.nextOffset;
+                loaded = true;
+                retryReset = false;
+            } catch (_error) {
+                error = 'Could not load challenge counts.';
+                retryReset = reset;
+            } finally {
+                loading = false;
+                pending = null;
+                render();
+            }
+        })();
+        return pending;
+    }
+    function loadMore() { return request(error ? retryReset : false); }
+    function refresh() { return request(true); }
+    return { loadMore, refresh };
+}
+
 function revealSections(root) {
     for (const id of SECTION_IDS) {
         const node = root.getElementById(id);
@@ -680,7 +867,7 @@ export async function loadAnalyticsSummary(fetchImpl = fetch) {
     return { summary: await response.json() };
 }
 
-async function boot(root = document, fetchImpl = fetch) {
+export async function bootAnalytics(root = document, fetchImpl = fetch) {
     try {
         const result = await loadAnalyticsSummary(fetchImpl);
         if (result.error) {
@@ -688,11 +875,12 @@ async function boot(root = document, fetchImpl = fetch) {
             return;
         }
         renderAnalyticsSummary(root, result.summary);
+        await createChallengeAnalyticsController(root, fetchImpl).loadMore();
     } catch (_error) {
         renderAnalyticsMessage(root, 'Could not load the summary.');
     }
 }
 
 if (typeof document !== 'undefined' && document.getElementById('analytics-title')) {
-    void boot();
+    void bootAnalytics();
 }

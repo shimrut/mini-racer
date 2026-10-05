@@ -249,6 +249,33 @@ export async function catalogHeadToHeadSize(subredditName: string): Promise<numb
     return Number.isFinite(size) ? Math.max(0, Math.trunc(size)) : 0;
 }
 
+// Read one bounded page and one extra index member to decide whether to continue.
+export async function readHeadToHeadCatalogPage(
+    subredditName: string,
+    offset: number,
+    pageSize: number,
+): Promise<{ items: HeadToHeadCatalogCard[]; nextOffset: number | null }> {
+    const rows = await redis.zRange(headToHeadCatalogAllKey(subredditName), offset, offset + pageSize, {
+        by: 'rank',
+        reverse: true,
+    });
+    const page = rows.slice(0, pageSize);
+    const rawCards = page.length
+        ? await redis.hMGet(headToHeadCatalogCardsKey(subredditName), page.map(({ member }) => member))
+        : [];
+    return {
+        items: rawCards.flatMap((raw, index) => {
+            const card = parseCard(raw);
+            return card
+                && card.challengeId === page[index].member
+                && normalizeName(card.subredditName) === normalizeName(subredditName)
+                ? [card]
+                : [];
+        }),
+        nextOffset: rows.length > pageSize ? offset + pageSize : null,
+    };
+}
+
 export async function upsertHeadToHeadCatalogCard(
     card: HeadToHeadCatalogCard,
     options?: { refreshEngagement?: boolean },

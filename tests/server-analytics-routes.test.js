@@ -242,3 +242,121 @@ describe('guest transfer diagnostic route', () => {
         }
     });
 });
+
+describe('issued challenge analytics routes', () => {
+    function dependencies(overrides = {}) {
+        return {
+            resolveAnalyticsToolSubredditName: async () => 'MiniRacer',
+            assertModeratorForSubreddit: vi.fn(async () => 'RaceMod'),
+            getServerAnalyticsSummary: vi.fn(),
+            getGuestProgressTransferDiagnostic: vi.fn(),
+            getRequestUsername: () => null,
+            recordRaceStart: vi.fn(),
+            recordPodiumEvent: vi.fn(),
+            recordChallengeEvent: vi.fn(async () => {}),
+            getChallengeAnalyticsPage: vi.fn(async () => ({ date: '2026-10-05', items: [], nextOffset: null })),
+            ...overrides,
+        };
+    }
+
+    function postEvent(baseUrl, body) {
+        return fetch(`${baseUrl}/api/analytics/challenge`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    }
+
+    it('reports view, Accept and author-open actions without forwarding browser targets', async () => {
+        const services = dependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        for (const action of ['view', 'click', 'own_open']) {
+            const response = await postEvent(baseUrl, {
+                action, trackKey: 'forgedTrack', postId: 't3_forged', subredditName: 'Other', userId: 't2_forged',
+                postData: { postType: 'head-to-head', challengeId: 'forged' },
+            });
+            expect(response.status).toBe(204);
+            await vi.waitFor(() => expect(services.recordChallengeEvent).toHaveBeenCalledWith({ action }));
+        }
+        expect(services.assertModeratorForSubreddit).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid actions without recording', async () => {
+        const services = dependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        for (const action of ['start', '', null, ['view']]) {
+            expect((await postEvent(baseUrl, { action })).status).toBe(400);
+        }
+        expect(services.recordChallengeEvent).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges immediately while Redis recording is pending', async () => {
+        let release;
+        const pending = new Promise((resolve) => { release = resolve; });
+        const services = dependencies({ recordChallengeEvent: vi.fn(() => pending) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        try {
+            expect((await postEvent(baseUrl, { action: 'view' })).status).toBe(204);
+            expect(services.recordChallengeEvent).toHaveBeenCalledWith({ action: 'view' });
+        } finally {
+            release();
+        }
+    });
+
+    it('keeps Redis failure benign for the poster', async () => {
+        const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const services = dependencies({ recordChallengeEvent: vi.fn(async () => { throw new Error('Redis unavailable'); }) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await postEvent(baseUrl, { action: 'view' })).status).toBe(204);
+        await vi.waitFor(() => expect(logError).toHaveBeenCalled());
+    });
+
+    it('uses moderator context for the paginated listing', async () => {
+        const result = { date: '2026-10-05', items: [{ trackKey: 'countryRoad', today: { views: 4 }, lifetime: { views: 30 } }], nextOffset: 50 };
+        const services = dependencies({ getChallengeAnalyticsPage: vi.fn(async () => result) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const response = await fetch(`${baseUrl}/api/analytics/challenges?offset=25&subredditName=Forged`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(result);
+        expect(services.assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 25);
+    });
+
+    it('defaults to the first track page and does not require a client identity', async () => {
+        const services = dependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await fetch(`${baseUrl}/api/analytics/challenges`)).status).toBe(200);
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 0);
+    });
+
+    it('denies non-moderators before reading catalog or counts', async () => {
+        const services = dependencies({ assertModeratorForSubreddit: vi.fn(async () => { throw new Error('Moderator access required for r/MiniRacer.'); }) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await fetch(`${baseUrl}/api/analytics/challenges`)).status).toBe(403);
+        expect(services.getChallengeAnalyticsPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing subreddit context', async () => {
+        const services = dependencies({ resolveAnalyticsToolSubredditName: async () => null });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await fetch(`${baseUrl}/api/analytics/challenges`)).status).toBe(400);
+        expect(services.assertModeratorForSubreddit).not.toHaveBeenCalled();
+        expect(services.getChallengeAnalyticsPage).not.toHaveBeenCalled();
+    });
+
+    it.each(['-1', '1.5', 'NaN', '9007199254740991', '', '0&offset=1', 'Infinity'])('rejects invalid offset %s', async (value) => {
+        const services = dependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await fetch(`${baseUrl}/api/analytics/challenges?offset=${value}`)).status).toBe(400);
+        expect(services.getChallengeAnalyticsPage).not.toHaveBeenCalled();
+    });
+
+    it('surfaces metric read failure instead of returning zeroes', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const services = dependencies({ getChallengeAnalyticsPage: vi.fn(async () => { throw new Error('Redis unavailable'); }) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const response = await fetch(`${baseUrl}/api/analytics/challenges`);
+        expect(response.status).toBe(500);
+        expect(await response.json()).toEqual({ error: 'Redis unavailable' });
+    });
+});

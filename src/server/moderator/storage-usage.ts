@@ -43,6 +43,15 @@ import {
     storedTrackRecordKey,
 } from '../tracks/track-store.js';
 import { cacheSharedJson } from '../redis/shared-cache.js';
+import {
+    challengeAnalyticsCountsKey,
+    challengeAnalyticsViewersKey,
+    challengeTrackAnalyticsCountsKey,
+    challengeTrackAnalyticsIndexKey,
+    challengeTrackAnalyticsRetentionDates,
+    challengeTrackAnalyticsViewersKey,
+} from './challenge-analytics-store.js';
+import { challengeAnalyticsMigrationKeys } from './challenge-analytics-migration.js';
 
 const SAMPLED_KEYS_PER_GROUP = 5;
 const SAMPLED_ROWS_PER_KEY = 20;
@@ -352,6 +361,80 @@ async function readLedgerSample(ledgerKey: string): Promise<string[]> {
     }
 }
 
+async function measureLegacyChallengeAnalytics(subredditName: string): Promise<StorageUsageGroup[]> {
+    const countsKey = challengeAnalyticsCountsKey(subredditName);
+    let postIds: string[] = [];
+    try {
+        postIds = [...new Set((await redis.hKeys(countsKey))
+            .filter((field) => field.startsWith('views:') || field.startsWith('clicks:'))
+            .map((field) => field.slice(field.indexOf(':') + 1)))];
+    } catch (_error) {
+        postIds = [];
+    }
+    const sampled = pickSpread(postIds, SAMPLED_PLAYERS);
+    const description = {
+        id: 'analytics',
+        label: 'Analytics',
+        detail: 'This page: daily player marks, summary totals, cohort starts, account ledger, and challenge views/clicks',
+    };
+    return await Promise.all([
+        measureKeyGroup({ ...description, strings: [], hashes: [countsKey], sortedSets: [] }),
+        measureKeyGroup({
+            ...description,
+            strings: [],
+            hashes: sampled.map((postId) => challengeAnalyticsViewersKey(subredditName, postId)),
+            sortedSets: [],
+            scale: sampled.length ? postIds.length / sampled.length : 1,
+        }),
+    ]);
+}
+
+async function measureChallengeAnalytics(subredditName: string, now: Date): Promise<StorageUsageGroup[]> {
+    const description = {
+        id: 'analytics',
+        label: 'Analytics',
+        detail: 'This page: player activity, cohorts, account ledger, and challenge views/clicks by track',
+    };
+    const periods = [null, ...challengeTrackAnalyticsRetentionDates(now)];
+    const migrationKeys = challengeAnalyticsMigrationKeys(subredditName);
+    const parts = await Promise.all([
+        measureLegacyChallengeAnalytics(subredditName),
+        Promise.all(periods.map(async (date) => {
+            const countsKey = challengeTrackAnalyticsCountsKey(subredditName, date);
+            let tracks: string[] = [];
+            try {
+                tracks = [...new Set((await redis.hKeys(countsKey))
+                    .filter((field) => /^(views|accept-clicks|own-opens):/.test(field))
+                    .map((field) => field.slice(field.indexOf(':') + 1)))];
+            } catch (_error) {
+                tracks = [];
+            }
+            const sampled = pickSpread(tracks, SAMPLED_TRACKS);
+            return await Promise.all([
+                measureKeyGroup({ ...description, strings: [], hashes: [countsKey], sortedSets: [] }),
+                measureKeyGroup({
+                    ...description,
+                    strings: [],
+                    hashes: sampled.map((trackKey) => challengeTrackAnalyticsViewersKey(subredditName, trackKey, date)),
+                    sortedSets: [],
+                    scale: sampled.length ? tracks.length / sampled.length : 1,
+                }),
+            ]);
+        })),
+        measureKeyGroup({
+            ...description,
+            strings: [migrationKeys.complete],
+            hashes: [migrationKeys.receipts],
+            sortedSets: [challengeTrackAnalyticsIndexKey(subredditName)],
+        }),
+    ]);
+    return [
+        ...parts[0],
+        ...parts[1].flat(),
+        parts[2],
+    ];
+}
+
 function buildKeyGroups({
     subredditName,
     now,
@@ -425,7 +508,7 @@ function buildKeyGroups({
         {
             id: 'analytics',
             label: 'Analytics',
-            detail: 'This page: daily player marks, the summary totals, cohort starts, and the account ledger',
+            detail: 'This page: player activity, cohorts, account ledger, and challenge views/clicks by track',
             strings: [],
             hashes: [
                 ...dates.flatMap((date) => [
@@ -492,6 +575,7 @@ async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> 
             .map((group) => measureKeyGroup(group)),
         measurePlayerRecords(analyticsScope(subreddit)),
         measureTracks(),
+        ...await measureChallengeAnalytics(subreddit, now),
     ]));
 
     return {

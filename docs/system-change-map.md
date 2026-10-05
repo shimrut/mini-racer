@@ -112,6 +112,33 @@ flowchart LR
 - `game/ui/loader.js` owns the status line and retry. The bar crawl lives in `styles/loading.css` and is not tied to startup phase percents. Dismissal removes the input-blocking class immediately and uses the shared 160ms motion token, without depending on animation frames that a hidden WebView may suspend.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches Journey events in Devvit. Separate moderator summary counters live in one `dailygp:analytics:{scope}:summary` hash per community. Each race, challenge create, or podium event increments that hash, and the moderator page reads it through `/api/analytics/summary`. The first read copies older per-day counter hashes into the summary so existing charts stay. Daily presence hashes remain, because cohort return rates still check who came back on a specific day. Expiry on these keys is refreshed once per server process per UTC day, not on every event. Cohort starts are recorded separately for signed-in accounts and are derived against retained daily presence marks for exact UTC-day D1/D2/D3/D7/D14/D30 return rates; guests remain outside the cohort denominator. That same moderator summary also includes a Redis occupancy walk from `src/server/moderator/storage-usage.ts` (named keys only, sampled row sizes, 5-minute cache); Head to Head share previews and 10-minute post identity stay unlisted, while the durable Head to Head challenge catalog is counted with posts.
 
+### Issued Challenge Analytics
+
+- The Head to Head poster reports each visible episode, Accept Challenge tap
+  and author Open Mini Racer tap through `game/head-to-head/poster-analytics.js`
+  and `POST /api/analytics/challenge`. Repeat visits/reloads and taps count;
+  redraws do not. Trusted Devvit context supplies track/account ownership.
+  The independent event route bypasses catalog loading and migration; reporting
+  never delays expansion.
+- `src/server/moderator/challenge-analytics-store.ts` aggregates Today (UTC)
+  and Lifetime per track across every challenge post, including older posts.
+  Each event updates both periods, so Lifetime includes Today without a midnight
+  merge job. Hashed identities deduplicate by track/day or track/lifetime;
+  unidentified views affect raw totals only. Daily counts/membership expire at
+  a fixed two-day deadline; lifetime counts/membership remain permanent.
+  `challenge-analytics-migration.ts` unions legacy per-post identities and imports
+  counts into Lifetime only, with atomic per-post snapshots for retry safety,
+  preserved source data and reconciliation of in-flight old-version writes.
+  Later reads inspect the fixed legacy mapping rather than traversing the catalog.
+- Moderator-only `GET /api/analytics/challenges` pages tracked keys 25 at a time,
+  loading only those stored definitions before name lookup. `pages/mod-analytics.js`
+  displays Track, Views, Unique viewers and Clicks with Today/Lifetime controls;
+  clicks combine Accept and author opens. Refresh reloads page zero; pagination
+  crossing a UTC day refetches instead of mixing days. Errors retain prior rows
+  and their date. Storage estimates cover daily/lifetime/index/import/legacy
+  keys. See [challenge-view-count-feasibility-2026-10-04.md](./challenge-view-count-feasibility-2026-10-04.md)
+  for event definitions, storage limits and validation evidence.
+
 ### UI And Modal Flow
 
 - `pages/game.html` contains the modal markup and the IDs/classes the UI modules depend on.

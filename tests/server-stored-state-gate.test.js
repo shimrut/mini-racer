@@ -55,6 +55,8 @@ function services() {
             getRequestUsername: () => 'RaceFan',
             recordRaceStart: vi.fn(async () => {}),
             recordPodiumEvent: vi.fn(async () => {}),
+            recordChallengeEvent: vi.fn(async () => {}),
+            getChallengeAnalyticsPage: vi.fn(async () => ({ items: [], nextOffset: null })),
         },
         tracks: {
             readPlacedStoredTracks: vi.fn(async () => []),
@@ -103,12 +105,13 @@ describe('the stored catalog gate', () => {
         expect(dependencies.campaign.getServerCampaignBootstrap).toHaveBeenCalledTimes(1);
     });
 
-    it('lets the two analytics recorders and telemetry answer without the catalog', async () => {
+    it('lets the analytics recorders and telemetry answer without the catalog', async () => {
         ensureStoredCatalogLoaded.mockRejectedValue(new Error('redis: timeout'));
         const dependencies = services();
         const baseUrl = await startApp(dependencies);
         expect((await post(`${baseUrl}/api/analytics/race-start`, { mode: 'daily' })).status).toBe(204);
         expect((await post(`${baseUrl}/api/analytics/podium`, { action: 'play' })).status).toBe(204);
+        expect((await post(`${baseUrl}/api/analytics/challenge`, { action: 'view' })).status).toBe(204);
         const telemetry = await post(`${baseUrl}/api/telemetry/journey/app-ready`, {});
         expect(telemetry.status).not.toBe(503);
         expect(ensureStoredCatalogLoaded).not.toHaveBeenCalled();
@@ -138,6 +141,9 @@ describe('the stored catalog gate', () => {
         expect((await fetch(`${baseUrl}/api/analytics/summary`)).status).toBe(503);
         expect((await fetch(`${baseUrl}/api/analytics/guest-transfer?username=RaceFan`)).status).toBe(503);
         expect((await fetch(`${baseUrl}/api/analytics/race-start`)).status).toBe(503);
+        expect((await fetch(`${baseUrl}/api/analytics/challenge`)).status).toBe(503);
+        expect((await fetch(`${baseUrl}/api/analytics/challenges`)).status).toBe(503);
+        expect((await post(`${baseUrl}/api/analytics/challenge/other`, { action: 'view' })).status).toBe(503);
         expect((await fetch(`${baseUrl}/api/some/new-route`)).status).toBe(503);
         expect(dependencies.analytics.getServerAnalyticsSummary).not.toHaveBeenCalled();
     });

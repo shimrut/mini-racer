@@ -1,5 +1,6 @@
 import { requestGameLaunchTarget } from '../modes/launch-target.js';
 import { cleanText } from '../shared/values.js';
+import { reportChallengePosterEvent, startChallengePosterViews } from './poster-analytics.js';
 
 export const HEAD_TO_HEAD_POST_TYPE = 'head-to-head';
 export const OWN_CHALLENGE_MESSAGE = "You can't accept your own Head to Head.";
@@ -57,12 +58,18 @@ export function applyHeadToHeadAccessState(button, message, access = {}) {
 export function bindAcceptChallenge(
     documentRef,
     openGame = openHeadToHead,
-    { ownChallenge = false, openOwnChallenge = openHomeAsRedirect } = {},
+    {
+        ownChallenge = false,
+        openOwnChallenge = openHomeAsRedirect,
+        reportClick = (action) => reportChallengePosterEvent(action),
+    } = {},
 ) {
     const button = documentRef?.getElementById('accept-challenge');
     if (!button || button.dataset.bound === '1') return button || null;
     button.dataset.bound = '1';
     button.addEventListener('click', async (event) => {
+        if (button.disabled) return;
+        try { void Promise.resolve(reportClick(ownChallenge ? 'own_open' : 'click')).catch(() => {}); } catch { }
         if (ownChallenge) {
             event.preventDefault?.();
             await openOwnChallenge(event);
@@ -96,6 +103,7 @@ export function bootHeadToHeadAccept(root = globalThis, documentRef = root.docum
     const access = resolveHeadToHeadPosterAccess(root);
     const button = bindAcceptChallenge(documentRef, openHeadToHead, {
         ownChallenge: access.ownChallenge === true,
+        reportClick: (action) => reportChallengePosterEvent(action, root),
         openOwnChallenge: openHomeAsRedirect,
     });
     applyHeadToHeadAccessState(
@@ -103,5 +111,6 @@ export function bootHeadToHeadAccept(root = globalThis, documentRef = root.docum
         documentRef?.getElementById?.('challenge-message'),
         access,
     );
+    startChallengePosterViews(documentRef, root);
     return { access, button };
 }

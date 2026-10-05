@@ -11,9 +11,12 @@ export type AnalyticsRouteDependencies = {
     getRequestUsername(): string | null;
     recordRaceStart(input: Record<string, unknown>): Promise<void>;
     recordPodiumEvent(input: Record<string, unknown>): Promise<void>;
+    recordChallengeEvent(input: { action: unknown }): Promise<void>;
+    getChallengeAnalyticsPage(subredditName: string, offset: number): Promise<unknown>;
 };
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
+const CHALLENGE_ANALYTICS_ACTIONS = new Set(['view', 'click', 'own_open']);
 
 const CLIENT_REPORTED_START_MODES = new Set(['daily', 'campaign', 'challenge']);
 
@@ -51,6 +54,45 @@ export function registerAnalyticsRoutes(
             await dependencies.recordPodiumEvent({ action });
         } catch (error) {
             console.error('Failed to record Mini Racer podium analytics:', error);
+        }
+    });
+
+    app.post('/api/analytics/challenge', async (req, res) => {
+        const { action } = req.body ?? {};
+        if (!CHALLENGE_ANALYTICS_ACTIONS.has(action)) {
+            res.status(400).json({ error: 'Unsupported challenge analytics action.' });
+            return;
+        }
+        res.status(204).end();
+        try {
+            await dependencies.recordChallengeEvent({ action });
+        } catch (error) {
+            console.error('Failed to record Mini Racer challenge analytics:', error);
+        }
+    });
+
+    app.get('/api/analytics/challenges', async (req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            const rawOffset = req.query.offset ?? '0';
+            const offset = typeof rawOffset === 'string' && /^\d+$/.test(rawOffset)
+                ? Number(rawOffset)
+                : Number.NaN;
+            if (!Number.isSafeInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER - 25) {
+                res.status(400).json({ error: 'Invalid challenge analytics offset.' });
+                return;
+            }
+            res.status(200).json(await dependencies.getChallengeAnalyticsPage(subredditName, offset));
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Challenge analytics failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to load Mini Racer challenge analytics:', error);
+            res.status(status).json({ error: message });
         }
     });
 

@@ -12,6 +12,13 @@ export function getRequestUserId(): string | null {
     return id.startsWith('t2_') ? id : null;
 }
 
+export function getRequestAnalyticsViewerIdentity(): string | null {
+    const userId = getRequestUserId();
+    if (userId) return `user:${userId}`;
+    const loid = typeof context.loid === 'string' ? context.loid.trim() : '';
+    return loid ? `loid:${loid}` : null;
+}
+
 export function getRequestRateLimitIdentity(): string | null {
     return createRequestRateLimitIdentity({
         loid: context.loid,

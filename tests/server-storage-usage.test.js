@@ -47,6 +47,12 @@ vi.mock('@devvit/web/server', () => ({
 }));
 
 const { getServerStorageUsage } = await import('../src/server/moderator/storage-usage.ts');
+const {
+    challengeAnalyticsCountsKey, challengeAnalyticsViewersKey,
+    challengeTrackAnalyticsCountsKey, challengeTrackAnalyticsViewersKey,
+    challengeTrackAnalyticsIndexKey, challengeTrackAnalyticsCounterFields,
+} = await import('../src/server/moderator/challenge-analytics-store.ts');
+const { challengeAnalyticsMigrationKeys } = await import('../src/server/moderator/challenge-analytics-migration.ts');
 const { CAMPAIGN_ID } = await import('../game/campaign/manifest.js');
 
 const SUBREDDIT = 'mini_racer';
@@ -148,6 +154,54 @@ describe('server storage usage', () => {
         expect(usage.totalBytes).toBe(0);
         expect(usage.groups.every((group) => group.bytes === 0)).toBe(true);
         expect(usage.measuredAt).toBe(NOW.toISOString());
+    });
+
+    it('continues accounting for retained legacy per-post totals and membership', async () => {
+        putHash(challengeAnalyticsCountsKey(SUBREDDIT), {
+            'views:t3_one': '4', 'clicks:t3_one': '1', 'started:t3_one': NOW.toISOString(),
+        });
+        putHash(challengeAnalyticsViewersKey(SUBREDDIT, 't3_one'), { 'hashed-player-one': '1', 'hashed-player-two': '1' });
+        const usage = await measure();
+        expect(groupById(usage, 'analytics')).toMatchObject({ keys: 2, rows: 5, bytes: seededBytes(), estimated: false });
+        expect(usage.totalBytes).toBe(seededBytes());
+    });
+
+    it('accounts for lifetime, retained UTC days, track index and legacy migration receipts', async () => {
+        const trackKey = 'countryRoad';
+        const fields = challengeTrackAnalyticsCounterFields(trackKey);
+        putHash(challengeTrackAnalyticsCountsKey(SUBREDDIT), {
+            [fields.views]: '8', [fields.acceptClicks]: '3', [fields.ownOpens]: '2', [fields.trackingStartedAt]: NOW.toISOString(),
+        });
+        putHash(challengeTrackAnalyticsViewersKey(SUBREDDIT, trackKey), { 'hashed-player-one': '1', 'hashed-player-two': '1' });
+        for (const date of [TODAY, '2026-08-21']) {
+            putHash(challengeTrackAnalyticsCountsKey(SUBREDDIT, date), {
+                [fields.views]: '4', [fields.acceptClicks]: '2', [fields.ownOpens]: '1',
+            });
+            putHash(challengeTrackAnalyticsViewersKey(SUBREDDIT, trackKey, date), { 'hashed-player-one': '1' });
+        }
+        putSortedSet(challengeTrackAnalyticsIndexKey(SUBREDDIT), { [trackKey]: 0 });
+        const migration = challengeAnalyticsMigrationKeys(SUBREDDIT);
+        putString(migration.complete, '1');
+        putHash(migration.receipts, { t3_one: '1' });
+        putHash(challengeAnalyticsCountsKey(SUBREDDIT), {
+            'views:t3_one': '4', 'clicks:t3_one': '1', 'started:t3_one': NOW.toISOString(),
+        });
+        putHash(challengeAnalyticsViewersKey(SUBREDDIT, 't3_one'), { 'hashed-player-one': '1' });
+        const usage = await measure();
+        expect(groupById(usage, 'analytics')).toMatchObject({ keys: 11, rows: 21, bytes: seededBytes(), estimated: false });
+        expect(usage.totalBytes).toBe(seededBytes());
+    });
+
+    it('samples track viewer membership with explicit estimated storage', async () => {
+        const tracks = Array.from({ length: 80 }, (_unused, index) => `track${String(index).padStart(3, '0')}`);
+        putHash(challengeTrackAnalyticsCountsKey(SUBREDDIT), Object.fromEntries(tracks.map((trackKey) => [`views:${trackKey}`, '1'])));
+        putSortedSet(challengeTrackAnalyticsIndexKey(SUBREDDIT), Object.fromEntries(tracks.map((trackKey) => [trackKey, 0])));
+        for (const trackKey of tracks) {
+            putHash(challengeTrackAnalyticsViewersKey(SUBREDDIT, trackKey), { 'hashed-viewer': '1' });
+        }
+        const usage = await measure();
+        expect(groupById(usage, 'analytics')).toMatchObject({ keys: 82, rows: 240, estimated: true });
+        expect(mockRedis.hLen.mock.calls.filter(([key]) => key.includes(':lifetime:') && key.endsWith(':viewers'))).toHaveLength(60);
     });
 
     it('adds up every key it can name, and counts each one once', async () => {
