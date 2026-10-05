@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCampaignFinalStage, getCampaignSeriesStages } from '../game/campaign/manifest.js';
 
-const { values, mockRedis, mockReddit, mockResults, mockIdentity, mockAvatar, mockPending } = vi.hoisted(() => {
+const { values, mockRedis, mockReddit, mockResults, mockBestTrack, mockIdentity, mockAvatar, mockPending } = vi.hoisted(() => {
     const values = new Map();
     const mockRedis = {
         get: vi.fn(async (key) => values.get(key) ?? null),
@@ -29,6 +29,7 @@ const { values, mockRedis, mockReddit, mockResults, mockIdentity, mockAvatar, mo
         mockRedis,
         mockReddit: { submitCustomPost: vi.fn(), getPostsByUser: vi.fn(), getPostById: vi.fn() },
         mockResults: vi.fn(),
+        mockBestTrack: vi.fn(),
         mockIdentity: vi.fn(),
         mockAvatar: vi.fn(),
         mockPending: vi.fn(),
@@ -37,7 +38,10 @@ const { values, mockRedis, mockReddit, mockResults, mockIdentity, mockAvatar, mo
 
 vi.mock('@devvit/redis', () => ({ redis: mockRedis }));
 vi.mock('@devvit/web/server', () => ({ reddit: mockReddit }));
-vi.mock('../src/server/campaign/campaign-store.js', () => ({ getCampaignResultsForSeries: mockResults }));
+vi.mock('../src/server/campaign/campaign-store.js', () => ({
+    getCampaignResultsForSeries: mockResults,
+    readCampaignBestStageTrackKey: mockBestTrack,
+}));
 vi.mock('../src/server/competition/competition-identity.js', () => ({ resolveAuthorizedPlayerIdentity: mockIdentity }));
 vi.mock('../src/server/player/reddit-avatar.js', () => ({ resolveRedditAvatarUrl: mockAvatar }));
 vi.mock('../src/server/player/guest-retirement.js', () => ({ isProgressTransferPending: mockPending }));
@@ -103,6 +107,7 @@ describe('Campaign result sharing', () => {
         mockReddit.submitCustomPost.mockResolvedValue(publishedPost());
         mockReddit.getPostsByUser.mockReturnValue({ all: async () => [] });
         mockResults.mockResolvedValue(completedResults());
+        mockBestTrack.mockResolvedValue(null);
         mockIdentity.mockResolvedValue({ canonicalPlayerId: 'reddit:racefan' });
         mockAvatar.mockResolvedValue('https://i.redd.it/racefan.png');
         mockPending.mockResolvedValue(false);
@@ -342,6 +347,30 @@ describe('Campaign result sharing', () => {
         mockResults.mockResolvedValue(timedResults(187_654));
         await refreshServerCampaignResultsShare(refreshInput);
         expect(post.mergePostData).toHaveBeenCalledWith({ totalTimeMs: 187_654 });
+    });
+
+    it('publishes the track of the stage where the player places best', async () => {
+        mockBestTrack.mockResolvedValue('numberThree');
+        await previewAndConfirm(input);
+        expect(mockBestTrack).toHaveBeenCalledWith('reddit:racefan', 'numbered-v1');
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].postData.bestTrackKey).toBe('numberThree');
+    });
+
+    it('publishes without a track when the stage places cannot be read', async () => {
+        mockBestTrack.mockRejectedValue(new Error('Redis temporarily unavailable'));
+        expect((await previewAndConfirm(input)).body.status).toBe('shared');
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].postData).not.toHaveProperty('bestTrackKey');
+    });
+
+    it('moves the post to a new best track and keeps it when places cannot be read', async () => {
+        mockBestTrack.mockResolvedValue('numberThree');
+        const post = await publishedFixture();
+        mockBestTrack.mockResolvedValue('numberSeven');
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledWith({ bestTrackKey: 'numberSeven' });
+        mockBestTrack.mockResolvedValue(null);
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledOnce();
     });
 
     it('keeps a posted total time when no total can be computed', async () => {

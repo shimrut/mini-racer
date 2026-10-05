@@ -1,29 +1,23 @@
-import { readCampaignPlace } from '../game/campaign/aggregate.js';
+import { formatCampaignPlace, readCampaignPlace } from '../game/campaign/aggregate.js';
 import { requestGameLaunchTarget } from '../game/modes/launch-target.js';
 import { exposeCampaignLauncherTestHooks } from '../game/debug/launcher-hooks.js';
-import { applyAvatar, isRedditAvatarUrl } from '../game/ui/avatar.js';
-import { createMedalIconSvg } from '../game/medals/medal-icon.js';
+import { formatSeriesMedals } from '../game/lobby/campaign-series-picker.js';
+import { STANDARD_MEDAL_TIER_RANK } from '../game/medals/medal-timing.js';
 import { formatRaceClock } from '../game/shared/race-time-text.js';
 import { cleanText } from '../game/shared/values.js';
+import { createPosterCarDrive, loadPosterCar } from '../game/track/poster-car.js';
+import { renderPosterTrack } from '../game/track/poster-track.js';
+import { ensureStoredTracks } from '../game/track/stored-track-service.js';
+import { TRACKS } from '../game/track/tracks.js';
+import { applyAvatar, isRedditAvatarUrl } from '../game/ui/avatar.js';
 
 const MEDAL_TIERS = ['author', 'gold', 'silver', 'bronze'];
-const PLACE_TIERS = ['gold', 'silver', 'bronze'];
-const ORDINAL_SUFFIXES = { 1: 'ST', 2: 'ND', 3: 'RD' };
-const MAX_ORDINAL_RANK = 100;
-const LONG_SERIES_NAME = 16;
+const MAX_LISTED_PLACE = 100;
 
-export function formatCampaignOrdinalSuffix(rank) {
-    const lastTwo = rank % 100;
-    if (lastTwo >= 11 && lastTwo <= 13) return 'TH';
-    return ORDINAL_SUFFIXES[rank % 10] || 'TH';
-}
-
-// Ranks 1-100 read as an ordinal; below that, as a share of all finishers.
-export function formatCampaignPlaceFigure({ rank, total }) {
-    if (rank <= MAX_ORDINAL_RANK) {
-        return { prefix: '', number: String(rank), suffix: formatCampaignOrdinalSuffix(rank) };
-    }
-    return { prefix: 'TOP', number: `${Math.ceil(rank * 100 / total)}%`, suffix: '' };
+// Places past 100th read as a share of all finishers.
+export function formatCampaignOverallPlace(place) {
+    if (place.rank <= MAX_LISTED_PLACE) return formatCampaignPlace(place);
+    return `TOP ${Math.ceil(place.rank * 100 / place.total)}%`;
 }
 
 export function readCampaignFinishedPostData(root = globalThis) {
@@ -38,9 +32,10 @@ export function readCampaignFinishedPostData(root = globalThis) {
             const count = postData.medalDistribution?.[tier];
             return [tier, Number.isSafeInteger(count) && count >= 0 ? count : 0];
         })),
+        stageCount: readPositiveInteger(postData.stageCount),
         place: readCampaignPlace(postData.place),
         totalTimeMs: readPositiveInteger(postData.totalTimeMs),
-        stageCount: readPositiveInteger(postData.stageCount),
+        bestTrackKey: cleanText(postData.bestTrackKey),
     };
 }
 
@@ -48,58 +43,62 @@ function readPositiveInteger(value) {
     return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
-function renderCampaignPlace(byId, poster, place) {
-    const block = byId('campaign-finished-place');
-    if (!block) return;
-    block.hidden = !place;
-    const tier = PLACE_TIERS[place ? place.rank - 1 : -1];
-    for (const name of PLACE_TIERS) poster?.classList.toggle(`finished-shell--${name}`, name === tier);
-    if (!place) return;
-    const figure = formatCampaignPlaceFigure(place);
-    const total = place.total.toLocaleString('en-US');
-    byId('campaign-finished-place-prefix').textContent = figure.prefix;
-    byId('campaign-finished-place-number').textContent = figure.number;
-    byId('campaign-finished-place-suffix').textContent = figure.suffix;
-    byId('campaign-finished-place-total').textContent = `of ${total}`;
-    byId('campaign-finished-place-text').textContent = `Overall place ${place.rank} of ${total}`;
-    byId('campaign-finished-place-figure').style?.setProperty('--place-chars', String(figure.number.length));
+function formatFinishedMedals({ medalDistribution, stageCount }) {
+    if (!stageCount) return '';
+    const medalCount = MEDAL_TIERS.reduce(
+        (sum, tier) => sum + medalDistribution[tier] * (STANDARD_MEDAL_TIER_RANK[tier] + 1),
+        0,
+    );
+    return formatSeriesMedals({ medalCount, stageCount });
+}
+
+function showStat(documentRef, name, text) {
+    documentRef.getElementById(`campaign-finished-${name}`).hidden = !text;
+    documentRef.getElementById(`campaign-finished-${name}-value`).textContent = text;
 }
 
 export function renderCampaignFinishedPoster(documentRef, value) {
     if (!documentRef || !value) return;
-    const byId = (id) => documentRef.getElementById(id);
-    const launcher = byId('campaign-launcher');
-    if (launcher) launcher.hidden = true;
-    const poster = byId('campaign-finished-poster');
-    if (poster) poster.hidden = false;
-    byId('campaign-finished-summary').textContent = `I finished the ${value.seriesName} campaign.`;
-    byId('campaign-finished-name').textContent = value.playerUsername;
-    applyAvatar(byId('campaign-finished-avatar'), value.playerAvatarUrl, {
+    documentRef.getElementById('campaign-launcher').hidden = true;
+    documentRef.getElementById('campaign-finished-poster').hidden = false;
+    documentRef.getElementById('campaign-finished-name').textContent = value.playerUsername;
+    applyAvatar(documentRef.getElementById('campaign-finished-avatar'), value.playerAvatarUrl, {
         alt: `${value.playerUsername} avatar`,
         genericClass: 'finished-avatar--generic',
     });
-    const series = byId('campaign-finished-series');
-    series.textContent = value.seriesName;
-    series.classList.toggle('finished-headline__series--long', value.seriesName.length > LONG_SERIES_NAME);
-    byId('campaign-finished-time').hidden = !value.totalTimeMs;
-    byId('campaign-finished-time-value').textContent = value.totalTimeMs ? formatRaceClock(value.totalTimeMs) : '';
-    byId('campaign-finished-stages').textContent = value.stageCount
-        ? `${value.stageCount} ${value.stageCount === 1 ? 'stage' : 'stages'}`
-        : '';
-    renderCampaignPlace(byId, poster, value.place);
-    const medals = byId('campaign-finished-medals');
-    for (const tier of MEDAL_TIERS) {
-        const slot = medals?.querySelector(`[data-campaign-medal="${tier}"]`);
-        if (!slot) continue;
-        const count = value.medalDistribution[tier];
-        slot.setAttribute('aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`);
-        slot.replaceChildren(createMedalIconSvg(tier, {
-            className: 'finished-medal-icon',
-            centerText: String(count),
-            showEmblem: false,
-        }));
-    }
-    byId('campaign-finished-race-btn').disabled = !value.seriesId;
+    documentRef.getElementById('campaign-finished-series').textContent = value.seriesName;
+    showStat(documentRef, 'place', value.place ? formatCampaignOverallPlace(value.place) : '');
+    showStat(documentRef, 'medals', formatFinishedMedals(value));
+    showStat(documentRef, 'time', value.totalTimeMs ? formatRaceClock(value.totalTimeMs) : '');
+    documentRef.getElementById('campaign-finished-race-btn').disabled = !value.seriesId;
+}
+
+let shownTrack = null;
+
+function paintFinishedTrack(documentRef) {
+    if (!shownTrack) return;
+    renderPosterTrack(
+        documentRef.getElementById('campaign-finished-track'),
+        shownTrack.trackKey,
+        shownTrack.image,
+        shownTrack.travel,
+    );
+}
+
+// A track made in the Creator is not in the app, so the page loads it first.
+export async function showFinishedTrack(documentRef, trackKey) {
+    if (!trackKey) return;
+    await ensureStoredTracks([trackKey], { includeBuiltIn: true });
+    const canvas = documentRef?.getElementById('campaign-finished-track');
+    if (!canvas || !TRACKS[trackKey]) return;
+    canvas.hidden = false;
+    shownTrack = { trackKey, image: null, travel: 1 };
+    paintFinishedTrack(documentRef);
+    const drive = createPosterCarDrive((image, travel) => {
+        shownTrack = { trackKey, image, travel };
+        paintFinishedTrack(documentRef);
+    });
+    drive.drive(await loadPosterCar(TRACKS[trackKey]));
 }
 
 export async function openCampaignGame(event, {
@@ -141,6 +140,9 @@ export function bootCampaignLauncher(documentRef = document, root = globalThis) 
     renderCampaignFinishedPoster(documentRef, finished);
     bindCampaignRaceButton(documentRef, (event) => openCampaignGame(event, { root }));
     exposeCampaignLauncherTestHooks(finished);
+    void showFinishedTrack(documentRef, finished?.bestTrackKey).catch((error) => {
+        console.error('The Campaign finished track could not be drawn:', error);
+    });
 }
 
 if (typeof document !== 'undefined') {
@@ -149,4 +151,5 @@ if (typeof document !== 'undefined') {
     } else {
         bootCampaignLauncher();
     }
+    globalThis.addEventListener('resize', () => paintFinishedTrack(document));
 }

@@ -1,5 +1,17 @@
 # Campaign finished screen investigation — 2026-10-04
 
+## Victory poster — 2026-10-05
+
+The finished poster follows the owner's reference layout, drawn only with the
+game's existing poster parts, colors and fonts: logo top left, player, series
+name, **Campaign / Complete**, the best-placed stage's track, then **Overall
+place**, **Medals** (the game's `43/64` score) and **Total time**, and **Play
+Campaign**. No challenge wording. The server picks the track with
+`readCampaignBestStageTrackKey()` (lowest stage rank, the bigger field on a
+tie), writes it as `postData.bestTrackKey`, and moves it when a later save
+changes the best stage. A failed read leaves the post without a track. Head to
+Head and this poster share `renderPosterTrack()`.
+
 ## Head to Head layout — 2026-10-05
 
 The finished poster now uses the Head to Head poster layout. The overall place

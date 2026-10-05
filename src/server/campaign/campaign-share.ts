@@ -21,7 +21,7 @@ import {
 import { playerFieldHash, redisKeyPart } from '../redis/redis-names.js';
 import { normalizeName } from '../shared/value-guards.js';
 import { campaignAggregateKeys } from './campaign-aggregate-store.js';
-import { getCampaignResultsForSeries } from './campaign-store.js';
+import { getCampaignResultsForSeries, readCampaignBestStageTrackKey } from './campaign-store.js';
 
 type ShareRecord = { createdAt: string; postId?: string; postUrl?: string; refreshPending?: boolean };
 type SharedPost = { id?: string; url?: string; authorName?: string };
@@ -84,6 +84,15 @@ async function readCampaignSharePlace(seriesId: string, playerId: string): Promi
         });
     } catch (error) {
         console.error('Campaign share place could not be read:', error);
+        return null;
+    }
+}
+
+async function readCampaignShareBestTrack(seriesId: string, playerId: string): Promise<string | null> {
+    try {
+        return await readCampaignBestStageTrackKey(playerId, seriesId);
+    } catch (error) {
+        console.error('Campaign share best track could not be read:', error);
         return null;
     }
 }
@@ -222,7 +231,9 @@ export async function refreshServerCampaignResultsShare({
         const placeChanged = livePlace !== null
             && (postedPlace?.rank !== livePlace.rank || postedPlace?.total !== livePlace.total);
         const timeChanged = screen.totalTimeMs !== null && data.totalTimeMs !== screen.totalTimeMs;
-        if (medalsMatch && !placeChanged && !timeChanged && current.refreshPending !== true) return;
+        const liveTrackKey = await readCampaignShareBestTrack(series.id, canonicalPlayerId);
+        const trackChanged = liveTrackKey !== null && data.bestTrackKey !== liveTrackKey;
+        if (medalsMatch && !placeChanged && !timeChanged && !trackChanged && current.refreshPending !== true) return;
         if (!await isRedisLockOwned(lock, redis)) throw new Error('Campaign post refresh lost its lock.');
         const copy = campaignShareCopy(
             `I finished the ${screen.title} campaign`,
@@ -230,13 +241,14 @@ export async function refreshServerCampaignResultsShare({
             livePlace ?? postedPlace,
             screen.totalTimeMs,
         );
-        const updates: { medalDistribution?: typeof screen.medalDistribution; stageCount?: number; totalTimeMs?: number; place?: NonNullable<CampaignSharePreview['place']> } = {};
+        const updates: { medalDistribution?: typeof screen.medalDistribution; stageCount?: number; totalTimeMs?: number; bestTrackKey?: string; place?: NonNullable<CampaignSharePreview['place']> } = {};
         if (!medalsMatch) {
             updates.medalDistribution = screen.medalDistribution;
             updates.stageCount = screen.stageCount;
         }
         if (timeChanged && screen.totalTimeMs !== null) updates.totalTimeMs = screen.totalTimeMs;
         if (placeChanged && livePlace) updates.place = livePlace;
+        if (trackChanged && liveTrackKey) updates.bestTrackKey = liveTrackKey;
         if (Object.keys(updates).length > 0) await post.mergePostData(updates);
         await post.setTextFallback({ text: copy.text });
         await clearRefreshPending(key, current);
@@ -356,6 +368,7 @@ export async function confirmServerCampaignResultsShare({
             return failure(409, 'preview_expired', 'This Campaign changed. Close this preview and share again.');
         }
         const playerAvatarUrl = await resolveRedditAvatarUrl(username);
+        const bestTrackKey = await readCampaignShareBestTrack(series.id, canonicalPlayerId);
         const title = preview.title;
         const postData = {
             postType: 'campaign-finished',
@@ -367,6 +380,7 @@ export async function confirmServerCampaignResultsShare({
             medalDistribution: preview.medalDistribution,
             stageCount: preview.stageCount,
             ...(preview.totalTimeMs ? { totalTimeMs: preview.totalTimeMs } : {}),
+            ...(bestTrackKey ? { bestTrackKey } : {}),
             ...(preview.place ? { place: preview.place } : {}),
         };
         const claim: ShareRecord = { createdAt: new Date().toISOString() };

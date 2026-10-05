@@ -36,49 +36,41 @@
         </footer>
     </main>
 
-    <main id="campaign-finished-poster" class="finished-shell" aria-labelledby="campaign-finished-series" hidden>
+    <main id="campaign-finished-poster" class="finished-shell" aria-labelledby="campaign-finished-title" hidden>
         <header class="finished-brand" aria-label="Mini Racer">
             <span class="finished-brand__mini">Mini</span>
             <span class="finished-brand__racer">Racer</span>
         </header>
 
-        <section class="finished-copy">
-            <p id="campaign-finished-summary" class="visually-hidden"></p>
-            <div class="finished-racer">
-                <img id="campaign-finished-avatar" class="finished-avatar finished-avatar--generic" alt="">
-                <span id="campaign-finished-name" class="finished-racer__name">A racer</span>
-            </div>
-            <div class="finished-headline">
-                <span class="finished-headline__label">Campaign complete</span>
-                <h1 id="campaign-finished-series" class="finished-headline__series">Campaign</h1>
-                <p class="finished-headline__meta">
-                    <span id="campaign-finished-time" hidden>
-                        <span class="finished-headline__dim">Time to beat</span>
-                        <span id="campaign-finished-time-value" class="finished-headline__time"></span>
-                    </span>
-                    <span id="campaign-finished-stages"></span>
-                </p>
-            </div>
+        <div class="finished-racer">
+            <img id="campaign-finished-avatar" class="finished-avatar finished-avatar--generic" alt="">
+            <span id="campaign-finished-name" class="finished-racer__name">A racer</span>
+        </div>
+
+        <section class="finished-head">
+            <p id="campaign-finished-series" class="finished-series"></p>
+            <h1 id="campaign-finished-title" class="finished-title">
+                <span class="finished-title__first">Campaign</span>
+                <span class="finished-title__second">Complete</span>
+            </h1>
         </section>
 
-        <section class="finished-standing" aria-label="Overall result">
-            <p id="campaign-finished-place" class="finished-place" hidden>
-                <span id="campaign-finished-place-text" class="visually-hidden"></span>
-                <span class="finished-place__label" aria-hidden="true">Overall place</span>
-                <span id="campaign-finished-place-figure" class="finished-place__figure" aria-hidden="true">
-                    <span id="campaign-finished-place-prefix" class="finished-place__affix"></span>
-                    <span id="campaign-finished-place-number"></span>
-                    <span id="campaign-finished-place-suffix" class="finished-place__affix"></span>
-                </span>
-                <span id="campaign-finished-place-total" class="finished-place__total" aria-hidden="true"></span>
-            </p>
-            <div id="campaign-finished-medals" class="finished-medals" aria-label="Medal distribution">
-                <span class="finished-medal" data-campaign-medal="author"></span>
-                <span class="finished-medal" data-campaign-medal="gold"></span>
-                <span class="finished-medal" data-campaign-medal="silver"></span>
-                <span class="finished-medal" data-campaign-medal="bronze"></span>
+        <canvas id="campaign-finished-track" class="finished-track" aria-hidden="true" hidden></canvas>
+
+        <dl class="finished-stats">
+            <div id="campaign-finished-place" class="finished-stat" hidden>
+                <dt class="finished-stat__label">Overall place</dt>
+                <dd id="campaign-finished-place-value" class="finished-stat__value"></dd>
             </div>
-        </section>
+            <div id="campaign-finished-medals" class="finished-stat" hidden>
+                <dt class="finished-stat__label">Medals</dt>
+                <dd id="campaign-finished-medals-value" class="finished-stat__value"></dd>
+            </div>
+            <div id="campaign-finished-time" class="finished-stat" hidden>
+                <dt class="finished-stat__label">Total time</dt>
+                <dd id="campaign-finished-time-value" class="finished-stat__value"></dd>
+            </div>
+        </dl>
 
         <footer class="finished-actions">
             <button id="campaign-finished-race-btn" type="button">Play Campaign</button>

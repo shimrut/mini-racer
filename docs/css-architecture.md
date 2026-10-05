@@ -107,15 +107,19 @@ animation. The existing 640px-height compaction also tightens medal sizing and
 vertical gaps so the added metrics/action leave the player avatar and all three
 actions visible on the tested 360x640 screen.
 
-The completion poster uses the Head to Head poster layout in its own
-`.finished-shell` block in `pages/campaign.css`. The left side has one large
-avatar and name, “Campaign complete”, the series name in big italic type, then
-a small **Time to beat** total and the stage count. The overall place takes the
-track's slot: a big ordinal up to 100th (`4TH`), `TOP 12%` after that, `of 2,850`
-under it, and the four medal counts below. Places 1 to 3 color the figure,
-avatar ring and background glow with the Head to Head medal colors. With no
-place, only the medals show there. Series names over 16 characters use a
-smaller size. The plain launcher is unchanged.
+The completion poster is a victory poster in its own `.finished-shell` block in
+`pages/campaign.css`, built only from existing poster parts. The logo sits top
+left. On phones the column reads: the player (Head to Head avatar and name), the
+series name as the Campaign post's red mono line, a white **Campaign** over red
+**Complete** (the Daily **Challenge / Active** lockup), the track of the stage
+where the player places best (drawn by `game/track/poster-track.js`, the same
+drawing and car as Head to Head), a row of label-over-value stats (**Overall
+place**, **Medals**, **Total time**), then the full-width red button. On wide
+and short screens the headline runs on one line, the track takes the left and
+the player and stats stack on the right. Overall place shows `#4 / 128` up to
+100th and `TOP 12%` after. Missing stats hide; without a track the rest gathers
+in the middle. No medal colors outside medal icons. The plain launcher is
+unchanged.
 
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same
