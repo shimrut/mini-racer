@@ -1,3 +1,5 @@
+- Road width in Mapmaker now includes **Tight**, one step narrower than Narrow (5.5 cars, 3.77u). Narrow, Normal and Wide stay the same.
+
 - Upgraded the Devvit toolchain from 0.14.5 to 0.14.7. Daily posts can now be pinned as community highlights. Nothing in the game uses that yet. Playtest race receipts that were missing now arrive. Scheduled jobs listed in the app stay on the same redeploy behavior.
 
 - A Campaign series is live when it is made live in the Creator, whatever the grounds of its stages. Mini Rally and Formula Mini stay hidden until they are made live there. The series screen no longer shows **Coming soon**.

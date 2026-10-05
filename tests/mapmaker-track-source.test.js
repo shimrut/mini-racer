@@ -41,9 +41,10 @@ const TRACK = {
 };
 
 describe('Mapmaker track source serializer', () => {
-    it('makes Narrow, Normal and Wide roads of 6, 6.5 and 7 pictures of the normal car', () => {
+    it('makes Tight, Narrow, Normal and Wide roads of 5.5, 6, 6.5 and 7 pictures of the normal car', () => {
         const pictureWidth = normalCarPictureWidth(CONFIG.gridSize);
-        expect(ROAD_WIDTHS.map(({ label, cars }) => [label, cars])).toEqual([['Narrow', 6], ['Normal', 6.5], ['Wide', 7]]);
+        expect(ROAD_WIDTHS.map(({ label, cars }) => [label, cars])).toEqual([['Tight', 5.5], ['Narrow', 6], ['Normal', 6.5], ['Wide', 7]]);
+        expect(formatTrackNumber(ROAD_WIDTHS[0].width)).toBe('3.77');
         ROAD_WIDTHS.forEach(({ width, cars }) => expect(width).toBeCloseTo(cars * pictureWidth, 9));
         expect(LINE_BUILD_CAR_UNITS).toBe(6.5);
         expect(DEFAULT_DRAW_WIDTH).toBe(LINE_BUILD_CAR_UNITS * pictureWidth);

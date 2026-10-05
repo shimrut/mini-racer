@@ -179,7 +179,8 @@ describe('road built from a saved road line', () => {
 
     it('gives a section its own width, from its bend to the next one', () => {
         const track = drawTrack();
-        const [narrow, , wide] = ROAD_WIDTHS;
+        const narrow = ROAD_WIDTHS.find((entry) => entry.value === 'narrow');
+        const wide = ROAD_WIDTHS.find((entry) => entry.value === 'wide');
         const line = { ...track.roadLine, width: wide.width };
         const plain = rebuild(track, line);
         const points = line.points.map((point, index) => (index === 0 ? { ...point, width: narrow.width } : point));
@@ -196,7 +197,8 @@ describe('road built from a saved road line', () => {
 
     it('changes the width smoothly where two sections meet', () => {
         const track = drawTrack();
-        const [narrow, , wide] = ROAD_WIDTHS;
+        const narrow = ROAD_WIDTHS.find((entry) => entry.value === 'narrow');
+        const wide = ROAD_WIDTHS.find((entry) => entry.value === 'wide');
         const line = { ...track.roadLine, width: wide.width };
         const points = line.points.map((point, index) => (index === 0 ? { ...point, width: narrow.width } : point));
         const plain = rebuild(track, line);
@@ -216,7 +218,9 @@ describe('road built from a saved road line', () => {
 
     it('keeps a corner between two widths as round as a corner of one width', () => {
         const track = drawTrack();
-        const [narrow, normal, wide] = ROAD_WIDTHS;
+        const narrow = ROAD_WIDTHS.find((entry) => entry.value === 'narrow');
+        const normal = ROAD_WIDTHS.find((entry) => entry.value === 'normal');
+        const wide = ROAD_WIDTHS.find((entry) => entry.value === 'wide');
         const line = { ...track.roadLine, width: wide.width };
         // Wall points where the wall turns: the race rounds each one by the
         // corner setting, but never past 1/2.5 of the wall on either side.
@@ -243,7 +247,8 @@ describe('road built from a saved road line', () => {
 
     it('gives a bend its own rounding where two widths meet', () => {
         const track = drawTrack();
-        const [narrow, , wide] = ROAD_WIDTHS;
+        const narrow = ROAD_WIDTHS.find((entry) => entry.value === 'narrow');
+        const wide = ROAD_WIDTHS.find((entry) => entry.value === 'wide');
         const points = track.roadLine.points.map((point, index) => (
             index === 1 ? { ...point, width: narrow.width, cornerRadius: 5 } : point
         ));

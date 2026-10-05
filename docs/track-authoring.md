@@ -43,8 +43,9 @@ race collision footprint remains `0.55u` wide × `1.23u` long.
 Road widths count pictures of the normal car across. That picture is the
 rear-tire span of the formula car as drawn in the race. The hit box stays
 `0.55u` wide and is not the width Mapmaker draws. **Road width** under
-**Shape** has three widths: **Narrow** (6 cars, `4.113u`), **Normal** (6.5
-cars, `4.455u`) and **Wide** (7 cars, `4.798u`). Draw makes a Normal road
+**Shape** has four widths: **Tight** (5.5 cars, `3.77u`), **Narrow** (6
+cars, `4.113u`), **Normal** (6.5 cars, `4.455u`) and **Wide** (7 cars,
+`4.798u`). Draw makes a Normal road
 unless you pick another width before you draw.
 
 **Draw** keeps the full-width road **open** while placing points. The first

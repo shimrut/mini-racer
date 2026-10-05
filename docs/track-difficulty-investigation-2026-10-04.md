@@ -38,7 +38,7 @@ Angle and tightness are related measurements, so avoid blindly adding two
 independent penalties for the same feature.
 
 Width should use finished race walls, rather than treating the editor's
-Narrow/Normal/Wide label as a universal measurement. Those labels use drawn
+Tight/Narrow/Normal/Wide label as a universal measurement. Those labels use drawn
 vehicle artwork, while collision width is `0.55u` and capsule length is
 `1.23u` (`game/config.js:37`, `docs/track-authoring.md:39`). Turning clearance
 also depends on vehicle orientation and length.

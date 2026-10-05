@@ -9,6 +9,7 @@ const MAX_DRAW_WIDTH = 20;
 const CAR_WIDTH = normalCarPictureWidth(CONFIG.gridSize);
 // The road widths of Draw, in cars. Wide is the widest road Draw makes.
 export const ROAD_WIDTHS = Object.freeze([
+    { value: 'tight', label: 'Tight', cars: 5.5 },
     { value: 'narrow', label: 'Narrow', cars: 6 },
     { value: 'normal', label: 'Normal', cars: 6.5 },
     { value: 'wide', label: 'Wide', cars: 7 },
