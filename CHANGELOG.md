@@ -1,3 +1,5 @@
+- **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
+
 - Road width in Mapmaker now includes **Tight**, one step narrower than Narrow (5.5 cars, 3.77u). Narrow, Normal and Wide stay the same.
 
 - Upgraded the Devvit toolchain from 0.14.5 to 0.14.7. Daily posts can now be pinned as community highlights. Nothing in the game uses that yet. Playtest race receipts that were missing now arrive. Scheduled jobs listed in the app stay on the same redeploy behavior.

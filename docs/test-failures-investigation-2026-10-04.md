@@ -235,3 +235,21 @@ Evidence: `/private/tmp/dailygp-commit-all-tests-2026-10-05.log`,
 `/private/tmp/dailygp-commit-all-route-tests-2026-10-05.log`,
 `/private/tmp/dailygp-commit-all-remaining-route-tests-2026-10-05.log`, and
 `/private/tmp/dailygp-commit-all-build-2026-10-05.log`.
+
+## Remaining track edits on v250 — 2026-10-05
+
+The follow-up checkpoint preserves the remaining Broken Road wall/checkpoint
+adjustments, Dirt Valley outer-wall adjustment, Ridge Runner replacement layout,
+and revised Dirt Valley/Ridge Runner medal times. The changelog records these
+content changes. No test expectations were changed.
+
+Typecheck, production build and diff checks pass. Focused runtime-integrity,
+server track-shape, medal and ground suites report **84 passed / three failed**
+across four files. The failing assertions are the already documented registry
+fingerprint and two missing-medal checks; the new track edits change the received
+registry fingerprint without introducing a new failing assertion. This focused
+run does not replace the full-suite checkpoint above.
+
+Evidence: `/private/tmp/dailygp-v250-track-commit-tests-2026-10-05.log`,
+`/private/tmp/dailygp-v250-track-commit-typecheck-2026-10-05.log`, and
+`/private/tmp/dailygp-v250-track-commit-build-2026-10-05.log`.

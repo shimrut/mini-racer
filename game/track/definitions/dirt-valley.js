@@ -4,7 +4,7 @@ export default {
     cornerRadius: 5,
     ground: 'dirt',
     outer: [
-        Point(36.517, 19.655),
+        Point(36.517, 19.405),
         Point(38.148, 9.913),
         Point(38.507, 8.516),
         Point(39.02, 7.391),
