@@ -1,4 +1,4 @@
-- The Campaign finished post now looks like the Head to Head poster: the player, **Campaign Complete**, their total time as **Time to beat**, overall place, medal counts and **Play Campaign**. The time updates when they get faster.
+- The Campaign finished post now leads with the player's overall place: a big number like **4TH** up to 100th, then **TOP 12%**, with the series name bigger below it and smaller medals.
 
 - **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
 

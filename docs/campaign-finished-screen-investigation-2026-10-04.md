@@ -1,16 +1,17 @@
 # Campaign finished screen investigation — 2026-10-04
 
-## Poster redesign — 2026-10-05
+## Poster hierarchy — 2026-10-05
 
-The finished post is now laid out like the Head to Head poster, using the same
-tokens, sizes and breakpoints. It shows the Mini Racer lockup, the player's
-avatar and name with “Campaign Complete” where VS sits, **Time to beat** (the
-total of the saved stage best times), the series name with its stage count,
-**Overall place** when a valid place was saved, the four medal counts where the
-track drawing sits, and the **Play Campaign** button. The server already saved
-`postData.totalTimeMs` and `postData.stageCount`. Posts made before the total
-was saved hide the time, and a missing stage count leaves its cell empty. The
-plain Campaign launcher is unchanged.
+The finished post now puts the player's overall place first. Ranks 1 to 100 show
+an ordinal (`4TH`, `11TH`, `21ST`); ranks past 100 show `TOP` and
+`ceil(rank * 100 / total)` percent, and `of 2,850` sits under either. Ranks 1 to
+3 use the podium gold, silver and bronze, and every other rank is white. The
+player's avatar and name sit beside the figure, as in a podium row. The series
+name is the second largest thing on the post, under “Campaign complete”, and the
+four medal counts are smaller than before. Total time is not shown. When the
+post has no saved place the place block hides and the player, series name and
+medals stay. The helpers are in `pages/campaign.js`. No server or post data
+change.
 
 ## Compact medal counts — 2026-10-05
 
