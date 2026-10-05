@@ -107,15 +107,16 @@ animation. The existing 640px-height compaction also tightens medal sizing and
 vertical gaps so the added metrics/action leave the player avatar and all three
 actions visible on the tested 360x640 screen.
 
-The completion poster keeps the Campaign launcher shell as one centered column
-that fits a single screen at 390x844, 512x512, 1280x720 and 360x520. Its `--u`
-is the smaller of 2.2vw and 1.55vh. The stack is the player, “Campaign
-complete · N stages”, the series name (two lines at most), a **Time to beat**
-tile beside an **Overall** tile (`#rank of total`, **Top X%** from 10
-finishers, top half only), the four labeled medal counts, then the hook and **Beat My Time**
-(**Race the Campaign** without a saved time) in the footer. Missing data hides
-its tile. The repeated “I finished…” line stays available to screen readers and
-is not shown. The track rings stay behind.
+The completion poster is a second `<main class="campaign-finished-poster">` in
+`pages/campaign.html`, shown instead of the plain launcher when
+`postData.postType` is `campaign-finished`. It reuses the Head to Head poster
+composition from `pages/head-to-head.css`: the Mini Racer lockup, the player's
+avatar and name with “Campaign Complete” where VS sits, **Time to beat** (the
+total time), the series name with the stage count, and Overall place. The four
+medal counts take the place of the track drawing, and **Play Campaign** fills
+the footer. Its tokens, breakpoints and button rules are copied from Head to
+Head, and its rules sit in one block at the end of `pages/campaign.css`. The
+“I finished…” line stays available to screen readers and is not shown.
 
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same

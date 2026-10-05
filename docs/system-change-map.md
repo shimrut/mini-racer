@@ -413,16 +413,14 @@ flowchart LR
   rechecks completion, and publishes the approved snapshot.
   `src/server/campaign/campaign-share.ts` publishes
   a player-authored `campaign-finished` post through the existing Campaign
-  entrypoint. The poster shows **Time to beat** (`postData.totalTimeMs`, the total
-  of the saved stage best times, left off when unknown) and **Overall**
-  (`#rank of finishers`, with **Top X%** from 10 finishers, top half only) when the aggregate
-  board is ready at preview time. An accepted race refreshes that
-  post's medal counts, total time, place and plain-text backup from the same
-  finished-screen tally and the current board. A place is left unchanged while ranking is not
-  ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
+  entrypoint. The poster shows **Time to beat** from `postData.totalTimeMs` (the
+  total of the saved stage best times) and includes **Overall place**
+  (`#rank / finishers`) when the aggregate board is ready at preview time. An
+  accepted race refreshes that post's medal counts, total time, place and
+  plain-text backup from the same finished-screen tally and the current board.
+  A place is left unchanged while ranking is not ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
   saved race still stands; opening that Campaign again tries the same post, as
-  does the next accepted race. Its **Beat My Time** (**Race the Campaign** when no total time was posted)
-  carries the exact series ID into startup and
+  does the next accepted race. Its **Play Campaign** carries the exact series ID into startup and
   selects the viewer's own last unlocked stage. Cold Creator IDs survive until
   their catalog arrives; unavailable series return an error instead of falling
   back to Numbers. A durable pre-submit claim prevents duplicate posts after an

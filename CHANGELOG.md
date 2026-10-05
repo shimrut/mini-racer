@@ -1,6 +1,6 @@
-- **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
+- The Campaign finished post now looks like the Head to Head poster: the player, **Campaign Complete**, their total time as **Time to beat**, overall place, medal counts and **Play Campaign**. The time updates when they get faster.
 
-- The Campaign finished post now leads with the finisher's total time as **Time to beat**, next to **Overall** (like #4 of 128, with **Top 4%** for the top half once 10 people have finished). The medals are labeled, and the button says **Beat My Time**. A faster stage time updates the time on the post. Older posts still open and show what they have.
+- **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
 
 - Road width in Mapmaker now includes **Tight**, one step narrower than Narrow (5.5 cars, 3.77u). Narrow, Normal and Wide stay the same.
 
