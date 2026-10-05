@@ -1628,18 +1628,4 @@ describe('Campaign server store', () => {
         expect(result.body).not.toHaveProperty('carUnlocks');
         expect(releaseResolved).toBe(true);
     });
-    it('picks the track of the stage where the player places best, a tie going to the bigger field', async () => {
-        const { getCampaignSeriesStages } = await import('../game/campaign/manifest.js');
-        const { readCampaignBestStageTrackKey } = await import('../src/server/campaign/campaign-store.ts');
-        const [first, second, third] = getCampaignSeriesStages('numbered-v1');
-        const places = { [first.raceId]: [2, 10], [second.raceId]: [1, 5], [third.raceId]: [1, 9] };
-        const placeFor = (key) => Object.entries(places).find(([raceId]) => key.endsWith(`:leaderboard:${raceId}`))?.[1];
-        mockRedis.zRank.mockImplementation(async (key) => (placeFor(key) ? placeFor(key)[0] - 1 : undefined));
-        mockRedis.zCard.mockImplementation(async (key) => placeFor(key)?.[1] ?? 0);
-
-        await expect(readCampaignBestStageTrackKey('reddit:racefan', 'numbered-v1')).resolves.toBe(third.trackKey);
-
-        mockRedis.zRank.mockResolvedValue(undefined);
-        await expect(readCampaignBestStageTrackKey('reddit:racefan', 'numbered-v1')).resolves.toBeNull();
-    });
 });

@@ -657,20 +657,6 @@ async function readCampaignStandingsByRaceId(playerId: string | null, seriesId: 
     return Object.fromEntries(entries);
 }
 
-// The track of the stage where the player holds their best place; a tie goes to the bigger field.
-export async function readCampaignBestStageTrackKey(playerId: string, seriesId: string): Promise<string | null> {
-    const standings = await readCampaignStandingsByRaceId(playerId, seriesId);
-    let best: { trackKey: string; rank: number; totalCount: number } | null = null;
-    for (const stage of getCampaignSeriesStages(seriesId)) {
-        const { rank, totalCount } = standings[stage.raceId] ?? { rank: null, totalCount: 0 };
-        if (rank === null) continue;
-        if (!best || rank < best.rank || (rank === best.rank && totalCount > best.totalCount)) {
-            best = { trackKey: stage.trackKey, rank, totalCount };
-        }
-    }
-    return best?.trackKey ?? null;
-}
-
 // Loads the stored tracks of these stages, in one read, before the request
 // reads their layout or medal times.
 async function loadStageTracks(stages: readonly { trackKey: string }[]): Promise<void> {

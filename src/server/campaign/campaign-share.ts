@@ -5,7 +5,6 @@ import { formatCampaignPlace, readCampaignPlace } from '../../../game/campaign/a
 import { buildCampaignFinishedScreen } from '../../../game/campaign/finished-screen.js';
 import { getCampaignFinalStage, getCampaignSeries, getCampaignStage } from '../../../game/campaign/manifest.js';
 import { sanitizeRedditUsername } from '../../../game/shared/leaderboard-identity.js';
-import { formatRaceClock } from '../../../game/shared/race-time-text.js';
 import { resolveAuthorizedPlayerIdentity } from '../competition/competition-identity.js';
 import { resolveRedditAvatarUrl } from '../player/reddit-avatar.js';
 import { isProgressTransferPending } from '../player/guest-retirement.js';
@@ -21,7 +20,7 @@ import {
 import { playerFieldHash, redisKeyPart } from '../redis/redis-names.js';
 import { normalizeName } from '../shared/value-guards.js';
 import { campaignAggregateKeys } from './campaign-aggregate-store.js';
-import { getCampaignResultsForSeries, readCampaignBestStageTrackKey } from './campaign-store.js';
+import { getCampaignResultsForSeries } from './campaign-store.js';
 
 type ShareRecord = { createdAt: string; postId?: string; postUrl?: string; refreshPending?: boolean };
 type SharedPost = { id?: string; url?: string; authorName?: string };
@@ -34,7 +33,6 @@ type CampaignSharePreview = {
     title: string;
     medalDistribution: { author: number; gold: number; silver: number; bronze: number };
     stageCount: number;
-    totalTimeMs?: number;
     medalSummary: string;
     place: { rank: number; total: number } | null;
     expiresAt: string;
@@ -55,12 +53,10 @@ function campaignShareCopy(
     title: string,
     medalDistribution: CampaignSharePreview['medalDistribution'],
     place: CampaignSharePreview['place'],
-    totalTimeMs?: number | null,
 ) {
     const medalSummary = Object.entries(medalDistribution).map(([tier, count]) => `${count} ${tier}`).join(' · ');
     const placeSummary = place ? `Overall place ${formatCampaignPlace(place)}` : '';
-    const timeSummary = totalTimeMs ? `Total time ${formatRaceClock(totalTimeMs)}` : '';
-    const details = [timeSummary, medalSummary, placeSummary].filter(Boolean).join('\n');
+    const details = [medalSummary, placeSummary].filter(Boolean).join('\n');
     return {
         medalSummary,
         placeSummary,
@@ -84,15 +80,6 @@ async function readCampaignSharePlace(seriesId: string, playerId: string): Promi
         });
     } catch (error) {
         console.error('Campaign share place could not be read:', error);
-        return null;
-    }
-}
-
-async function readCampaignShareBestTrack(seriesId: string, playerId: string): Promise<string | null> {
-    try {
-        return await readCampaignBestStageTrackKey(playerId, seriesId);
-    } catch (error) {
-        console.error('Campaign share best track could not be read:', error);
         return null;
     }
 }
@@ -230,25 +217,19 @@ export async function refreshServerCampaignResultsShare({
         const postedPlace = readCampaignPlace(data.place);
         const placeChanged = livePlace !== null
             && (postedPlace?.rank !== livePlace.rank || postedPlace?.total !== livePlace.total);
-        const timeChanged = screen.totalTimeMs !== null && data.totalTimeMs !== screen.totalTimeMs;
-        const liveTrackKey = await readCampaignShareBestTrack(series.id, canonicalPlayerId);
-        const trackChanged = liveTrackKey !== null && data.bestTrackKey !== liveTrackKey;
-        if (medalsMatch && !placeChanged && !timeChanged && !trackChanged && current.refreshPending !== true) return;
+        if (medalsMatch && !placeChanged && current.refreshPending !== true) return;
         if (!await isRedisLockOwned(lock, redis)) throw new Error('Campaign post refresh lost its lock.');
         const copy = campaignShareCopy(
             `I finished the ${screen.title} campaign`,
             screen.medalDistribution,
             livePlace ?? postedPlace,
-            screen.totalTimeMs,
         );
-        const updates: { medalDistribution?: typeof screen.medalDistribution; stageCount?: number; totalTimeMs?: number; bestTrackKey?: string; place?: NonNullable<CampaignSharePreview['place']> } = {};
+        const updates: { medalDistribution?: typeof screen.medalDistribution; stageCount?: number; place?: NonNullable<CampaignSharePreview['place']> } = {};
         if (!medalsMatch) {
             updates.medalDistribution = screen.medalDistribution;
             updates.stageCount = screen.stageCount;
         }
-        if (timeChanged && screen.totalTimeMs !== null) updates.totalTimeMs = screen.totalTimeMs;
         if (placeChanged && livePlace) updates.place = livePlace;
-        if (trackChanged && liveTrackKey) updates.bestTrackKey = liveTrackKey;
         if (Object.keys(updates).length > 0) await post.mergePostData(updates);
         await post.setTextFallback({ text: copy.text });
         await clearRefreshPending(key, current);
@@ -279,7 +260,7 @@ export async function previewServerCampaignResultsShare({
     if (!screen) return failure(409, 'campaign_incomplete', 'Finish this Campaign before sharing your results.');
     const title = `I finished the ${screen.title} campaign`;
     const place = await readCampaignSharePlace(series.id, canonicalPlayerId);
-    const copy = campaignShareCopy(title, screen.medalDistribution, place, screen.totalTimeMs);
+    const copy = campaignShareCopy(title, screen.medalDistribution, place);
     const preview: CampaignSharePreview = {
         username,
         subredditName: request.subredditName,
@@ -288,7 +269,6 @@ export async function previewServerCampaignResultsShare({
         title,
         medalDistribution: screen.medalDistribution,
         stageCount: screen.stageCount,
-        ...(screen.totalTimeMs !== null ? { totalTimeMs: screen.totalTimeMs } : {}),
         medalSummary: copy.medalSummary,
         place,
         expiresAt: new Date(Date.now() + SHARE_PREVIEW_TTL_SECONDS * 1000).toISOString(),
@@ -317,7 +297,6 @@ async function readPreview(token: unknown): Promise<CampaignSharePreview | null>
             || typeof preview.seriesId !== 'string' || typeof preview.seriesName !== 'string'
             || typeof preview.title !== 'string' || typeof preview.medalSummary !== 'string'
             || (preview.place != null && !readCampaignPlace(preview.place))
-            || (preview.totalTimeMs != null && !(Number.isSafeInteger(preview.totalTimeMs) && preview.totalTimeMs > 0))
             || !Number.isInteger(preview.stageCount) || preview.stageCount <= 0
             || !preview.medalDistribution
             || !['author', 'gold', 'silver', 'bronze'].every((tier) => {
@@ -368,7 +347,6 @@ export async function confirmServerCampaignResultsShare({
             return failure(409, 'preview_expired', 'This Campaign changed. Close this preview and share again.');
         }
         const playerAvatarUrl = await resolveRedditAvatarUrl(username);
-        const bestTrackKey = await readCampaignShareBestTrack(series.id, canonicalPlayerId);
         const title = preview.title;
         const postData = {
             postType: 'campaign-finished',
@@ -379,8 +357,6 @@ export async function confirmServerCampaignResultsShare({
             playerAvatarUrl,
             medalDistribution: preview.medalDistribution,
             stageCount: preview.stageCount,
-            ...(preview.totalTimeMs ? { totalTimeMs: preview.totalTimeMs } : {}),
-            ...(bestTrackKey ? { bestTrackKey } : {}),
             ...(preview.place ? { place: preview.place } : {}),
         };
         const claim: ShareRecord = { createdAt: new Date().toISOString() };
@@ -394,7 +370,7 @@ export async function confirmServerCampaignResultsShare({
                 title,
                 entry: 'campaign',
                 postData,
-                textFallback: { text: campaignShareCopy(title, preview.medalDistribution, preview.place, preview.totalTimeMs).text },
+                textFallback: { text: campaignShareCopy(title, preview.medalDistribution, preview.place).text },
                 runAs: 'USER',
                 userGeneratedContent: { text: title },
             });

@@ -1,8 +1,12 @@
 import { TRACKS } from '../game/track/tracks.js';
 import { getTrackName } from '../game/track/catalog.js';
 import { ensureStoredTracks } from '../game/track/stored-track-service.js';
-import { renderPosterTrack } from '../game/track/poster-track.js';
+import { renderTrackPreviewCanvas } from '../game/track/preview-renderer.js';
 import { createPosterCarDrive, loadPosterCar } from '../game/track/poster-car.js';
+import {
+    resolveTrackPresentation,
+    TRACK_PRESENTATION_SURFACES,
+} from '../game/track/presentation.js';
 import { exposeHeadToHeadLauncherTestHooks } from '../game/debug/launcher-hooks.js';
 import { applyAvatar, GENERIC_SNOO_URL, isRedditAvatarUrl } from '../game/ui/avatar.js';
 import { getMedalForRaceTime } from '../game/medals/medal-timing.js';
@@ -167,7 +171,36 @@ function posterAvatars(challenge, viewer) {
 }
 
 function renderChallengeTrack(documentRef, trackKey, carImage = null, carTravel = 1) {
-    renderPosterTrack(documentRef.getElementById('challenge-track'), trackKey, carImage, carTravel);
+    const canvas = documentRef.getElementById('challenge-track');
+    const track = TRACKS[trackKey];
+    if (!canvas || !track) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = globalThis.devicePixelRatio || 1;
+    const width = Math.round(rect.width * dpr);
+    const height = Math.round(rect.height * dpr);
+    if (width < 2 || height < 2) return;
+    canvas.width = width;
+    canvas.height = height;
+    renderTrackPreviewCanvas(canvas, {
+        trackGeometry: { outer: track.outer, inner: track.inner },
+        cornerRadius: track.cornerRadius,
+        presentation: resolveTrackPresentation(trackKey, {
+            surface: TRACK_PRESENTATION_SURFACES.DAILY_CHALLENGE_PREVIEW,
+            ground: track.ground,
+        }),
+        startLine: track.startLine,
+        startPos: track.startPos,
+        startAngle: track.startAngle ?? 0,
+        transparentBackground: true,
+        previewRenderMode: 'schematic',
+        showSchematicCarTrail: true,
+        moveSchematicCarPastStartLine: true,
+        schematicCarImage: carImage,
+        schematicCarTravel: carTravel,
+        schematicReserveCarSlot: true,
+        hideSchematicStartArrow: true,
+        runHistory: [],
+    });
 }
 
 let lastPosterAvatars = null;

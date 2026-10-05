@@ -1,40 +1,5 @@
 # Campaign finished screen investigation — 2026-10-04
 
-## Victory poster — 2026-10-05
-
-The finished poster follows the owner's reference layout, drawn only with the
-game's existing poster parts, colors and fonts: logo top left, player, series
-name, **Campaign / Complete**, the best-placed stage's track, then **Overall
-place**, **Medals** (the game's `43/64` score) and **Total time**, and **Play
-Campaign**. No challenge wording. The server picks the track with
-`readCampaignBestStageTrackKey()` (lowest stage rank, the bigger field on a
-tie), writes it as `postData.bestTrackKey`, and moves it when a later save
-changes the best stage. A failed read leaves the post without a track. Head to
-Head and this poster share `renderPosterTrack()`.
-
-## Head to Head layout — 2026-10-05
-
-The finished poster now uses the Head to Head poster layout. The overall place
-replaces the track, with the medal counts under it. The left side shows only the
-player's avatar (larger), their name, the series name and a small **Time to
-beat** with the stage count. The server again writes `totalTimeMs` (the total
-of the stage best times) to the post and refreshes it when it changes. Places 1
-to 3 tint the place, avatar ring and glow with the medal colors, the way Head to
-Head tints by medal. The place rules below still apply.
-
-## Poster hierarchy — 2026-10-05
-
-The finished post now puts the player's overall place first. Ranks 1 to 100 show
-an ordinal (`4TH`, `11TH`, `21ST`); ranks past 100 show `TOP` and
-`ceil(rank * 100 / total)` percent, and `of 2,850` sits under either. Ranks 1 to
-3 use the podium gold, silver and bronze, and every other rank is white. The
-player's avatar and name sit beside the figure, as in a podium row. The series
-name is the second largest thing on the post, under “Campaign complete”, and the
-four medal counts are smaller than before. Total time is not shown. When the
-post has no saved place the place block hides and the player, series name and
-medals stay. The helpers are in `pages/campaign.js`. No server or post data
-change.
-
 ## Compact medal counts — 2026-10-05
 
 The user replaced the proposed medal stacks with one count per Bronze, Silver,

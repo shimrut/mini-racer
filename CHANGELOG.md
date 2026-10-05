@@ -1,5 +1,3 @@
-- The Campaign finished post is now a victory poster: the player, the Campaign name, **Campaign Complete**, the track where the player placed best, then their overall place (**TOP 12%** past 100th), medals and total time. The track moves if they place better on another stage.
-
 - **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
 
 - Road width in Mapmaker now includes **Tight**, one step narrower than Narrow (5.5 cars, 3.77u). Narrow, Normal and Wide stay the same.

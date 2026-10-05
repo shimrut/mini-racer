@@ -413,12 +413,9 @@ flowchart LR
   rechecks completion, and publishes the approved snapshot.
   `src/server/campaign/campaign-share.ts` publishes
   a player-authored `campaign-finished` post through the existing Campaign
-  entrypoint. The poster shows **Overall place** (`#rank / finishers` up to
-  100th, then `TOP X%`) when the aggregate board is ready at preview time, the
-  medal score, `postData.totalTimeMs` as **Total time**, and the track of
-  `postData.bestTrackKey`, the stage where the player places best. An accepted
-  race refreshes that
-  post's medal counts, total time, best track, place and plain-text backup from the same finished-screen
+  entrypoint. The poster includes **Overall place** (`#rank / finishers`) when
+  the aggregate board is ready at preview time. An accepted race refreshes that
+  post's medal counts, place and plain-text backup from the same finished-screen
   tally and the current board. A place is left unchanged while ranking is not
   ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
   saved race still stands; opening that Campaign again tries the same post, as
