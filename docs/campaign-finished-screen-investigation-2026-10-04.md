@@ -1,5 +1,15 @@
 # Campaign finished screen investigation — 2026-10-04
 
+## Head to Head layout — 2026-10-05
+
+The finished poster now uses the Head to Head poster layout. The overall place
+replaces the track, with the medal counts under it. The left side shows only the
+player's avatar (larger), their name, the series name and a small **Time to
+beat** with the stage count. The server again writes `totalTimeMs` (the total
+of the stage best times) to the post and refreshes it when it changes. Places 1
+to 3 tint the place, avatar ring and glow with the medal colors, the way Head to
+Head tints by medal. The place rules below still apply.
+
 ## Poster hierarchy — 2026-10-05
 
 The finished post now puts the player's overall place first. Ranks 1 to 100 show

@@ -39,24 +39,25 @@ function createPoster() {
                     toggle: (name, on) => { classes[on ? 'add' : 'delete'](name); },
                     contains: (name) => classes.has(name),
                 },
+                style: { setProperty: vi.fn() },
                 setAttribute: vi.fn(),
                 replaceChildren: vi.fn(),
             });
         }
         return elements.get(id);
     };
-    const launcher = getElement('launcher');
-    getElement('campaign-medals').querySelector = getElement;
-    const documentRef = { getElementById: getElement, querySelector: () => launcher };
+    getElement('campaign-finished-medals').querySelector = getElement;
+    const documentRef = { getElementById: getElement };
     return {
         getElement,
+        documentRef,
         render: (postData) => renderCampaignFinishedPoster(documentRef, readCampaignFinishedPostData(finishedRoot(postData))),
     };
 }
 
 function placeText(getElement) {
     return ['prefix', 'number', 'suffix', 'total']
-        .map((part) => getElement(`campaign-place-${part}`).textContent);
+        .map((part) => getElement(`campaign-finished-place-${part}`).textContent);
 }
 
 describe('campaign launcher custom post', () => {
@@ -64,27 +65,27 @@ describe('campaign launcher custom post', () => {
         const markup = readFileSync(new URL('../pages/campaign.html', import.meta.url), 'utf8');
 
         expect(markup).toContain('class="campaign-eyebrow">The Numbers</p>');
-        expect(markup).toContain('id="campaign-place"');
         expect(markup).not.toContain('Permanent series');
     });
 
-    it('stacks the poster as place, player, eyebrow, series name, then medals', () => {
+    it('lays the finished poster out like Head to Head with the place in the track slot', () => {
         const markup = readFileSync(new URL('../pages/campaign.html', import.meta.url), 'utf8');
-        const order = ['campaign-place"', 'campaign-player"', 'campaign-eyebrow"', 'campaign-title"', 'campaign-medals"']
-            .map((id) => markup.indexOf(`id="${id}`));
+        const order = ['campaign-finished-avatar', 'campaign-finished-series', 'campaign-finished-time',
+            'campaign-finished-place', 'campaign-finished-medals', 'campaign-finished-race-btn']
+            .map((id) => markup.indexOf(`id="${id}"`));
 
         expect(order).not.toContain(-1);
         expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 
-    it('uses the podium tier colors for the first three places', () => {
+    it('uses the Head to Head medal colors for the first three places', () => {
         const css = readFileSync(new URL('../pages/campaign.css', import.meta.url), 'utf8');
-        const podiumCss = readFileSync(new URL('../pages/podium.css', import.meta.url), 'utf8');
+        const headToHeadCss = readFileSync(new URL('../pages/head-to-head.css', import.meta.url), 'utf8');
 
         for (const tier of ['gold', 'silver', 'bronze']) {
-            const color = podiumCss.match(new RegExp(`--${tier}: (#[0-9a-f]{6});`))[1];
-            expect(css).toContain(`--${tier}: ${color};`);
-            expect(css).toMatch(new RegExp(`\\.campaign-hero--${tier}\\s*\\{\\s*--tier: var\\(--${tier}\\);`));
+            const color = headToHeadCss.match(new RegExp(`--medal-${tier}: (#[0-9a-f]{6});`))[1];
+            expect(css).toContain(`--medal-${tier}: ${color};`);
+            expect(css).toContain(`.finished-shell--${tier} { --glow: var(--medal-${tier}); --tier: var(--medal-${tier}); }`);
         }
     });
 
@@ -122,6 +123,22 @@ describe('campaign launcher custom post', () => {
         expect(openGame).toHaveBeenCalledOnce();
     });
 
+    it('binds the finished poster action when the poster is shown', () => {
+        const button = { dataset: {}, addEventListener: vi.fn() };
+        const ids = [];
+        const documentRef = {
+            getElementById: (id) => {
+                ids.push(id);
+                return id === 'campaign-finished-poster' ? { hidden: false } : button;
+            },
+        };
+
+        bindCampaignRaceButton(documentRef, vi.fn());
+
+        expect(ids).toContain('campaign-finished-race-btn');
+        expect(ids).not.toContain('campaign-race-btn');
+    });
+
     it('keeps normal launchers separate from finished campaign posts', () => {
         expect(readCampaignFinishedPostData(finishedRoot({ postType: 'campaign-launcher' }))).toBeNull();
         expect(readCampaignFinishedPostData(finishedRoot())).toMatchObject({
@@ -133,19 +150,20 @@ describe('campaign launcher custom post', () => {
         });
     });
 
-    it('renders the player, finished series, medal counts and specific Campaign action', () => {
+    it('renders the player, finished series, time, stages, medal counts and Campaign action', () => {
         const { getElement, render } = createPoster();
 
-        render(FINISHED_POST);
+        render({ ...FINISHED_POST, totalTimeMs: 187654, stageCount: 16 });
 
-        expect(getElement('launcher').classList.contains('campaign-launcher--finished')).toBe(true);
-        expect(getElement('campaign-player').hidden).toBe(false);
-        expect(getElement('campaign-player-name').textContent).toBe('RaceFan');
-        expect(getElement('campaign-player-avatar').src).toBe(FINISHED_POST.playerAvatarUrl);
-        expect(getElement('campaign-eyebrow').textContent).toBe('Campaign complete');
-        expect(getElement('campaign-title').textContent).toBe('Night Races');
-        expect(getElement('campaign-description').textContent).toBe('I finished the Night Races campaign.');
-        expect(getElement('campaign-medals').hidden).toBe(false);
+        expect(getElement('campaign-launcher').hidden).toBe(true);
+        expect(getElement('campaign-finished-poster').hidden).toBe(false);
+        expect(getElement('campaign-finished-name').textContent).toBe('RaceFan');
+        expect(getElement('campaign-finished-avatar').src).toBe(FINISHED_POST.playerAvatarUrl);
+        expect(getElement('campaign-finished-series').textContent).toBe('Night Races');
+        expect(getElement('campaign-finished-summary').textContent).toBe('I finished the Night Races campaign.');
+        expect(getElement('campaign-finished-time').hidden).toBe(false);
+        expect(getElement('campaign-finished-time-value').textContent).toBe('3:07.654');
+        expect(getElement('campaign-finished-stages').textContent).toBe('16 stages');
         for (const [tier, count] of Object.entries(FINISHED_POST.medalDistribution)) {
             expect(getElement(`[data-campaign-medal="${tier}"]`).setAttribute).toHaveBeenCalledWith(
                 'aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`,
@@ -153,18 +171,34 @@ describe('campaign launcher custom post', () => {
             expect(getElement(`[data-campaign-medal="${tier}"]`).replaceChildren)
                 .toHaveBeenCalledWith(expect.objectContaining({ tier, centerText: String(count) }));
         }
-        expect(getElement('campaign-race-btn').textContent).toBe('Play Campaign');
-        expect(getElement('campaign-race-btn').disabled).toBe(false);
+        expect(getElement('campaign-finished-race-btn').disabled).toBe(false);
 
         render({ ...FINISHED_POST, seriesId: null, playerAvatarUrl: 'https://example.com/avatar.png' });
-        expect(getElement('campaign-player-avatar').src).toBe(GENERIC_SNOO_URL);
-        expect(getElement('campaign-race-btn').disabled).toBe(true);
+        expect(getElement('campaign-finished-avatar').src).toBe(GENERIC_SNOO_URL);
+        expect(getElement('campaign-finished-race-btn').disabled).toBe(true);
     });
 
-    it('never reads or shows the total time', () => {
-        const finished = readCampaignFinishedPostData(finishedRoot({ ...FINISHED_POST, totalTimeMs: 187654 }));
+    it('hides the time and stage count on posts that do not carry them', () => {
+        const { getElement, render } = createPoster();
 
-        expect(finished).not.toHaveProperty('totalTimeMs');
+        render({ ...FINISHED_POST, totalTimeMs: 0, stageCount: -1 });
+
+        expect(getElement('campaign-finished-time').hidden).toBe(true);
+        expect(getElement('campaign-finished-stages').textContent).toBe('');
+
+        render({ ...FINISHED_POST, stageCount: 1 });
+        expect(getElement('campaign-finished-stages').textContent).toBe('1 stage');
+    });
+
+    it('shrinks long series names', () => {
+        const { getElement, render } = createPoster();
+        const series = getElement('campaign-finished-series');
+
+        render({ ...FINISHED_POST, seriesName: 'Formula Mini Grand Tour' });
+        expect(series.classList.contains('finished-headline__series--long')).toBe(true);
+
+        render(FINISHED_POST);
+        expect(series.classList.contains('finished-headline__series--long')).toBe(false);
     });
 
     it('writes the ordinal suffix for every kind of rank', () => {
@@ -186,13 +220,14 @@ describe('campaign launcher custom post', () => {
 
     it('renders the overall place figure, its total and the tier color', () => {
         const { getElement, render } = createPoster();
-        const hero = getElement('campaign-hero');
-        const tiers = () => ['gold', 'silver', 'bronze'].filter((tier) => hero.classList.contains(`campaign-hero--${tier}`));
+        const poster = getElement('campaign-finished-poster');
+        const tiers = () => ['gold', 'silver', 'bronze'].filter((tier) => poster.classList.contains(`finished-shell--${tier}`));
 
         render({ ...FINISHED_POST, place: { rank: 1, total: 40 } });
-        expect(getElement('campaign-place').hidden).toBe(false);
+        expect(getElement('campaign-finished-place').hidden).toBe(false);
         expect(placeText(getElement)).toEqual(['', '1', 'ST', 'of 40']);
-        expect(getElement('campaign-place').setAttribute).toHaveBeenCalledWith('aria-label', 'Overall place 1 of 40');
+        expect(getElement('campaign-finished-place-text').textContent).toBe('Overall place 1 of 40');
+        expect(getElement('campaign-finished-place-figure').style.setProperty).toHaveBeenCalledWith('--place-chars', '1');
         expect(tiers()).toEqual(['gold']);
 
         render({ ...FINISHED_POST, place: { rank: 2, total: 12 } });
@@ -218,22 +253,21 @@ describe('campaign launcher custom post', () => {
 
         render({ ...FINISHED_POST, place: { rank: 342, total: 2850 } });
         expect(placeText(getElement)).toEqual(['TOP', '12%', '', 'of 2,850']);
-        expect(getElement('campaign-place').setAttribute).toHaveBeenCalledWith('aria-label', 'Overall place 342 of 2850');
-        expect(getElement('campaign-hero').classList.contains('campaign-hero--gold')).toBe(false);
+        expect(getElement('campaign-finished-place-text').textContent).toBe('Overall place 342 of 2,850');
+        expect(getElement('campaign-finished-poster').classList.contains('finished-shell--gold')).toBe(false);
     });
 
-    it('hides the place block and keeps the player and medals when there is no place', () => {
+    it('hides the place and keeps the medals when there is no place', () => {
         const { getElement, render } = createPoster();
 
         render({ ...FINISHED_POST, place: { rank: 1, total: 40 } });
         render(FINISHED_POST);
-        expect(getElement('campaign-place').hidden).toBe(true);
-        expect(getElement('campaign-hero').classList.contains('campaign-hero--gold')).toBe(false);
-        expect(getElement('campaign-player').hidden).toBe(false);
-        expect(getElement('campaign-medals').hidden).toBe(false);
+        expect(getElement('campaign-finished-place').hidden).toBe(true);
+        expect(getElement('campaign-finished-poster').classList.contains('finished-shell--gold')).toBe(false);
+        expect(getElement('[data-campaign-medal="gold"]').replaceChildren).toHaveBeenCalled();
 
         render({ ...FINISHED_POST, place: { rank: 4, total: 3 } });
-        expect(getElement('campaign-place').hidden).toBe(true);
+        expect(getElement('campaign-finished-place').hidden).toBe(true);
     });
 
     it('stores the shared series before expanding, without carrying the finisher progress', async () => {

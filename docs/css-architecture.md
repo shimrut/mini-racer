@@ -107,15 +107,15 @@ animation. The existing 640px-height compaction also tightens medal sizing and
 vertical gaps so the added metrics/action leave the player avatar and all three
 actions visible on the tested 360x640 screen.
 
-The completion poster keeps the Campaign launcher shell. Top to bottom it reads
-**Overall place**, the place figure with the player beside it, “Campaign
-complete”, the series name, then four small medal counts. Ranks 1 to 100 show a
-big italic number with a small ordinal (`4` and `TH`); later ranks show `TOP 12%`.
-`of 2,850` sits under either. Ranks 1 to 3 use the podium gold, silver and bronze
-for the figure and the avatar ring; every other rank is white. With no saved
-place the place block hides and the player row stays. Total time is not shown.
-The “I finished…” line stays for screen readers only. Its rules are scoped to
-`.campaign-launcher--finished`.
+The completion poster uses the Head to Head poster layout in its own
+`.finished-shell` block in `pages/campaign.css`. The left side has one large
+avatar and name, “Campaign complete”, the series name in big italic type, then
+a small **Time to beat** total and the stage count. The overall place takes the
+track's slot: a big ordinal up to 100th (`4TH`), `TOP 12%` after that, `of 2,850`
+under it, and the four medal counts below. Places 1 to 3 color the figure,
+avatar ring and background glow with the Head to Head medal colors. With no
+place, only the medals show there. Series names over 16 characters use a
+smaller size. The plain launcher is unchanged.
 
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same

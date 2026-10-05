@@ -3,12 +3,14 @@ import { requestGameLaunchTarget } from '../game/modes/launch-target.js';
 import { exposeCampaignLauncherTestHooks } from '../game/debug/launcher-hooks.js';
 import { applyAvatar, isRedditAvatarUrl } from '../game/ui/avatar.js';
 import { createMedalIconSvg } from '../game/medals/medal-icon.js';
+import { formatRaceClock } from '../game/shared/race-time-text.js';
 import { cleanText } from '../game/shared/values.js';
 
 const MEDAL_TIERS = ['author', 'gold', 'silver', 'bronze'];
 const PLACE_TIERS = ['gold', 'silver', 'bronze'];
 const ORDINAL_SUFFIXES = { 1: 'ST', 2: 'ND', 3: 'RD' };
 const MAX_ORDINAL_RANK = 100;
+const LONG_SERIES_NAME = 16;
 
 export function formatCampaignOrdinalSuffix(rank) {
     const lastTwo = rank % 100;
@@ -37,64 +39,67 @@ export function readCampaignFinishedPostData(root = globalThis) {
             return [tier, Number.isSafeInteger(count) && count >= 0 ? count : 0];
         })),
         place: readCampaignPlace(postData.place),
+        totalTimeMs: readPositiveInteger(postData.totalTimeMs),
+        stageCount: readPositiveInteger(postData.stageCount),
     };
 }
 
-function renderCampaignPlace(documentRef, place) {
-    const block = documentRef.getElementById('campaign-place');
-    const hero = documentRef.getElementById('campaign-hero');
-    if (!block || !hero) return;
+function readPositiveInteger(value) {
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+function renderCampaignPlace(byId, poster, place) {
+    const block = byId('campaign-finished-place');
+    if (!block) return;
     block.hidden = !place;
     const tier = PLACE_TIERS[place ? place.rank - 1 : -1];
-    for (const name of PLACE_TIERS) hero.classList.toggle(`campaign-hero--${name}`, name === tier);
+    for (const name of PLACE_TIERS) poster?.classList.toggle(`finished-shell--${name}`, name === tier);
     if (!place) return;
     const figure = formatCampaignPlaceFigure(place);
-    const setText = (id, text) => { documentRef.getElementById(id).textContent = text; };
-    setText('campaign-place-prefix', figure.prefix);
-    setText('campaign-place-number', figure.number);
-    setText('campaign-place-suffix', figure.suffix);
-    setText('campaign-place-total', `of ${place.total.toLocaleString('en-US')}`);
-    block.setAttribute('aria-label', `Overall place ${place.rank} of ${place.total}`);
+    const total = place.total.toLocaleString('en-US');
+    byId('campaign-finished-place-prefix').textContent = figure.prefix;
+    byId('campaign-finished-place-number').textContent = figure.number;
+    byId('campaign-finished-place-suffix').textContent = figure.suffix;
+    byId('campaign-finished-place-total').textContent = `of ${total}`;
+    byId('campaign-finished-place-text').textContent = `Overall place ${place.rank} of ${total}`;
+    byId('campaign-finished-place-figure').style?.setProperty('--place-chars', String(figure.number.length));
 }
 
 export function renderCampaignFinishedPoster(documentRef, value) {
     if (!documentRef || !value) return;
-    documentRef.querySelector('.campaign-launcher')?.classList.add('campaign-launcher--finished');
-    const player = documentRef.getElementById('campaign-player');
-    if (player) player.hidden = false;
-    const playerName = documentRef.getElementById('campaign-player-name');
-    if (playerName) playerName.textContent = value.playerUsername;
-    applyAvatar(documentRef.getElementById('campaign-player-avatar'), value.playerAvatarUrl, {
+    const byId = (id) => documentRef.getElementById(id);
+    const launcher = byId('campaign-launcher');
+    if (launcher) launcher.hidden = true;
+    const poster = byId('campaign-finished-poster');
+    if (poster) poster.hidden = false;
+    byId('campaign-finished-summary').textContent = `I finished the ${value.seriesName} campaign.`;
+    byId('campaign-finished-name').textContent = value.playerUsername;
+    applyAvatar(byId('campaign-finished-avatar'), value.playerAvatarUrl, {
         alt: `${value.playerUsername} avatar`,
-        genericClass: 'campaign-player__avatar--generic',
+        genericClass: 'finished-avatar--generic',
     });
-    const eyebrow = documentRef.getElementById('campaign-eyebrow');
-    if (eyebrow) eyebrow.textContent = 'Campaign complete';
-    const title = documentRef.getElementById('campaign-title');
-    if (title) title.textContent = value.seriesName;
-    const description = documentRef.getElementById('campaign-description');
-    if (description) description.textContent = `I finished the ${value.seriesName} campaign.`;
-    renderCampaignPlace(documentRef, value.place);
-    const medals = documentRef.getElementById('campaign-medals');
-    if (medals) {
-        medals.hidden = false;
-        for (const tier of MEDAL_TIERS) {
-            const slot = medals.querySelector(`[data-campaign-medal="${tier}"]`);
-            if (!slot) continue;
-            const count = value.medalDistribution[tier];
-            slot.setAttribute('aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`);
-            slot.replaceChildren(createMedalIconSvg(tier, {
-                className: 'campaign-medal-icon',
-                centerText: String(count),
-                showEmblem: false,
-            }));
-        }
+    const series = byId('campaign-finished-series');
+    series.textContent = value.seriesName;
+    series.classList.toggle('finished-headline__series--long', value.seriesName.length > LONG_SERIES_NAME);
+    byId('campaign-finished-time').hidden = !value.totalTimeMs;
+    byId('campaign-finished-time-value').textContent = value.totalTimeMs ? formatRaceClock(value.totalTimeMs) : '';
+    byId('campaign-finished-stages').textContent = value.stageCount
+        ? `${value.stageCount} ${value.stageCount === 1 ? 'stage' : 'stages'}`
+        : '';
+    renderCampaignPlace(byId, poster, value.place);
+    const medals = byId('campaign-finished-medals');
+    for (const tier of MEDAL_TIERS) {
+        const slot = medals?.querySelector(`[data-campaign-medal="${tier}"]`);
+        if (!slot) continue;
+        const count = value.medalDistribution[tier];
+        slot.setAttribute('aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`);
+        slot.replaceChildren(createMedalIconSvg(tier, {
+            className: 'finished-medal-icon',
+            centerText: String(count),
+            showEmblem: false,
+        }));
     }
-    const button = documentRef.getElementById('campaign-race-btn');
-    if (button) {
-        button.textContent = 'Play Campaign';
-        button.disabled = !value.seriesId;
-    }
+    byId('campaign-finished-race-btn').disabled = !value.seriesId;
 }
 
 export async function openCampaignGame(event, {
@@ -121,7 +126,8 @@ export function bindCampaignRaceButton(
     documentRef = document,
     openGame = openCampaignGame,
 ) {
-    const button = documentRef?.getElementById('campaign-race-btn');
+    const finished = documentRef?.getElementById('campaign-finished-poster')?.hidden === false;
+    const button = documentRef?.getElementById(finished ? 'campaign-finished-race-btn' : 'campaign-race-btn');
     if (!button || button.dataset.bound === '1') return button || null;
     button.dataset.bound = '1';
     button.addEventListener('click', (event) => {

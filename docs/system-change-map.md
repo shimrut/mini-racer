@@ -415,8 +415,9 @@ flowchart LR
   a player-authored `campaign-finished` post through the existing Campaign
   entrypoint. The poster leads with **Overall place** (an ordinal up to 100th,
   then `TOP X%`, with the finisher count under it) when the aggregate board is
-  ready at preview time. An accepted race refreshes that
-  post's medal counts, place and plain-text backup from the same finished-screen
+  ready at preview time, and shows `postData.totalTimeMs` as a small **Time to
+  beat**. An accepted race refreshes that
+  post's medal counts, total time, place and plain-text backup from the same finished-screen
   tally and the current board. A place is left unchanged while ranking is not
   ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
   saved race still stands; opening that Campaign again tries the same post, as

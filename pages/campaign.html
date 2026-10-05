@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <main class="campaign-launcher" aria-labelledby="campaign-title">
+    <main id="campaign-launcher" class="campaign-launcher" aria-labelledby="campaign-title">
         <div class="campaign-launcher__track" aria-hidden="true">
             <span></span>
             <span></span>
@@ -24,36 +24,64 @@
         </header>
 
         <section class="campaign-copy">
-            <div id="campaign-hero" class="campaign-hero">
-                <p id="campaign-place" class="campaign-place" hidden>
-                    <span class="campaign-place__label" aria-hidden="true">Overall place</span>
-                    <span class="campaign-place__figure">
-                        <span id="campaign-place-prefix" class="campaign-place__affix"></span>
-                        <span id="campaign-place-number" class="campaign-place__number"></span>
-                        <span id="campaign-place-suffix" class="campaign-place__affix"></span>
-                    </span>
-                    <span id="campaign-place-total" class="campaign-place__total"></span>
-                </p>
-                <div id="campaign-player" class="campaign-player" hidden>
-                    <img id="campaign-player-avatar" class="campaign-player__avatar" alt="">
-                    <span id="campaign-player-name" class="campaign-player__name"></span>
-                </div>
-            </div>
-            <p id="campaign-eyebrow" class="campaign-eyebrow">The Numbers</p>
+            <p class="campaign-eyebrow">The Numbers</p>
             <h1 id="campaign-title">Campaign</h1>
-            <p id="campaign-description" class="campaign-description">
+            <p class="campaign-description">
                 Progress through the full stage series, bank medals, and unlock the next race.
             </p>
-            <div id="campaign-medals" class="campaign-medals" aria-label="Medal distribution" hidden>
-                <span data-campaign-medal="author"></span>
-                <span data-campaign-medal="gold"></span>
-                <span data-campaign-medal="silver"></span>
-                <span data-campaign-medal="bronze"></span>
-            </div>
         </section>
 
         <footer class="campaign-actions">
             <button id="campaign-race-btn" type="button">Race Campaign</button>
+        </footer>
+    </main>
+
+    <main id="campaign-finished-poster" class="finished-shell" aria-labelledby="campaign-finished-series" hidden>
+        <header class="finished-brand" aria-label="Mini Racer">
+            <span class="finished-brand__mini">Mini</span>
+            <span class="finished-brand__racer">Racer</span>
+        </header>
+
+        <section class="finished-copy">
+            <p id="campaign-finished-summary" class="visually-hidden"></p>
+            <div class="finished-racer">
+                <img id="campaign-finished-avatar" class="finished-avatar finished-avatar--generic" alt="">
+                <span id="campaign-finished-name" class="finished-racer__name">A racer</span>
+            </div>
+            <div class="finished-headline">
+                <span class="finished-headline__label">Campaign complete</span>
+                <h1 id="campaign-finished-series" class="finished-headline__series">Campaign</h1>
+                <p class="finished-headline__meta">
+                    <span id="campaign-finished-time" hidden>
+                        <span class="finished-headline__dim">Time to beat</span>
+                        <span id="campaign-finished-time-value" class="finished-headline__time"></span>
+                    </span>
+                    <span id="campaign-finished-stages"></span>
+                </p>
+            </div>
+        </section>
+
+        <section class="finished-standing" aria-label="Overall result">
+            <p id="campaign-finished-place" class="finished-place" hidden>
+                <span id="campaign-finished-place-text" class="visually-hidden"></span>
+                <span class="finished-place__label" aria-hidden="true">Overall place</span>
+                <span id="campaign-finished-place-figure" class="finished-place__figure" aria-hidden="true">
+                    <span id="campaign-finished-place-prefix" class="finished-place__affix"></span>
+                    <span id="campaign-finished-place-number"></span>
+                    <span id="campaign-finished-place-suffix" class="finished-place__affix"></span>
+                </span>
+                <span id="campaign-finished-place-total" class="finished-place__total" aria-hidden="true"></span>
+            </p>
+            <div id="campaign-finished-medals" class="finished-medals" aria-label="Medal distribution">
+                <span class="finished-medal" data-campaign-medal="author"></span>
+                <span class="finished-medal" data-campaign-medal="gold"></span>
+                <span class="finished-medal" data-campaign-medal="silver"></span>
+                <span class="finished-medal" data-campaign-medal="bronze"></span>
+            </div>
+        </section>
+
+        <footer class="finished-actions">
+            <button id="campaign-finished-race-btn" type="button">Play Campaign</button>
         </footer>
     </main>
 </body>
