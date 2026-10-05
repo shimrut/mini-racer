@@ -34,10 +34,17 @@
                 Progress through the full stage series, bank medals, and unlock the next race.
             </p>
             <div class="campaign-results">
-                <p id="campaign-place" class="campaign-place" hidden>
-                    <span class="campaign-place__label" aria-hidden="true">Overall place</span>
-                    <span id="campaign-place-value"></span>
-                </p>
+                <div id="campaign-stats" class="campaign-stats" hidden>
+                    <p id="campaign-time" class="campaign-stat campaign-stat--time" role="group" hidden>
+                        <span class="campaign-stat__label" aria-hidden="true">Time to beat</span>
+                        <span id="campaign-time-value" class="campaign-stat__value"></span>
+                    </p>
+                    <p id="campaign-place" class="campaign-stat" role="group" hidden>
+                        <span class="campaign-stat__label" aria-hidden="true">Overall</span>
+                        <span id="campaign-place-value" class="campaign-stat__value"></span>
+                        <span id="campaign-place-top" class="campaign-stat__note" hidden></span>
+                    </p>
+                </div>
                 <div id="campaign-medals" class="campaign-medals" aria-label="Medal distribution" hidden>
                     <span data-campaign-medal="author"></span>
                     <span data-campaign-medal="gold"></span>
@@ -48,6 +55,7 @@
         </section>
 
         <footer class="campaign-actions">
+            <p id="campaign-hook" class="campaign-hook" hidden></p>
             <button id="campaign-race-btn" type="button">Race Campaign</button>
         </footer>
     </main>

@@ -107,11 +107,15 @@ animation. The existing 640px-height compaction also tightens medal sizing and
 vertical gaps so the added metrics/action leave the player avatar and all three
 actions visible on the tested 360x640 screen.
 
-The completion poster keeps the Campaign launcher shell. Its reading stack uses
-the same step as the Head to Head poster: player, “Campaign finished”, the
-series name, the rank figure, then the medals. The repeated “I finished…” line
-stays available to screen readers and is not shown. The track rings stay on the
-right. Play Campaign stays in the footer.
+The completion poster keeps the Campaign launcher shell as one centered column
+that fits a single screen at 390x844, 512x512, 1280x720 and 360x520. Its `--u`
+is the smaller of 2.2vw and 1.55vh. The stack is the player, “Campaign
+complete · N stages”, the series name (two lines at most), a **Time to beat**
+tile beside an **Overall** tile (`#rank of total`, **Top X%** from 10
+finishers, top half only), the four labeled medal counts, then the hook and **Beat My Time**
+(**Race the Campaign** without a saved time) in the footer. Missing data hides
+its tile. The repeated “I finished…” line stays available to screen readers and
+is not shown. The track rings stay behind.
 
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same

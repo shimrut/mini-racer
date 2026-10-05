@@ -1,5 +1,32 @@
 # Campaign finished screen investigation — 2026-10-04
 
+## Poster redesign — 2026-10-05
+
+The finished post is now a centered one-screen poster built to let the finisher
+brag and give a viewer a reason to tap: brand, player (gold-ringed avatar and
+`u/name`), "Campaign complete · N stages", the series name, a **Time to beat**
+tile beside an **Overall** tile (`#rank of total`, plus **Top X%** with
+X = ceil(rank / total × 100) once 10 people have finished, top half only), the four labeled
+medal counts, then "Think you're faster?" above **Beat My Time**. A post with no
+saved total says "Can you finish it?" and **Race the Campaign**. A tile whose data
+is missing is hidden, so posts made before this change still render. The button
+keeps its click behavior (the exact series ID reaches startup). The plain
+Campaign launcher renders pixel-identical to before.
+
+- `postData.totalTimeMs` (positive safe integer, omitted when unknown) is the
+  `totalTimeMs` that `buildCampaignFinishedScreen()` already returns. It rides
+  the ten-minute preview token (checked when the token is read), is published at
+  confirm, and is added to the plain-text backup as `Total time 3:07.654`. The
+  post title is unchanged.
+- A refresh treats a changed total like changed medals: a faster stage time with
+  the same medals now rewrites the post data and plain text, and a post made
+  before this change gains its total on the player's next accepted race. A total
+  that cannot be computed leaves the posted one alone.
+- The poster also reads `stageCount`, which was already in the post data.
+- Layout unit `--u` is the smaller of 2.2vw and 1.55vh (5 to 14px), checked at
+  390x844, 512x512, 1280x720 and 360x520. The series name stops at two lines.
+  An unusually large board stacks the two tiles instead of overflowing.
+
 ## Compact medal counts — 2026-10-05
 
 The user replaced the proposed medal stacks with one count per Bronze, Silver,

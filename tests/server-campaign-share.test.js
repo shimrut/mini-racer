@@ -54,6 +54,13 @@ const input = { seriesId: 'numbered-v1', redditUsername: 'RaceFan', subredditNam
 const completedResults = () => Object.fromEntries(stages.map((stage, index) => [stage.raceId, {
     medal: ['author', 'gold', 'silver', 'bronze'][index % 4],
 }]));
+// The first stage carries the remainder so the saved stage times sum to totalTimeMs.
+const timedResults = (totalTimeMs, medal = (index) => ['author', 'gold', 'silver', 'bronze'][index % 4]) => Object.fromEntries(
+    stages.map((stage, index) => [stage.raceId, {
+        medal: medal(index),
+        bestTimeMs: index === 0 ? totalTimeMs - (stages.length - 1) * 1000 : 1000,
+    }]),
+);
 const publishedPost = (overrides = {}) => ({
     id: 't3_finished',
     url: 'https://reddit.com/r/MiniRacer/comments/finished',
@@ -180,7 +187,9 @@ describe('Campaign result sharing', () => {
             },
         });
         expect(submitted.postData.place).toBeUndefined();
+        expect(submitted.postData.totalTimeMs).toBeUndefined();
         expect(submitted.textFallback.text).not.toContain('Overall place');
+        expect(submitted.textFallback.text).not.toContain('Total time');
         expect(Object.values(submitted.postData.medalDistribution).reduce((sum, count) => sum + count, 0)).toBe(stages.length);
         expect(submitted.postData.medalDistribution).toEqual(stages.reduce((counts, _stage, index) => {
             counts[['author', 'gold', 'silver', 'bronze'][index % 4]] += 1;
@@ -240,6 +249,29 @@ describe('Campaign result sharing', () => {
         expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
     });
 
+    it('publishes the total time shown in the preview, in the post data and the plain text', async () => {
+        mockResults.mockResolvedValue(timedResults(187_654));
+        const preview = await previewServerCampaignResultsShare(input);
+        expect(JSON.parse(values.get(`campaign:share-preview:${preview.body.shareToken}`)).totalTimeMs).toBe(187_654);
+        mockResults.mockResolvedValue(timedResults(100_000));
+        const confirmed = await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken, totalTimeMs: 1 });
+        expect(confirmed.body.status).toBe('shared');
+        const submitted = mockReddit.submitCustomPost.mock.calls[0][0];
+        expect(submitted.title).toBe('I finished the Numbers campaign');
+        expect(submitted.postData.totalTimeMs).toBe(187_654);
+        expect(submitted.textFallback.text).toContain('Total time 3:07.654');
+    });
+
+    it.each([0, -1, 1.5, '187654', Number.MAX_SAFE_INTEGER + 1])('rejects a preview whose total time was altered to %j', async (totalTimeMs) => {
+        mockResults.mockResolvedValue(timedResults(187_654));
+        const preview = await previewServerCampaignResultsShare(input);
+        const key = `campaign:share-preview:${preview.body.shareToken}`;
+        values.set(key, JSON.stringify({ ...JSON.parse(values.get(key)), totalTimeMs }));
+        expect(await confirmServerCampaignResultsShare({ ...input, shareToken: preview.body.shareToken }))
+            .toMatchObject({ body: { status: 'preview_expired' } });
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
     it('updates the shared place when a later save changes it', async () => {
         const post = await publishedFixture();
         rankBoard(1, 4);
@@ -284,11 +316,40 @@ describe('Campaign result sharing', () => {
         expect(post.setTextFallback).toHaveBeenCalledOnce();
     });
 
-    it('does not write a post for a faster time with unchanged medals', async () => {
+    it('does not write a post when medals, place and total time are unchanged', async () => {
+        mockResults.mockResolvedValue(timedResults(187_654));
         const post = await publishedFixture();
         await refreshServerCampaignResultsShare(refreshInput);
         expect(post.mergePostData).not.toHaveBeenCalled();
         expect(post.setTextFallback).not.toHaveBeenCalled();
+    });
+
+    it('updates the total time and plain text when a faster time keeps the medals', async () => {
+        mockResults.mockResolvedValue(timedResults(187_654));
+        const post = await publishedFixture();
+        mockResults.mockResolvedValue(timedResults(170_001));
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledOnce();
+        expect(post.mergePostData).toHaveBeenCalledWith({ totalTimeMs: 170_001 });
+        expect(post.setTextFallback).toHaveBeenCalledWith({ text: expect.stringContaining('Total time 2:50.001') });
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledOnce();
+    });
+
+    it('adds the total time to a post made before it was carried', async () => {
+        const post = await publishedFixture();
+        expect(mockReddit.submitCustomPost.mock.calls[0][0].postData.totalTimeMs).toBeUndefined();
+        mockResults.mockResolvedValue(timedResults(187_654));
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).toHaveBeenCalledWith({ totalTimeMs: 187_654 });
+    });
+
+    it('keeps a posted total time when no total can be computed', async () => {
+        mockResults.mockResolvedValue(timedResults(187_654));
+        const post = await publishedFixture();
+        mockResults.mockResolvedValue(completedResults());
+        await refreshServerCampaignResultsShare(refreshInput);
+        expect(post.mergePostData).not.toHaveBeenCalled();
     });
 
     it.each([{ redditUsername: 'OtherRacer' }, { subredditName: 'OtherCommunity' }])('keeps updates scoped to the owner and community: %j', async (other) => {
