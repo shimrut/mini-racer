@@ -65,6 +65,11 @@ export function normalizeCampaignSeriesData(value) {
         if (ids.has(id)) throw new Error(`Campaign series ${id} is listed twice.`);
         ids.add(id);
         const stages = (Array.isArray(entry.stages) ? entry.stages : []).map(normalizeStage);
+        const finalStageId = entry.finalStageId ?? null;
+        if (finalStageId !== null && (!stages.length
+            || finalStageId !== `${id}-${String(stages.length - 1).padStart(2, '0')}`)) {
+            throw new Error(`The final stage of ${id} must be its last stage.`);
+        }
         for (const stage of stages) {
             if (trackKeys.has(stage.trackKey)) {
                 throw new Error(`Track ${stage.trackKey} is in more than one Campaign stage.`);
@@ -75,6 +80,7 @@ export function normalizeCampaignSeriesData(value) {
             id,
             name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id,
             ground: typeof entry.ground === 'string' ? entry.ground : 'tarmac',
+            finalStageId,
             stages,
         };
     });
@@ -97,6 +103,7 @@ export function serializeCampaignSeries(data) {
             id: series.id,
             name: series.name,
             ground: series.ground,
+            finalStageId: series.finalStageId ?? null,
             stages: series.stages.map((stage) => ({
                 trackKey: stage.trackKey,
                 laps: stage.laps,
@@ -142,6 +149,10 @@ function removeDraftStage(series, stageIndex) {
     const targets = series.stages.map((stage) => stage.requiredMedals);
     const remaining = series.stages.filter((_, index) => index !== stageIndex);
     series.stages = remaining.map((stage, index) => ({ ...stage, requiredMedals: targets[index] }));
+    if (series.finalStageId) {
+        series.finalStageId = series.stages.length && stageIndex < series.stages.length
+            ? `${series.id}-${String(series.stages.length - 1).padStart(2, '0')}` : null;
+    }
 }
 
 function liveStageError(series, action) {
@@ -221,6 +232,11 @@ export function applyTrackSeriesUpdate(data, {
     }
 
     const series = next.series.find((entry) => entry.id === target.seriesId);
+    if (isAppCampaignSeriesLive(series) && series.finalStageId) {
+        throw liveStageError(series, 'add stages after its final stage');
+    }
+    // A draft endpoint must be selected again when its length changes.
+    series.finalStageId = null;
     const stageIndex = series.stages.length;
     const stageLaps = laps ?? 1;
     const lapsError = getStageLapsError(stageLaps);
@@ -248,5 +264,6 @@ export function moveSeriesStage(data, seriesId, trackKey, direction) {
     const stages = [...series.stages];
     [stages[from], stages[to]] = [stages[to], stages[from]];
     series.stages = stages.map((stage, index) => ({ ...stage, requiredMedals: targets[index] }));
+    if (from === stages.length - 1 || to === stages.length - 1) series.finalStageId = null;
     return next;
 }

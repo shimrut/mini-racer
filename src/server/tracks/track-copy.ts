@@ -42,7 +42,10 @@ export function matchesAppTrack(
     return Boolean(source)
         && !record.draftLoop?.length
         && !record.roadLine
-        && JSON.stringify(sortedKeys(record.track)) === JSON.stringify(sortedKeys(source))
+        // Creator storage drops obsolete rendering fields from older app tracks.
+        && JSON.stringify(sortedKeys(record.track)) === JSON.stringify(sortedKeys(
+            normalizeTrackShape(source!, { maxNameLength: MAX_TRACK_NAME_LENGTH }),
+        ))
         // The app and the Creator write the medal times in another order.
         && JSON.stringify(sortedKeys(record.medalRow ?? null)) === JSON.stringify(sortedKeys(appMedalRow(record.key)))
         && record.fingerprint === createTrackFingerprint(source!);

@@ -19,6 +19,7 @@ import {
     deriveCampaignProgress,
     getCampaignBootstrap,
     getCampaignPbGhost,
+    getCampaignAggregate,
     getCampaignSnapshot,
     startServerCampaignRace,
     submitCampaignRun,
@@ -32,6 +33,7 @@ import {
     CAMPAIGN_LIVE_STAGES,
     countCampaignMedals,
     getCampaignSeriesStages,
+    getCampaignFinalStage,
     getCampaignStage,
     isCampaignSeriesFinished,
     isCampaignSeriesId,
@@ -193,6 +195,25 @@ function campaignFinishOwnerStillMatches(ownerPlayerId) {
     return getActivePlayerOwnerId() === ownerPlayerId;
 }
 
+// Reserve Results while the server validates the last stage. Local medal data
+// and a recovering bootstrap must not make Home flash before confirmation.
+function campaignRunCanFinishSeries(engine, stage) {
+    const verified = engine.campaignVerifiedBootstrap;
+    if (!stage?.seriesId) return false;
+    return !verified || ((verified.campaignId ?? CAMPAIGN_ID) === stage.seriesId
+        && !isCampaignSeriesFinished(stage.seriesId, verified.progress?.resultsByRaceId));
+}
+
+// After the last stage, Results opens the finished screen.
+function campaignFinishedNextRace(engine, raceId, enabled) {
+    return {
+        label: 'Results',
+        enabled,
+        replaceMenu: true,
+        action: () => engine.showReadyCampaignFinished(raceId),
+    };
+}
+
 function campaignFinishViewIsOpen(engine, raceId) {
     return engine.activeRaceMode === 'campaign'
         && engine.status === 'won'
@@ -231,15 +252,17 @@ async function resolveDefaultCampaignStage(engine) {
         throw new Error('Campaign progress is not authoritative.');
     }
     const lobbyState = normalizeCampaignLobbyState(decorateCampaignState(bootstrap));
-    const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState)?.id);
+    const stage = getCampaignStage(getDefaultCampaignLobbyStage(lobbyState, engine.launchTarget?.seriesId)?.id);
     return stage?.trackKey && stage?.raceId ? stage : null;
 }
 
-function getDefaultCampaignLobbyStage(lobbyState) {
+function getDefaultCampaignLobbyStage(lobbyState, targetedSeriesId = null) {
     const unlockedStages = Array.isArray(lobbyState?.stages)
         ? lobbyState.stages.filter((stage) => stage.unlocked)
         : [];
-    return lobbyState?.nextStage || unlockedStages.at(-1) || null;
+    return (targetedSeriesId && targetedSeriesId === lobbyState?.seriesId
+        ? unlockedStages.at(-1)
+        : lobbyState?.nextStage || unlockedStages.at(-1)) || null;
 }
 
 // The series line of each live series. Without a server summary (no connection,
@@ -445,6 +468,11 @@ function responseConfirmsCampaignResult(response, entry) {
 
 // The series on the Campaign screen: the last one this device showed, or Numbers.
 function selectedCampaignSeriesId(engine) {
+    if (engine.launchTarget?.mode === 'campaign'
+        && engine.launchTarget.seriesId
+        && engine.campaignSeriesId === engine.launchTarget.seriesId) {
+        return engine.campaignSeriesId;
+    }
     if (!isCampaignSeriesId(engine.campaignSeriesId)) {
         engine.campaignSeriesId = readSelectedCampaignSeriesId();
     }
@@ -619,7 +647,7 @@ export const campaignEngineMethods = {
         do {
             verified = this.campaignVerifiedBootstrap ?? bootstrap;
             const state = normalizeCampaignLobbyState(decorateCampaignState(this.campaignBootstrap ?? verified));
-            stage = getCampaignStage(getDefaultCampaignLobbyStage(state)?.id);
+            stage = getCampaignStage(getDefaultCampaignLobbyStage(state, this.launchTarget?.seriesId)?.id);
             if (!stage?.trackKey) throw new Error('The Campaign has no playable stage.');
             prepared = await this.prepareRaceTrack?.(PREPARATION_SLOTS.CAMPAIGN, {
                 trackKey: stage.trackKey,
@@ -683,10 +711,13 @@ export const campaignEngineMethods = {
 
     // `view` is 'series' (the list of series) or 'stages' (the stages of one series).
     // Entering the Campaign shows the series; a return from a race shows the stages.
-    // With only one live series, the Campaign always shows the stages.
-    showCampaignLobby({ refresh = true, view = 'stages' } = {}) {
+    // Ordinary entry skips the series list when only one series is live.
+    // View Campaign explicitly opens that list from the completion screen.
+    showCampaignLobby({ refresh = true, view = 'stages', forceSeriesView = false } = {}) {
         this.cancelRacePreparation?.();
-        this.campaignLobbyView = view === 'series' && campaignHasSeriesChoice() ? 'series' : 'stages';
+        this.campaignLobbyView = view === 'series' && (forceSeriesView || campaignHasSeriesChoice())
+            ? 'series'
+            : 'stages';
         this._campaignCarouselPaintReady = false;
         this.activeCampaignStage = null;
         this.activeHeadToHead = null;
@@ -744,7 +775,7 @@ export const campaignEngineMethods = {
         const cards = buildCampaignCarouselCards(this.campaignLobbyState);
         this.campaignCarousel.render(cards, {
             selectedChallengeId: this.selectedCampaignStageId
-                || getDefaultCampaignLobbyStage(this.campaignLobbyState)?.id
+                || getDefaultCampaignLobbyStage(this.campaignLobbyState, this.launchTarget?.seriesId)?.id
                 || null,
             loading: !this._campaignBootstrapReady,
         });
@@ -857,7 +888,7 @@ export const campaignEngineMethods = {
                 : null;
             const stage = getCampaignStage(
                 selectedLobbyStage?.id
-                || getDefaultCampaignLobbyStage(this.campaignLobbyState)?.id
+                || getDefaultCampaignLobbyStage(this.campaignLobbyState, this.launchTarget?.seriesId)?.id
                 || requestedId,
             );
             if (!stage) return;
@@ -1108,6 +1139,7 @@ export const campaignEngineMethods = {
         message = null,
         shareRequest = null,
         scoreboardSnapshot = null,
+        submitted = false,
     }) {
         const comparison = this.getRaceComparisonResult?.(finalTime) ?? null;
         const paceBaseline = this.getActiveRacePaceBaseline?.()
@@ -1130,6 +1162,16 @@ export const campaignEngineMethods = {
         }
         const trackLine = `${getTrackName(stage.trackKey, stage.trackKey)} · ${stage.lapCount} ${stage.lapCount === 1 ? 'lap' : 'laps'}`;
         const nextTarget = getCampaignNextStageTarget(this, stage);
+        this._campaignFinishedReady = null;
+        const pending = getCampaignVerificationEntry(stage.raceId);
+        const isFinalStage = getCampaignFinalStage(stage.seriesId)?.raceId === stage.raceId;
+        const verifiedResults = this.campaignVerifiedBootstrap?.progress?.resultsByRaceId;
+        const revisit = isFinalStage
+            && (this.campaignVerifiedBootstrap?.campaignId ?? CAMPAIGN_ID) === stage.seriesId
+            && isCampaignSeriesFinished(stage.seriesId, verifiedResults);
+        const finishesSeries = isFinalStage
+            && (submitted || (pending?.verificationState === 'pending' && !pending.progressConfirmed))
+            && campaignRunCanFinishSeries(this, stage);
         this.modal.showModal(
             'Campaign race complete',
             null,
@@ -1187,9 +1229,14 @@ export const campaignEngineMethods = {
                         enabled: nextTarget.unlocked,
                         action: () => void this.startCampaignNextStage(nextTarget.stage),
                     }
-                    : null,
+                    : revisit || finishesSeries
+                        ? campaignFinishedNextRace(this, stage.raceId, revisit)
+                        : null,
             },
         );
+        if (revisit) this.markCampaignFinishedReady(stage.seriesId, verifiedResults, {
+            raceId: stage.raceId, ownerPlayerId: getActivePlayerOwnerId(), revisit: true,
+        });
         if (this.modal.modalMsg) {
             this.modal.modalMsg.style.display = '';
             this.modal.modalMsg.textContent = message || trackLine;
@@ -1197,40 +1244,134 @@ export const campaignEngineMethods = {
         this.prepareCampaignNextTrack?.(stage, nextTarget);
     },
 
-    presentCampaignFinishedScreen(seriesId, resultsByRaceId, { raceId, ownerPlayerId = null } = {}) {
+    // The finished screen opens only from Results, so the player first sees the
+    // result of the run that finished the series.
+    markCampaignFinishedReady(seriesId, resultsByRaceId, { raceId, ownerPlayerId = null, revisit = false } = {}) {
         if (!campaignFinishOwnerStillMatches(ownerPlayerId)) return;
-        if (this._campaignFinishedCelebratedSeriesId === seriesId) return;
         const screen = buildCampaignFinishedScreen(seriesId, resultsByRaceId);
         if (!screen || !campaignFinishViewIsOpen(this, raceId)) return;
-        this._campaignFinishedCelebratedSeriesId = seriesId;
-        if (this.modal.isRunsViewActive?.()) {
-            this._pendingCampaignFinished = { seriesId, raceId, ownerPlayerId };
-            this.modal.onFinishViewRestored = () => this.showPendingCampaignFinished();
+        this._campaignFinishedReady = { raceId, ownerPlayerId, seriesId, resultsByRaceId, revisit };
+    },
+
+    // On the last stage, Results shows once the server confirms the series is
+    // finished, and goes away when it does not.
+    syncCampaignFinishedNext(raceId) {
+        const ready = this._campaignFinishedReady?.raceId === raceId;
+        this.modal.setCombinedNextRace?.(ready
+            ? campaignFinishedNextRace(this, raceId, true) : null);
+    },
+
+    showReadyCampaignFinished(raceId) {
+        const ready = this._campaignFinishedReady;
+        if (!ready || ready.raceId !== raceId) return;
+        if (!campaignFinishOwnerStillMatches(ready.ownerPlayerId)) return;
+        if (!campaignFinishViewIsOpen(this, raceId) || this.modal.isRunsViewActive?.()) return;
+        this._campaignFinishedReady = null;
+        // Recheck the published endpoint before using a saved action.
+        const screen = buildCampaignFinishedScreen(ready.seriesId, ready.resultsByRaceId);
+        if (!screen) {
+            this.syncCampaignFinishedNext(raceId);
             return;
         }
-        this._pendingCampaignFinished = null;
-        this.showCampaignFinishedNow(screen);
+        this.showCampaignFinishedNow(screen, { celebrate: !ready.revisit });
     },
 
-    showPendingCampaignFinished() {
-        const pending = this._pendingCampaignFinished;
-        this._pendingCampaignFinished = null;
-        if (!pending || !campaignFinishOwnerStillMatches(pending.ownerPlayerId)) return;
-        if (this.activeRaceMode !== 'campaign' || this.status !== 'won') return;
-        if (this.activeCampaignStage?.raceId !== pending.raceId) return;
-        if (this.modal?.isModalActive?.() !== true) return;
-        const results = this.campaignVerifiedBootstrap?.progress?.resultsByRaceId;
-        const screen = buildCampaignFinishedScreen(pending.seriesId, results);
-        if (screen) this.showCampaignFinishedNow(screen);
-    },
-
-    showCampaignFinishedNow(screen) {
-        const stage = this.activeCampaignStage;
+    // View Campaign opens all live series; View Series opens this series' Tracks.
+    showCampaignFinishedNow(screen, { celebrate = true } = {}) {
+        const ownerPlayerId = getActivePlayerOwnerId();
+        clearTimeout(this._campaignAggregateSession?.timer);
+        const session = { screen, ownerPlayerId, snapshot: null, inFlight: null, pollDelayMs: 2000, viewVersion: 0 };
+        this._campaignAggregateSession = session;
         this.modal.showCampaignFinished?.(screen, {
-            primaryActionLabel: 'Campaign',
-            primaryAction: () => this.showCampaignLobby(),
-            secondaryActionLabel: 'Improve',
-            secondaryAction: stage ? () => void this.startCampaignStage(stage) : null,
+            celebrate,
+            playerUsername: this.redditUsername || globalThis.devvit?.context?.username || 'Guest racer',
+            playerAvatarUrl: globalThis.devvit?.context?.snoovatar,
+            shareRequest: { kind: 'campaign-finished', seriesId: screen.seriesId, ownerPlayerId },
+            primaryActionLabel: 'View Campaign',
+            primaryAction: () => this.showCampaignLobby({ view: 'series', forceSeriesView: true }),
+            secondaryActionLabel: 'View Series',
+            secondaryAction: () => this.openCampaignTracks(),
+            leaderboardAction: () => this.openCampaignAggregateStandings(session),
+        });
+        void this.loadCampaignAggregate(session);
+    },
+
+    campaignAggregateSessionIsCurrent(session) {
+        return this._campaignAggregateSession === session
+            && campaignFinishOwnerStillMatches(session.ownerPlayerId)
+            && this.activeRaceMode === 'campaign'
+            && getCampaignFinalStage(session.screen.seriesId)?.raceId === session.screen.finalStageId
+            && (this.modal.isCampaignFinishedViewActive?.() === true
+                || (this.modal.isRunsViewActive?.() === true
+                    && this.modal.matchesModalScoreboardContext?.({ challengeId: session.screen.seriesId }) === true));
+    },
+
+    async loadCampaignAggregate(session) {
+        if (!this.campaignAggregateSessionIsCurrent(session)) return;
+        if (session.inFlight) return session.inFlight;
+        clearTimeout(session.timer);
+        session.needsRefresh = true;
+        this.modal.updateCampaignFinishedAggregate?.(session.snapshot, { isLoading: true });
+        session.inFlight = getCampaignAggregate(session.screen.seriesId).then((response) => {
+            if (!this.campaignAggregateSessionIsCurrent(session)) return;
+            const body = response?.body;
+            if (!response?.ok || body?.seriesId !== session.screen.seriesId
+                || body.finalStageId !== session.screen.finalStageId) throw new Error('Campaign leaderboard unavailable.');
+            session.snapshot = { ...normalizeScoreboardSnapshot(body),
+                totalTimeMs: body.totalTimeMs, ready: body.ready === true };
+            session.needsRefresh = !session.snapshot.ready;
+            this.modal.updateCampaignFinishedAggregate?.(session.snapshot);
+            if (session.snapshot.ready && this.modal.isRunsViewActive?.()) {
+                this.modal.updateModalScoreboardSnapshot?.(session.snapshot);
+            }
+            if (session.snapshot.ready) session.pollDelayMs = 2000;
+        }).catch(() => {
+            if (this.campaignAggregateSessionIsCurrent(session)) {
+                this.modal.updateCampaignFinishedAggregate?.(session.snapshot, { failed: true });
+            }
+        }).finally(() => {
+            session.inFlight = null;
+            if (session.needsRefresh && this.campaignAggregateSessionIsCurrent(session)) {
+                session.timer = setTimeout(() => void this.loadCampaignAggregate(session), session.pollDelayMs);
+                session.pollDelayMs = Math.min(session.pollDelayMs * 2, 15000);
+            }
+        });
+        return session.inFlight;
+    },
+
+    openCampaignAggregateStandings(session) {
+        // This board has a single entry point: the saved Campaign results.
+        if (!this.campaignAggregateSessionIsCurrent(session)
+            || this.modal.isCampaignFinishedViewActive?.() !== true || !session.snapshot?.ready || session.needsRefresh) return;
+        const viewVersion = ++session.viewVersion;
+        let pageRequest = null;
+        this.modal.showRunsModal(null, null, null, 'back', {
+            scoreboardSnapshot: session.snapshot,
+            scoreboardMode: 'campaign-aggregate',
+            scoreboardChallengeId: session.screen.seriesId,
+            scoreboardTitle: session.screen.title,
+            showGlobalLeaderboard: true,
+            allowLeaderboardOpen: false,
+            onLoadMoreLeaderboard: async () => {
+                if (pageRequest) return pageRequest;
+                const snapshot = session.snapshot;
+                if (!snapshot.hasMore || !this.campaignAggregateSessionIsCurrent(session)) return snapshot;
+                pageRequest = getCampaignAggregate(session.screen.seriesId, {
+                    limit: 50, offset: snapshot.nextOffset,
+                }).then((response) => {
+                    if (!this.campaignAggregateSessionIsCurrent(session) || !this.modal.isRunsViewActive?.()
+                        || session.viewVersion !== viewVersion || session.snapshot !== snapshot) return session.snapshot;
+                    if (!response?.ok || response.body?.ready !== true
+                        || response.body.seriesId !== session.screen.seriesId
+                        || response.body.finalStageId !== session.screen.finalStageId) {
+                        throw new Error('Could not load more Campaign results.');
+                    }
+                    session.snapshot = mergeLeaderboardPages(snapshot, normalizeScoreboardSnapshot(response.body));
+                    this.modal.updateModalScoreboardSnapshot(session.snapshot);
+                    return session.snapshot;
+                }).finally(() => { pageRequest = null; });
+                return pageRequest;
+            },
         });
     },
 
@@ -1353,6 +1494,7 @@ export const campaignEngineMethods = {
                 scoreboardSnapshot: enqueued
                     ? campaignPendingSnapshot(finalTime)
                     : campaignErrorSnapshot(finalTime, null),
+                submitted: enqueued,
             });
             this.configureLeaderboardOpponentFinish?.({
                 mode: 'campaign',
@@ -1534,21 +1676,33 @@ export const campaignEngineMethods = {
             } else {
                 this.refreshCampaignVerificationOverlay?.();
             }
+            const aggregateSession = this._campaignAggregateSession;
+            if (aggregateSession?.screen.seriesId === seriesId
+                && this.campaignAggregateSessionIsCurrent(aggregateSession)) {
+                // A PB can be confirmed after the player opened the saved
+                // Campaign summary. Refresh after any older rank request.
+                void Promise.resolve(aggregateSession.inFlight).then(() => this.loadCampaignAggregate(aggregateSession));
+            }
             if (
                 !entry.progressConfirmed
                 && confirmsThisSeries
-                && !wasFinished
+                && getCampaignFinalStage(seriesId)?.raceId === raceId
                 && isCampaignSeriesFinished(seriesId, confirmed.resultsByRaceId)
             ) {
-                this.presentCampaignFinishedScreen(seriesId, confirmed.resultsByRaceId, {
+                this.markCampaignFinishedReady(seriesId, confirmed.resultsByRaceId, {
                     raceId,
                     ownerPlayerId: entry.ownerPlayerId ?? null,
+                    revisit: wasFinished,
                 });
             }
             if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
                 const nextTarget = getCampaignNextStageTarget(this, stage);
-                this.modal.setCombinedNextRaceEnabled?.(nextTarget?.unlocked === true);
-                this.prepareCampaignNextTrack?.(stage, nextTarget);
+                if (nextTarget) {
+                    this.modal.setCombinedNextRaceEnabled?.(nextTarget.unlocked === true);
+                    this.prepareCampaignNextTrack?.(stage, nextTarget);
+                } else {
+                    this.syncCampaignFinishedNext(raceId);
+                }
             }
             await this.refreshCampaignAfterAcceptedRun(stage, ghostRecovery);
             void this.resolveLeaderboardOpponentAdvanceAfterVerification?.({
@@ -1578,8 +1732,12 @@ export const campaignEngineMethods = {
         if (this.modal.matchesModalScoreboardContext?.({ challengeId: raceId })) {
             this.modal.setCombinedWinMedal?.(null);
             const nextTarget = getCampaignNextStageTarget(this, stage);
-            this.modal.setCombinedNextRaceEnabled?.(nextTarget?.unlocked === true);
-            this.prepareCampaignNextTrack?.(stage, nextTarget);
+            if (nextTarget) {
+                this.modal.setCombinedNextRaceEnabled?.(nextTarget.unlocked === true);
+                this.prepareCampaignNextTrack?.(stage, nextTarget);
+            } else {
+                this.syncCampaignFinishedNext(raceId);
+            }
         }
         this.updateCampaignFinishSnapshot(
             raceId,
@@ -1651,7 +1809,7 @@ export const campaignEngineMethods = {
         const campaignStages = Array.isArray(lobbyState?.stages)
             ? lobbyState.stages
             : [];
-        const defaultStage = getDefaultCampaignLobbyStage(lobbyState);
+        const defaultStage = getDefaultCampaignLobbyStage(lobbyState, this.launchTarget?.seriesId);
         const requestedStageId = typeof stageLike === 'string'
             ? stageLike
             : (stageLike?.raceId || stageLike?.id || defaultStage?.id);

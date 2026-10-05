@@ -29,7 +29,7 @@ import { readTracksToShare } from '../tracks/creator-track-access.js';
 
 // Campaign series made in the Creator, and copies of the app series that are
 // not live. A draft is private. A published series is live for players: its
-// stages are fixed, and new stages can only go after the last one.
+// stages are fixed. It can grow until a designated final stage is published.
 
 export type StoredSeriesStage = { trackKey: string; laps: number; requiredMedals: number };
 export type StoredSeriesStatus = 'draft' | 'published';
@@ -41,6 +41,9 @@ export type StoredSeriesRecord = {
     ground: string;
     // Actual grounds of the published stages only. Older records use ground.
     grounds?: string[];
+    // A draft declaration takes effect only when explicitly published.
+    finalStageId?: string | null;
+    publishedFinalStageId?: string | null;
     stages: StoredSeriesStage[];
     status: StoredSeriesStatus;
     // The stages that players can race. They cannot change.
@@ -59,6 +62,7 @@ export type StoredSeriesDefinition = {
     name: string;
     ground: string;
     grounds?: string[];
+    finalStageId: string | null;
     stages: StoredSeriesStage[];
 };
 
@@ -71,7 +75,7 @@ const INDEX_KEY = `${SERIES_PREFIX}:index`;
 const REVISION_KEY = `${SERIES_PREFIX}:revision`;
 const WRITE_LOCK_TTL_MS = 10_000;
 
-type AppSeriesDefinition = { id: string; name?: string; ground?: string; stages?: StoredSeriesStage[] };
+type AppSeriesDefinition = { id: string; name?: string; ground?: string; finalStageId?: string | null; stages?: StoredSeriesStage[] };
 const APP_SERIES_DEFINITIONS = ((seriesData as { series?: AppSeriesDefinition[] }).series ?? []);
 const APP_SERIES_IDS = new Set(APP_SERIES_DEFINITIONS.map((series) => series.id));
 
@@ -110,9 +114,31 @@ export function toSeriesDefinition(record: StoredSeriesRecord): StoredSeriesDefi
         name: record.name,
         ground: record.ground,
         grounds: getCampaignSeriesGrounds(record),
+        finalStageId: publishedFinalStageId(record),
         // Players see only the published stages.
         stages: record.stages.slice(0, record.publishedStageCount).map((stage) => ({ ...stage })),
     };
+}
+
+// Missing fields on old Creator series mean an ongoing Campaign. Only an
+// exact migrated app copy may inherit the app's explicit endpoint.
+function publishedFinalStageId(record: StoredSeriesRecord): string | null {
+    if (typeof record.publishedFinalStageId === 'string') return record.publishedFinalStageId;
+    if (record.publishedFinalStageId !== undefined || record.origin !== 'migrated') return null;
+    const app = APP_SERIES_DEFINITIONS.find((definition) => definition.id === record.id);
+    if (!app?.finalStageId || record.publishedStageCount !== app.stages?.length
+        || record.stages.length !== app.stages.length
+        || !record.stages.every((stage, index) => sameStage(stage, app.stages?.[index]))) return null;
+    return app.finalStageId;
+}
+
+function normalizeFinalStageId(value: unknown, seriesId: string, stages: StoredSeriesStage[]): string | null {
+    if (value === null || value === undefined) return null;
+    const tailId = stages.length ? `${seriesId}-${String(stages.length - 1).padStart(2, '0')}` : null;
+    if (typeof value !== 'string' || value !== tailId) {
+        throw new TrackInputError('The final stage must be the last stage of the series.');
+    }
+    return value;
 }
 
 // ---- The per-install cache that the Campaign manifest reads ----
@@ -335,6 +361,14 @@ export async function saveStoredSeries(
                 throw new TrackInputError('A series in the game already uses this key. Choose another key.');
             }
             const fixed = existing?.publishedStageCount ?? 0;
+            const sealedFinalStageId = existing ? publishedFinalStageId(existing) : null;
+            const finalStageId = normalizeFinalStageId(
+                Object.hasOwn(payload, 'finalStageId') ? payload.finalStageId : existing?.finalStageId ?? sealedFinalStageId,
+                id, stages,
+            );
+            if (sealedFinalStageId && (finalStageId !== sealedFinalStageId || stages.length !== fixed)) {
+                throw new TrackInputError(`${existing!.name} has a published final stage, so its endpoint cannot change and no stages can follow it.`);
+            }
             if (fixed > 0) {
                 if (ground !== existing!.ground) {
                     throw new TrackInputError(`${existing!.name} is live, so its ground cannot change.`);
@@ -360,6 +394,8 @@ export async function saveStoredSeries(
                 name,
                 ground,
                 ...(existing?.grounds ? { grounds: [...existing.grounds] } : {}),
+                finalStageId,
+                publishedFinalStageId: sealedFinalStageId,
                 stages,
                 status: existing?.status ?? 'draft',
                 publishedStageCount: fixed,
@@ -402,7 +438,14 @@ export async function publishStoredSeries(
             if (existing.stages.length < getCampaignSeriesMinStages(existing)) {
                 throw new TrackInputError('Add more stages before the series goes live.');
             }
-            if (existing.stages.length === existing.publishedStageCount) {
+            const sealedFinalStageId = publishedFinalStageId(existing);
+            const finalStageId = normalizeFinalStageId(existing.finalStageId ?? sealedFinalStageId, id, existing.stages);
+            if (sealedFinalStageId && (finalStageId !== sealedFinalStageId
+                || existing.stages.length !== existing.publishedStageCount)) {
+                throw new TrackInputError('The published final stage cannot change and no stages can follow it.');
+            }
+            if (existing.stages.length === existing.publishedStageCount
+                && finalStageId === sealedFinalStageId) {
                 throw new TrackInputError('Every stage of this series is live already.');
             }
             const tracksToLock = [];
@@ -418,6 +461,8 @@ export async function publishStoredSeries(
             const record: StoredSeriesRecord = {
                 ...existing,
                 grounds: [...grounds],
+                finalStageId,
+                publishedFinalStageId: finalStageId,
                 status: 'published',
                 publishedStageCount: existing.stages.length,
                 publishedAt: existing.publishedAt ?? now.toISOString(),
@@ -596,6 +641,8 @@ export async function copyLiveAppSeries({
                 name: definition.name ?? definition.id,
                 ground: definition.ground ?? 'tarmac',
                 grounds: appSeriesGrounds(definition),
+                finalStageId: definition.finalStageId ?? null,
+                publishedFinalStageId: definition.finalStageId ?? null,
                 stages,
                 status: 'published',
                 publishedStageCount: stages.length,
@@ -649,6 +696,7 @@ export async function copyAppSeriesDrafts({
             await saveStoredSeries(definition.id, {
                 name: definition.name ?? definition.id,
                 ground: definition.ground ?? 'tarmac',
+                finalStageId: definition.finalStageId ?? null,
                 stages: definition.stages ?? [],
             }, { username, origin: 'migrated', now });
             report.copied.push(definition.id);

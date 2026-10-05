@@ -274,7 +274,9 @@ export function buildModalRunsPayload(source, {
         lapTimesArray: source.listData ?? source.lapTimesArray ?? null,
         bestTime: source.bestTime ?? source.lapTime ?? null,
         currentTime: source.currentTime ?? source.lapTime ?? null,
-        scoreboardTrackKey: source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
+        scoreboardTrackKey: source.scoreboardMode === 'campaign-aggregate'
+            ? null
+            : source.scoreboardTrackKey || source.trackKey || currentTrackKey || null,
         scoreboardSnapshot: source.scoreboardSnapshot ?? null,
         ...buildRunsViewFields(source),
     };
@@ -308,4 +310,3 @@ export function buildModalRunsPayload(source, {
 
     return normalized;
 }
-

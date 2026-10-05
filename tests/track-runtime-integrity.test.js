@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import {
     DEFAULT_TRACK_KEY,
     hasTrack,
@@ -14,6 +14,21 @@ import { DEFAULT_TRACK_GROUND_KEY, isTrackGroundKey } from '../game/track/ground
 import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime.js';
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
+const MEDAL_TIMES = JSON.parse(readFileSync(new URL('../game/medals/medal-times.json', import.meta.url), 'utf8'));
+
+// Extracted from the installed v2.4.0 server bundle, independently checked
+// against racer-v2-4 (e9a578eb). Pin the entire definitions, legacy fields included.
+const V240_TRACK_CONTRACTS = [
+    ['brokenWing', 'e7c79e7b37bf692842b428dde318a9b9e9eb427634b8397dabfb0ab2cb8a6dc8', { author: 11.47, gold: 11.82, silver: 12.15, bronze: 12.41 }],
+    ['twinWings', '648e054e784739b182f9c3672ae06d5ecf9b87fad322c81e304abb22db213e5d', { author: 10.71, gold: 10.96, silver: 11.22, bronze: 11.53 }],
+    ['splitJaw', '7d59b5e236ad341c69789d38966bf3fe178836df8214c66bcf62efd2845b920c', { author: 15.05, gold: 15.25, silver: 15.55, bronze: 15.95 }],
+    ['stoneGate', '668459c6b959cd15d399adc296fd7db9e48c8a4e577d45e413997ba0e19f03f1', { author: 7.42, gold: 7.69, silver: 7.91, bronze: 8.23 }],
+    ['crakowBoot', '336a804037d459ee6d50798326e989cd4adde3d10b9f419dd620341dee859276', { author: 11.2, gold: 11.45, silver: 11.75, bronze: 12.1 }],
+    ['slingshotRun', 'cb3dc9d43fe62001e5b94afc625727201ee02fd69a8e0548660cc3b9338e7193', { author: 8.41, gold: 8.72, silver: 9.03, bronze: 9.34 }],
+    ['brokenAntler', 'cbe788705ca5666450902b87e543404dc256ff975058353cbd276d70748f4da4', { author: 9.75, gold: 9.91, silver: 10.22, bronze: 10.53 }],
+    ['mantisBend', '08f40e9823151e696374fea60429af0313dcccd65624a9a6331bdbc2a28f6c4e', { author: 10.82, gold: 10.99, silver: 11.35, bronze: 11.71 }],
+    ['monkeyWrench', 'e73246072966192f4579e8189f14fbf4e6c68d432a2605a7cbdb2f6343bede07', { author: 12.35, gold: 12.61, silver: 12.89, bronze: 13.11 }],
+];
 
 function expectFinitePoint(point) {
     expect(Number.isFinite(point?.x)).toBe(true);
@@ -227,6 +242,12 @@ describe('track runtime integrity', () => {
             'sharkTail',
             'hookBend',
             'windingLane',
+            'grandSlam',
+            'dirtyDancing',
+            'greyHarbor',
+            'endlessLoop',
+            'crescentValley',
+            'seaCharger',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -266,7 +287,8 @@ describe('track runtime integrity', () => {
         // Eight tracks now restore their original race shapes. Four later layouts
         // survive as Mountain Pass, Shark Tail, Hook Bend and Winding Lane.
         // The historical subsets above remain unchanged; the fingerprints below
-        // include the restorations, subsequent additions and metadata cleanup.
+        // include the restorations, subsequent additions, metadata cleanup
+        // and the nine v2.4.0 production restorations.
         // Dedicated shape checks below pin both the originals and saved variants.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
@@ -275,17 +297,36 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !reshapedKeys.has(trackKey) && !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(withoutReshapedOrAdded)).toBe(
-            'dd1476c68a0d83fd9cf3e7d4dc30aa50dd9641585a5819dd1ae4999cf50aa325',
+            'ba83b613cc5241c66275ddf6aa273611429bed6c31162d56577455a25fac8b05',
         );
         const throughSharkBite = Object.fromEntries(
             Object.entries(TRACKS).filter(([trackKey]) => !addedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(throughSharkBite)).toBe(
-            'd5bbad33c382fab3e7ae3d29f469989e73532147fc988424118c3635f4489d9f',
+            '744984e326e68fa08b1a0c3353a66425cfb3a1f261a17ca00c4e842f92180867',
+        );
+        // Keep the unchanged subset pinned while excluding current authoring
+        // edits/additions and the production restorations pinned separately below.
+        const latestReshapedKeys = new Set([
+            'dirtValley', 'smallSteps', 'lapinLoop', 'centralDistrict', 'roughCut', 'hillsideScramble',
+            ...V240_TRACK_CONTRACTS.map(([trackKey]) => trackKey),
+        ]);
+        const latestAddedKeys = new Set(['grandSlam', 'dirtyDancing', 'greyHarbor', 'endlessLoop', 'crescentValley', 'seaCharger']);
+        const unchangedSinceWindingLane = Object.fromEntries(
+            Object.entries(TRACKS)
+                .filter(([trackKey]) => !latestReshapedKeys.has(trackKey) && !latestAddedKeys.has(trackKey)),
+        );
+        expect(hashTrackRegistry(unchangedSinceWindingLane)).toBe(
+            'c0b2320fed2a23574efccdf691c63a7b4d6ab1bada1cf6d83e49c228912404f9',
         );
         expect(hashTrackRegistry(TRACKS)).toBe(
-            '7c493f7f0648aca359740b0451a2faf49d646f5f5692e7868a4db1d115182d1e',
+            '9266d047e6e1815e25618fe021b9439a2b6a64b64867f2bdfdf36bc2640c68d0',
         );
+    });
+
+    it.each(V240_TRACK_CONTRACTS)('keeps %s identical to production v2.4.0', (trackKey, expectedHash, medalRow) => {
+        expect(hashTrackRegistry(TRACKS[trackKey])).toBe(expectedHash);
+        expect(MEDAL_TIMES[trackKey]).toEqual(medalRow);
     });
 
     // Expected shapes come from the original definitions: 0feab0e0 for Mountain

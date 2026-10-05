@@ -200,6 +200,9 @@ your left-right changes. The numbers describe your own lap, so a wall hit
 shows as a slow point.
 
 **Test Drive** is the race view. Time, best lap and speed are the race HUD.
+Opening it or pressing **Reset** runs the same three red start lights and
+**GO!** as a race. The car and lap clock wait for the 1.1-second countdown;
+pause becomes available once driving starts.
 The bar shows the next gate and wall contacts, and **Reset**. Tap the speed,
 or press Escape, to pause. On a computer the bar also has **Desktop** and
 **Mobile**. **Desktop** fills the wide view and steers with the arrow keys or
@@ -254,9 +257,10 @@ so maps can be made on a laptop, tablet or phone.
   (Cloudflare KV `MAPMAKER_KV`). It saves unfinished maps too and runs no
   admission checks. The picker shows only your password's maps. Opening the
   editor loads your newest saved map, or a blank map when there are none.
-  Other passwords cannot list, overwrite, rename or delete your maps, even
-  when the names match. **Remove track** deletes your cloud map; removing the
-  final map opens a blank editor. It never changes the game.
+  Other tester passwords cannot list, overwrite, rename or delete your maps,
+  even when the names match. The original password's local import tool can
+  review maps from every workspace. **Remove track** deletes your cloud map;
+  removing the final map opens a blank editor. It never changes the game.
   Existing maps saved before workspace isolation remain with the original
   password because the old records contain no individual author identity.
   Browser recovery, Test Drive drafts and lap times are scoped to the same
@@ -266,13 +270,14 @@ so maps can be made on a laptop, tablet or phone.
   reload or from another location can briefly lag a successful save or removal.
   See [Cloudflare's KV consistency documentation](https://developers.cloudflare.com/kv/concepts/how-kv-works/#consistency).
 - **Editor updates.** The online build uses the same Mapmaker and Test Drive
-  source as the local tool. It includes road-line bend editing, whole-road and
+  source as the local tool, including the three red start lights and **GO!**
+  on Test Drive entry and **Reset**. It includes road-line bend editing, whole-road and
   per-section widths, corner rounding, undo/redo, grounds, checks and medal
   times. Cloud saves preserve the editable road line, widths and rounding.
   Save records the submitted version; later edits remain unsaved. Renamed
   unsaved maps retain their cloud identity through recovery, so their next
   save replaces the previous name.
-- **At home.** Add the passcode to `.env.local` in the repo root and restart
+- **At home.** Add the original passcode to `.env.local` in the repo root and restart
   `npm run mapmaker`:
 
   ```sh
@@ -282,6 +287,32 @@ so maps can be made on a laptop, tablet or phone.
   The track picker then shows **Cloud maps** at the top. Opening one loads it
   as an unsaved map. **Save** adds it to the game as usual and deletes its
   cloud copy. **Remove track** on a cloud map deletes its cloud copy too.
+  Localhost lists everyone's maps under **Cloud** or **All**, including maps
+  from workspaces whose passwords were revoked. Website sessions still show
+  only their own workspace. The import API requires the original password
+  sent by the local server; an issued password or website cookie cannot use it.
+  Cloud cards show the source workspace, so identical names remain distinct.
+  When a new import's key already exists locally, it receives a numbered name
+  instead of replacing that track. Existing edits and unfinished drawings are
+  preserved. Browser recovery retains the exact cloud source through reload
+  and rename, and a local save deletes only that source copy. Editing pauses
+  until the local save and source cleanup finish, preventing a pending save
+  from marking another selected map as saved.
+  Online **Save** stores an individual track, not a Campaign series; after
+  importing and saving the track locally, assign it in **Campaign Planner**.
+  The 2026-10-04 investigation found workspace isolation had also restricted
+  localhost to its own two maps. The local import path now uses authenticated
+  all-workspace listing and workspace-specific deletion; no map migration is
+  required.
+  Published to `miniracer.club` as `7a6afad5.miniracer.pages.dev`. Live API and
+  localhost checks returned **Sea Charger** from `creator1` plus the original
+  two maps; desktop and phone localhost pickers displayed that tester map.
+  Original website-cookie access remained private and all-workspace access
+  returned 403. All 195 focused Mapmaker/Creator-save tests, typecheck and the
+  isolated site build passed. Browser fixtures checked same-name imports,
+  recovery, unfinished-road preservation, pending-save controls and exact
+  source cleanup on desktop and phone with zero page errors. Live validation
+  only read existing maps; it did not import, save or delete the tester's work.
 - **Touch.** Tap to draw or select, drag the map to move it and pinch to zoom.
   The buttons at the top of the map undo and redo, and in Edit add a point
   after the selected one or delete the selected point. On a narrow screen the
@@ -359,7 +390,50 @@ live session checks confirmed the choices for all six passwords.
    Hook Loop and Winding Road shapes respectively. Separate race-shape
    fingerprints pin the eight originals and four preserved variants; the
    earlier passing historical subset fingerprints remain unchanged.
+   The 2026-10-04 refresh also includes Grand Slam, Dirty Dancing, Grey Harbor,
+   Endless Loop and Crescent Valley, plus the existing Dirt Valley, Small
+   Steps, Lapin Loop and Central District edits. Removing those five additions
+   and substituting the four earlier definitions from `70587b86^` exactly
+   recovers the previous full fingerprint. A new subset assertion pins every
+   other track to that reviewed baseline; the complete current fingerprint is
+   `6f18f61af1e9b08606be126a5a87efa6a4ec6ae9032e3a816345e002a8c00b52`
+   before the production restorations below and subsequent authoring edits.
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
+
+### Production v2.4.0 restoration — 2026-10-05
+
+Broken Wing, Twin Wings, Split Jaw, Stone Gate, Crakow Boot, Slingshot Run,
+Broken Antler, Mantis Bend and Monkey Wrench now match the installed
+`MiniRacerGame` v2.4.0 definitions and medal targets exactly. Their keys, names
+and Daily placement remain the same. The source files at `racer-v2-4`
+(`e9a578eb`) were independently compared with the downloaded production server
+bundle before restoration, including legacy `drawWidth` and `lineSmoothing`.
+Production PB fingerprints also match. Dedicated integrity assertions pin each
+complete track definition and its four medal targets to that production data.
+Their share thumbnails match the current renderer output for the restored
+geometry; eight stale JPEGs were regenerated. The production version also
+contains older thumbnails, so those image files were not used as the source.
+
+Creator copies omit those two obsolete rendering fields when comparing with
+the app definition. Readiness and Daily/Campaign admission recognize the exact
+app geometry and medal targets as already approved: the newer authoring
+checkpoint heuristic rejects the published Slingshot Run layout. Any edited
+geometry or targets still runs the authoring checks, and unfinished roads or
+missing medal times remain inadmissible.
+
+The complete working-tree fingerprint, including the existing Sea Charger
+addition and independent Rough Cut/Hillside Scramble authoring edits, is now
+`9266d047e6e1815e25618fe021b9439a2b6a64b64867f2bdfdf36bc2640c68d0`.
+The unchanged subset excludes those authoring edits and the nine independently
+pinned restorations. Numbers remains unchanged, with Endless Loop as its
+designated final stage. Gun Slinger retirement and the Chelsea Boots medal
+change are outside this nine-track restoration.
+
+Local verification covers all nine starting/driving with no browser runtime
+errors, exact production assertions, Creator copy/admission, replay/track checks,
+share rendering, typecheck and build. The full suite has 4,450 passing tests and
+six unrelated failures: two missing medal calibrations and four Country Road
+snapshot fingerprints from separate authoring work. Nothing was deployed.
 
 ## Campaign Series
 
@@ -381,7 +455,31 @@ its own stages. `game/campaign/series.json` holds them, and
   remove its stages freely.
 - A live series is fixed. A track cannot leave it, and its
   position, laps, medal target and medal times cannot change. Players' saved
-  results were checked against them. New tracks go after the last stage.
+  results were checked against them. New tracks can go after its published
+  stages until its designated final stage is published.
+- Every finished Campaign has an explicit `finalStageId`, using its existing
+  stage race ID. Numbers ends at Endless Loop, `numbered-v1-16`. Other app
+  series remain undesignated until their endpoint is chosen. A missing
+  designation means an ongoing Campaign; the last currently live stage does
+  not count as its finish.
+- In the Redis Creator's Campaign panel, mark the current tail **Final stage**,
+  then **Save** and publish it. Saving the choice alone does not finish the
+  authoring process or enable player completion. You may continue growing the
+  draft before publication; adding a stage clears the draft designation so the
+  new tail must be selected explicitly. You can also publish a final declaration
+  on an already live tail without adding a stage. Publication permanently fixes
+  the endpoint and the server rejects additional stages or endpoint changes.
+  Existing live-stage and track locks still apply. App/local JSON authoring
+  retains `finalStageId` through parser and serialization roundtrips and requires
+  it to identify the tail. Set an app Campaign's endpoint before release and
+  preserve it afterward, just like its published stage contracts.
+- Players finish a Campaign when the server confirms a medal on that published
+  final stage. **Total best time** adds their saved full-race PB milliseconds
+  for every stage, including each stage's required laps once. A valid time is
+  required on every stage; missing times never count as zero. Lower totals rank
+  higher on one permanent leaderboard per Campaign, and improving an earlier
+  stage PB after finishing updates the total. Gold/Author on every stage remains
+  the separate `progress.complete` mastery condition.
 - The first stage of every series is open. Each later stage needs any medal on
   the stage before it and a **Medal Target**: the medals from that series that
   the player holds (bronze 1, silver 2, gold 3, author 4). The target must go
@@ -444,6 +542,9 @@ series; these copies stay editable. **Copy played Dailies** copies the tracks
 of past Dailies, and **Copy live Campaign** copies each live series with its
 stage tracks. These two write locked copies, and only exact copies of the
 app tracks. A track whose Daily players can still race waits for a later run.
+The copies preserve explicit app endpoints, and Copy Check/Undo compare the
+endpoint too. Legacy Creator series with no declaration remain ongoing; an
+exact migrated app Numbers copy may inherit its explicit app endpoint.
 
 Save records the version submitted when pressed. You may keep editing or
 select another track/series while it runs; newer edits remain unsaved. Failed

@@ -378,6 +378,38 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(context.modal.showModal.mock.calls[0][3].nextRace).toBe(null);
     });
 
+    it('reserves Results immediately for the first valid final-stage result', () => {
+        const lastStage = NUMBERS_STAGES.at(-1);
+        const finalStage = {
+            raceId: lastStage.raceId,
+            seriesId: CAMPAIGN_NUMBERS_SERIES_ID,
+            trackKey: lastStage.trackKey,
+            lapCount: lastStage.lapCount,
+            rulesRevision: lastStage.rulesRevision,
+        };
+        const unfinished = {
+            campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+            progress: { resultsByRaceId: campaignMedalResults(NUMBERS_STAGES) },
+        };
+        const nextRaceFor = (overrides, finish) => {
+            const context = createCampaignFinishContext(overrides);
+            context.showCampaignFinish(finalStage, { finalTime: 60, medal: 'gold', submitted: true, ...finish });
+            return context.modal.showModal.mock.calls[0][3].nextRace;
+        };
+
+        expect(nextRaceFor({ campaignVerifiedBootstrap: unfinished }))
+            .toMatchObject({ label: 'Results', enabled: false, replaceMenu: true });
+        expect(nextRaceFor({ campaignVerifiedBootstrap: unfinished }, { medal: null }))
+            .toMatchObject({ label: 'Results', enabled: false, replaceMenu: true });
+        expect(nextRaceFor({ campaignVerifiedBootstrap: unfinished }, { submitted: false })).toBe(null);
+        expect(nextRaceFor({
+            campaignVerifiedBootstrap: {
+                ...unfinished,
+                progress: { resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze') },
+            },
+        })).toMatchObject({ label: 'Results', enabled: true });
+    });
+
     function campaignMedalResults(stages, lastMedal = null) {
         const resultsByRaceId = {};
         stages.forEach((stage, index) => {
@@ -414,6 +446,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
             showCampaignLobby: vi.fn(),
             startCampaignStage: vi.fn(),
+            openCampaignTracks: vi.fn(),
             modal: {
                 modalMsg: { style: {}, textContent: '' },
                 showModal: vi.fn(),
@@ -425,9 +458,54 @@ describe('Campaign lobby and shared modal adapters', () => {
                 isRunsViewActive: vi.fn(() => false),
                 setCombinedWinMedal: vi.fn(),
                 setCombinedNextRaceEnabled: vi.fn(),
+                setCombinedNextRace: vi.fn(),
             },
             ...overrides,
         });
+    }
+
+    it('offers saved Results after a completed final-stage replay without a new submission', () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext({
+            campaignVerifiedBootstrap: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID, ranked: true, signedIn: true,
+                progress: { resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze') },
+            },
+        });
+        context.showCampaignFinish(context.activeCampaignStage, { finalTime: 30, medal: null });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({ label: 'Results', enabled: true });
+        expect(context._campaignFinishedReady).toMatchObject({ revisit: true });
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
+        clearActivePlayerOwnerId();
+    });
+
+    it('keeps Results available after an improved completed final-stage replay is confirmed', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext({
+            campaignVerifiedBootstrap: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID, ranked: true, signedIn: true,
+                progress: { resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze') },
+            },
+        });
+        const stage = context.activeCampaignStage;
+        context.showCampaignFinish(stage, { finalTime: 20, medal: 'gold', submitted: true });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({ label: 'Results', enabled: true });
+        await confirmCampaignRun(context, stage.raceId, {
+            accepted: true,
+            progress: { campaignId: CAMPAIGN_NUMBERS_SERIES_ID, resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'gold') },
+        });
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Results', enabled: true }));
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(context._campaignFinishedReady).toMatchObject({ revisit: true });
+        clearActivePlayerOwnerId();
+    });
+
+    // The Next the finished series puts on the result screen, or undefined.
+    function finishedNext(context) {
+        return context.modal.setCombinedNextRace.mock.calls
+            .map(([nextRace]) => nextRace)
+            .findLast((nextRace) => nextRace?.enabled === true);
     }
 
     async function confirmCampaignRun(context, raceId, body) {
@@ -442,7 +520,40 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
     }
 
-    it('shows the finished screen when the saved run completes the series', async () => {
+    it.each([true, false])('keeps Results visible through validation with bootstrap loaded=%s', async (loaded) => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext({ refreshCampaignAfterAcceptedRun: vi.fn() });
+        const bootstrap = context.campaignVerifiedBootstrap;
+        context.campaignVerifiedBootstrap = loaded ? bootstrap : null;
+        context.campaignBootstrap = loaded ? bootstrap : null;
+        context.handleCampaignWin({ lapTime: 10_000 });
+
+        // Local medal data is provisional; the real win path must reserve the
+        // action even when it cannot determine the server's eventual medal.
+        const [, , stats, actions] = context.modal.showModal.mock.calls[0];
+        expect(stats.lapMedal).toBeNull();
+        expect(actions.nextRace).toMatchObject({ label: 'Results', enabled: false, replaceMenu: true });
+        const entry = getCampaignVerificationEntry(context.activeCampaignStage.raceId);
+        expect(entry).toBeTruthy();
+        let accept;
+        campaignServiceMocks.submitCampaignRun.mockReturnValue(new Promise((resolve) => { accept = resolve; }));
+        // Bootstrap may recover while the already displayed result is saving.
+        context.campaignVerifiedBootstrap = bootstrap;
+        const saving = context.processCampaignVerificationEntry(entry);
+        expect(context.modal.setCombinedNextRace).not.toHaveBeenCalled();
+        accept({ ok: true, body: {
+            accepted: true,
+            progress: { campaignId: CAMPAIGN_NUMBERS_SERIES_ID, resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze') },
+        } });
+        await saving;
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(
+            expect.objectContaining({ label: 'Results', enabled: true, replaceMenu: true }),
+        );
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        clearActivePlayerOwnerId();
+    });
+
+    it('lets Results open the finished screen when the saved run completes the series', async () => {
         setActivePlayerOwnerId('player-a');
         const context = finishConfirmationContext();
         const lastStage = NUMBERS_STAGES.at(-1);
@@ -455,30 +566,156 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
 
+        // The result screen stays; nothing opens until the player presses Finish.
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true });
+        finishedNext(context).action();
         expect(context.modal.showCampaignFinished).toHaveBeenCalledWith(
             expect.objectContaining({
                 seriesId: CAMPAIGN_NUMBERS_SERIES_ID,
                 title: 'Numbers',
-                facts: expect.arrayContaining([
-                    { label: 'Stages', value: '16' },
-                    { label: 'Medals', value: '16/64' },
-                    { label: 'Surface', value: 'Street' },
-                ]),
+                medalTotal: `${NUMBERS_STAGES.length}/${NUMBERS_STAGES.length * 4}`,
             }),
             expect.objectContaining({
-                primaryActionLabel: 'Campaign',
-                secondaryActionLabel: 'Improve',
+                primaryActionLabel: 'View Campaign',
+                secondaryActionLabel: 'View Series',
+                shareRequest: { kind: 'campaign-finished', seriesId: CAMPAIGN_NUMBERS_SERIES_ID, ownerPlayerId: 'player-a' },
             }),
         );
         const actions = context.modal.showCampaignFinished.mock.calls[0][1];
         actions.primaryAction();
         actions.secondaryAction();
-        expect(context.showCampaignLobby).toHaveBeenCalled();
-        expect(context.startCampaignStage).toHaveBeenCalledWith(context.activeCampaignStage);
+        expect(context.showCampaignLobby).toHaveBeenCalledWith({ view: 'series', forceSeriesView: true });
+        expect(context.openCampaignTracks).toHaveBeenCalledOnce();
+        expect(context.startCampaignStage).not.toHaveBeenCalled();
         clearActivePlayerOwnerId();
     });
 
-    it('does not show the finished screen for an earlier stage, a repeat, or a ghost retry', async () => {
+    it('reserves Results on a retry while the earlier valid run awaits confirmation', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        const stage = context.activeCampaignStage;
+        let resolveSubmit;
+        campaignServiceMocks.submitCampaignRun.mockReturnValue(new Promise((resolve) => {
+            resolveSubmit = resolve;
+        }));
+        campaignServiceMocks.getCampaignSnapshot.mockResolvedValue({ ok: false });
+        campaignServiceMocks.getCampaignPbGhost.mockResolvedValue({ ok: false });
+        enqueueCampaignVerification({ raceId: stage.raceId, bestTime: 5, replay: { revision: 1, segments: [] }, ownerPlayerId: 'player-a' });
+        const confirming = context.processCampaignVerificationEntry({
+            raceId: stage.raceId,
+            bestTime: 5,
+            replay: { revision: 1, segments: [] },
+            ownerPlayerId: 'player-a',
+        });
+
+        // The earlier valid run reserves Results even on a slower retry.
+        context.status = 'playing';
+        context.modal.isModalActive.mockReturnValue(false);
+        context.status = 'won';
+        context.modal.isModalActive.mockReturnValue(true);
+        context.showCampaignFinish(stage, { finalTime: 25, medal: null });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({ label: 'Results', enabled: false, replaceMenu: true });
+
+        resolveSubmit({
+            ok: true,
+            body: {
+                accepted: true,
+                progress: {
+                    campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                    resultsByRaceId: { ...campaignMedalResults(NUMBERS_STAGES, 'bronze'), [stage.raceId]: { bestTimeMs: 5000, medal: 'author' } },
+                },
+            },
+        });
+        await confirming;
+
+        expect(context.modal.showModal).toHaveBeenCalledOnce();
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true });
+        finishedNext(context).action();
+        expect(context.modal.showCampaignFinished).toHaveBeenCalledOnce();
+        clearActivePlayerOwnerId();
+    });
+
+    it.each(['dismissed', 'retrying', 'other-stage', 'other-mode', 'other-player', 'standings'])(
+        'does not open the celebration from a saved Next action after %s',
+        (change) => {
+            setActivePlayerOwnerId('player-a');
+            const context = finishConfirmationContext();
+            const raceId = context.activeCampaignStage.raceId;
+            context.markCampaignFinishedReady(
+                CAMPAIGN_NUMBERS_SERIES_ID,
+                campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+                { raceId, ownerPlayerId: 'player-a' },
+            );
+            context.syncCampaignFinishedNext(raceId);
+            const next = finishedNext(context);
+
+            if (change === 'dismissed') context.modal.isModalActive.mockReturnValue(false);
+            if (change === 'retrying') context.status = 'playing';
+            if (change === 'other-stage') context.activeCampaignStage = NUMBERS_STAGES[0];
+            if (change === 'other-mode') context.activeRaceMode = 'daily';
+            if (change === 'other-player') setActivePlayerOwnerId('player-b');
+            if (change === 'standings') context.modal.isRunsViewActive.mockReturnValue(true);
+            next.action();
+
+            expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+            clearActivePlayerOwnerId();
+        },
+    );
+
+    it('consumes the confirmed celebration on Next so the action cannot repeat it', () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        const raceId = context.activeCampaignStage.raceId;
+        context.markCampaignFinishedReady(
+            CAMPAIGN_NUMBERS_SERIES_ID,
+            campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            { raceId, ownerPlayerId: 'player-a' },
+        );
+        context.syncCampaignFinishedNext(raceId);
+        const next = finishedNext(context);
+        next.action();
+        next.action();
+
+        expect(context.modal.showCampaignFinished).toHaveBeenCalledOnce();
+        clearActivePlayerOwnerId();
+    });
+
+    it('rechecks the endpoint before using a saved finished action', () => {
+        setActivePlayerOwnerId('player-a');
+        const series = {
+            id: 'extended-finish-v1', name: 'Extended Finish', ground: 'dirt',
+            finalStageId: 'extended-finish-v1-01',
+            stages: [
+                { trackKey: 'countryRoad', laps: 1, requiredMedals: 0 },
+                { trackKey: 'forestTrail', laps: 1, requiredMedals: 1 },
+            ],
+        };
+        registerStoredSeries([series]);
+        const stages = getCampaignSeriesStages(series.id);
+        const context = finishConfirmationContext({ activeCampaignStage: stages.at(-1) });
+        const raceId = stages.at(-1).raceId;
+        context.markCampaignFinishedReady(series.id, campaignMedalResults(stages, 'bronze'), {
+            raceId, ownerPlayerId: 'player-a',
+        });
+        context.syncCampaignFinishedNext(raceId);
+        const next = finishedNext(context);
+
+        registerStoredSeries([{
+            ...series,
+            finalStageId: 'extended-finish-v1-02',
+            stages: [...series.stages, { trackKey: 'countryRoad', laps: 2, requiredMedals: 2 }],
+        }]);
+        next.action();
+
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(null);
+        clearStoredSeriesForTests();
+        clearActivePlayerOwnerId();
+    });
+
+    it('offers Results for a repeat and no finished action for earlier stages or ghost retries', async () => {
         setActivePlayerOwnerId('player-a');
         const firstStage = NUMBERS_STAGES[0];
         const early = finishConfirmationContext({
@@ -499,7 +736,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 },
             },
         });
-        expect(early.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(early)).toBeUndefined();
 
         const repeat = finishConfirmationContext({
             campaignVerifiedBootstrap: {
@@ -516,6 +753,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'gold'),
             },
         });
+        expect(finishedNext(repeat)).toMatchObject({ label: 'Results', enabled: true });
         expect(repeat.modal.showCampaignFinished).not.toHaveBeenCalled();
 
         const retry = finishConfirmationContext();
@@ -538,25 +776,77 @@ describe('Campaign lobby and shared modal adapters', () => {
             ownerPlayerId: 'player-a',
             progressConfirmed: true,
         });
-        expect(retry.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(retry)).toBeUndefined();
         clearActivePlayerOwnerId();
     });
 
-    it('waits while standings are open, and skips a left finish or another player', async () => {
+    it('keeps a ready Next through duplicate acceptance and ghost recovery', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        const raceId = context.activeCampaignStage.raceId;
+        const body = {
+            accepted: true,
+            trackPbPersistenceStatus: 'unavailable',
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
+            },
+        };
+        await confirmCampaignRun(context, raceId, body);
+        await confirmCampaignRun(context, raceId, body);
+        await context.processCampaignVerificationEntry({
+            raceId,
+            bestTime: 20,
+            replay: { revision: 1, segments: [] },
+            ownerPlayerId: 'player-a',
+            progressConfirmed: true,
+        });
+
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(
+            expect.objectContaining({ enabled: true }),
+        );
+        finishedNext(context).action();
+        expect(context.modal.showCampaignFinished).toHaveBeenCalledOnce();
+        clearActivePlayerOwnerId();
+    });
+
+    it('removes waiting Next when the saved final-stage result has no medal', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        const stage = context.activeCampaignStage;
+        context.showCampaignFinish(stage, { finalTime: 20, medal: 'bronze', submitted: true });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace.enabled).toBe(false);
+        await confirmCampaignRun(context, stage.raceId, {
+            accepted: true,
+            progress: {
+                campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
+                resultsByRaceId: {
+                    ...campaignMedalResults(NUMBERS_STAGES),
+                    [stage.raceId]: { bestTimeMs: 20000, medal: null },
+                },
+            },
+        });
+
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(null);
+        expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
+        clearActivePlayerOwnerId();
+    });
+
+    it('keeps Next while standings are open, and skips a left finish or another player', async () => {
         setActivePlayerOwnerId('player-a');
         const lastStage = NUMBERS_STAGES.at(-1);
-        const waiting = finishConfirmationContext();
-        waiting.modal.isRunsViewActive.mockReturnValue(true);
-        await confirmCampaignRun(waiting, lastStage.raceId, {
+        const standings = finishConfirmationContext();
+        standings.modal.isRunsViewActive.mockReturnValue(true);
+        await confirmCampaignRun(standings, lastStage.raceId, {
             accepted: true,
             progress: {
                 campaignId: CAMPAIGN_NUMBERS_SERIES_ID,
                 resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
             },
         });
-        expect(waiting.modal.showCampaignFinished).not.toHaveBeenCalled();
-        waiting.modal.onFinishViewRestored();
-        expect(waiting.modal.showCampaignFinished).toHaveBeenCalledTimes(1);
+        expect(standings.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(standings)).toMatchObject({ enabled: true });
 
         const left = finishConfirmationContext();
         left.modal.isModalActive.mockReturnValue(false);
@@ -567,7 +857,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
             },
         });
-        expect(left.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(left)).toBeUndefined();
 
         const otherPlayer = finishConfirmationContext();
         setActivePlayerOwnerId('player-b');
@@ -578,7 +868,25 @@ describe('Campaign lobby and shared modal adapters', () => {
                 resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze'),
             },
         });
-        expect(otherPlayer.modal.showCampaignFinished).not.toHaveBeenCalled();
+        expect(finishedNext(otherPlayer)).toBeUndefined();
+        clearActivePlayerOwnerId();
+    });
+
+    it('removes the waiting Next when the server refuses the last-stage run', async () => {
+        setActivePlayerOwnerId('player-a');
+        const context = finishConfirmationContext();
+        campaignServiceMocks.submitCampaignRun.mockResolvedValue({
+            ok: false,
+            status: 422,
+            body: { error: 'Submission replay validation failed.' },
+        });
+        await context.processCampaignVerificationEntry({
+            raceId: NUMBERS_STAGES.at(-1).raceId,
+            bestTime: 20,
+            replay: { revision: 1, segments: [] },
+            ownerPlayerId: 'player-a',
+        });
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(null);
         clearActivePlayerOwnerId();
     });
 

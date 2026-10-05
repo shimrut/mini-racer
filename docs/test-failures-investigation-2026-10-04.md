@@ -129,3 +129,109 @@ earlier integrity fix; substituting their HEAD definitions in a read-only
 registry reconstruction recovers the previously passing full-registry hash.
 These unrelated geometry edits were left intact. Full-run evidence:
 `/tmp/dailygp-suite-after-daily-test-fixes.log`.
+
+## Follow-up: challenge analytics branch baseline
+
+The later `codex/challenge-view-analytics` checkout includes a seventeenth
+Numbers stage (`numbered-v1-16`, Endless Loop) and more track work. Its complete
+run with local socket access reports 4,238 passed / 52 failed, across 329
+passing / seven failing files. Comparing failing test names with the run
+before analytics implementation found no new failing case.
+
+| File | Failures | Current cause |
+| --- | ---: | --- |
+| `tests/guest-transfer-recording.test.js` | 45 | Every snapshot diff is confined to the new Campaign stage's lock marker and total Campaign stages changing from 26 to 27. No other recorded transfer outputs differ. |
+| `tests/campaign-manifest.test.js` | 2 | Expected Numbers stage list and medal gates end at stage 16 / gate 37; actual list adds stage 17 / gate 39. |
+| `tests/campaign-series-screen.test.js` | 1 | Expected 16 Numbers stages / 64 possible medals; actual UI has 17 / 68. |
+| `tests/server-head-to-head.test.js` | 1 | The invalid-stage fixture uses `numbered-v1-16`, which is now valid, so preview correctly returns ready instead of 404. |
+| `tests/medals.test.js` | 1 | Catalog tracks `dirtyDancing` and `lapinLoop` have no medal thresholds. |
+| `tests/track-grounds.test.js` | 1 | The ground/replay-limit check encounters missing medal thresholds on `dirtyDancing`. |
+| `tests/track-runtime-integrity.test.js` | 1 | The expected catalog suffix omits `grandSlam`, `dirtyDancing`, `greyHarbor`, `endlessLoop` and `crescentValley`. This assertion stops before subsequent fingerprint checks. |
+
+The missing medal rows are content gaps, not merely stale expectations. The
+other failures above reflect the current stage/catalog changes. No runtime
+code, test expectation or snapshot was changed to investigate this run.
+
+Evidence: `/private/tmp/dailygp-challenge-analytics-baseline.log` (includes
+additional sandbox `listen EPERM` failures), and
+`/private/tmp/dailygp-challenge-analytics-final-tests.log` (completed run with
+socket access). The 132 focused challenge-analytics tests pass separately.
+
+## Fix: non-medal failures on the challenge analytics branch
+
+At the user's request, fixed all 50 non-medal failures and left medal
+calibration data and its two failing tests untouched.
+
+- Campaign expectations now include Endless Loop as `numbered-v1-16`, one
+  lap, gate 39; the series screen expects 17 stages and 68 possible medals.
+- The invalid Head to Head Campaign fixture uses `numbered-v1-99` and first
+  asserts that the manifest does not contain it. Its 404 rejection remains
+  required; the existing all-stage test includes the newly valid stage.
+- Refreshed 45 transfer snapshots and reviewed every changed line: 90 total
+  stage-count values change from 26 to 27, and 20 lock inventories gain only
+  the new stage marker. No other persisted transfer output changed. Historical
+  two-/three-lap and interrupted-transfer checks remain intact.
+- Added the five missing catalog keys and reviewed the exposed full-registry
+  mismatch. Removing those additions and substituting the earlier Dirt Valley,
+  Small Steps, Lapin Loop and Central District definitions from `70587b86^`
+  exactly recovers the previous hash
+  `7c493f7f0648aca359740b0451a2faf49d646f5f5692e7868a4db1d115182d1e`.
+  Dirt Valley was an additional committed reshape missing from the earlier
+  diagnosis. The existing subset and individual restoration hashes still
+  pass. A new baseline-derived subset hash protects every other track, and
+  the complete fingerprint now pins the current registry. No geometry changed.
+
+All 153 tests across the five affected files pass without snapshot-update
+mode. The complete `npm test`, with localhost socket access, passes typecheck
+and asset generation, then reports **4,290 passed / two failed**, across
+334 passing / two failing files (4,292 tests / 336 files). The only failures
+are `tests/medals.test.js` and `tests/track-grounds.test.js`, for the missing
+Dirty Dancing / Lapin Loop medal thresholds. Runtime code was unchanged by
+this follow-up; docs now reflect the seventeenth Campaign stage and current
+integrity baseline.
+
+Evidence: `/private/tmp/dailygp-nonmedal-focused-verified.log`,
+`/private/tmp/dailygp-track-fingerprint-review.json`, and
+`/private/tmp/dailygp-nonmedal-test-fixes.log`. `git diff --check` passes.
+
+
+## Track analytics aggregation validation — 2026-10-05
+
+Before the final legacy upgrade-reconciliation follow-up, the aggregate
+implementation's full serial suite reports **4,316 passed / two
+failed** across 335 passing / two failing files (4,318 tests / 337 files).
+The remaining assertions are the same intentionally untouched medal gaps.
+Default-parallel and four-worker runs additionally exceeded five-second limits
+in geometry-heavy track privacy/copy/migration/integrity tests. All 65 tests in
+those five files pass serially without changing timeouts or expectations.
+Evidence: `/private/tmp/dailygp-track-analytics-full-serial.log` and
+`/private/tmp/dailygp-track-analytics-heavy-recheck.log`.
+
+## Full working-tree checkpoint — 2026-10-05
+
+At the user's request, the checkpoint includes all 101 modified tracked files
+and all 18 previously untracked files on `codex/campaign-finished-sharing`:
+Campaign completion, fixed final stages, aggregate standings and sharing,
+Mapmaker workspace/import and authoring changes, Test Drive countdowns,
+track definitions, medal rows, share images, tests and documentation.
+
+Typecheck and production build pass. The build retains the existing inconsistent
+JSON import-attribute warning. `git diff --check` passes.
+
+The complete serial test run reports 4,371 passed / 85 failed across 343 files.
+Seventy-eight failures in seven HTTP route files came from blocked localhost
+listeners (`listen EPERM`), including the resulting track-route timeouts.
+Rerunning those seven files with localhost access passes all 78 tests. Combined
+validation therefore establishes **4,449 passed / seven assertion failures**,
+without claiming a green unrestricted full-suite run.
+
+The remaining failures are four guest-transfer snapshot mismatches involving
+Country Road track fingerprints and their derived Campaign stage markers, one
+track-registry fingerprint mismatch, and the two documented missing-medal
+assertions. Test expectations and runtime code were not changed to make this
+checkpoint pass. All requested working-tree changes are preserved.
+
+Evidence: `/private/tmp/dailygp-commit-all-tests-2026-10-05.log`,
+`/private/tmp/dailygp-commit-all-route-tests-2026-10-05.log`,
+`/private/tmp/dailygp-commit-all-remaining-route-tests-2026-10-05.log`, and
+`/private/tmp/dailygp-commit-all-build-2026-10-05.log`.

@@ -146,6 +146,20 @@ describe('the copy check', () => {
         expect(check.series.problems.map((problem) => problem.key)).toEqual(['numbered-v1']);
     });
 
+    it('checks and keeps a copy whose designated endpoint differs from the app', async () => {
+        await runLiveCampaignCopy({ username: 'Mod', now: noon, copyLiveSeries });
+        const key = 'dailygp:campaign:series:v1:series:numbered-v1';
+        const record = JSON.parse(strings.get(key));
+        record.finalStageId = null;
+        record.publishedFinalStageId = null;
+        strings.set(key, JSON.stringify(record));
+        const check = await runCopyCheck({ username: 'Mod', now: noon });
+        expect(check.series.problems).toContainEqual({ key: 'numbered-v1', problem: expect.stringContaining('final stage') });
+        const undo = await runCopyUndo('live-campaign', { username: 'Mod', now: noon });
+        expect(undo.removedSeries).toEqual([]);
+        expect(await tracks.readStoredTrack(numbers.stages[0].trackKey)).not.toBeNull();
+    });
+
     it('compares a stored Daily list with the app list', async () => {
         const schedule = (keys) => strings.set('dailygp:daily:schedule:v1', JSON.stringify({
             version: 1, keys, revision: 1, updatedAt: noon.toISOString(), updatedBy: 'Mod' }));

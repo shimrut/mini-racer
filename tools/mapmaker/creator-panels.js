@@ -69,11 +69,20 @@ function seriesMedalsText(stage) {
     return Number.isFinite(stage.requiredMedals) ? String(stage.requiredMedals) : '';
 }
 
+function seriesTailId(draft) {
+    return draft.stages.length ? `${draft.id}-${String(draft.stages.length - 1).padStart(2, '0')}` : null;
+}
+
+function hasUnpublishedFinalStage(draft) {
+    return Boolean(draft.finalStageId && draft.finalStageId !== draft.publishedFinalStageId);
+}
+
 // The series as the server stores it. The typed text is only for the field.
 function seriesPayload(draft) {
     return {
         name: draft.name,
         ground: draft.ground,
+        finalStageId: draft.finalStageId ?? null,
         stages: draft.stages.map(({ trackKey, laps, requiredMedals }) => ({ trackKey, laps, requiredMedals })),
     };
 }
@@ -480,6 +489,8 @@ export class CreatorPanels {
             id: '',
             name: '',
             ground: 'tarmac',
+            finalStageId: null,
+            publishedFinalStageId: null,
             stages: [],
             status: 'draft',
             publishedStageCount: 0,
@@ -554,6 +565,8 @@ export class CreatorPanels {
             status: draft.status,
             fixed: draft.publishedStageCount ?? 0,
             ground: draft.ground,
+            finalStageId: draft.finalStageId ?? null,
+            publishedFinalStageId: draft.publishedFinalStageId ?? null,
             stages: draft.stages.map((stage) => {
                 const track = trackByKey.get(stage.trackKey);
                 return [stage.trackKey, stage.laps, track?.name, track?.ready, track?.ground, track?.source];
@@ -630,7 +643,10 @@ export class CreatorPanels {
         }
         refs.idInput.disabled = !draft.isNew || this.seriesSavingDraft === draft;
         refs.saveButton.disabled = !this.seriesDirty || this.busy;
-        refs.liveButton.disabled = this.seriesDirty || this.busy || draft.isNew || unpublished <= 0;
+        refs.liveButton.disabled = this.seriesDirty || this.busy || draft.isNew
+            || (unpublished <= 0 && !hasUnpublishedFinalStage(draft));
+        refs.liveButton.textContent = unpublished > 0
+            ? (fixed ? 'Make new stages live' : 'Make live') : 'Publish final stage';
         refs.deleteButton.disabled = this.busy || draft.isNew || fixed > 0;
         refs.stages.forEach(({ stage, medals, error }, index) => {
             const text = seriesMedalsText(stage);
@@ -668,6 +684,7 @@ export class CreatorPanels {
             draft.name = nameInput.value;
             if (draft.isNew && !draft.idTouched && this.seriesSavingDraft !== draft) {
                 draft.id = seriesIdFromName(nameInput.value);
+                if (draft.finalStageId) draft.finalStageId = seriesTailId(draft);
             }
             this.markSeriesEdited();
         });
@@ -675,12 +692,14 @@ export class CreatorPanels {
             'data-field': 'series-id', disabled: !draft.isNew || this.seriesSavingDraft === draft } });
         idInput.addEventListener('input', () => {
             draft.id = idInput.value.trim();
+            if (draft.finalStageId) draft.finalStageId = seriesTailId(draft);
             draft.idTouched = true;
             this.markSeriesEdited();
         });
         const surfaces = this.seriesSurfaces(draft);
 
         const stageRefs = [];
+        const sealed = Boolean(draft.publishedFinalStageId);
         const stageRows = draft.stages.map((stage, index) => {
             const track = trackByKey.get(stage.trackKey) ?? { name: stage.trackKey, ready: false };
             const locked = index < fixed;
@@ -714,6 +733,14 @@ export class CreatorPanels {
             const error = element('p', { className: 'creator-row-error', text: message ?? '' });
             error.hidden = !message;
             stageRefs.push({ stage, medals, error });
+            const finalStage = index === draft.stages.length - 1 ? element('input', { attrs: {
+                type: 'checkbox', checked: draft.finalStageId === seriesTailId(draft),
+                disabled: sealed, 'aria-label': 'Final stage', 'data-field': 'series-final-stage',
+            } }) : null;
+            finalStage?.addEventListener('change', () => {
+                draft.finalStageId = finalStage.checked ? seriesTailId(draft) : null;
+                changed();
+            });
             return element('li', { className: 'creator-row' }, [
                 element('span', { className: 'creator-row-index', text: String(index + 1) }),
                 track.source && track.source !== 'app'
@@ -728,17 +755,24 @@ export class CreatorPanels {
                     element('span', { text: 'Medals' }),
                     medals,
                 ]),
+                finalStage ? element('label', { className: 'creator-inline-field' }, [
+                    finalStage, element('span', { text: 'Final stage' }),
+                ]) : null,
                 element('span', { className: 'creator-row-actions' }, [
                     button('↑', () => {
                         draft.stages = moveItem(draft.stages, index, index - 1);
+                        draft.finalStageId = null;
                         changed();
                     }, { disabled: locked || index - 1 < fixed, title: 'Move up' }),
                     button('↓', () => {
                         draft.stages = moveItem(draft.stages, index, index + 1);
+                        draft.finalStageId = null;
                         changed();
                     }, { disabled: locked || index === draft.stages.length - 1, title: 'Move down' }),
                     button('✕', () => {
                         draft.stages = draft.stages.filter((_, entry) => entry !== index);
+                        if (draft.finalStageId) draft.finalStageId = index === draft.stages.length
+                            ? null : seriesTailId(draft);
                         changed();
                     }, { disabled: locked, title: 'Take out of the series' }),
                 ]),
@@ -747,7 +781,7 @@ export class CreatorPanels {
         });
 
         const candidates = this.seriesCandidates(draft);
-        const addSelect = element('select', { attrs: { 'aria-label': 'Track to add' } }, [
+        const addSelect = element('select', { attrs: { 'aria-label': 'Track to add', disabled: sealed } }, [
             element('option', { text: candidates.length ? 'Choose a track' : 'No free track', attrs: { value: '' } }),
             ...candidates.map((track) => element('option', {
                 text: `${track.name}${track.ready ? '' : ' (not ready)'}`,
@@ -755,13 +789,14 @@ export class CreatorPanels {
             })),
         ]);
         const addStage = () => {
-            if (!addSelect.value) return;
+            if (sealed || !addSelect.value) return;
             const previous = Number(draft.stages.at(-1)?.requiredMedals);
             draft.stages = [...draft.stages, {
                 trackKey: addSelect.value,
                 laps: 1,
                 requiredMedals: draft.stages.length ? (Number.isFinite(previous) ? previous : 0) + 2 : 0,
             }];
+            draft.finalStageId = null;
             changed();
         };
 
@@ -771,8 +806,10 @@ export class CreatorPanels {
             className: 'primary-btn',
             disabled: !this.seriesDirty || this.busy,
         });
-        const liveButton = button(fixed ? 'Make new stages live' : 'Make live', () => this.publishSeries(), {
-            disabled: this.seriesDirty || this.busy || draft.isNew || unpublished <= 0,
+        const liveButton = button(unpublished <= 0 ? 'Publish final stage'
+            : fixed ? 'Make new stages live' : 'Make live', () => this.publishSeries(), {
+            disabled: this.seriesDirty || this.busy || draft.isNew
+                || (unpublished <= 0 && !hasUnpublishedFinalStage(draft)),
             title: 'Players see the series. The stages cannot change after this.',
         });
         const deleteButton = button('Delete', () => this.deleteSeries(), {
@@ -799,12 +836,16 @@ export class CreatorPanels {
             ]),
             fixed ? element('p', {
                 className: 'field-hint',
-                text: `The first ${fixed} stages are live, so they cannot change. New stages go after them.`,
+                text: sealed ? 'The final stage is live. This Campaign cannot gain more stages.'
+                    : `The first ${fixed} stages are live, so they cannot change. New stages go after them.`,
             }) : null,
+            element('p', { className: 'field-hint', text: sealed
+                ? 'Players finish the Campaign by earning a medal on its final stage.'
+                : 'Mark the last stage as Final stage when the Campaign is ready to end. Publishing it fixes the endpoint permanently.' }),
             element('ol', { className: 'creator-list' }, stageRows),
             element('div', { className: 'creator-adder' }, [
                 addSelect,
-                button('Add stage', addStage, { disabled: !candidates.length }),
+                button('Add stage', addStage, { disabled: sealed || !candidates.length }),
             ]),
         ]);
     }
@@ -969,7 +1010,8 @@ export class CreatorPanels {
         const draft = this.seriesDraft;
         if (!await this.confirm({
             title: 'Make the series live?',
-            message: `Make ${draft.name} live? Players see it at once, and its stages cannot change after this.`,
+            message: `Make ${draft.name} live? Players see it at once, and its stages cannot change after this.`
+                + (hasUnpublishedFinalStage(draft) ? ' Its final stage fixes the endpoint permanently; no more stages can be added.' : ''),
             confirmLabel: 'Make live',
         })) return;
         if (this.busy || this.seriesDraft !== draft) return;

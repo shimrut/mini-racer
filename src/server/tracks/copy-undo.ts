@@ -7,6 +7,7 @@ import {
     listAppSeriesDefinitions,
     listStoredSeries,
     removeSeriesCopy,
+    toSeriesDefinition,
     type StoredSeriesRecord,
 } from '../campaign/series-store.js';
 import { COPY_LOG_PREFIX } from './copy-check.js';
@@ -59,8 +60,12 @@ function isLockedCopy(record: StoredTrackRecord, reason: 'daily' | 'series'): bo
 
 function sameAsAppSeries(record: StoredSeriesRecord, definition: AppSeries): boolean {
     const stages = definition.stages ?? [];
+    const publishedFinalStageId = toSeriesDefinition(record).finalStageId;
+    const finalStageId = definition.finalStageId ?? null;
     return record.name === (definition.name ?? definition.id)
         && record.ground === (definition.ground ?? 'tarmac')
+        && (Object.hasOwn(record, 'finalStageId') ? record.finalStageId : publishedFinalStageId) === finalStageId
+        && (record.publishedStageCount === 0 || publishedFinalStageId === finalStageId)
         && record.stages.length === stages.length
         && stages.every((stage, index) => record.stages[index].trackKey === stage.trackKey
             && record.stages[index].laps === stage.laps

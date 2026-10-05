@@ -19,7 +19,8 @@ import {
 } from './daily-podium-post-store.js';
 import { getRequestAppSlug } from '../request/request-context.js';
 import { resolveMiniRacerPostFlairId } from '../posts/post-flair-service.js';
-import { cacheSharedJson } from '../redis/shared-cache.js';
+import { resolveRedditAvatarUrl } from '../player/reddit-avatar.js';
+export { resolveRedditAvatarUrl } from '../player/reddit-avatar.js';
 import { getServerFinalDailyGpPodiumGhosts } from '../daily/daily-gp-store.js';
 import {
     DAILY_PODIUM_REPLAY_MARKER,
@@ -34,8 +35,6 @@ import { formatChallengeDate } from '../shared/format-race-time.js';
 
 const EMPTY_FINISH_LABEL = 'No verified finish';
 const PODIUM_RETRY_WINDOW_MS = 6 * 60 * 60 * 1000;
-const SNOOVATAR_CACHE_TTL_SECONDS = 60 * 60;
-const SNOOVATAR_CACHE_KEY_PREFIX = 'mini-racer:snoovatar:v1:';
 
 export type DailyPodiumPostResult = {
     created: boolean;
@@ -117,24 +116,6 @@ export function sanitizeDailyGpPodiumForPost(
             { ...positions[2], avatarUrl: null },
         ],
     };
-}
-
-export async function resolveRedditAvatarUrl(displayName: string): Promise<string | null> {
-    const username = displayName.trim().replace(/^u\//i, '').trim();
-    const cacheUsername = username.toLowerCase();
-    if (!cacheUsername) return null;
-
-    try {
-        return await cacheSharedJson(async () => {
-            const avatarUrl = await reddit.getSnoovatarUrl(username);
-            return isRedditAvatarUrl(avatarUrl) ? avatarUrl : null;
-        }, {
-            key: `${SNOOVATAR_CACHE_KEY_PREFIX}${encodeURIComponent(cacheUsername)}`,
-            ttl: SNOOVATAR_CACHE_TTL_SECONDS,
-        });
-    } catch {
-        return null;
-    }
 }
 
 export async function resolveDailyGpPodiumAvatarsForPost(

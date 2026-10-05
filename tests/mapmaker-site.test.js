@@ -284,6 +284,95 @@ describe('cloud map password workspaces through middleware and routes', () => {
         expect((await mapsFor(env, legacy)).map((map) => map.trackKey)).toEqual(['existing']);
     });
 
+    it('lists every saved workspace for the original local-import password, including revoked workspaces', async () => {
+        const env = { ...sharedEnv(), MAPMAKER_KV: createKv(1) };
+        await saveMap(env.MAPMAKER_KV, 'sameName', { track: { ...sampleTrack(), name: 'Original map' } }, LEGACY_OWNER);
+        await saveMap(env.MAPMAKER_KV, 'sameName', { track: { ...sampleTrack(), name: 'Alice map' } }, 'alice');
+        await saveMap(env.MAPMAKER_KV, 'second', { track: sampleTrack() }, 'alice');
+        await saveMap(env.MAPMAKER_KV, 'sameName', { track: { ...sampleTrack(), name: 'Bob map' } }, 'bob');
+        env.MAPMAKER_PASSCODES = JSON.stringify({ alice: 'alice-password' });
+        const response = await runApi(request('/api/maps?scope=all', { headers: { [PASSCODE_HEADER]: PASSCODE } }), env);
+        expect(response.status).toBe(200);
+        const maps = (await response.json()).maps;
+        expect(maps.map((map) => map.cloudId).sort()).toEqual(['alice:sameName', 'alice:second', 'bob:sameName', 'legacy:sameName']);
+        expect(maps.filter((map) => map.trackKey === 'sameName').map((map) => map.track.name).sort()).toEqual(['Alice map', 'Bob map', 'Original map']);
+        expect(maps.map((map) => map.workspaceId).sort()).toEqual(['alice', 'alice', 'bob', 'legacy']);
+        expect(maps.every((map, index) => index === 0 || maps[index - 1].updatedAt >= map.updatedAt)).toBe(true);
+        expect(env.MAPMAKER_KV.listRequests).toEqual([
+            { prefix: 'map:', cursor: undefined },
+            { prefix: 'workspace-map:', cursor: undefined },
+            { prefix: 'workspace-map:', cursor: '1' },
+            { prefix: 'workspace-map:', cursor: '2' },
+        ]);
+        expect((await mapsFor(env, await login(env, PASSCODE))).map((map) => map.track.name)).toEqual(['Original map']);
+    });
+
+    it('derives import identities from valid storage keys rather than stored identity fields', async () => {
+        const env = sharedEnv();
+        const map = normalizeCloudMap('differentStoredKey', { track: sampleTrack() });
+        await env.MAPMAKER_KV.put('workspace-map:alice:realKey', JSON.stringify({ ...map, workspaceId: 'bob', cloudId: 'bob:victim' }));
+        for (const key of ['map:bad-key', 'workspace-map:alice:bad-key', 'workspace-map:bad/id:goodKey', 'workspace-map:alice:extra:goodKey', 'workspace-map:legacy:goodKey']) {
+            await env.MAPMAKER_KV.put(key, JSON.stringify(map));
+        }
+        const response = await runApi(request('/api/maps?scope=all', { headers: { [PASSCODE_HEADER]: PASSCODE } }), env);
+        expect((await response.json()).maps).toEqual([{ ...map, trackKey: 'realKey', workspaceId: 'alice', cloudId: 'alice:realKey' }]);
+    });
+
+    it('does not give website cookies or issued passwords an all-workspace import view', async () => {
+        const env = sharedEnv();
+        const legacy = await login(env, PASSCODE);
+        const alice = await login(env, 'alice-password');
+        await putMap(env, alice, 'privateMap');
+        for (const headers of [
+            { Cookie: legacy },
+            { Cookie: alice },
+            { [PASSCODE_HEADER]: 'alice-password' },
+            { Cookie: legacy, [PASSCODE_HEADER]: 'alice-password' },
+        ]) {
+            for (const [path, method] of [['/api/maps?scope=all', 'GET'], ['/api/maps/privateMap?scope=all&workspace=alice', 'DELETE']]) {
+                expect((await runApi(request(path, { method, headers }), env)).status).toBe(403);
+            }
+        }
+        expect((await mapsFor(env, alice)).map((map) => map.trackKey)).toEqual(['privateMap']);
+    });
+
+    it('deletes only the selected workspace copy during a local import', async () => {
+        const env = sharedEnv();
+        for (const owner of [LEGACY_OWNER, 'alice', 'bob']) {
+            await saveMap(env.MAPMAKER_KV, 'sameName', { track: sampleTrack() }, owner);
+        }
+        env.MAPMAKER_PASSCODES = JSON.stringify({ alice: 'alice-password' });
+        const headers = { [PASSCODE_HEADER]: PASSCODE };
+        const response = await runApi(request('/api/maps/sameName?scope=all&workspace=bob', { method: 'DELETE', headers }), env);
+        expect(response.status).toBe(200);
+        expect(env.MAPMAKER_KV.store.has('workspace-map:bob:sameName')).toBe(false);
+        expect(env.MAPMAKER_KV.store.has('workspace-map:alice:sameName')).toBe(true);
+        expect(env.MAPMAKER_KV.store.has('map:sameName')).toBe(true);
+        const legacy = await runApi(request('/api/maps/sameName?scope=all&workspace=legacy', { method: 'DELETE', headers }), env);
+        expect(legacy.status).toBe(200);
+        expect(env.MAPMAKER_KV.store.has('map:sameName')).toBe(false);
+        expect(env.MAPMAKER_KV.store.has('workspace-map:alice:sameName')).toBe(true);
+    });
+
+    it('rejects invalid import deletions and prevents all-workspace writes', async () => {
+        const env = sharedEnv();
+        await saveMap(env.MAPMAKER_KV, 'goodKey', { track: sampleTrack() }, 'alice');
+        const headers = { [PASSCODE_HEADER]: PASSCODE };
+        for (const path of [
+            '/api/maps/goodKey?scope=all',
+            '/api/maps/goodKey?scope=all&workspace=alice%3Abob',
+            '/api/maps/goodKey?scope=all&workspace=alice%2Fbob',
+            '/api/maps/bad-key?scope=all&workspace=alice',
+        ]) {
+            expect((await runApi(request(path, { method: 'DELETE', headers }), env)).status).toBe(400);
+        }
+        const put = await runApi(request('/api/maps/goodKey?scope=all&workspace=alice', {
+            method: 'PUT', headers, body: JSON.stringify({ track: sampleTrack() }),
+        }), env);
+        expect(put.status).toBe(405);
+        expect(env.MAPMAKER_KV.store.size).toBe(1);
+    });
+
     it('scopes rename, replaceKey and deletion to the authenticated workspace', async () => {
         const env = sharedEnv();
         const alice = await login(env, 'alice-password');

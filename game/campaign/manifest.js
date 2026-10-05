@@ -56,6 +56,11 @@ function buildSeries(definition, { app = false } = {}) {
         });
     }));
     const ground = typeof definition.ground === 'string' ? definition.ground : 'tarmac';
+    const finalStageId = typeof definition.finalStageId === 'string' ? definition.finalStageId : null;
+    if (finalStageId && stages.some((stage) => stage.raceId === finalStageId)
+        && stages.at(-1)?.raceId !== finalStageId) {
+        throw new Error(`The final stage of ${id} must be its last stage.`);
+    }
     const grounds = Object.freeze(getCampaignSeriesGrounds(definition, app
         ? (trackKey) => Object.hasOwn(TRACK_CATALOG, trackKey)
             ? TRACK_CATALOG[trackKey].ground ?? 'tarmac' : null
@@ -67,6 +72,7 @@ function buildSeries(definition, { app = false } = {}) {
             : id,
         ground,
         grounds,
+        finalStageId,
         // The game gets only the series published in the Creator, so a stored series is live.
         live: app ? isAppCampaignSeriesLive({ id }) : true,
         stages,
@@ -185,6 +191,12 @@ export function getCampaignSeriesStages(seriesId) {
     return getCampaignSeries(seriesId)?.stages ?? Object.freeze([]);
 }
 
+// A growing Campaign has no finish until its designated endpoint is published.
+export function getCampaignFinalStage(seriesId) {
+    const series = getCampaignSeries(seriesId);
+    return series?.stages.find((stage) => stage.raceId === series.finalStageId) ?? null;
+}
+
 export function getCampaignStage(raceId) {
     return typeof raceId === 'string' ? currentViews().stageByRaceId.get(raceId) ?? null : null;
 }
@@ -226,9 +238,9 @@ export function isCampaignStageUnlocked(raceId, resultsByRaceId = {}) {
     return getCampaignUnlockedRaceIds(resultsByRaceId).includes(raceId);
 }
 
-// A series is finished when its last stage has a medal.
+// Completion uses only the designated, published final stage.
 export function isCampaignSeriesFinished(seriesId, resultsByRaceId = {}) {
-    const lastStage = getCampaignSeriesStages(seriesId).at(-1);
+    const lastStage = getCampaignFinalStage(seriesId);
     return Boolean(lastStage)
         && getCampaignStageMedalCount(resultsByRaceId?.[lastStage.raceId]?.medal) > 0;
 }

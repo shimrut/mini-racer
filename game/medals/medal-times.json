@@ -624,16 +624,16 @@
     "bronze": 12.05
   },
   "brokenWing": {
-    "author": 11.41,
-    "gold": 11.76,
-    "silver": 11.95,
-    "bronze": 12.27
+    "author": 11.47,
+    "gold": 11.82,
+    "silver": 12.15,
+    "bronze": 12.41
   },
   "twinWings": {
-    "author": 11.98,
-    "gold": 12.31,
-    "silver": 12.67,
-    "bronze": 12.99
+    "author": 10.71,
+    "gold": 10.96,
+    "silver": 11.22,
+    "bronze": 11.53
   },
   "halfLife": {
     "author": 11.27,
@@ -648,10 +648,10 @@
     "bronze": 9.99
   },
   "splitJaw": {
-    "author": 15.31,
-    "gold": 15.52,
-    "silver": 15.85,
-    "bronze": 16.15
+    "author": 15.05,
+    "gold": 15.25,
+    "silver": 15.55,
+    "bronze": 15.95
   },
   "chelseaBoots": {
     "author": 7.17,
@@ -660,28 +660,28 @@
     "bronze": 7.83
   },
   "stoneGate": {
-    "author": 10.11,
-    "gold": 10.32,
-    "silver": 10.75,
-    "bronze": 11.03
+    "author": 7.42,
+    "gold": 7.69,
+    "silver": 7.91,
+    "bronze": 8.23
   },
   "crakowBoot": {
-    "author": 8.59,
-    "gold": 8.76,
-    "silver": 8.98,
-    "bronze": 9.15
+    "author": 11.2,
+    "gold": 11.45,
+    "silver": 11.75,
+    "bronze": 12.1
   },
   "slingshotRun": {
-    "author": 7.95,
-    "gold": 8.19,
-    "silver": 8.33,
-    "bronze": 8.64
+    "author": 8.41,
+    "gold": 8.72,
+    "silver": 9.03,
+    "bronze": 9.34
   },
   "mantisBend": {
-    "author": 10.24,
-    "gold": 10.47,
-    "silver": 10.71,
-    "bronze": 10.99
+    "author": 10.82,
+    "gold": 10.99,
+    "silver": 11.35,
+    "bronze": 11.71
   },
   "brokenAntler": {
     "author": 9.75,
@@ -834,10 +834,10 @@
     "bronze": 10.77
   },
   "countryRoad": {
-    "author": 12.7,
-    "gold": 12.87,
-    "silver": 13.08,
-    "bronze": 13.32
+    "author": 12.35,
+    "gold": 12.78,
+    "silver": 13.18,
+    "bronze": 13.74
   },
   "gripCircuit": {
     "author": 17.95,
@@ -870,22 +870,22 @@
     "bronze": 14.59
   },
   "forestTrail": {
-    "author": 11.34,
-    "gold": 11.54,
-    "silver": 11.73,
-    "bronze": 12.05
+    "author": 12.53,
+    "gold": 12.96,
+    "silver": 13.38,
+    "bronze": 14.04
   },
   "hillsideScramble": {
-    "author": 13.95,
-    "gold": 14.18,
-    "silver": 14.35,
-    "bronze": 14.74
+    "author": 14.23,
+    "gold": 14.61,
+    "silver": 15.11,
+    "bronze": 15.97
   },
   "dirtLoop": {
     "author": 8.83,
-    "gold": 8.98,
-    "silver": 9.12,
-    "bronze": 9.34
+    "gold": 9.17,
+    "silver": 9.42,
+    "bronze": 9.96
   },
   "ridgeRunner": {
     "author": 13.75,
@@ -894,28 +894,28 @@
     "bronze": 14.77
   },
   "brokenRoad": {
-    "author": 12.34,
-    "gold": 12.65,
-    "silver": 13.02,
-    "bronze": 13.43
+    "author": 13.25,
+    "gold": 13.73,
+    "silver": 14.22,
+    "bronze": 15
   },
   "roughCut": {
-    "author": 12.1,
-    "gold": 12.33,
-    "silver": 12.64,
-    "bronze": 12.95
+    "author": 11.99,
+    "gold": 12.4,
+    "silver": 12.84,
+    "bronze": 13.34
   },
   "dirtSnake": {
-    "author": 13.34,
-    "gold": 13.67,
-    "silver": 13.91,
-    "bronze": 14.29
+    "author": 14.56,
+    "gold": 14.98,
+    "silver": 15.54,
+    "bronze": 16.12
   },
   "wildCrest": {
-    "author": 13.19,
-    "gold": 13.42,
-    "silver": 13.77,
-    "bronze": 14.05
+    "author": 12.87,
+    "gold": 13.32,
+    "silver": 13.72,
+    "bronze": 14.28
   },
   "dirtValley": {
     "author": 15.63,
@@ -994,5 +994,29 @@
     "gold": 9.99,
     "silver": 10.23,
     "bronze": 10.51
+  },
+  "endlessLoop": {
+    "author": 10.4,
+    "gold": 10.63,
+    "silver": 10.89,
+    "bronze": 11.21
+  },
+  "crescentValley": {
+    "author": 11.6,
+    "gold": 11.83,
+    "silver": 12.11,
+    "bronze": 12.5
+  },
+  "centralDistrict": {
+    "author": 10.71,
+    "gold": 10.9,
+    "silver": 11.19,
+    "bronze": 11.49
+  },
+  "seaCharger": {
+    "author": 9.8,
+    "gold": 10,
+    "silver": 10.2,
+    "bronze": 10.6
   }
 }

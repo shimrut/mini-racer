@@ -4,6 +4,7 @@ import {
     CAMPAIGN_NUMBERS_SERIES_ID,
     CAMPAIGN_SERIES,
     countCampaignMedals,
+    getCampaignFinalStage,
     getCampaignSeries,
     getCampaignSeriesStages,
     getCampaignStage,
@@ -88,6 +89,11 @@ import {
 import { playerFieldHash } from '../redis/redis-names.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 import { progressTransferPendingReply } from '../guest-transfer/progress-transfer-reply.js';
+import { getCampaignAggregateTotalTimeMs } from '../../../game/campaign/aggregate.js';
+import {
+    campaignAggregateNeedsUpdate, queueCampaignAggregate, queueRemoveCampaignAggregate,
+    readCampaignAggregateSnapshot, runCampaignAggregateFill,
+} from './campaign-aggregate-store.js';
 
 type CampaignMedal = 'bronze' | 'silver' | 'gold' | 'author';
 
@@ -382,6 +388,7 @@ async function writeProgressWithOwnedLock(
             JSON.stringify(record),
             isGuestPlayerId(playerId) ? { expiration: expiresAt } : undefined,
         );
+        await queueCampaignAggregate(transaction, playerId, progress.campaignId, progress.resultsByRaceId);
         if (isGuestPlayerId(playerId)) {
             await transaction.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, {
                 member: playerId,
@@ -421,7 +428,7 @@ async function extendOtherGuestSeriesBestEffort(playerId: string, seriesId: stri
 async function mutateProgress(
     playerId: string,
     seriesId: string,
-    mutate: (progress: CampaignProgress) => CampaignProgress,
+    mutate: (progress: CampaignProgress) => CampaignProgress | Promise<CampaignProgress>,
 ): Promise<CampaignProgress> {
     const lock = await acquireRedisLockWithRetry(
         progressLockKey(playerId, seriesId),
@@ -432,8 +439,22 @@ async function mutateProgress(
     if (!lock) throw new CampaignProgressBusyError('Campaign progress update is already in progress.');
     try {
         const { progress: current, unknownRows } = await readProgressForWrite(playerId, seriesId);
-        const next = mutate(current);
-        if (next === current) return current;
+        const next = await mutate(current);
+        if (next === current) {
+            // Adopt retained complete progress and repair a lost derived row,
+            // even when there is no new source PB to save.
+            if (await campaignAggregateNeedsUpdate(playerId, seriesId, current.resultsByRaceId)) {
+                const transaction = await beginOwnedRedisLockTransaction(lock, redis, {
+                    watchedKeys: transferStateKeys(playerId), check: () => assertNoProgressTransfer(playerId),
+                });
+                if (!transaction) throw new CampaignProgressBusyError('Campaign progress lock was lost.');
+                await queueCampaignAggregate(transaction, playerId, seriesId, current.resultsByRaceId);
+                if (!await commitOwnedRedisLockTransaction(transaction)) {
+                    throw new CampaignProgressBusyError('Campaign aggregate repair was interrupted.');
+                }
+            }
+            return current;
+        }
         await writeProgressWithOwnedLock(playerId, next, lock, undefined, { unknownRows, fenceTransfer: true });
         return next;
     } finally {
@@ -513,6 +534,7 @@ export async function cleanupExpiredCampaignGuests(nowMs = Date.now()): Promise<
         for (const playerId of expired) {
             for (const series of CAMPAIGN_SERIES) await transaction.del(progressKey(playerId, series.id));
         }
+        for (const series of CAMPAIGN_SERIES) await queueRemoveCampaignAggregate(transaction, series.id, expired);
         await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, expired);
         const results = await transaction.exec();
         return Array.isArray(results) && results.length > 0 ? expired.length : 0;
@@ -644,31 +666,21 @@ async function loadStageTracks(stages: readonly { trackKey: string }[]): Promise
 async function repairCampaignProgressFromLeaderboard(
     playerId: string,
     progress: CampaignProgress,
+    { retryIfBusy = false }: { retryIfBusy?: boolean } = {},
 ): Promise<CampaignProgress> {
     const seriesId = progress.campaignId;
-    const missingStages = getCampaignSeriesStages(seriesId).filter(
-        (stage) => !progress.resultsByRaceId[stage.raceId],
-    );
-    if (!missingStages.length) return progress;
-    await loadStageTracks(missingStages);
-
-    const recovered = await Promise.all(missingStages.map(async (stage) => {
-        const entry = await readEntryByPlayerId(
-            competitionFor(stage),
-            playerId,
-        );
-        return campaignResultFromEntry(stage, entry, playerId);
-    }));
-    const recoveredResults = recovered.filter(
-        (result): result is CampaignBestResult => result !== null,
-    );
-    if (!recoveredResults.length) return progress;
-
+    const stages = getCampaignSeriesStages(seriesId);
+    await loadStageTracks(stages);
+    let recoveredResults: CampaignBestResult[] = [];
+    const readRecoveredResults = async () => (await Promise.all(stages.map(async (stage) => (
+        campaignResultFromEntry(stage, await readEntryByPlayerId(competitionFor(stage), playerId), playerId)
+    )))).filter((result): result is CampaignBestResult => result !== null);
     const withRecovered = (base: CampaignProgress): CampaignProgress => {
         const resultsByRaceId = { ...base.resultsByRaceId };
         let changed = false;
         for (const result of recoveredResults) {
-            if (resultsByRaceId[result.raceId]) continue;
+            const previous = resultsByRaceId[result.raceId];
+            if (previous && previous.bestTimeMs <= result.bestTimeMs) continue;
             resultsByRaceId[result.raceId] = result;
             changed = true;
         }
@@ -682,16 +694,37 @@ async function repairCampaignProgressFromLeaderboard(
         } satisfies CampaignProgress;
     };
     try {
-        return await mutateProgress(playerId, seriesId, withRecovered);
+        return await mutateProgress(playerId, seriesId, async (current) => {
+            // Entries may have committed a faster accepted PB before its
+            // progress save failed. Read them after taking the progress lock
+            // and keep the faster compatible evidence on every stage.
+            recoveredResults = await readRecoveredResults();
+            await assertNoProgressTransfer(playerId);
+            return withRecovered(current);
+        });
     } catch (error) {
-        // A held lock, a transfer of the player, or a transfer that started
-        // during the write: show the recovered results and write nothing.
-        // A later read repairs again.
-        if (error instanceof CampaignProgressBusyError || error instanceof CampaignProgressTransferPendingError) {
+        if (!retryIfBusy && (error instanceof CampaignProgressBusyError || error instanceof CampaignProgressTransferPendingError)) {
+            // Existing bootstrap/sign-in summaries can project accepted board
+            // evidence while transfer owns the source. They persist nothing;
+            // aggregate adoption and rank access still require owned writes.
+            if (!recoveredResults.length) recoveredResults = await readRecoveredResults();
             return withRecovered(progress);
         }
         throw error;
     }
+}
+
+// A completed share needs its saved medal distribution, without loading the
+// standings. Preserve the cheap complete-record path; missing rows recover
+// through the same compatible-entry repair as bootstrap.
+export async function getCampaignResultsForSeries(
+    playerId: string,
+    seriesId: string,
+): Promise<CampaignProgress['resultsByRaceId']> {
+    const saved = await readProgress(playerId, seriesId);
+    const progress = getCampaignSeriesStages(seriesId).every((stage) => saved.resultsByRaceId[stage.raceId])
+        ? saved : await repairCampaignProgressFromLeaderboard(playerId, saved);
+    return progress.resultsByRaceId;
 }
 
 export async function repairCampaignStandingsFromEntries(
@@ -756,7 +789,11 @@ export async function getServerCampaignBootstrap({
 } = {}) {
     // Stage details (standings, ranks, repairs) cost 4 to 5 reads for each
     // stage, so the bootstrap reads them for one series only.
-    const series = getCampaignSeries(requestedSeriesId) ?? getCampaignSeries(CAMPAIGN_NUMBERS_SERIES_ID)!;
+    const requested = requestedSeriesId != null && requestedSeriesId !== '';
+    const series = getCampaignSeries(requested ? requestedSeriesId : CAMPAIGN_NUMBERS_SERIES_ID);
+    if (!series) {
+        return { status: 404, body: { reason: 'campaign_unavailable', error: 'This Campaign is unavailable.' } };
+    }
     await loadStageTracks(getCampaignSeriesStages(series.id));
     const identity = await identityFor({ playerId, redditUsername, guestToken });
     const canonicalPlayerId = identity.canonicalPlayerId;
@@ -902,6 +939,152 @@ export async function getServerCampaignSnapshot({
         offset: normalizeOffset(offset),
     });
     return { status: 200, body: { race: stage, ...snapshot } };
+}
+
+async function removeRetiredAggregateCandidate(playerId: string, seriesId: string): Promise<boolean> {
+    const lock = await acquireRedisLock(progressLockKey(playerId, seriesId), CAMPAIGN_PROGRESS_LOCK_TTL_MS, redis);
+    if (!lock) return false;
+    try {
+        let retired = false;
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis, {
+            watchedKeys: [...transferStateKeys(playerId), CAMPAIGN_GUEST_EXPIRY_KEY],
+            check: async () => {
+                const [promotion, expiresAt] = await Promise.all([
+                    readGuestPromotionTarget(playerId), redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, playerId),
+                ]);
+                retired = Boolean(promotion) || (Number.isFinite(expiresAt) && Number(expiresAt) <= Date.now());
+            },
+        });
+        if (!transaction) return false;
+        // The player may have raced and refreshed retention while this fill
+        // waited for its progress lock. Retry from its current source instead.
+        if (!retired) {
+            await transaction.discard();
+            return false;
+        }
+        if (!await queueRemoveCampaignAggregate(transaction, seriesId, [playerId])) {
+            await transaction.discard();
+            return true;
+        }
+        return await commitOwnedRedisLockTransaction(transaction);
+    } finally {
+        await releaseRedisLock(lock, redis).catch((error) => console.error('Campaign aggregate candidate lock cleanup failed:', error));
+    }
+}
+
+async function retainCampaignAggregateGuestCandidate(
+    playerId: string, seriesId: string,
+): Promise<'active' | 'retired' | 'busy' | 'unsupported'> {
+    const lock = await acquireRedisLock(progressLockKey(playerId, seriesId), CAMPAIGN_PROGRESS_LOCK_TTL_MS, redis);
+    if (!lock) return 'busy';
+    try {
+        let state: 'active' | 'retired' | 'unsupported' = 'unsupported';
+        let inferredExpiry: number | null = null;
+        const transaction = await beginOwnedRedisLockTransaction(lock, redis, {
+            watchedKeys: [...transferStateKeys(playerId), CAMPAIGN_GUEST_EXPIRY_KEY],
+            check: async () => {
+                await assertNoProgressTransfer(playerId);
+                const existing = await redis.zScore(CAMPAIGN_GUEST_EXPIRY_KEY, playerId);
+                if (existing !== null && existing !== undefined) {
+                    if (Number.isFinite(existing)) state = Number(existing) > Date.now() ? 'active' : 'retired';
+                    return;
+                }
+                const finalStage = getCampaignFinalStage(seriesId);
+                const [progress, entry] = await Promise.all([
+                    readProgress(playerId, seriesId),
+                    finalStage ? readEntryByPlayerId(competitionFor(finalStage), playerId) : null,
+                ]);
+                const observations = [progress.updatedAt, entry?.updatedAt,
+                    ...Object.values(progress.resultsByRaceId).map((row) => row.updatedAt)]
+                    .map((value) => typeof value === 'string' ? Date.parse(value) : Number.NaN)
+                    .filter(Number.isFinite);
+                if (!observations.length) return;
+                inferredExpiry = Math.max(...observations) + CAMPAIGN_GUEST_TTL_SECONDS * 1000;
+                state = inferredExpiry > Date.now() ? 'active' : 'retired';
+            },
+        });
+        if (!transaction) return 'busy';
+        if (inferredExpiry === null) {
+            await transaction.discard();
+            return state;
+        }
+        // Another series can refresh the shared guest retention while this
+        // series owns its progress lock. WATCH prevents inferred old evidence
+        // from overwriting that newer activity.
+        await transaction.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, { member: playerId, score: inferredExpiry });
+        return await commitOwnedRedisLockTransaction(transaction) ? state : 'busy';
+    } catch (error) {
+        if (error instanceof CampaignProgressTransferPendingError) return 'busy';
+        throw error;
+    } finally {
+        await releaseRedisLock(lock, redis).catch((error) => console.error('Campaign aggregate guest retention lock cleanup failed:', error));
+    }
+}
+
+async function reconcileCampaignAggregateCandidate(playerId: string, seriesId: string): Promise<boolean> {
+    if (!playerId.startsWith('reddit:') && !playerId.startsWith('guest:')) return true;
+    if (isGuestPlayerId(playerId)) {
+        // A permanent promotion mark must never recreate the retired guest.
+        if (await readGuestPromotionTarget(playerId)) return removeRetiredAggregateCandidate(playerId, seriesId);
+        const retention = await retainCampaignAggregateGuestCandidate(playerId, seriesId);
+        if (retention === 'busy') return false;
+        if (retention === 'unsupported') return true;
+        if (retention === 'retired') return removeRetiredAggregateCandidate(playerId, seriesId);
+    }
+    try {
+        await repairCampaignProgressFromLeaderboard(playerId, await readProgress(playerId, seriesId), { retryIfBusy: true });
+        return true;
+    } catch (error) {
+        if (error instanceof CampaignProgressBusyError || error instanceof CampaignProgressTransferPendingError) return false;
+        throw error;
+    }
+}
+
+// Reuses the existing bounded migration scheduler; ranking adoption does not
+// depend on historic finishers visiting the new screen.
+export async function runCampaignAggregateFills(): Promise<void> {
+    for (const series of CAMPAIGN_SERIES) {
+        if (!getCampaignFinalStage(series.id)) continue;
+        await runCampaignAggregateFill(series.id, (playerId) => reconcileCampaignAggregateCandidate(playerId, series.id));
+    }
+}
+
+export async function getServerCampaignAggregate({
+    seriesId, playerId, redditUsername, guestToken, limit, offset,
+}: {
+    seriesId?: unknown; playerId?: unknown; redditUsername?: unknown; guestToken?: unknown; limit?: unknown; offset?: unknown;
+} = {}) {
+    const series = getCampaignSeries(seriesId);
+    if (!series || !getCampaignFinalStage(series.id)) {
+        return { status: 404, body: { reason: 'campaign_unavailable', error: 'This Campaign leaderboard is unavailable.' } };
+    }
+    const identity = await identityFor({ playerId, redditUsername, guestToken });
+    const canonicalPlayerId = identity.canonicalPlayerId;
+    if (!canonicalPlayerId) return identityRequired();
+    if (identity.guestStatus === 'guest_promotion_pending' || await isProgressTransferPending(canonicalPlayerId)) {
+        return progressTransferPendingReply();
+    }
+    await cleanupExpiredCampaignGuestsBestEffort();
+    let progress: CampaignProgress;
+    try {
+        progress = await repairCampaignProgressFromLeaderboard(
+            canonicalPlayerId, await readProgress(canonicalPlayerId, series.id), { retryIfBusy: true },
+        );
+    } catch (error) {
+        if (error instanceof CampaignProgressTransferPendingError) return progressTransferPendingReply();
+        if (error instanceof CampaignProgressBusyError) return { status: 503, body: { error: 'Campaign progress is busy. Try again.' } };
+        throw error;
+    }
+    const totalTimeMs = getCampaignAggregateTotalTimeMs(series.id, progress.resultsByRaceId);
+    if (totalTimeMs === null) {
+        return { status: 403, body: { reason: 'campaign_unfinished', error: 'Finish this Campaign before opening its leaderboard.' } };
+    }
+    const ready = await runCampaignAggregateFill(series.id,
+        (candidate) => reconcileCampaignAggregateCandidate(candidate, series.id));
+    return { status: 200, body: await readCampaignAggregateSnapshot({
+        seriesId: series.id, playerId: canonicalPlayerId, totalTimeMs,
+        limit: normalizeLimit(limit), offset: normalizeOffset(offset), ready,
+    }) };
 }
 
 export async function prepareServerCampaignLeaderboardRace({
@@ -1532,7 +1715,10 @@ async function clearGuestCampaignProgress(
             });
         }
         await runner(locks, async (transaction) => {
-            for (const series of CAMPAIGN_SERIES) await transaction.del(progressKey(guestPlayerId, series.id));
+            for (const series of CAMPAIGN_SERIES) {
+                await transaction.del(progressKey(guestPlayerId, series.id));
+                await queueRemoveCampaignAggregate(transaction, series.id, [guestPlayerId]);
+            }
             await transaction.zRem(CAMPAIGN_GUEST_EXPIRY_KEY, [guestPlayerId]);
         });
         return hadProgress;

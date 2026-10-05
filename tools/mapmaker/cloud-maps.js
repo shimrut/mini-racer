@@ -4,6 +4,27 @@ import { DEFAULT_TRACK_GROUND_KEY, TRACK_GROUND_KEYS } from '../../game/track/gr
 
 export const MAPMAKER_ONLINE = import.meta.env?.MODE === 'online';
 
+// Local imports keep the workspace in their identity, including same-name maps.
+export function cloudMapId(map) {
+    return map.cloudId ?? map.trackKey;
+}
+
+export function prepareCloudImport(map, tracks, dirtyTrackKeys = new Set()) {
+    const draft = structuredClone(map);
+    draft.cloudId = cloudMapId(map);
+    const original = draft.originalTrackKey;
+    draft.originalTrackKey = original && Object.hasOwn(tracks, original) && !dirtyTrackKeys.has(original)
+        ? original : null;
+    const baseKey = draft.trackKey;
+    const baseName = draft.track.name;
+    let suffix = 2;
+    while (Object.hasOwn(tracks, draft.trackKey) && draft.trackKey !== draft.originalTrackKey) {
+        draft.trackKey = `${baseKey}${suffix}`;
+        draft.track.name = `${baseName} ${suffix++}`;
+    }
+    return draft;
+}
+
 let ownerId = null;
 let groundKeys = [DEFAULT_TRACK_GROUND_KEY];
 

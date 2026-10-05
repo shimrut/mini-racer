@@ -3,7 +3,10 @@ import {
     CAMPAIGN_REQUEST_TIMEOUT_MS,
     deriveCampaignProgress,
     getCampaignBootstrap,
+    getCampaignAggregate,
     submitCampaignRun,
+    previewCampaignResultsShare,
+    confirmCampaignResultsShare,
 } from '../game/campaign/service.js';
 import { getCampaignStage } from '../game/campaign/manifest.js';
 import { clearStoredSeriesForTests, isStoredSeriesListLoaded } from '../game/campaign/stored-series.js';
@@ -23,6 +26,16 @@ describe('campaign client progress', () => {
     it('starts with only Number Zero unlocked', () => {
         const progress = deriveCampaignProgress();
         expect(progress.unlockedRaceIds).toEqual(['numbered-v1-00']);
+    });
+
+    it('requests the series aggregate through the normal authenticated player request', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true, status: 200, json: vi.fn().mockResolvedValue({ ready: true }),
+        });
+        await getCampaignAggregate('numbered-v1', { limit: 25, offset: 50 });
+        const url = new URL(globalThis.fetch.mock.calls[0][0], 'http://localhost');
+        expect(url.pathname).toBe('/api/campaign/aggregate');
+        expect(Object.fromEntries(url.searchParams)).toMatchObject({ seriesId: 'numbered-v1', limit: '25', offset: '50' });
     });
 
     it('unlocks stages as the medal total climbs, one at a time', () => {
@@ -230,7 +243,7 @@ describe('campaign client progress', () => {
                 }))
                 .mockResolvedValueOnce({ ok: false, status: 503, json: vi.fn() });
 
-            await expect(getCampaignBootstrap()).resolves.toMatchObject({ availability: 'unavailable' });
+            await expect(getCampaignBootstrap({ seriesId: 'night-v1' })).resolves.toMatchObject({ availability: 'unavailable' });
 
             expect(isStoredSeriesListLoaded()).toBe(true);
             expect(getCampaignStage('night-v1-00')).not.toBeNull();
@@ -256,5 +269,34 @@ describe('campaign client progress', () => {
             authoritative: true,
             ranked: true,
         });
+    });
+
+    it('previews only the series ID and retains the server disclosure', async () => {
+        const body = { status: 'ready', shareToken: 'preview-token', username: 'RaceFan', title: 'I finished the Numbers campaign' };
+        globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body });
+        await expect(previewCampaignResultsShare({ seriesId: 'numbered-v1' })).resolves.toEqual({ ok: true, status: 200, body });
+        const [url, options] = globalThis.fetch.mock.calls[0];
+        expect(url).toBe('/api/campaign/share/preview');
+        expect(JSON.parse(options.body)).toEqual({ seriesId: 'numbered-v1' });
+    });
+
+    it('publishes only after confirmation and sends only the server preview token', async () => {
+        const body = { status: 'shared', postUrl: 'https://www.reddit.com/r/test/comments/shared' };
+        globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body });
+        await expect(confirmCampaignResultsShare('preview-token')).resolves.toEqual({ ok: true, status: 200, body });
+        const [url, options] = globalThis.fetch.mock.calls[0];
+        expect(url).toBe('/api/campaign/share/confirm');
+        expect(JSON.parse(options.body)).toEqual({ shareToken: 'preview-token' });
+    });
+
+    it('requests an unknown Creator series by its ID and refuses a different campaign response', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true, status: 200,
+            json: async () => ({ ranked: true, campaignId: 'numbered-v1', stages: [], progress: {} }),
+        });
+        await expect(getCampaignBootstrap({ seriesId: 'creator-target-v1' })).resolves.toMatchObject({
+            campaignId: 'creator-target-v1', availability: 'unavailable',
+        });
+        expect(new URL(globalThis.fetch.mock.calls[0][0]).searchParams.get('seriesId')).toBe('creator-target-v1');
     });
 });

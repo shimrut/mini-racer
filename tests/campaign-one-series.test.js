@@ -72,6 +72,18 @@ describe('Campaign with one live series', () => {
         expect(context.lobbyUi.showCampaign.mock.calls.at(-1)[0].view).toBe('stages');
     });
 
+    it('opens the series list from View Campaign even with only one live series', () => {
+        const context = createContext();
+        context.modal = { showCampaignFinished: vi.fn() };
+        context.showCampaignFinishedNow({ title: 'Numbers', seriesId: 'numbered-v1' });
+        const actions = context.modal.showCampaignFinished.mock.calls[0][1];
+
+        actions.primaryAction();
+
+        expect(actions.primaryActionLabel).toBe('View Campaign');
+        expect(context.lobbyUi.showCampaign.mock.calls.at(-1)[0].view).toBe('series');
+    });
+
     it('hides the series choice, and goes Home on Escape', async () => {
         const onBack = vi.fn();
         const onBackToCampaignSeries = vi.fn();

@@ -607,11 +607,14 @@ describe('head-to-head service', () => {
     });
 
     it('refuses a Campaign race that the manifest does not define', async () => {
+        const { getCampaignStage } = await import('../game/campaign/manifest.js');
+        const unknownRaceId = 'numbered-v1-99';
+        expect(getCampaignStage(unknownRaceId)).toBeNull();
         const service = createHeadToHeadService({
             resolveSource: vi.fn(async () => ({
                 ...source(),
-                sourceId: 'numbered-v1-16',
-                raceId: 'numbered-v1-16',
+                sourceId: unknownRaceId,
+                raceId: unknownRaceId,
             })),
             validateReplay: vi.fn(),
             now: () => new Date('2026-07-23T12:00:00.000Z'),

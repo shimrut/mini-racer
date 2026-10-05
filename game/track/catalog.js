@@ -170,6 +170,9 @@ export const TRACK_CATALOG = {
     grandSlam: { name: "Grand Slam", ground: "grip" },
     dirtyDancing: { name: "Dirty Dancing", ground: "dirt" },
     greyHarbor: { name: "Grey Harbor" },
+    endlessLoop: { name: "Endless Loop" },
+    crescentValley: { name: "Crescent Valley" },
+    seaCharger: { name: "Sea Charger" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -306,6 +309,8 @@ export const TRACK_SCHEDULE_KEYS = [
     'sharkTail',
     'hookBend',
     'windingLane',
+    'greyHarbor',
+    'crescentValley',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

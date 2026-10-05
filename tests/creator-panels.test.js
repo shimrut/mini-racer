@@ -159,6 +159,59 @@ describe('Creator Campaign Planner', () => {
         ],
     };
 
+    it('lets a moderator declare the current tail, saves it, and publishes it without adding stages', async () => {
+        const view = structuredClone(seriesView);
+        view.series[0].finalStageId = null;
+        view.series[0].publishedFinalStageId = null;
+        const fetchMock = vi.fn(async (url, options) => {
+            if (options?.method === 'PUT') {
+                Object.assign(view.series[0], JSON.parse(options.body), { revision: 6 });
+                return jsonResponse({ series: structuredClone(view.series[0]) });
+            }
+            if (options?.method === 'POST') {
+                Object.assign(view.series[0], { publishedFinalStageId: view.series[0].finalStageId, revision: 7 });
+                return jsonResponse({ series: structuredClone(view.series[0]) });
+            }
+            if (String(url).includes('/api/creator/daily')) return jsonResponse(dailyView);
+            if (String(url).includes('/api/creator/migration')) return jsonResponse({ report: null, preview: { copied: [] } });
+            return jsonResponse(structuredClone(view));
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        const root = document.getElementById('creator-series-view');
+        root.querySelector('[aria-label="Final stage"]').click();
+        expect(panels.seriesDraft.finalStageId).toBe('night-v1-00');
+        expect(buttonsByText(root, 'Publish final stage')[0].disabled).toBe(true);
+        await panels.saveSeries();
+        const put = fetchMock.mock.calls.find(([, options]) => options?.method === 'PUT');
+        expect(JSON.parse(put[1].body)).toMatchObject({ finalStageId: 'night-v1-00' });
+        expect(buttonsByText(root, 'Publish final stage')[0].disabled).toBe(false);
+        await panels.publishSeries();
+        expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({
+            message: expect.stringContaining('endpoint permanently'),
+        }));
+        expect(root.querySelector('[aria-label="Final stage"]').disabled).toBe(true);
+        expect(buttonsByText(root, 'Add stage')[0].disabled).toBe(true);
+        expect(root.querySelector('.creator-adder select').disabled).toBe(true);
+    });
+
+    it('keeps a draft editable and clears its final declaration when adding another stage', async () => {
+        const view = structuredClone(seriesView);
+        Object.assign(view.series[0], { finalStageId: 'night-v1-00', publishedFinalStageId: null });
+        vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(view)));
+        const panels = new CreatorPanels({ confirm, onOpenTrack: vi.fn(), onTracksChanged: vi.fn(), setStatus: vi.fn() });
+        await panels.loadSeries('night-v1');
+        const root = document.getElementById('creator-series-view');
+        const add = root.querySelector('.creator-adder select');
+        add.value = 'dayLoop';
+        buttonsByText(root, 'Add stage')[0].click();
+        expect(panels.seriesDraft.finalStageId).toBeNull();
+        expect(root.querySelectorAll('[aria-label="Final stage"]')).toHaveLength(1);
+        root.querySelector('[aria-label="Final stage"]').click();
+        expect(panels.seriesDraft.finalStageId).toBe('night-v1-01');
+    });
+
     it('adds a free track on another surface after the live stages, and saves the series', async () => {
         const fetchMock = vi.fn(async (url, options) => {
             if (options?.method === 'PUT') return jsonResponse({ series: {

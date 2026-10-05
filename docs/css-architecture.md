@@ -78,6 +78,41 @@ Daily, Campaign, and Head to Head share one finish column in
 rows, and buttons use the same 320px width and 0.35rem padding, and the rows
 sit 2.75rem below the hero. Mode only changes the content in those slots.
 
+The Campaign completion view (`#modal-campaign-finished-view` in
+`styles/results.css`) centers the player portrait and name above the series name
+and gold COMPLETE lockup. The portrait uses the existing avatar fallback and a
+circular gold frame. Four medal icons show the saved best-stage counts for
+Bronze, Silver, Gold and Author, including zero counts, using the existing SVG
+center-text option. Tier names sit below the icons; the row stays the same size
+for short and long series. The existing weighted medal total follows it.
+Individual stage results remain in View Series. The completion composition
+keeps animated headings below the shared dialog in its own stacking context.
+All three actions stack vertically at equal width with shared 1.25rem typography;
+the red
+Share Results button is last, at the bottom of the completion column, and takes
+initial keyboard focus. Short-height spacing and reduced-motion rules keep the
+shared shell usable.
+The first valid final-stage result reserves the Finished action immediately,
+with Home hidden while confirmation is pending. Canonical acceptance enables
+that same button; rejection restores Home. Replays of the completed final stage show Results; earlier-stage replays retain their existing actions.
+Share Results uses the existing result-share-panel preview, account disclosure,
+confirmation, retry and success controls. Escape cancels preparation/preview
+and restores the trigger; posting stays open until the response settles.
+The completion summary also uses two metric columns for Total best time and
+Overall place. Overall place reuses the shared `modal-stat-stack` and
+`modal-stat-button` interaction to open the aggregate board; there is no extra
+leaderboard/refresh/retry action. The board reuses the shared standings shell.
+Back restores the same summary and focuses Overall place; the quiet view class suppresses another medal/title
+animation. The existing 640px-height compaction also tightens medal sizing and
+vertical gaps so the added metrics/action leave the player avatar and all three
+actions visible on the tested 360x640 screen.
+
+The completion poster keeps the Campaign launcher shell. Its reading stack uses
+the same step as the Head to Head poster: player, “Campaign finished”, the
+series name, the rank figure, then the medals. The repeated “I finished…” line
+stays available to screen readers and is not shown. The track rings stay on the
+right. Play Campaign stays in the footer.
+
 Head to Head fills the hero with italic Outfit `YOU WON` / `YOU LOST` /
 `YOU TIED` on the left above a right-aligned race time of the same
 size, scoped under `#modal-combined-view.is-challenge-finish`. Green is a win,

@@ -1,5 +1,6 @@
 import { isValidDraft } from '../../tools/mapmaker/edit-history.js';
 import { normalizeMedalRow } from '../../tools/mapmaker/medal-times.js';
+import { isValidTrackKey } from '../../tools/mapmaker/track-source.js';
 import { LEGACY_OWNER, isWorkspaceId } from './gate.js';
 
 // Cloud maps: Mapmaker drafts saved online, one KV entry for each track key.
@@ -58,6 +59,30 @@ export async function listMaps(kv, ownerId) {
     return maps.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+// Local imports include revoked workspaces too. Identity comes from the KV key,
+// never fields supplied when a map was saved.
+export async function listAllMaps(kv) {
+    const maps = [];
+    for (const prefix of [MAP_PREFIX, 'workspace-map:']) {
+        let cursor;
+        do {
+            const page = await kv.list({ prefix, cursor });
+            await Promise.all(page.keys.map(async ({ name }) => {
+                const parts = prefix === MAP_PREFIX
+                    ? [LEGACY_OWNER, name.slice(MAP_PREFIX.length)]
+                    : name.slice(prefix.length).split(':');
+                const [workspaceId, trackKey] = parts;
+                if (parts.length !== 2 || !isWorkspaceId(workspaceId) || !isValidTrackKey(trackKey)
+                    || (prefix !== MAP_PREFIX && workspaceId === LEGACY_OWNER)) return;
+                const map = await kv.get(name, 'json');
+                if (map) maps.push({ ...map, trackKey, workspaceId, cloudId: `${workspaceId}:${trackKey}` });
+            }));
+            cursor = page.list_complete ? undefined : page.cursor;
+        } while (cursor);
+    }
+    return maps.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 // replaceKey is the map's earlier key, when the track was renamed since.
 export async function saveMap(kv, trackKey, body, ownerId) {
     const prefix = mapPrefix(ownerId);
@@ -70,5 +95,6 @@ export async function saveMap(kv, trackKey, body, ownerId) {
 }
 
 export function deleteMap(kv, trackKey, ownerId) {
+    if (!isValidTrackKey(trackKey)) throw new MapError('The cloud map key is not valid.');
     return kv.delete(mapPrefix(ownerId) + trackKey);
 }

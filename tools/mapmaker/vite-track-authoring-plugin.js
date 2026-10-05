@@ -6,7 +6,7 @@ import {
 } from './track-repository.js';
 import { isValidTrackKey } from './track-source.js';
 import { parseTrackDestination } from './campaign-series.js';
-import { PASSCODE_HEADER } from '../../site/lib/gate.js';
+import { LEGACY_OWNER, PASSCODE_HEADER, isWorkspaceId } from '../../site/lib/gate.js';
 
 const ENDPOINT = '/__mapmaker/save-track';
 const REMOVE_ENDPOINT = '/__mapmaker/remove-track';
@@ -128,12 +128,20 @@ async function forwardCloudRequest(cloud, payload) {
         return [501, { error: 'Add MAPMAKER_PASSCODE to .env.local and restart npm run mapmaker to see your cloud maps.' }];
     }
     const method = payload?.method;
-    const key = typeof payload?.key === 'string' ? payload.key : '';
-    const validRequest = (method === 'GET' && !key) || (method === 'DELETE' && isValidTrackKey(key));
-    if (!validRequest) return [400, { error: 'Cloud maps request is invalid.' }];
+    const cloudId = typeof payload?.key === 'string' ? payload.key : '';
+    const parts = cloudId.split(':');
+    const workspace = parts.length === 2 ? parts[0] : LEGACY_OWNER;
+    const key = parts.length === 2 ? parts[1] : cloudId;
+    const validRequest = (method === 'GET' && !cloudId) || (method === 'DELETE' && isValidTrackKey(key));
+    if (!validRequest || parts.length > 2 || !isWorkspaceId(workspace)) {
+        return [400, { error: 'Cloud maps request is invalid.' }];
+    }
+    const url = new URL(`/api/maps${key ? `/${encodeURIComponent(key)}` : ''}`, cloud.url);
+    url.searchParams.set('scope', 'all');
+    if (method === 'DELETE') url.searchParams.set('workspace', workspace);
     let response;
     try {
-        response = await fetch(`${cloud.url}/api/maps${key ? `/${key}` : ''}`, {
+        response = await fetch(url, {
             method,
             headers: { [PASSCODE_HEADER]: cloud.passcode },
         });

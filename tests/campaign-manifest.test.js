@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
     CAMPAIGN_ID,
     CAMPAIGN_NUMBERS_SERIES_ID,
@@ -6,12 +6,18 @@ import {
     campaignHasSeriesChoice,
     countCampaignMedals,
     getCampaignSeriesStages,
+    getCampaignSeries,
+    getCampaignFinalStage,
     getCampaignStage,
     getCampaignStageMedalCount,
     getCampaignUnlockedRaceIds,
+    isCampaignSeriesFinished,
 } from '../game/campaign/manifest.js';
 import { isAppCampaignSeriesLive } from '../game/campaign/series-rules.js';
 import { normalizeRaceSpec } from '../game/race/race-spec.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
+
+afterEach(() => clearStoredSeriesForTests());
 
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 
@@ -22,6 +28,31 @@ function getNumbersUnlockedRaceIds(results) {
 }
 
 describe('Campaign manifest', () => {
+    it('finishes Numbers only on its designated Endless Loop endpoint', () => {
+        expect(getCampaignSeries('numbered-v1').finalStageId).toBe('numbered-v1-16');
+        expect(getCampaignFinalStage('numbered-v1')?.trackKey).toBe('endlessLoop');
+        expect(isCampaignSeriesFinished('numbered-v1', { 'numbered-v1-15': { medal: 'gold' } })).toBe(false);
+        expect(isCampaignSeriesFinished('numbered-v1', { 'numbered-v1-16': { medal: 'bronze' } })).toBe(true);
+        expect(isCampaignSeriesFinished('numbered-v1', { 'numbered-v1-16': { medal: null } })).toBe(false);
+        expect(getCampaignFinalStage('missing-v1')).toBeNull();
+    });
+
+    it('keeps undeclared and progressively published Campaigns unfinished', () => {
+        const stages = [{ trackKey: 'circuit', laps: 1, requiredMedals: 0 }];
+        const results = { 'growing-v1-00': { medal: 'author' }, 'growing-v1-01': { medal: 'bronze' } };
+        registerStoredSeries([{ id: 'growing-v1', stages }]);
+        expect(getCampaignSeries('growing-v1').finalStageId).toBeNull();
+        expect(isCampaignSeriesFinished('growing-v1', results)).toBe(false);
+        registerStoredSeries([{ id: 'growing-v1', finalStageId: 'growing-v1-01', stages }]);
+        expect(getCampaignFinalStage('growing-v1')).toBeNull();
+        expect(isCampaignSeriesFinished('growing-v1', results)).toBe(false);
+        registerStoredSeries([{ id: 'growing-v1', finalStageId: 'growing-v1-01', stages: [
+            ...stages, { trackKey: 'sunlitTemple', laps: 2, requiredMedals: 1 },
+        ] }]);
+        expect(getCampaignFinalStage('growing-v1')?.raceId).toBe('growing-v1-01');
+        expect(isCampaignSeriesFinished('growing-v1', results)).toBe(true);
+    });
+
     it('lets players see only the series on a live ground', () => {
         // A series is live only when the Creator makes it live. In the app
         // data, only Numbers is live, whatever the grounds of the others.
@@ -55,6 +86,7 @@ describe('Campaign manifest', () => {
             { raceId: 'numbered-v1-13', trackKey: 'goldenRatio', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 32, previousRaceId: 'numbered-v1-12' } },
             { raceId: 'numbered-v1-14', trackKey: 'squareRoot', lapCount: 2, unlock: { type: 'medal_total', requiredMedals: 35, previousRaceId: 'numbered-v1-13' } },
             { raceId: 'numbered-v1-15', trackKey: 'halfLife', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 37, previousRaceId: 'numbered-v1-14' } },
+            { raceId: 'numbered-v1-16', trackKey: 'endlessLoop', lapCount: 1, unlock: { type: 'medal_total', requiredMedals: 39, previousRaceId: 'numbered-v1-15' } },
         ]);
         expect(Object.isFrozen(NUMBERS_STAGES)).toBe(true);
         expect(Object.isFrozen(getCampaignStage('numbered-v1-03'))).toBe(true);
@@ -62,7 +94,7 @@ describe('Campaign manifest', () => {
 
     it('keeps every gate reachable on Gold alone and strictly rising', () => {
         const requirements = NUMBERS_STAGES.map((stage) => stage.unlock.requiredMedals ?? 0);
-        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32, 35, 37]);
+        expect(requirements).toEqual([0, 1, 3, 7, 10, 12, 15, 17, 20, 22, 25, 27, 30, 32, 35, 37, 39]);
         requirements.forEach((required, index) => {
             expect(required).toBeLessThanOrEqual(index * 3);
             if (index > 0) expect(required).toBeGreaterThan(requirements[index - 1]);

@@ -36,7 +36,7 @@ const REFUSAL_MESSAGES = [
     'failed to mint',
 ];
 
-function refusedBeforePosting(error: unknown): boolean {
+export function isUserActionRefusedBeforePosting(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error ?? '');
     return REFUSAL_MESSAGES.some((refusal) => message.toLowerCase().includes(refusal));
 }
@@ -269,7 +269,7 @@ export async function submitUserComment({
             fallbackCommentUrl,
         }));
     } catch (submitError) {
-        if (refusedBeforePosting(submitError)) {
+        if (isUserActionRefusedBeforePosting(submitError)) {
             await redis.del(record.key).catch((error: unknown) => {
                 console.error('A refused comment could not clear its record:', error);
             });

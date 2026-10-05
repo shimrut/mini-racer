@@ -8,6 +8,7 @@ import {
     isLiveAppSeries,
     listAppSeriesDefinitions,
     listStoredSeries,
+    toSeriesDefinition,
     type StoredSeriesRecord,
     type StoredSeriesStage,
 } from '../campaign/series-store.js';
@@ -94,8 +95,12 @@ function checkTrack(
 
 function checkSeries(definition: AppSeries, record: StoredSeriesRecord, report: CopyCheckReport): void {
     const stages = appStages(definition);
+    const finalStageId = definition.finalStageId ?? null;
+    const publishedFinalStageId = toSeriesDefinition(record).finalStageId;
+    const declaredFinalStageId = Object.hasOwn(record, 'finalStageId') ? record.finalStageId : publishedFinalStageId;
     const sameContent = record.name === (definition.name ?? definition.id)
         && record.ground === (definition.ground ?? 'tarmac')
+        && declaredFinalStageId === finalStageId
         && record.stages.length === stages.length
         && stages.every((stage, index) => sameStage(stage, record.stages[index]));
     if (!isLiveAppSeries(definition)) {
@@ -103,15 +108,17 @@ function checkSeries(definition: AppSeries, record: StoredSeriesRecord, report: 
         return;
     }
     // Players raced every stage of a live app series. Its copy must keep them
-    // live and unchanged; new stages after them are allowed.
+    // live and unchanged, including an explicitly designated app endpoint.
     const keepsLiveStages = record.status === 'published'
         && record.publishedStageCount >= stages.length
         && record.ground === (definition.ground ?? 'tarmac')
+        && (!finalStageId || (declaredFinalStageId === finalStageId && publishedFinalStageId === finalStageId
+            && record.stages.length === stages.length && record.publishedStageCount === stages.length))
         && stages.every((stage, index) => sameStage(stage, record.stages[index]));
     if (!keepsLiveStages) {
         report.series.problems.push({
             key: definition.id,
-            problem: 'Players race this series, but its Redis copy changed its live stages.',
+            problem: 'Players race this series, but its Redis copy changed its live stages or final stage.',
         });
     } else if (sameContent && record.publishedStageCount === stages.length) {
         report.series.exact.push(definition.id);

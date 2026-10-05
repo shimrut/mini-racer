@@ -12,7 +12,7 @@ export async function onRequestPut({ request, env, params, data }) {
 
 export async function onRequestDelete({ env, params, data }) {
     try {
-        await deleteMap(env.MAPMAKER_KV, params.key, data?.mapmakerOwner);
+        await deleteMap(env.MAPMAKER_KV, params.key, data?.mapmakerImportOwner ?? data?.mapmakerOwner);
         return Response.json({ deleted: params.key });
     } catch (error) {
         if (!(error instanceof MapError)) throw error;

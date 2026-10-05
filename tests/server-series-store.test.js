@@ -51,7 +51,7 @@ vi.mock('../game/track/live-grounds.js', () => ({
 const series = await import('../src/server/campaign/series-store.ts');
 const tracks = await import('../src/server/tracks/track-store.ts');
 const { ensureStoredCatalogLoaded } = await import('../src/server/tracks/stored-catalog.ts');
-const { getCampaignSeries, CAMPAIGN_ALL_SERIES } = await import('../game/campaign/manifest.js');
+const { getCampaignSeries, getCampaignFinalStage, isCampaignSeriesFinished, CAMPAIGN_ALL_SERIES } = await import('../game/campaign/manifest.js');
 const { setStoredSeriesResolver } = await import('../game/campaign/stored-series.js');
 const { setStoredTrackResolver } = await import('../game/track/stored-tracks.js');
 
@@ -96,6 +96,75 @@ afterEach(() => {
 });
 
 describe('stored Campaign series', () => {
+    it('publishes a designated endpoint explicitly and freezes it permanently', async () => {
+        await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
+        await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        await reload();
+        const results = { 'night-v1-01': { medal: 'bronze' } };
+        expect(isCampaignSeriesFinished('night-v1', results)).toBe(false);
+
+        const declared = await series.saveStoredSeries('night-v1', {
+            ...draft, finalStageId: 'night-v1-01',
+        }, { username: 'ModOne', baseRevision: 2 });
+        expect(declared).toMatchObject({ finalStageId: 'night-v1-01', publishedFinalStageId: null });
+        await reload();
+        expect(getCampaignFinalStage('night-v1')).toBeNull();
+
+        const sealed = await series.publishStoredSeries('night-v1', { username: 'ModOne', baseRevision: 3 });
+        expect(sealed).toMatchObject({ publishedFinalStageId: 'night-v1-01', publishedStageCount: 2 });
+        await reload();
+        expect(getCampaignFinalStage('night-v1')?.raceId).toBe('night-v1-01');
+        expect(isCampaignSeriesFinished('night-v1', results)).toBe(true);
+        for (const input of [
+            { ...draft, finalStageId: null },
+            { ...draft, finalStageId: 'night-v1-02', stages: [...draft.stages,
+                { trackKey: 'nightThree', laps: 1, requiredMedals: 3 }] },
+        ]) {
+            await expect(series.saveStoredSeries('night-v1', input, { username: 'ModOne', baseRevision: sealed.revision }))
+                .rejects.toThrow('endpoint cannot change');
+        }
+        expect(await series.saveStoredSeries('night-v1', { ...draft, name: 'Night renamed' }, {
+            username: 'ModOne', baseRevision: sealed.revision,
+        })).toMatchObject({ name: 'Night renamed', finalStageId: 'night-v1-01', publishedFinalStageId: 'night-v1-01' });
+    });
+
+    it('allows progressive release before the final declaration is published', async () => {
+        await series.saveStoredSeries('night-v1', { ...draft, finalStageId: 'night-v1-01' }, { username: 'ModOne' });
+        const extended = await series.saveStoredSeries('night-v1', { ...draft, finalStageId: 'night-v1-02',
+            stages: [...draft.stages, { trackKey: 'nightThree', laps: 1, requiredMedals: 3 }],
+        }, { username: 'ModOne', baseRevision: 1 });
+        expect(extended.publishedFinalStageId).toBeNull();
+        const published = await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        expect(series.toSeriesDefinition(published).finalStageId).toBe('night-v1-02');
+    });
+
+    it('rejects a non-tail or foreign final stage and leaves legacy Creator series ongoing', async () => {
+        for (const finalStageId of ['night-v1-00', 'other-v1-01', 'night-v1-99', 1]) {
+            await expect(series.saveStoredSeries('night-v1', { ...draft, finalStageId }, { username: 'ModOne' }))
+                .rejects.toThrow('last stage');
+        }
+        await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
+        const published = await series.publishStoredSeries('night-v1', { username: 'ModOne' });
+        delete published.finalStageId;
+        delete published.publishedFinalStageId;
+        expect(series.toSeriesDefinition(published).finalStageId).toBeNull();
+    });
+
+    it('copies explicit app endpoints without inventing endpoints for hidden app drafts', async () => {
+        const copied = await series.copyLiveAppSeries({ dryRun: false, username: 'ModOne' });
+        expect(copied.failed).toEqual([]);
+        const numbers = await series.readStoredSeries('numbered-v1');
+        expect(numbers).toMatchObject({ finalStageId: 'numbered-v1-16', publishedFinalStageId: 'numbered-v1-16' });
+        delete numbers.finalStageId;
+        delete numbers.publishedFinalStageId;
+        expect(series.toSeriesDefinition(numbers).finalStageId).toBe('numbered-v1-16');
+        numbers.origin = 'creator';
+        expect(series.toSeriesDefinition(numbers).finalStageId).toBeNull();
+        const hidden = await series.copyAppSeriesDrafts({ dryRun: false, username: 'ModOne' });
+        for (const id of hidden.copied) expect(await series.readStoredSeries(id))
+            .toMatchObject({ finalStageId: null, publishedFinalStageId: null });
+    });
+
     it('keeps a draft private, and makes a published series live for players', async () => {
         const saved = await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
         expect(saved).toMatchObject({ status: 'draft', publishedStageCount: 0, revision: 1 });
@@ -219,7 +288,7 @@ describe('stored Campaign series', () => {
         await saveTrack('dirtNight', 'Dirt Night', 'dirt');
         await reload();
         await series.saveStoredSeries('mixed-v1', {
-            ...draft, stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
+            ...draft, finalStageId: 'mixed-v1-01', stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
         }, { username: 'ModOne' });
         expect(await series.publishStoredSeries('mixed-v1', { username: 'ModOne' }))
             .toMatchObject({ status: 'published', publishedStageCount: 2, grounds: ['tarmac', 'dirt'] });
@@ -296,7 +365,7 @@ describe('stored Campaign series', () => {
         await saveTrack('dirtNight', 'Dirt Night', 'dirt');
         await reload();
         await series.saveStoredSeries('mixed-v1', {
-            ...draft, stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
+            ...draft, finalStageId: 'mixed-v1-01', stages: [draft.stages[0], { trackKey: 'dirtNight', laps: 1, requiredMedals: 1 }],
         }, { username: 'ModOne' });
         const watch = mockRedis.watch.getMockImplementation();
         mockRedis.watch.mockImplementation(async (...keys) => {
@@ -309,7 +378,7 @@ describe('stored Campaign series', () => {
             return transaction;
         });
         await expect(series.publishStoredSeries('mixed-v1', { username: 'ModOne' })).rejects.toThrow('Retry');
-        expect(await series.readStoredSeries('mixed-v1')).toMatchObject({ status: 'draft', publishedStageCount: 0 });
+        expect(await series.readStoredSeries('mixed-v1')).toMatchObject({ status: 'draft', publishedStageCount: 0, publishedFinalStageId: null });
         expect((await series.readStoredSeries('mixed-v1')).grounds).toBeUndefined();
         expect((await tracks.readStoredTrack('nightOne')).lockedAt).toBeNull();
         expect((await tracks.readStoredTrack('dirtNight')).lockedAt).toBeNull();

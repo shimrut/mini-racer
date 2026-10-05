@@ -26,10 +26,10 @@ describe('Campaign series screen', () => {
     it('lists every series on a live ground with its ground, stage count and medals', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
-            series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 16, finished: false }],
+            series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 17, finished: false }],
         });
         expect(rows.map((row) => [row.name, row.infoParts])).toEqual([
-            ['Numbers', ['Street · 16 stages', '23/64 medals']],
+            ['Numbers', ['Street · 17 stages', '23/68 medals']],
             ['Mini Rally', ['Dirt · 10 stages', '0/40 medals']],
         ]);
         expect(rows[0].current).toBe(true);

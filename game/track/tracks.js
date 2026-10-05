@@ -167,6 +167,9 @@ import windingLane from './definitions/winding-lane.js';
 import grandSlam from './definitions/grand-slam.js';
 import dirtyDancing from './definitions/dirty-dancing.js';
 import greyHarbor from './definitions/grey-harbor.js';
+import endlessLoop from './definitions/endless-loop.js';
+import crescentValley from './definitions/crescent-valley.js';
+import seaCharger from './definitions/sea-charger.js';
 import { TRACK_CATALOG } from './catalog.js';
 import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
 
@@ -340,6 +343,9 @@ const TRACK_GEOMETRY = {
     grandSlam,
     dirtyDancing,
     greyHarbor,
+    endlessLoop,
+    crescentValley,
+    seaCharger,
 };
 
 // The tracks in the app, without the stored tracks.

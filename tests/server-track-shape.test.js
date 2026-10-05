@@ -4,11 +4,14 @@ import { normalizeTrackShape, TrackInputError } from '../src/server/tracks/track
 import { createTrackFingerprint } from '../src/server/competition/pb-ghost-trace.ts';
 
 describe('stored track shape', () => {
-    it('keeps every built-in track exactly, so a stored copy has the same fingerprint', () => {
+    it('keeps every built-in race field exactly while dropping obsolete rendering metadata', () => {
         for (const [trackKey, track] of Object.entries(TRACKS)) {
             const copy = normalizeTrackShape(track, { maxNameLength: 40 });
+            const { drawWidth, lineSmoothing, ...raceTrack } = track;
             expect(createTrackFingerprint(copy), trackKey).toBe(createTrackFingerprint(track));
-            expect(copy, trackKey).toEqual({ ...track });
+            expect(copy, trackKey).toEqual(raceTrack);
+            expect(copy).not.toHaveProperty('drawWidth');
+            expect(copy).not.toHaveProperty('lineSmoothing');
         }
     });
 

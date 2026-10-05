@@ -72,6 +72,7 @@ export function seriesContent(series) {
     return JSON.stringify({
         name: String(series?.name ?? '').trim(),
         ground: series?.ground,
+        finalStageId: series?.finalStageId ?? null,
         stages: (series?.stages ?? []).map((stage) => ({
             trackKey: stage.trackKey,
             laps: Number(stage.laps),
@@ -97,6 +98,8 @@ export function fitsLiveSeries(draft, server) {
     const fixed = server?.publishedStageCount ?? 0;
     if (!fixed) return true;
     if (draft.ground !== server.ground) return false;
+    if (server.publishedFinalStageId && (draft.finalStageId !== server.publishedFinalStageId
+        || draft.stages.length !== fixed)) return false;
     for (let index = 0; index < fixed; index += 1) {
         const mine = draft.stages[index];
         const theirs = server.stages[index];

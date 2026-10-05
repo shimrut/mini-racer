@@ -99,4 +99,34 @@ describe('game launch target', () => {
         expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
         expect(resolveGameLaunchTarget(root)).toEqual({ mode: 'home', challengeId: null });
     });
+
+    it('pins a completion post to its series despite an old saved launch request', () => {
+        const root = createRoot({ postData: {
+            postType: 'campaign-finished', seriesId: 'night-v1',
+            medalDistribution: { author: 10 },
+        } });
+        requestGameLaunchTarget('campaign', { root, seriesId: 'numbered-v1' });
+        expect(resolveGameLaunchTarget(root)).toEqual({
+            mode: 'campaign', challengeId: null, seriesId: 'night-v1',
+        });
+        expect(root.localStorage.getItem(LAUNCH_TARGET_KEY)).toBeNull();
+    });
+
+    it('carries the specific series through a one-use expanded launch request', () => {
+        const root = createRoot();
+        requestGameLaunchTarget('campaign', { root, seriesId: 'night-v1' });
+        expect(resolveGameLaunchTarget(root)).toEqual({
+            mode: 'campaign', challengeId: null, seriesId: 'night-v1',
+        });
+        expect(resolveGameLaunchTarget(root)).toEqual({ mode: 'home', challengeId: null });
+    });
+
+    it('ignores a series target for another mode and normal campaign launchers', () => {
+        const root = createRoot();
+        requestGameLaunchTarget('daily', { root, seriesId: 'night-v1' });
+        expect(resolveGameLaunchTarget(root)).toEqual({ mode: 'daily', challengeId: null });
+        expect(resolveGameLaunchTarget(createRoot({ postData: {
+            postType: 'campaign-launcher', seriesId: 'night-v1',
+        } }))).toEqual({ mode: 'campaign', challengeId: null });
+    });
 });

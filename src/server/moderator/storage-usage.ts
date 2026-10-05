@@ -1,5 +1,5 @@
 import { redis } from '@devvit/redis';
-import { CAMPAIGN_LIVE_STAGES } from '../../../game/campaign/manifest.js';
+import { CAMPAIGN_LIVE_STAGES, CAMPAIGN_SERIES } from '../../../game/campaign/manifest.js';
 import {
     analyticsRetentionWindow,
     analyticsScope,
@@ -14,6 +14,7 @@ import {
     summaryKey,
 } from './analytics-store.js';
 import { campaignProgressKeys } from '../campaign/campaign-progress-key.js';
+import { campaignAggregateKeys } from '../campaign/campaign-aggregate-store.js';
 import { carUnlockHashKey } from '../player/car-unlock-store.js';
 import { createRedisPlayerProfileKey } from '../competition/competition-identity.js';
 import { toCampaignCompetition } from '../competition/competition.js';
@@ -453,6 +454,7 @@ function buildKeyGroups({
     const sampledDays = pickSpread(storedDays, SAMPLED_DAILY_DAYS);
     const dailyScale = sampledDays.length > 0 ? storedDays.length / sampledDays.length : 1;
     const campaigns = CAMPAIGN_LIVE_STAGES.map((stage) => toCampaignCompetition(stage.seriesId, stage));
+    const aggregates = CAMPAIGN_SERIES.map((series) => campaignAggregateKeys(series.id));
     const guestExpiryKeys = [...new Set(
         campaigns.flatMap((competition) => (competition.guestExpiryKey ? [competition.guestExpiryKey] : [])),
     )];
@@ -490,10 +492,14 @@ function buildKeyGroups({
         },
         {
             ...leaderboards,
-            strings: campaigns.map((competition) => competition.standingsRevisionKey),
+            strings: [
+                ...campaigns.map((competition) => competition.standingsRevisionKey),
+                ...aggregates.flatMap((keys) => [keys.revision, keys.fillState, keys.fillReady, keys.fillLock]),
+            ],
             hashes: campaigns.map((competition) => competition.entryHashKey),
             sortedSets: [
                 ...campaigns.map((competition) => competition.leaderboardKey),
+                ...aggregates.map((keys) => keys.leaderboard),
                 ...guestExpiryKeys,
             ],
         },

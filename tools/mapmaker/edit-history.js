@@ -82,6 +82,13 @@ function validKey(key) {
         && !['__proto__', 'constructor', 'prototype'].includes(key);
 }
 
+function validCloudKey(key) {
+    if (validKey(key)) return true;
+    if (typeof key !== 'string') return false;
+    const parts = key.split(':');
+    return parts.length === 2 && /^[A-Za-z0-9_-]{1,64}$/.test(parts[0]) && validKey(parts[1]);
+}
+
 function validPoint(point) {
     return point !== null && typeof point === 'object'
         && Number.isFinite(point.x) && Number.isFinite(point.y)
@@ -131,7 +138,7 @@ function normalizeRecovery(recovery) {
     const drafts = [];
     for (const draft of recovery.drafts) {
         if (!isValidDraft(draft) || keys.has(draft.trackKey)
-            || (draft.cloudKey !== undefined && draft.cloudKey !== null && !validKey(draft.cloudKey))) return null;
+            || (draft.cloudKey !== undefined && draft.cloudKey !== null && !validCloudKey(draft.cloudKey))) return null;
         if (draft.pendingMedalText !== undefined && (!draft.pendingMedalText
             || typeof draft.pendingMedalText !== 'object' || Array.isArray(draft.pendingMedalText)
             || !Object.entries(draft.pendingMedalText).every(([tier, text]) => (

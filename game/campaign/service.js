@@ -125,7 +125,9 @@ function clearLegacyPendingCampaignResults() {
 
 export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
     clearLegacyPendingCampaignResults();
-    const requestedSeriesId = normalizeSeriesId(seriesId);
+    // A post can name a Creator series before its catalog reaches this client.
+    const requestedSeriesId = typeof seriesId === 'string' && seriesId.trim()
+        ? seriesId.trim() : CAMPAIGN_ID;
     if (typeof fetch !== 'function') return unavailableCampaignBootstrap(requestedSeriesId);
     try {
         const url = playerRequestUrl(API_ROUTES.campaignBootstrapUrl);
@@ -133,6 +135,9 @@ export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
         const response = await requestJson(url.toString());
         if (!response.ok || !response.body) throw new Error(`Campaign bootstrap failed: ${response.status}`);
         if (Array.isArray(response.body.storedSeries)) registerStoredSeries(response.body.storedSeries);
+        if ((response.body.campaignId ?? CAMPAIGN_ID) !== requestedSeriesId) {
+            throw new Error('The requested Campaign is unavailable.');
+        }
         // The answer leaves out an empty list, so any good answer brings the
         // whole list. The stage tracks can still fail to load after this.
         markStoredSeriesLoaded();
@@ -203,11 +208,35 @@ export async function getCampaignSnapshot(raceId, { limit = 50, offset = 0 } = {
     return requestJson(url.toString());
 }
 
+export async function getCampaignAggregate(seriesId, { limit = 50, offset = 0 } = {}) {
+    const url = playerRequestUrl(API_ROUTES.campaignAggregateUrl);
+    url.searchParams.set('seriesId', seriesId);
+    url.searchParams.set('limit', String(limit));
+    url.searchParams.set('offset', String(offset));
+    return requestJson(url.toString());
+}
+
 export async function submitCampaignRun({ raceId, trackKey, replay, submissionOwnerId = null }) {
     return requestJson(API_ROUTES.campaignSubmitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(playerIdentityBody({ raceId, trackKey, replay, submissionOwnerId })),
+    });
+}
+
+export async function previewCampaignResultsShare({ seriesId }) {
+    return requestJson(API_ROUTES.campaignSharePreviewUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seriesId }),
+    });
+}
+
+export async function confirmCampaignResultsShare(shareToken) {
+    return requestJson(API_ROUTES.campaignShareConfirmUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareToken }),
     });
 }
 

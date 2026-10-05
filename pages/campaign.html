@@ -24,11 +24,27 @@
         </header>
 
         <section class="campaign-copy">
-            <p class="campaign-eyebrow">The Numbers</p>
+            <div id="campaign-player" class="campaign-player" hidden>
+                <img id="campaign-player-avatar" class="campaign-player__avatar" alt="">
+                <span id="campaign-player-name"></span>
+            </div>
+            <p id="campaign-eyebrow" class="campaign-eyebrow">The Numbers</p>
             <h1 id="campaign-title">Campaign</h1>
-            <p class="campaign-description">
+            <p id="campaign-description" class="campaign-description">
                 Progress through the full stage series, bank medals, and unlock the next race.
             </p>
+            <div class="campaign-results">
+                <p id="campaign-place" class="campaign-place" hidden>
+                    <span class="campaign-place__label" aria-hidden="true">Overall place</span>
+                    <span id="campaign-place-value"></span>
+                </p>
+                <div id="campaign-medals" class="campaign-medals" aria-label="Medal distribution" hidden>
+                    <span data-campaign-medal="author"></span>
+                    <span data-campaign-medal="gold"></span>
+                    <span data-campaign-medal="silver"></span>
+                    <span data-campaign-medal="bronze"></span>
+                </div>
+            </div>
         </section>
 
         <footer class="campaign-actions">

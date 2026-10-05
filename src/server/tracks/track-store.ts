@@ -154,7 +154,7 @@ export function summarizeStoredTrack(record: StoredTrackRecord): StoredTrackSumm
         lockedAt: record.lockedAt,
         lockReason: record.lockReason,
         medalRow: record.medalRow,
-        ready: !getTrackCompletenessError(record.track, record.draftLoop, record.medalRow),
+        ready: !getTrackCompletenessError(record.track, record.draftLoop, record.medalRow, record.key),
     };
 }
 
@@ -544,7 +544,7 @@ export async function saveStoredTrack(
             if (inDaily && !isLiveGround(groundKey) && previousGround !== groundKey) {
                 throw new TrackInputError('Take this track out of the Daily list before changing to a ground that is not live.');
             }
-            if (assigned && getTrackCompletenessError(track, draftLoop, medalRow)) {
+            if (assigned && getTrackCompletenessError(track, draftLoop, medalRow, trackKey)) {
                 throw new TrackInputError('Take this track out of the Daily list and the Campaign series before saving unfinished work.');
             }
             const stamp = now.toISOString();

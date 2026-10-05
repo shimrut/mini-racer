@@ -3,10 +3,11 @@ function expose(getState) {
   globalThis.advanceTime = () => {};
 }
 
-export function exposeCampaignLauncherTestHooks() {
+export function exposeCampaignLauncherTestHooks(finished = null) {
   expose(() => ({
-    screen: 'campaign-launcher',
+    screen: finished ? 'campaign-finished-poster' : 'campaign-launcher',
     destination: 'campaign',
+    ...(finished || {}),
   }));
 }
 

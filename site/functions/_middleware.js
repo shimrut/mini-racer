@@ -11,6 +11,7 @@ import {
     publicOwnerId,
     readCookie,
     readWorkspaces,
+    isWorkspaceId,
     sessionCookie,
     sessionOwner,
 } from '../lib/gate.js';
@@ -100,6 +101,30 @@ export async function onRequest(context) {
         // Only server-authenticated context can select a cloud map namespace.
         context.data ??= {};
         context.data.mapmakerOwner = ownerId;
+        if (url.searchParams.get('scope') === 'all') {
+            // Website cookies and issued passwords retain their private list.
+            // Only the original password sent by the local server can import all.
+            if (headerCode === null || ownerId !== LEGACY_OWNER) {
+                return privateResponse(Response.json(
+                    { error: 'All cloud maps are available only through the original local-import password.' },
+                    { status: 403 },
+                ));
+            }
+            if (url.pathname === '/api/maps' && request.method === 'GET') {
+                context.data.mapmakerImportAll = true;
+            } else if (url.pathname.startsWith('/api/maps/') && request.method === 'DELETE') {
+                const workspaceId = url.searchParams.get('workspace');
+                if (!isWorkspaceId(workspaceId)) {
+                    return privateResponse(Response.json({ error: 'The cloud map workspace is not valid.' }, { status: 400 }));
+                }
+                context.data.mapmakerImportOwner = workspaceId;
+            } else {
+                return privateResponse(Response.json(
+                    { error: 'All-workspace imports can only list or delete cloud maps.' },
+                    { status: 405 },
+                ));
+            }
+        }
         return privateResponse(await context.next());
     }
     if (url.pathname.startsWith('/api/')) {

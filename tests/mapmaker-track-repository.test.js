@@ -61,9 +61,9 @@ function seriesSource(
 ) {
     return `${JSON.stringify({
         series: [
-            { id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', stages: numbersStages },
-            { id: 'dirt-v1', name: 'Dirt', ground: 'dirt', stages: dirtStages },
-            { id: 'grip-v1', name: 'Formula Mini', ground: 'grip', stages: formulaMiniStages },
+            { id: 'numbered-v1', name: 'Numbers', ground: 'tarmac', finalStageId: null, stages: numbersStages },
+            { id: 'dirt-v1', name: 'Dirt', ground: 'dirt', finalStageId: null, stages: dirtStages },
+            { id: 'grip-v1', name: 'Formula Mini', ground: 'grip', finalStageId: null, stages: formulaMiniStages },
         ],
     }, null, 2)}\n`;
 }

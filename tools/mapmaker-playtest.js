@@ -15,6 +15,7 @@ import {
     getLookAheadLerpFactor,
 } from '../game/race/race-camera.js';
 import { RaceHud } from '../game/race/ui-hud.js';
+import { START_LIGHT_DELAYS_MS, START_GO_DELAY_MS, START_GO_MESSAGE_MS } from '../game/race/start-timing.js';
 import { InteractionsUi } from '../game/race/ui-interactions.js';
 import { getDefaultDrawnCarAssetForGround } from '../game/car/car-skin-grounds.js';
 import { DRAWN_CAR_DRAW_PIXELS } from '../game/car/drawn-car/formula.js';
@@ -92,6 +93,8 @@ let feedback = '';
 let loadError = null;
 let lastFrame = 0;
 let frameRemainder = 0;
+let startSequenceSteps = 0;
+let startSequenceActive = false;
 let manualTime = false;
 let hud = null;
 let draftLaps = [];
@@ -136,7 +139,7 @@ function readDraft() {
 function makeRunState() {
     const track = draft.track;
     return {
-        status: 'playing',
+        status: 'starting',
         activeRaceMode: 'daily',
         currentTrackKey: draft.trackKey,
         activeRunId: 0,
@@ -194,6 +197,11 @@ function resetRun() {
     lookAhead.y = 0;
     car.drawn?.resetMotion();
     hud?.resetHud();
+    hud?.resetCountdown();
+    hud?.showStartLights();
+    startSequenceSteps = 0;
+    startSequenceActive = true;
+    frameRemainder = 0;
     paused = false;
     wallContacts = 0;
     contactSpots = [];
@@ -214,7 +222,7 @@ function usesMobileDrive() {
 }
 
 function syncPauseControl() {
-    const canPause = Boolean(state) && state.status !== 'won';
+    const canPause = state?.status === 'playing';
     ui.speedo.classList.toggle('speedometer--pause', canPause);
     if (canPause) {
         ui.speedo.setAttribute('role', 'button');
@@ -226,7 +234,7 @@ function syncPauseControl() {
 }
 
 function togglePause() {
-    if (!state || state.status === 'won') return;
+    if (state?.status !== 'playing') return;
     paused = !paused;
     if (paused) {
         interactions.resetTouchControls();
@@ -267,7 +275,27 @@ function updateDisplayPose(alpha) {
 }
 
 function tick() {
-    if (!state || paused || state.status !== 'playing') return;
+    if (!state || paused) return;
+    if (startSequenceActive) {
+        const elapsedMs = ++startSequenceSteps * STEP * 1000;
+        if (state.status === 'starting') {
+            START_LIGHT_DELAYS_MS.forEach((delay, index) => {
+                if (elapsedMs + 1e-6 >= delay) hud?.turnOnCountdownLight(index);
+            });
+            if (elapsedMs + 1e-6 >= START_GO_DELAY_MS) {
+                hud?.hideStartLights();
+                hud?.showGoMessage();
+                state.status = 'playing';
+            }
+            // The GO frame starts at the grid with a zero lap clock.
+            return;
+        }
+        if (elapsedMs + 1e-6 >= START_GO_DELAY_MS + START_GO_MESSAGE_MS) {
+            hud?.resetCountdown();
+            startSequenceActive = false;
+        }
+    }
+    if (state.status !== 'playing') return;
     savePreviousPose();
     state.keys.left = heldKeys.has('ArrowLeft') || heldKeys.has('KeyA') || heldButtons.left;
     state.keys.right = heldKeys.has('ArrowRight') || heldKeys.has('KeyD') || heldButtons.right;
@@ -366,7 +394,7 @@ function drawRaceCar(map, zoom, dt) {
         speedKph: state.cachedSpeed * KPH_PER_WORLD_UNIT,
         speedPx: running ? state.cachedSpeed * CONFIG.gridSize : 0,
         steer: (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0),
-        holding: false,
+        holding: state.status === 'starting',
         size: drawWidth,
         lowQuality: false,
     });
@@ -488,7 +516,9 @@ function renderFlowSummary() {
 function renderGameToText() {
     if (!state) return JSON.stringify({ mode: 'unavailable', error: loadError });
     return JSON.stringify({
-        mode: state.status === 'won' ? 'lap-complete' : paused ? 'paused' : 'driving',
+        mode: state.status === 'won' ? 'lap-complete' : paused ? 'paused' : state.status === 'starting' ? 'countdown' : 'driving',
+        startLights: hud?.countdownLights.map((light) => light?.classList.contains('on') === true),
+        goVisible: hud?.goMessage?.classList.contains('visible') === true,
         coordinates: 'world units; origin upper left; x right, y down',
         trackKey: draft.trackKey,
         car: {

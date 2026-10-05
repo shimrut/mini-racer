@@ -128,6 +128,7 @@ vi.mock('../game/campaign/series.json', async () => {
                 real.series.find((series) => series.id === 'numbered-v1'),
                 {
                     id: 'test-v1',
+                    finalStageId: 'test-v1-09',
                     name: 'Test',
                     ground: 'tarmac',
                     stages: TEST_SERIES_TRACKS.map((trackKey, index) => ({

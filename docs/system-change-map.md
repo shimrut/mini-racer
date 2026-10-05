@@ -159,7 +159,7 @@ flowchart LR
 - A bootstrap answer is either authoritative or a fallback, and only an authoritative one may act on the account. Launch identity failure now pauses on **Server synchronization failed**: **Retry Sync** repeats bootstrap, **Continue Offline** takes the last confirmed profile. One shared identity chase (`game/player/identity-recovery.js`) then retries immediately in the background, again when a Daily or Campaign personal best is queued, and later at 30s and 2m plus reconnect or foreground resume. A hosted outage presents the last confirmed profile for that owner from `game/player/profile-cache.js` — never the all-locked default — and applies no default locks, no selected-car rewrite, and no preference save, because a resulting stock selection would survive the outage. The cache holds the last three owners' normalized preference and unlock snapshots and never a guest token.
 - Queued results belong to the account that raced them. `game/player/active-owner.js` holds the owner the server named for this session, `game/scoreboard/verification-queue.js` stores entries per owner (`verification-queue-transfer.js` settles them after a guest transfer), and only the current owner's entries are processed or displayed — another account's wait for it to return, so both accounts can hold a queued result for the same race. A result finished before the bootstrap answered is stamped with who this phone already is (`readLastConfirmedProfileOwnerId`, else this phone's guest id) and never dropped. This visit's bootstrap may attach a first-time guest run; a later Reddit sign-in does not take another owner's waiting run. Daily and Campaign submissions carry `submissionOwnerId`, and the server refuses a mismatch with `409 submission_identity_changed` before rate limiting or replay validation, so a paused result keeps its replay and burns no attempts.
 - Reddit sign-in now pauses for an explicit progress choice whenever a guest credential is present. The player chooses **Use Guest Progress** (replace the account state) or **Use Saved Progress** / **Start Fresh** (discard the guest state); there is no automatic best-of merge. `src/server/routes/player-routes.ts` exposes the idempotent selection request, while `src/server/daily/daily-gp-store.ts` coordinates Daily, Campaign, and car-unlock replacement before retiring the guest. The transfer record is durable and account-scoped: Daily and Campaign guest sources stay intact until each copy is checkpointed, cleanup is resumable, and affected account/guest writes wait while the transfer is pending. Player and Campaign bootstrap remain non-authoritative until the choice completes.
-- The progress-choice prompt presents two compact selectable rows and one confirmation action. Each row shows three concise metrics—Daily, Campaign, and Garage—as labeled values with dividers; the selected row uses the red game accent and the action reads `CONTINUE WITH GUEST` or `CONTINUE WITH ACCOUNT` for the current choice. Campaign counts reconcile stored progress with strict-replay leaderboard entries before the summary is shown, so the choice screen uses the same verified result evidence as Campaign bootstrap. Daily uses the current seven-day playlist, Campaign uses the 16-stage manifest, and Garage uses the authoritative unlock snapshot. The chooser uses the shared modal palette, Outfit headings and values, mono metric labels, restrained selection rings, and the red pill action treatment. A locally queued Campaign finish is excluded from the unlocked-stage count until the server confirms it. Temporary transfer contention returns `503 progress_selection_retryable`, account mutations in guest replacement are fenced by the coordinator locks, inconsistent checkpoints stop with `guest_progress_recovery_required`, and the existing manual retry leaves the selected save choice intact.
+- The progress-choice prompt presents two compact selectable rows and one confirmation action. Each row shows three concise metrics—Daily, Campaign, and Garage—as labeled values with dividers; the selected row uses the red game accent and the action reads `CONTINUE WITH GUEST` or `CONTINUE WITH ACCOUNT` for the current choice. Campaign counts reconcile stored progress with strict-replay leaderboard entries before the summary is shown, so the choice screen uses the same verified result evidence as Campaign bootstrap. Daily uses the current seven-day playlist, Campaign uses the 17-stage manifest, and Garage uses the authoritative unlock snapshot. The chooser uses the shared modal palette, Outfit headings and values, mono metric labels, restrained selection rings, and the red pill action treatment. A locally queued Campaign finish is excluded from the unlocked-stage count until the server confirms it. Temporary transfer contention returns `503 progress_selection_retryable`, account mutations in guest replacement are fenced by the coordinator locks, inconsistent checkpoints stop with `guest_progress_recovery_required`, and the existing manual retry leaves the selected save choice intact.
 - Campaign lobby unlocks and the finish-sheet **Next** action read verified server progress only. Pending verification may still paint the stage time on the sheet, but **Next** stays disabled until the server accepts the run, then the same sheet turns **Next** on and restores its click action. `startCampaignStage` refuses to stamp the next race when confirmation times out or fails.
 - Mode runtimes load in the background for prefetch, but only the active launch mode's methods stay installed on `RealTimeRacer.prototype`. `game/modes/runtime-loader.js` re-applies the active mode after warming another mode so Daily overrides are not replaced by shared `challenge-run` helpers. Switching Daily, Campaign, or Head to Head installs the newly selected mode and leaves it in place.
 - `game/daily-challenge/ui.js` renders the start screen card, playlist modal, preview canvas, and challenge summary state, including local submission stages like submitting, verifying, retrying, and terminal errors.
@@ -340,8 +340,8 @@ flowchart LR
   or last medal outside the clipped card.
 - `game/campaign/manifest.js` is the immutable `numbered-v1` stage order:
   Number Zero through Nine, Imaginary Number, Infinite Pie, Euler's Number,
-  Golden Ratio, Square Root, and Half Life with fixed
-  `2,2,1,1,2,1,1,3,2,1,3,1,2,2,2,1` laps and medal-total gating plus a
+  Golden Ratio, Square Root, Half Life, and Endless Loop with fixed
+  `2,2,1,1,2,1,1,3,2,1,3,1,2,2,2,1,1` laps and medal-total gating plus a
   preceding-stage medal. Every stage track is Campaign-only and must remain
   absent from `TRACK_SCHEDULE_KEYS`.
   `TRACK_CATALOG`/`TRACKS` contain all playable geometry;
@@ -359,17 +359,74 @@ flowchart LR
   accepts stages on any ground. The live-ground list
   (`game/track/live-grounds.js`: Street, Dirt and Track) controls only Daily
   admission and the Legacy Garage list.
+- A Campaign ends only at its explicit, published `finalStageId`.
+  `game/campaign/manifest.js` exposes `getCampaignFinalStage()` and requires a
+  saved medal there for ordinary completion. Numbers designates Endless Loop,
+  `numbered-v1-16`; the other app series remain undesignated. In the Redis Creator,
+  a moderator marks the current tail as **Final stage**, saves it, then publishes
+  the declaration. `src/server/campaign/series-store.ts` keeps draft
+  `finalStageId` separate from its internal `publishedFinalStageId`; public
+  definitions expose the published endpoint only. An ongoing series can grow,
+  but publishing the final declaration permanently blocks endpoint changes and
+  additional stages. Old Creator records without a designation stay ongoing;
+  only an exact migrated app copy can inherit its explicit app endpoint.
 - `game/campaign/engine-methods.js` adapts the shared simulation, replay,
   cumulative medal flash, and PB ghost renderer to Campaign and isolated
   player challenges. Campaign finishes open the result sheet immediately (same
-  pattern as Daily), then confirm in the background. When that confirmation is
-  the first saved medal on the series' last stage, the result sheet becomes
-  one Campaign finished screen (`game/campaign/finished-screen.js`). The raced
-  series fills its name, surface, stage count and medal total, so Creator
-  series use the same screen. It does not appear for an already finished
-  series, a ghost retry, a rejected run, another player, or a reply that
-  arrives after that finish sheet has gone. If standings are open, it waits
-  until the player comes back to the finish. Challenge finishes do not
+  pattern as Daily), then confirm in the background. A submitted medal on an
+  unfinished series' designated final stage reserves a disabled Results in place of Home/Next
+  from the first render. Canonical confirmation enables that same button; the result sheet
+  stays visible until the player presses it to open the Campaign finished screen
+  (`game/campaign/finished-screen.js`). A late confirmation can also add Results to
+  an open retry result for that stage. The raced
+  series fills its name, four best-stage medal counts (Bronze, Silver, Gold and
+  Author) and the existing weighted medal total, with a
+  centered player portrait/name from existing player/Devvit identity, so
+  Creator series use the same screen. Its View Campaign opens the Campaign
+  series list even with one live series. View Series opens the completed series
+  in Tracks. The same **Results** label reopens the saved summary from a replay
+  of an already completed final stage, without replaying its celebration;
+  earlier-stage replays keep their ordinary actions.
+  A pending valid final-stage queue entry also reserves Results on a retry.
+  Enabled Results never comes from unconfirmed progress, another player, or a reply that
+  arrives while the player is racing or has left the finish. If standings are
+  open, Results is updated on the underlying result; returning never opens the
+  celebration automatically. Pressing Results rechecks the owner, open finish
+  context and current published endpoint, and consumes the ready action.
+  The summary includes **Total best time** and clickable **Overall place**, its
+  only aggregate leaderboard entry. The action column retains View Campaign,
+  View Series and Share Results without a refresh/retry button. `game/campaign/aggregate.js` sums saved
+  full-race PB milliseconds across every stage, requiring the final-stage medal
+  and valid times throughout. Required laps are already included in each PB.
+  The shared standings view uses the series title, pagination and player
+  highlight, with no stage rail, ghost or opponent-race actions. Back restores
+  the summary and Overall place focus without another celebration. The request
+  starts immediately when the summary opens. Rank stays withheld while historic
+  adoption reports `ready: false`, with retries backing off from 2 to 15 seconds;
+  failures retain the completion and total and retry automatically. Late replies
+  must still match the owner, series endpoint and active summary/standings view.
+  The red **Share Results** action sits last and uses the shared preview/confirmation
+  dialog. `POST /api/campaign/share/preview` reads the signed-in player's saved
+  progress and reuses the finished-screen model for the name and highest-medal
+  distribution. Its ten-minute token binds the shown title/medals to the player
+  and community. `POST /api/campaign/share/confirm` accepts only that token,
+  rechecks completion, and publishes the approved snapshot.
+  `src/server/campaign/campaign-share.ts` publishes
+  a player-authored `campaign-finished` post through the existing Campaign
+  entrypoint. The poster includes **Overall place** (`#rank / finishers`) when
+  the aggregate board is ready at preview time. An accepted race refreshes that
+  post's medal counts, place and plain-text backup from the same finished-screen
+  tally and the current board. A place is left unchanged while ranking is not
+  ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
+  saved race still stands; opening that Campaign again tries the same post, as
+  does the next accepted race. Its **Play Campaign** carries the exact series ID into startup and
+  selects the viewer's own last unlocked stage. Cold Creator IDs survive until
+  their catalog arrives; unavailable series return an error instead of falling
+  back to Numbers. A durable pre-submit claim prevents duplicate posts after an
+  uncertain Reddit reply; retries recover the original post. The existing avatar
+  cache is shared through `src/server/player/reddit-avatar.ts` with its podium
+  export retained. See [Campaign finish and sharing](./campaign-finished-screen-investigation-2026-10-04.md).
+  Challenge finishes do not
   stamp YOU WON from the phone: a claimed beat stays pending until the first
   submit body, which is the official beat / not beat and can turn Brag on. A
   local loss or tie can still settle on that sheet immediately. Origin place
@@ -451,6 +508,24 @@ flowchart LR
   revision commits together; bootstrap repairs retained strict entries whose
   rank is missing. Signed-in progress is permanent. Campaign records do
   not share Daily keys or expiry policy.
+- `src/server/campaign/campaign-aggregate-store.ts` maintains one permanent
+  sorted-set board per sealed series (`campaign:<series>:aggregate:v1:*`). Its
+  score and revision commit in the same owned transaction as Campaign progress,
+  including repaired faster stage PBs and guest/account merge; guest discard,
+  retirement and inactivity cleanup remove the derived row. The authenticated
+  `GET /api/campaign/aggregate` repairs the caller's saved evidence and admits
+  only finishers with a complete aggregate. It returns the total, current rank,
+  count and paginated rows, using the existing display-name rules and a
+  revision-keyed ten-second shared page cache. Historic adoption scans the final
+  stage's entry hash with a persisted cursor and reconciles at most ten
+  candidates per invocation. HSCAN overflow and busy/transfer candidates remain
+  queued for retry. Adoption starts immediately; legacy `notBeforeMs` wait
+  fields are ignored without losing cursor/retry work. Overall place reads
+  Loading only while actual request/inventory work remains.
+  `server-app.ts` includes these bounded batches in the existing
+  `runRacedListFill` scheduler, so adoption does not depend on finishers opening
+  the summary. The moderator storage inventory includes the new keys. See
+  [Campaign aggregate implementation](./campaign-aggregate-leaderboard-investigation-2026-10-05.md).
 - `src/server/head-to-head-*` owns verified-result source resolution,
   isolated duel results, custom-post idempotency, and the three-new-posts per
   track/player/subreddit/UTC-day limit. New custom posts run as the signed-in
@@ -717,8 +792,11 @@ These client-facing routes are registered under `src/server/routes/`:
 - `/api/campaign/bootstrap`
 - `/api/campaign/start`
 - `/api/campaign/snapshot`
+- `/api/campaign/aggregate`
 - `/api/campaign/submit`
 - `/api/campaign/pb-ghost`
+- `/api/campaign/share/preview`
+- `/api/campaign/share/confirm`
 - `/api/head-to-head`
 - `/api/head-to-head/preview`
 - `/api/head-to-head/create`
@@ -825,6 +903,9 @@ These are useful, but they are not on the critical player path:
   Both reuse `getDrawnCar()` without player customization options: static
   artwork in the editor, animated artwork in Test Drive. Tarmac uses Formula
   here; the existing player and poster stock defaults remain unchanged.
+  Test Drive uses `RaceHud` and the shared start timing in
+  `game/race/start-timing.js` for the three red lights and GO on entry/Reset.
+  Its fixed-step loop holds the car and lap clock until GO, matching the race.
 - `site/`, `tools/build-site.js`, `tools/mapmaker/cloud-maps.js`
   The miniracer.club Cloudflare Pages project: the promo page (`LP/`) and the
   online Mapmaker at `/mapmaker`, with private workspaces selected by issued
@@ -838,7 +919,13 @@ These are useful, but they are not on the critical player path:
   fencing rejects stale tabs after password switching. Online starts with
   only owned maps or a blank editor, using the shared current editing source.
   Online **Save** stores maps in `MAPMAKER_KV`; the local Mapmaker opens them and
-  deletes the cloud copy once it saves one into the game. See
+  deletes the cloud copy once it saves one into the game. The original password
+  in `.env.local` lists all workspace maps through `scope=all`; website cookies
+  and issued passwords cannot use that import scope. Local picker/recovery
+  identities include the source workspace, and cleanup targets only that copy.
+  Same-name imports get distinct local names without replacing existing work.
+  Local editing pauses during save/cleanup so its acknowledgement cannot mark
+  another map saved. See
   `docs/track-authoring.md`, **Online Mapmaker**.
 - `tools/runner.*`
   Bot checks for a saved track, at `tools/runner.html`.

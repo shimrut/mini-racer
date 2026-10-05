@@ -1,4 +1,5 @@
 import { CONFIG } from "../config.js";
+import { START_LIGHT_DELAYS_MS, START_GO_DELAY_MS, START_GO_MESSAGE_MS } from './start-timing.js';
 import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import {
   ageSparkParticles,
@@ -409,19 +410,19 @@ export const raceEngineMethods = {
       setTimeout(() => {
         this.hud.turnOnCountdownLight(0);
         this.carEffectsAudio?.scheduleCountdownLight?.();
-      }, 100),
+      }, START_LIGHT_DELAYS_MS[0]),
     );
     this.activeTimers.push(
       setTimeout(() => {
         this.hud.turnOnCountdownLight(1);
         this.carEffectsAudio?.scheduleCountdownLight?.();
-      }, 433),
+      }, START_LIGHT_DELAYS_MS[1]),
     );
     this.activeTimers.push(
       setTimeout(() => {
         this.hud.turnOnCountdownLight(2);
         this.carEffectsAudio?.scheduleCountdownLight?.();
-      }, 767),
+      }, START_LIGHT_DELAYS_MS[2]),
     );
 
     this.activeTimers.push(
@@ -453,10 +454,10 @@ export const raceEngineMethods = {
               if (ghostStart.noticeNeeded) {
                 this.hud.showGhostUnavailableNotice?.();
               }
-            }, 300),
+            }, START_GO_MESSAGE_MS),
           );
         });
-      }, 1100),
+      }, START_GO_DELAY_MS),
     );
   },
 

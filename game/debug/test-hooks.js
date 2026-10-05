@@ -53,6 +53,17 @@ export function renderGameToText(engine) {
         }
       : null,
     campaignRaceId: engine.activeCampaignStage?.raceId || null,
+    campaignResults: engine.modal?.isCampaignFinishedViewActive?.() ? {
+      seriesId: engine._campaignAggregateSession?.screen?.seriesId || null,
+      totalBestTime: document.getElementById('campaign-finished-time')?.textContent || null,
+      overallPlace: document.getElementById('campaign-finished-rank')?.textContent || null,
+    } : null,
+    campaignLeaderboard: engine.modal?.isRunsViewActive?.()
+      && engine.modal?._modalRunsPayload?.scoreboardMode === 'campaign-aggregate' ? {
+        seriesId: engine._campaignAggregateSession?.screen?.seriesId || null,
+        playerRank: engine.modal._modalRunsPayload.scoreboardSnapshot?.playerRank ?? null,
+        totalCount: engine.modal._modalRunsPayload.scoreboardSnapshot?.totalCount ?? 0,
+      } : null,
     playerChallengeId: engine.activeHeadToHead?.challengeId || null,
     raceComparison: engine.raceComparisonTarget
       ? {

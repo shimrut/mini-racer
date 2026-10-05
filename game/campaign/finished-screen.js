@@ -1,40 +1,44 @@
-import { formatSeriesMedals, getSeriesKerbColors } from '../lobby/campaign-series-picker.js';
+import { formatSeriesMedals } from '../lobby/campaign-series-picker.js';
+import { getCampaignAggregateTotalTimeMs } from './aggregate.js';
 import {
     countCampaignMedals,
     getCampaignSeries,
     isCampaignSeriesFinished,
 } from './manifest.js';
-import { getCampaignSeriesSurfaceLabel } from './series-surfaces.js';
+
+const STAGE_MEDAL_TIERS = new Set(['author', 'gold', 'silver', 'bronze']);
+const MEDAL_TIER_ORDER = ['author', 'gold', 'silver', 'bronze'];
 
 // One screen for every campaign. The series that was just finished fills the
-// title, surface, stage count and medal total. A series the game does not
-// currently publish, or one that is not finished, has no screen.
+// title, the medal of each stage and the medal total. A series the game does
+// not currently publish, or one that is not finished, has no screen.
 export function buildCampaignFinishedScreen(seriesId, resultsByRaceId = {}) {
     const series = getCampaignSeries(seriesId);
     if (!series || !isCampaignSeriesFinished(seriesId, resultsByRaceId)) return null;
 
     const stageCount = series.stages.length;
     const medalCount = countCampaignMedals(resultsByRaceId, seriesId);
-    const surfaceLabel = getCampaignSeriesSurfaceLabel(series);
-    const mastered = series.stages.every((stage) => {
+    const medals = series.stages.map((stage) => {
         const medal = resultsByRaceId?.[stage.raceId]?.medal;
-        return medal === 'gold' || medal === 'author';
+        return {
+            stageNumber: stage.stageNumber,
+            tier: STAGE_MEDAL_TIERS.has(medal) ? medal : null,
+        };
     });
-    const ground = series.grounds?.[0] ?? series.ground;
+    const medalDistribution = Object.fromEntries(MEDAL_TIER_ORDER.map((tier) => [
+        tier, medals.filter((medal) => medal.tier === tier).length,
+    ]));
 
     return {
         seriesId: series.id,
-        seriesName: series.name,
-        eyebrow: 'Campaign finished',
+        finalStageId: series.finalStageId,
+        totalTimeMs: getCampaignAggregateTotalTimeMs(series.id, resultsByRaceId),
+        stageCount,
+        medalDistribution,
         title: series.name,
-        summary: mastered
-            ? `${series.name} is finished, with gold or better on every stage.`
-            : `${series.name} is finished.`,
-        kerb: getSeriesKerbColors(ground),
-        facts: [
-            { label: 'Stages', value: String(stageCount) },
-            { label: 'Medals', value: formatSeriesMedals({ medalCount, stageCount }) },
-            { label: 'Surface', value: surfaceLabel },
-        ],
+        status: 'Complete',
+        medals,
+        bestTier: MEDAL_TIER_ORDER.find((tier) => medals.some((medal) => medal.tier === tier)) ?? null,
+        medalTotal: formatSeriesMedals({ medalCount, stageCount }),
     };
 }

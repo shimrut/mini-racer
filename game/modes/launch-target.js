@@ -6,6 +6,11 @@ function normalizeTarget(value) {
     return typeof value === 'string' && VALID_TARGETS.has(value) ? value : null;
 }
 
+function campaignSeriesTarget(mode, value) {
+    const seriesId = typeof value === 'string' ? value.trim() : '';
+    return mode === 'campaign' && seriesId ? { seriesId } : {};
+}
+
 function readQueryTarget(root) {
     try {
         return normalizeTarget(new URLSearchParams(root?.location?.search || '').get('mode'));
@@ -21,6 +26,7 @@ function readExplicitPostTarget(root) {
     const fixedTargetByPostType = {
         'daily-launcher': 'daily',
         'campaign-launcher': 'campaign',
+        'campaign-finished': 'campaign',
         'lobby-launcher': 'home',
     };
     const fixedTarget = Object.prototype.hasOwnProperty.call(
@@ -29,7 +35,11 @@ function readExplicitPostTarget(root) {
     )
         ? fixedTargetByPostType[postData.postType]
         : null;
-    if (fixedTarget) return { mode: fixedTarget, challengeId: null };
+    if (fixedTarget) return {
+        mode: fixedTarget,
+        challengeId: null,
+        ...campaignSeriesTarget(fixedTarget, postData.postType === 'campaign-finished' ? postData.seriesId : null),
+    };
 
     if (postData.postType !== 'mode-launcher') return null;
     const mode = normalizeTarget(postData.launchMode);
@@ -65,6 +75,7 @@ function readStoredTarget(root) {
             challengeId: mode === 'challenge' && typeof parsed.challengeId === 'string'
                 ? parsed.challengeId
                 : null,
+            ...campaignSeriesTarget(mode, parsed.seriesId),
         };
     } catch {
         return null;
@@ -82,6 +93,7 @@ function clearStoredTarget(root) {
 
 export function requestGameLaunchTarget(mode, {
     challengeId = null,
+    seriesId = null,
     root = globalThis,
 } = {}) {
     const target = normalizeTarget(mode);
@@ -92,6 +104,7 @@ export function requestGameLaunchTarget(mode, {
             challengeId: target === 'challenge' && typeof challengeId === 'string'
                 ? challengeId
                 : null,
+            ...campaignSeriesTarget(target, seriesId),
             expiresAt: Date.now() + LAUNCH_TARGET_TTL_MS,
         }));
         return true;
@@ -112,7 +125,7 @@ function peekStoredRedirectTarget(root) {
         const mode = normalizeTarget(parsed.mode);
         if (mode !== 'campaign' && mode !== 'home') return null;
         storage.removeItem(LAUNCH_TARGET_KEY);
-        return { mode, challengeId: null };
+        return { mode, challengeId: null, ...campaignSeriesTarget(mode, parsed.seriesId) };
     } catch {
         return null;
     }

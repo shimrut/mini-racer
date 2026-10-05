@@ -55,6 +55,7 @@ const { BUILT_IN_TRACKS, TRACKS } = await import('../game/track/tracks.js');
 const { getTrackDefinitionIdentity } = await import('../game/track/definition-identity.js');
 const { getRaceMedalThresholds } = await import('../game/medals/medal-timing.js');
 const { createTrackFingerprint } = await import('../src/server/competition/pb-ghost-trace.ts');
+const { getTrackCompletenessError, isBuiltInTrackComplete, readCompleteTrack } = await import('../src/server/tracks/track-readiness.ts');
 
 const noon = new Date('2030-03-10T12:00:00.000Z');
 
@@ -113,6 +114,32 @@ describe('exact copies of app tracks', () => {
         expect(createTrackFingerprint(rounder.track)).toBe(record.fingerprint);
         expect(matchesAppTrack(rounder)).toBe(false);
         expect(matchesAppTrack({ ...record, medalRow: { ...record.medalRow, gold: record.medalRow.gold + 0.01 } })).toBe(false);
+    });
+
+    it('admits the production Slingshot Run from the app and from a normalized stored copy', async () => {
+        const record = buildLockedTrackCopy('slingshotRun', { username: 'Mod', reason: 'daily', now: noon });
+        expect(BUILT_IN_TRACKS.slingshotRun.drawWidth).toBe(3.85);
+        expect(record.track).not.toHaveProperty('drawWidth');
+        expect(record.track).not.toHaveProperty('lineSmoothing');
+        expect(getTrackCompletenessError(record.track, [], record.medalRow)).toContain('out of order');
+        expect(isBuiltInTrackComplete(record.key)).toBe(true);
+        expect((await readCompleteTrack(record.key)).stored).toBeNull();
+
+        await tracks.saveLockedTrackCopy(record);
+        expect(tracks.summarizeStoredTrack(record).ready).toBe(true);
+        expect((await readCompleteTrack(record.key)).stored).toEqual(record);
+    });
+
+    it('checks edited Slingshot Run geometry, targets and unfinished work even with the same app key', () => {
+        const record = buildLockedTrackCopy('slingshotRun', { username: 'Mod', reason: 'daily', now: noon });
+        const edited = { ...record.track, cornerRadius: record.track.cornerRadius + 1 };
+        expect(createTrackFingerprint(edited)).toBe(record.fingerprint);
+        expect(getTrackCompletenessError(edited, [], record.medalRow, record.key)).toContain('out of order');
+        expect(getTrackCompletenessError(record.track, [], { ...record.medalRow, gold: record.medalRow.gold + 0.01 }, record.key))
+            .toContain('out of order');
+        expect(getTrackCompletenessError(record.track, [{ x: 1, y: 1 }], record.medalRow, record.key)).toBe('Finish the road.');
+        expect(getTrackCompletenessError(record.track, [], { ...record.medalRow, author: null }, record.key)).not.toBeNull();
+        expect(getTrackCompletenessError(record.track, [], record.medalRow, 'customSlingshot')).toContain('out of order');
     });
 });
 

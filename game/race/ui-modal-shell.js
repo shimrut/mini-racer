@@ -11,6 +11,8 @@ import {
     shouldCelebrateMedalTier,
     renderChallengeFinishHero,
 } from '../medals/medals.js';
+import { createMedalIconSvg } from '../medals/medal-icon.js';
+import { applyAvatar } from '../ui/avatar.js';
 import {
     closeModalElement,
     closeModalElementInstantly,
@@ -36,6 +38,7 @@ function isButtonElement(node) {
 
 const LEADERBOARD_SWIPE_MIN_DISTANCE_PX = 56;
 const LEADERBOARD_SWIPE_AXIS_RATIO = 1.25;
+const CAMPAIGN_FINISHED_MEDAL_TIERS = ['bronze', 'silver', 'gold', 'author'];
 
 function getSingleTouchPoint(touches) {
     if (!touches || touches.length !== 1) return null;
@@ -384,7 +387,7 @@ export class ModalShell {
         const preferred = this._modalKind === 'pause'
             ? this.modalResumeBtn
             : this._modalKind === 'campaign-finished'
-                ? this.campaignFinishedPrimaryBtn
+                ? this.campaignFinishedShareBtn
                 : this._modalKind === 'win'
                     ? winPreferred
                     : null;
@@ -528,6 +531,8 @@ export class ModalShell {
     get modalCampaignFinishedView() { return document.getElementById('modal-campaign-finished-view'); }
     get campaignFinishedPrimaryBtn() { return document.getElementById('campaign-finished-primary'); }
     get campaignFinishedSecondaryBtn() { return document.getElementById('campaign-finished-secondary'); }
+    get campaignFinishedShareBtn() { return document.getElementById('campaign-finished-share'); }
+    get campaignFinishedRankBtn() { return document.getElementById('campaign-finished-rank-button'); }
     get combinedMenuBtn() { return document.getElementById('combined-menu-btn'); }
     get combinedNextBtn() { return document.getElementById('combined-next-btn'); }
     get combinedSettingsBtn() { return document.getElementById('combined-settings-btn'); }
@@ -640,13 +645,13 @@ export class ModalShell {
         }
     }
 
-    _challengeShareButtons(result, shareText) {
+    _challengeShareButtons(result, shareText, campaignFinished = false) {
         const buttons = [];
         if (typeof result?.postId === 'string' && result.postId.startsWith('t3_')) {
             const send = document.createElement('button');
             send.type = 'button';
             send.className = 'result-share-panel__button result-share-panel__button--primary';
-            send.textContent = 'Send Challenge';
+            send.textContent = campaignFinished ? 'Send Results' : 'Send Challenge';
             send.onclick = () => this._sendChallenge(result.postId, shareText);
             buttons.push(send);
         }
@@ -655,7 +660,7 @@ export class ModalShell {
             copy.type = 'button';
             copy.className = 'result-share-panel__button';
             copy.textContent = 'Copy Link';
-            copy.setAttribute('aria-label', 'Copy challenge link');
+            copy.setAttribute('aria-label', campaignFinished ? 'Copy results link' : 'Copy challenge link');
             copy.onclick = () => this._copyChallengeLink(copy, result.postUrl);
             buttons.push(copy);
         }
@@ -717,6 +722,9 @@ export class ModalShell {
         const enabled = visible
             && nextRace.enabled !== false
             && typeof nextRace.action === 'function';
+        if (this.combinedMenuBtn) {
+            this.combinedMenuBtn.hidden = Boolean(nextRace?.replaceMenu);
+        }
         button.hidden = !visible;
         button.style.display = visible ? '' : 'none';
         actions?.classList?.toggle?.('combined-actions--with-next', visible);
@@ -745,6 +753,11 @@ export class ModalShell {
         if (!button || button.hidden) return false;
         button.disabled = !this._combinedNextRaceEnabled || !this._combinedNextRaceReady;
         return true;
+    }
+
+    // Shows, changes or (with null) removes Next after the result screen is open.
+    setCombinedNextRace(nextRace) {
+        this._syncCombinedNextRace(nextRace);
     }
 
     setCombinedNextRaceEnabled(enabled) {
@@ -943,6 +956,9 @@ export class ModalShell {
         const panel = this.modal?.querySelector?.('.result-share-panel');
         const scrollTop = Number(panel?.dataset?.savedScrollTop);
         const restoreFocusElement = panel?._restoreFocusElement || null;
+        if (panel?._shareTriggerButton && !['posting', 'settled'].includes(panel.dataset.shareState)) {
+            panel._shareTriggerButton.disabled = false;
+        }
         resetMenuKeyboardState(this._shareMenuKeyboardState, this.getSharePanelButtons(), {
             container: this.getSharePanelActionsContainer(),
             focusPreferred: false,
@@ -959,22 +975,26 @@ export class ModalShell {
     _showShareOutcome(panel, triggerButton, result, {
         bragged = false,
         commented = false,
+        campaignFinished = false,
         keepShareAvailable = false,
         noteText = '',
         shareText = '',
     } = {}) {
+        const scrim = panel.closest('.result-share-panel');
+        if (scrim) scrim.dataset.shareState = 'settled';
         const isChallengeCreate = Boolean(result?.postUrl) && !result?.commentText;
-        const isChallengeRepeat = (isChallengeCreate && result?.status === 'already_created')
+        const isChallengeRepeat = (isChallengeCreate && ['already_created', 'already_shared'].includes(result?.status))
             || result?.status === 'already_commented';
         panel.replaceChildren();
         const title = document.createElement('h3');
         title.className = 'result-share-panel__title';
         title.textContent = isChallengeRepeat
             ? 'Already posted'
-            : isChallengeCreate ? 'Challenge created' : commented ? 'Comment posted' : 'Shared';
+            : campaignFinished ? 'Results shared' : isChallengeCreate ? 'Challenge created' : commented ? 'Comment posted' : 'Shared';
         const copy = document.createElement('blockquote');
         copy.className = 'result-share-panel__copy';
         copy.textContent = noteText
+            || (campaignFinished ? shareText || result?.title || 'Your Campaign results are already shared.' : '')
             || result?.commentText
             || (isChallengeRepeat
                 ? 'This time is already up.'
@@ -988,7 +1008,7 @@ export class ModalShell {
         done.className = 'result-share-panel__button result-share-panel__button--dismiss';
         done.textContent = 'Done';
         done.onclick = () => this._closeSharePanel();
-        const shareButtons = isChallengeCreate ? this._challengeShareButtons(result, shareText) : [];
+        const shareButtons = isChallengeCreate ? this._challengeShareButtons(result, shareText, campaignFinished) : [];
         const buttons = [...shareButtons, done];
         const preferredIndex = Math.max(0, buttons.findIndex((button) => (
             button.classList.contains('result-share-panel__button--primary')
@@ -996,7 +1016,7 @@ export class ModalShell {
         actions.append(...buttons);
         panel.append(title, copy, actions);
         triggerButton.disabled = !keepShareAvailable;
-        if (this._isPostedConcede()) {
+        if (commented && this._isPostedConcede()) {
             void this._offerPostedConcedeNextChallenge(triggerButton);
             resetMenuKeyboardState(this._shareMenuKeyboardState, buttons, {
                 preferredIndex,
@@ -1081,6 +1101,7 @@ export class ModalShell {
     async _startShare(request, triggerButton, hostView) {
         if (!triggerButton || !hostView) return;
         const isChallenge = request?.kind === 'head-to-head';
+        const isCampaignFinished = request?.kind === 'campaign-finished';
         const isBrag = request?.kind === 'challenge-brag';
         const isChallengeComment = request?.kind === 'challenge-comment';
         const isDailyShare = isChallenge
@@ -1092,10 +1113,12 @@ export class ModalShell {
         this._closeSharePanel?.({ restoreScroll: false });
         const scrim = document.createElement('section');
         scrim.className = 'result-share-panel';
+        scrim._shareTriggerButton = triggerButton;
+        scrim._restoreFocusElement = triggerButton;
         scrim.setAttribute('role', 'dialog');
         scrim.setAttribute(
             'aria-label',
-            isChallenge
+            isCampaignFinished ? 'Share Campaign results' : isChallenge
                 ? 'Create player challenge'
                 : isBrag
                     ? 'Brag about this win'
@@ -1107,7 +1130,7 @@ export class ModalShell {
         scrim.appendChild(panel);
         const title = document.createElement('h3');
         title.className = 'result-share-panel__title';
-        title.textContent = isChallenge
+        title.textContent = isCampaignFinished ? 'Share your results' : isChallenge
             ? 'Challenge other racers'
             : isBrag
                 ? 'Brag about your win'
@@ -1138,7 +1161,7 @@ export class ModalShell {
 
         const username = this.getRedditUsername?.();
         if (!username) {
-            status.textContent = isChallenge
+            status.textContent = isCampaignFinished ? 'Sign in to Reddit to share your results.' : isChallenge
                 ? 'Sign in to Reddit to challenge other racers.'
                 : isBrag
                     ? 'Sign in to Reddit to brag about this win.'
@@ -1159,6 +1182,7 @@ export class ModalShell {
             : 'Preparing your verified result…';
         try {
             const response = await this.previewShare(request);
+            if (!scrim.isConnected) return;
             const body = response?.body || {};
             if (
                 body.status === 'already_shared'
@@ -1169,6 +1193,7 @@ export class ModalShell {
                 this._showShareOutcome(panel, triggerButton, body, {
                     bragged: isBrag,
                     commented: isChallengeComment,
+                    campaignFinished: isCampaignFinished,
                     keepShareAvailable: isDailyShare,
                 });
                 return;
@@ -1183,7 +1208,7 @@ export class ModalShell {
             disclosureUser.className = 'result-share-panel__accent';
             disclosureUser.textContent = `u/${body.username}`;
             disclosure.append(
-                isChallenge
+                isCampaignFinished ? 'Post these results as ' : isChallenge
                     ? 'Create this challenge post as '
                     : 'Post this comment as ',
                 disclosureUser,
@@ -1191,9 +1216,12 @@ export class ModalShell {
             );
             const copy = document.createElement('blockquote');
             copy.className = 'result-share-panel__copy';
-            copy.textContent = isChallenge
-                ? (body.title || 'Create a verified Head to Head.')
-                : body.commentText;
+            copy.textContent = isCampaignFinished
+                ? [body.title, body.medalSummary, body.placeSummary].filter(Boolean).join('\n')
+                : isChallenge
+                    ? (body.title || 'Create a verified Head to Head.')
+                    : body.commentText;
+            if (isCampaignFinished) copy.style.whiteSpace = 'pre-line';
             const actions = document.createElement('div');
             actions.className = 'result-share-panel__actions';
             const cancelReady = cancel.cloneNode(true);
@@ -1205,15 +1233,18 @@ export class ModalShell {
             const confirm = document.createElement('button');
             confirm.type = 'button';
             confirm.className = 'result-share-panel__button result-share-panel__button--primary';
-            confirm.textContent = isChallenge ? 'Create Challenge' : 'Post Comment';
+            confirm.textContent = isCampaignFinished ? 'Post Results' : isChallenge ? 'Create Challenge' : 'Post Comment';
             confirm.onclick = async () => {
+                scrim.dataset.shareState = 'posting';
                 confirm.disabled = true;
                 cancelReady.disabled = true;
                 confirm.textContent = 'Posting…';
                 try {
                     const shareToken = isChallenge ? body.challengeToken : body.shareToken;
                     const confirmed = await this.confirmShare(shareToken, request);
+                    if (!scrim.isConnected) return;
                     if (confirmed?.body?.status === 'comment_unconfirmed') {
+                        scrim.dataset.shareState = 'settled';
                         markCommentSpent('unconfirmed');
                         confirm.remove();
                         cancelReady.disabled = false;
@@ -1251,10 +1282,13 @@ export class ModalShell {
                     this._showShareOutcome(panel, triggerButton, confirmed.body, {
                         bragged: isBrag,
                         commented: isChallengeComment,
+                        campaignFinished: isCampaignFinished,
                         keepShareAvailable: isDailyShare,
-                        shareText: isChallenge ? body.title : '',
+                        shareText: isChallenge || isCampaignFinished ? body.title : '',
                     });
                 } catch (error) {
+                    if (!scrim.isConnected) return;
+                    scrim.dataset.shareState = 'ready';
                     confirm.disabled = false;
                     cancelReady.disabled = false;
                     confirm.textContent = 'Try Again';
@@ -1270,6 +1304,7 @@ export class ModalShell {
                 focusPreferred: true,
             });
         } catch (error) {
+            if (!scrim.isConnected) return;
             triggerButton.disabled = false;
             status.textContent = error?.message || 'Could not prepare this result for sharing.';
             status.classList.add('is-error');
@@ -1334,34 +1369,39 @@ export class ModalShell {
         this._hidePauseTrackPreview();
         this._modalKind = 'campaign-finished';
         this._modalRunsPayload = null;
+        this._runsReturnView = null;
+        this._savedModalState = null;
+        this._campaignFinishedState = { screen, options };
+        this.modalCampaignFinishedView.classList.toggle('campaign-finished--quiet', options.celebrate === false);
         this.modal.classList.remove('modal--win', 'modal--pause');
         this.modal.setAttribute('aria-labelledby', 'campaign-finished-title');
 
-        const eyebrow = document.getElementById('campaign-finished-eyebrow');
-        const title = document.getElementById('campaign-finished-title');
-        const summary = document.getElementById('campaign-finished-summary');
-        const facts = document.getElementById('campaign-finished-facts');
-        const kerb = document.getElementById('campaign-finished-kerb');
-        if (eyebrow) eyebrow.textContent = screen.eyebrow || '';
-        if (title) title.textContent = screen.title || '';
-        if (summary) summary.textContent = screen.summary || '';
-        if (kerb) {
-            kerb.style.setProperty('--series-kerb-a', screen.kerb?.a || '');
-            kerb.style.setProperty('--series-kerb-b', screen.kerb?.b || '');
+        const series = document.getElementById('campaign-finished-series');
+        const status = document.getElementById('campaign-finished-status');
+        const medals = document.getElementById('campaign-finished-medals');
+        const total = document.getElementById('campaign-finished-total');
+        const playerName = document.getElementById('campaign-finished-player-name');
+        if (playerName) playerName.textContent = options.playerUsername || 'Guest racer';
+        applyAvatar(document.getElementById('campaign-finished-avatar'), options.playerAvatarUrl);
+        if (series) series.textContent = screen.title || '';
+        if (status) status.textContent = screen.status || '';
+        if (total) total.textContent = screen.medalTotal || '';
+        if (medals) {
+            medals.parentElement?.style.setProperty('--campaign-finished-medal-count', String(CAMPAIGN_FINISHED_MEDAL_TIERS.length));
+            medals.replaceChildren(...CAMPAIGN_FINISHED_MEDAL_TIERS.map((tier, index) => {
+                const count = screen.medalDistribution?.[tier] ?? 0;
+                const item = document.createElement('li');
+                item.className = 'campaign-finished__medal';
+                item.dataset.campaignMedal = tier;
+                item.setAttribute('aria-label', `${count} ${tier} ${count === 1 ? 'medal' : 'medals'}`);
+                item.style.setProperty('--campaign-finished-medal-index', String(index));
+                const icon = createMedalIconSvg(tier, { centerText: String(count), showEmblem: false });
+                icon.setAttribute('aria-hidden', 'true');
+                item.append(icon);
+                return item;
+            }));
         }
-        if (facts) {
-            facts.replaceChildren();
-            for (const fact of screen.facts || []) {
-                const row = document.createElement('div');
-                row.className = 'campaign-finished__fact';
-                const label = document.createElement('dt');
-                label.textContent = fact.label;
-                const value = document.createElement('dd');
-                value.textContent = fact.value;
-                row.append(label, value);
-                facts.append(row);
-            }
-        }
+        if (screen.bestTier && options.celebrate !== false) this.playUnlockSound?.(screen.bestTier);
 
         const syncAction = (button, label, action) => {
             if (!button) return;
@@ -1372,12 +1412,46 @@ export class ModalShell {
             button.setAttribute('aria-label', label);
             this._bindClickAction(button, action);
         };
-        syncAction(this.campaignFinishedPrimaryBtn, options.primaryActionLabel || 'Campaign', options.primaryAction);
-        syncAction(this.campaignFinishedSecondaryBtn, options.secondaryActionLabel || 'Improve', options.secondaryAction);
+        syncAction(this.campaignFinishedPrimaryBtn, options.primaryActionLabel || 'View Campaign', options.primaryAction);
+        syncAction(this.campaignFinishedSecondaryBtn, options.secondaryActionLabel || 'View Series', options.secondaryAction);
+        this._bindClickAction(this.campaignFinishedRankBtn, options.leaderboardAction);
+        this.updateCampaignFinishedAggregate(null, { isLoading: typeof options.leaderboardAction === 'function' });
+        const shareButton = this.campaignFinishedShareBtn;
+        syncAction(shareButton, 'Share Results', options.shareRequest
+            ? () => void this._startShare(options.shareRequest, shareButton, this.modalCampaignFinishedView)
+            : null);
+        if (shareButton) {
+            shareButton.disabled = false;
+        }
 
         this._setActiveView(this.modalCampaignFinishedView);
         openModalElement(this.modal, () => this.modal.classList.add('active'));
         scheduleAfterModalPaint(() => this.activateModalFocusTrap(this.modal));
+    }
+
+    isCampaignFinishedViewActive() {
+        return this.isModalActive() && this._modalKind === 'campaign-finished'
+            && this.modalCampaignFinishedView?.classList.contains('active-view') === true;
+    }
+
+    updateCampaignFinishedAggregate(snapshot, { isLoading = false, failed = false } = {}) {
+        const screen = this._campaignFinishedState?.screen;
+        if (!screen) return;
+        const time = document.getElementById('campaign-finished-time');
+        const rank = document.getElementById('campaign-finished-rank');
+        const totalMs = Number(snapshot?.totalTimeMs ?? screen.totalTimeMs);
+        if (time) time.textContent = totalMs > 0
+            ? this.content.formatTime(totalMs / 1000) : '—';
+        if (rank) {
+            rank.textContent = isLoading || snapshot?.ready === false ? 'Loading…' : failed ? 'Unavailable'
+                    : snapshot?.playerRank > 0 ? `#${snapshot.playerRank} / ${snapshot.totalCount}` : '—';
+            rank.setAttribute('aria-busy', String(isLoading || snapshot?.ready === false));
+        }
+        const button = this.campaignFinishedRankBtn;
+        if (button) {
+            button.disabled = isLoading || failed || snapshot?.ready !== true || !(snapshot?.playerRank > 0)
+                || typeof this._campaignFinishedState.options.leaderboardAction !== 'function';
+        }
     }
 
     showPauseResults(options = {}) {
@@ -1786,7 +1860,10 @@ export class ModalShell {
 
         const wasCombinedActive = this.modalCombinedView?.classList.contains('active-view');
         const wasMainActive = this.modalMainView?.classList.contains('active-view');
-        if (wasCombinedActive) {
+        if (this.isCampaignFinishedViewActive?.()) {
+            this._runsReturnView = 'campaign-finished';
+            this._savedModalState = { kind: 'campaign-finished' };
+        } else if (wasCombinedActive) {
             this._runsReturnView = 'combined';
             this._savedModalState = { kind: this._modalKind };
         } else if (wasMainActive) {
@@ -1956,6 +2033,15 @@ export class ModalShell {
         }
         this.configureRunsModalHeader?.();
 
+        if (this._runsReturnView === 'campaign-finished') {
+            this._modalKind = 'campaign-finished';
+            this.modal?.setAttribute('aria-labelledby', 'campaign-finished-title');
+            this.modalCampaignFinishedView?.classList.add('campaign-finished--quiet');
+            this._setActiveView(this.modalCampaignFinishedView);
+            scheduleAfterModalPaint(() => this.campaignFinishedRankBtn?.focus());
+            return;
+        }
+
         const isCombinedViewReturn = this._runsReturnView === 'combined'
             || this._savedModalState?.kind === 'win'
             || this._modalKind === 'win';
@@ -1970,9 +2056,6 @@ export class ModalShell {
         } else {
             this._setActiveView(this.modalMainView);
         }
-        const restored = this.onFinishViewRestored;
-        this.onFinishViewRestored = null;
-        restored?.();
     }
 
     isStandaloneRunsViewActive() {
@@ -2017,8 +2100,10 @@ export class ModalShell {
         if (this._modalKind === 'pause' && this.modalResumeBtn?.offsetParent !== null) {
             return this.modalResumeBtn;
         }
-        if (this._modalKind === 'campaign-finished' && this.campaignFinishedPrimaryBtn?.offsetParent !== null) {
-            return this.campaignFinishedPrimaryBtn;
+        if (this._modalKind === 'campaign-finished') {
+            return [this.campaignFinishedShareBtn, this.campaignFinishedPrimaryBtn].find((button) => (
+                button && !button.disabled && !button.hidden && button.offsetParent !== null
+            )) || null;
         }
         if (this._modalKind === 'win') {
             const winFocusCandidates = [
@@ -2112,7 +2197,9 @@ export class ModalShell {
         if (isEscape && this.isSharePanelOpen?.()) {
             event.preventDefault();
             event.stopPropagation();
-            this._closeSharePanel();
+            if (this.modal?.querySelector?.('.result-share-panel')?.dataset.shareState !== 'posting') {
+                this._closeSharePanel();
+            }
             return;
         }
         if (isEscape) {

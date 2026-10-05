@@ -186,7 +186,7 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     color: var(--maker-muted);
 }
 
-.creator-inline-field input {
+.creator-inline-field input:not([type="checkbox"]) {
     width: 4rem;
 }
 
@@ -445,4 +445,3 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
 .creator-launcher-card .creator-error {
     color: var(--maker-danger-text);
 }
-

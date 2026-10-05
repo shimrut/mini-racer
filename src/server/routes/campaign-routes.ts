@@ -12,8 +12,13 @@ export type CampaignRouteDependencies = {
     getServerCampaignBootstrap(input: Record<string, unknown>): Promise<ServiceResult>;
     startServerCampaignRace(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignSnapshot(input: Record<string, unknown>): Promise<ServiceResult>;
+    getServerCampaignAggregate(input: Record<string, unknown>): Promise<ServiceResult>;
     submitServerCampaignRun(input: Record<string, unknown>): Promise<ServiceResult>;
     getServerCampaignPbGhost(input: Record<string, unknown>): Promise<ServiceResult>;
+    previewServerCampaignResultsShare(input: Record<string, unknown>): Promise<ServiceResult>;
+    confirmServerCampaignResultsShare(input: Record<string, unknown>): Promise<ServiceResult>;
+    refreshServerCampaignResultsShare(input: Record<string, unknown>): Promise<void>;
+    readContextSubredditName(): string | null;
     // The published Creator series, and the placed stored tracks among these keys.
     describeStoredSeries?(): readonly { stages: readonly { trackKey: string }[] }[];
     describeStoredTracks?(trackKeys: string[]): unknown[];
@@ -60,12 +65,25 @@ export function registerCampaignRoutes(
     app.get('/api/campaign/bootstrap', async (req, res) => {
         try {
             const { playerId, guestToken, seriesId } = req.query ?? {};
-            send(res, await withStoredSeries(await dependencies.getServerCampaignBootstrap({
+            const result = await withStoredSeries(await dependencies.getServerCampaignBootstrap({
                 playerId,
                 guestToken,
                 seriesId,
                 redditUsername: dependencies.getRequestUsername(),
-            }), dependencies));
+            }), dependencies);
+            if (result.status === 200) {
+                try {
+                    await dependencies.refreshServerCampaignResultsShare?.({
+                        seriesId,
+                        redditUsername: dependencies.getRequestUsername(),
+                        subredditName: dependencies.readContextSubredditName?.(),
+                        onlyIfPending: true,
+                    });
+                } catch (error) {
+                    console.error('Campaign shared post could not be refreshed:', error);
+                }
+            }
+            send(res, result);
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign:', error);
             sendFailure(res, error, { error: 'Campaign bootstrap failed' });
@@ -102,13 +120,39 @@ export function registerCampaignRoutes(
         }
     });
 
+    app.get('/api/campaign/aggregate', async (req, res) => {
+        try {
+            const { seriesId, limit, offset, playerId, guestToken } = req.query ?? {};
+            send(res, await dependencies.getServerCampaignAggregate({
+                seriesId, limit: parseOptionalInteger(limit), offset: parseOptionalInteger(offset), playerId, guestToken,
+                redditUsername: dependencies.getRequestUsername(),
+            }));
+        } catch (error) {
+            console.error('Failed to load Mini Racer Campaign aggregate standings:', error);
+            sendFailure(res, error, { error: 'Campaign leaderboard failed' });
+        }
+    });
+
     app.post('/api/campaign/submit', async (req, res) => {
         try {
-            send(res, await dependencies.submitServerCampaignRun({
+            const redditUsername = dependencies.getRequestUsername();
+            const result = await dependencies.submitServerCampaignRun({
                 ...(req.body ?? {}),
-                redditUsername: dependencies.getRequestUsername(),
+                redditUsername,
                 requestRateLimitIdentity: dependencies.getRequestRateLimitIdentity(),
-            }));
+            });
+            if (result.status === 200 && (result.body as { accepted?: boolean })?.accepted === true) {
+                try {
+                    await dependencies.refreshServerCampaignResultsShare({
+                        raceId: req.body?.raceId,
+                        redditUsername,
+                        subredditName: dependencies.readContextSubredditName(),
+                    });
+                } catch (error) {
+                    console.error('Campaign race saved, but its shared post could not be refreshed:', error);
+                }
+            }
+            send(res, result);
         } catch (error) {
             console.error('Failed to submit Mini Racer Campaign run:', error);
             sendFailure(res, error, { accepted: false, error: 'Campaign submission failed' });
@@ -127,6 +171,32 @@ export function registerCampaignRoutes(
         } catch (error) {
             console.error('Failed to load Mini Racer Campaign ghost:', error);
             sendFailure(res, error, { error: 'Campaign ghost lookup failed' });
+        }
+    });
+
+    app.post('/api/campaign/share/preview', async (req, res) => {
+        try {
+            send(res, await dependencies.previewServerCampaignResultsShare({
+                seriesId: req.body?.seriesId,
+                redditUsername: dependencies.getRequestUsername(),
+                subredditName: dependencies.readContextSubredditName(),
+            }));
+        } catch (error) {
+            console.error('Failed to preview Mini Racer Campaign results:', error);
+            sendFailure(res, error, { status: 'share_failed', error: 'Could not prepare this result for sharing.' });
+        }
+    });
+
+    app.post('/api/campaign/share/confirm', async (req, res) => {
+        try {
+            send(res, await dependencies.confirmServerCampaignResultsShare({
+                shareToken: req.body?.shareToken,
+                redditUsername: dependencies.getRequestUsername(),
+                subredditName: dependencies.readContextSubredditName(),
+            }));
+        } catch (error) {
+            console.error('Failed to share Mini Racer Campaign results:', error);
+            sendFailure(res, error, { status: 'share_failed', error: 'Could not share this result.' });
         }
     });
 }

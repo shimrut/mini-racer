@@ -122,10 +122,13 @@ import {
     getServerCampaignBootstrap,
     getServerCampaignPbGhost,
     getServerCampaignSnapshot,
+    getServerCampaignAggregate,
+    runCampaignAggregateFills,
     startServerCampaignRace,
     submitServerCampaignRun,
 } from './campaign/campaign-store.js';
 import { createHeadToHeadService } from './head-to-head/head-to-head-service.js';
+import { previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } from './campaign/campaign-share.js';
 import {
     confirmHeadToHeadBrag,
     previewHeadToHeadBrag,
@@ -253,8 +256,13 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignBootstrap: (input) => getServerCampaignBootstrap(input),
         startServerCampaignRace: (input) => startServerCampaignRace(input),
         getServerCampaignSnapshot: (input) => getServerCampaignSnapshot(input),
+        getServerCampaignAggregate: (input) => getServerCampaignAggregate(input),
         submitServerCampaignRun: (input) => submitServerCampaignRun(input),
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
+        previewServerCampaignResultsShare: (input) => previewServerCampaignResultsShare(input),
+        confirmServerCampaignResultsShare: (input) => confirmServerCampaignResultsShare(input),
+        refreshServerCampaignResultsShare: (input) => refreshServerCampaignResultsShare(input),
+        readContextSubredditName,
         describeStoredSeries: resolveStoredSeriesForRequest,
         describeStoredTracks: describePlacedStoredTracks,
         refreshStoredCatalog: reloadPinnedCatalog,
@@ -312,7 +320,11 @@ function registerProductionRoutes(app: express.Application): void {
         ),
     });
     registerInternalRoutes(app, {
-        runRacedListFill: () => runRacedListFill(),
+        runRacedListFill: async () => {
+            const result = await runRacedListFill();
+            await runCampaignAggregateFills();
+            return result;
+        },
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

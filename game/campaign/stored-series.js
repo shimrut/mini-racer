@@ -2,7 +2,8 @@
 // app. The game and the server give the manifest the published ones before
 // they read the Campaign. A stored series with the name of an app series
 // replaces it. Each entry has the form of an entry in series.json:
-// { id, name, ground, grounds, stages: [{ trackKey, laps, requiredMedals }] }.
+// { id, name, ground, grounds, finalStageId, stages: [{ trackKey, laps, requiredMedals }] }.
+// finalStageId is null until the Creator publishes a designated endpoint.
 // grounds lists the actual published surfaces; ground is the legacy theme.
 // This file has no imports, so the manifest can use it.
 

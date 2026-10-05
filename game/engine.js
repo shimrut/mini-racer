@@ -12,7 +12,7 @@ import {
 } from "./player/progress-state.js";
 import { isVerificationQueueSubmissionBlocked } from "./scoreboard/verification-queue.js";
 import { getActivePlayerOwnerId } from "./player/active-owner.js";
-import { readSelectedCampaignSeriesId } from "./campaign/service.js";
+import { confirmCampaignResultsShare, previewCampaignResultsShare, readSelectedCampaignSeriesId } from "./campaign/service.js";
 import { createRunPolicy } from "./race/run-policy.js";
 import {
   detectDevicePerformance,
@@ -187,6 +187,9 @@ export class RealTimeRacer {
     this._campaignBootstrapPromise = null;
     this._campaignBootstrapRequestId = 0;
     this.launchTarget = launchTarget || resolveGameLaunchTarget();
+    this.campaignSeriesId = this.launchTarget.mode === 'campaign'
+      ? this.launchTarget.seriesId || null
+      : null;
     this.modeRuntimeController = modeRuntimeController;
     if (typeof ensureModeRuntime === "function") {
       this.ensureModeRuntime = ensureModeRuntime;
@@ -462,6 +465,12 @@ export class RealTimeRacer {
       getGarageUi: () => this.garage,
       getRedditUsername: () => this.redditUsername,
       previewShare: async (payload) => {
+        if (payload?.kind === "campaign-finished") {
+          if (payload.ownerPlayerId !== getActivePlayerOwnerId()) {
+            return { ok: false, body: { error: 'Your account changed. Reopen the Campaign to share.' } };
+          }
+          return previewCampaignResultsShare(payload);
+        }
         if (payload?.kind === "head-to-head") {
           return previewHeadToHead(payload);
         }
@@ -476,6 +485,12 @@ export class RealTimeRacer {
         return previewDailyChallengeShare(payload);
       },
       confirmShare: async (shareToken, request) => {
+        if (request?.kind === "campaign-finished") {
+          if (request.ownerPlayerId !== getActivePlayerOwnerId()) {
+            return { ok: false, body: { error: 'Your account changed. Reopen the Campaign to share.' } };
+          }
+          return confirmCampaignResultsShare(shareToken);
+        }
         if (request?.kind === "head-to-head") {
           const response = await createHeadToHead(shareToken, { replay: request.replay });
           if (response?.ok) this.applyCarUnlockSnapshot?.(response.body?.carUnlocks);
@@ -708,7 +723,10 @@ export class RealTimeRacer {
         bootstrap: this.campaignVerifiedBootstrap ?? this.campaignBootstrap,
         stage: this.activeCampaignStage,
       });
-      this.showCampaignLobby({ refresh: false, view: "series" });
+      this.showCampaignLobby({
+        refresh: false,
+        view: this.launchTarget?.seriesId ? "stages" : "series",
+      });
     } else if (mode !== "challenge") {
       this.showHomeLobby();
     }

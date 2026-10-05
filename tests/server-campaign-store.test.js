@@ -203,6 +203,40 @@ describe('Campaign server store', () => {
         expect(mockRedis.zAdd).not.toHaveBeenCalled();
     });
 
+    it('rejects an explicitly unavailable Campaign while omitted ID defaults to Numbers', async () => {
+        const { getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
+        const unknown = await getServerCampaignBootstrap({ seriesId: 'unpublished-v1', redditUsername: 'RaceFan' });
+        expect(unknown).toEqual({
+            status: 404,
+            body: { reason: 'campaign_unavailable', error: 'This Campaign is unavailable.' },
+        });
+        expect(mockRedis.get).not.toHaveBeenCalled();
+        const defaultCampaign = await getServerCampaignBootstrap({ redditUsername: 'RaceFan' });
+        expect(defaultCampaign.body.campaignId).toBe(CAMPAIGN_NUMBERS_SERIES_ID);
+    });
+
+    it('reads only the selected saved series for a completed Campaign share', async () => {
+        const { getCampaignResultsForSeries } = await import('../src/server/campaign/campaign-store.ts');
+        const playerId = 'reddit:racefan';
+        const resultsByRaceId = Object.fromEntries(NUMBERS_STAGES.map((stage) => [stage.raceId, {
+            raceId: stage.raceId,
+            trackKey: stage.trackKey,
+            lapCount: stage.lapCount,
+            rulesRevision: stage.rulesRevision,
+            bestTimeMs: 12_345,
+            medal: 'gold',
+            checkpointTimesSec: null,
+            updatedAt: '2026-10-05T06:00:00.000Z',
+        }]));
+        const playerHash = createHash('sha256').update(playerId, 'utf8').digest('base64url');
+        const key = `campaign:numbered-v1:progress:${playerHash}`;
+        strings.set(key, JSON.stringify({ campaignId: 'numbered-v1', resultsByRaceId }));
+        expect(await getCampaignResultsForSeries(playerId, 'numbered-v1')).toEqual(resultsByRaceId);
+        expect(mockRedis.get).toHaveBeenCalledExactlyOnceWith(key);
+        expect(mockRedis.hGet).not.toHaveBeenCalled();
+        expect(mockRedis.zCard).not.toHaveBeenCalled();
+    });
+
     it('keeps each player progress in its own key rather than one campaign hash', async () => {
         const { startServerCampaignRace, getServerCampaignBootstrap } = await import('../src/server/campaign/campaign-store.ts');
         await startServerCampaignRace({ raceId: 'numbered-v1-00', redditUsername: 'RaceFan' });

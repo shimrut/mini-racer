@@ -80,8 +80,8 @@ import {
     setPendingMedalText,
 } from './mapmaker/pending-medal-text.js';
 import {
-    MAPMAKER_ONLINE, cloudStorageKey, closeCloudSession, deleteCloudMap, getCloudGroundKeys,
-    listCloudMaps, loadCloudSession, saveCloudMap, verifyCloudSession,
+    MAPMAKER_ONLINE, cloudMapId, cloudStorageKey, closeCloudSession, deleteCloudMap, getCloudGroundKeys,
+    listCloudMaps, loadCloudSession, prepareCloudImport, saveCloudMap, verifyCloudSession,
 } from './mapmaker/cloud-maps.js';
 
 const PANEL_HIDDEN_KEY = 'mapmaker:panel-hidden:v1';
@@ -296,7 +296,7 @@ class MapmakerApp {
         this.baselineQualityCodesByKey = new Map();
         this.baselineGeometryByKey = new Map();
         this.trackPreviews = new TrackPreviews((key) => (key.startsWith(CLOUD_CARD_PREFIX)
-            ? this.cloudMaps.find((map) => CLOUD_CARD_PREFIX + map.trackKey === key)?.track
+            ? this.cloudMaps.find((map) => CLOUD_CARD_PREFIX + cloudMapId(map) === key)?.track
             : this.state.tracks[key]));
         this.hintText = '';
         this.statusMessage = null;
@@ -314,7 +314,7 @@ class MapmakerApp {
         this.creatorRefreshPending = false;
         this.creatorUsername = null;
         this.creatorPanels = null;
-        // Track key -> the key of its saved cloud map.
+        // Track key -> its saved cloud identity (workspace:key for local imports).
         this.cloudKeyByKey = new Map();
         // The local Mapmaker lists the cloud maps in the track picker.
         this.cloudMaps = [];
@@ -460,8 +460,8 @@ class MapmakerApp {
             originalTrackKey: this.state.originalTrackKeyByKey.get(key) ?? null,
             track: this.state.tracks[key],
             draftLoop: this.draftLoopsByKey.get(key) ?? [],
-            ...(MAPMAKER_ONLINE ? {
-                cloudKey: this.cloudKeyByKey.get(key) ?? null,
+            cloudKey: this.cloudKeyByKey.get(key) ?? null,
+            ...(MAPMAKER_ONLINE || this.cloudKeyByKey.has(key) ? {
                 medalRow: this.getMedalRow(key),
                 pendingMedalText: Object.fromEntries(this.pendingMedalText.get(key) ?? []),
             } : {}),
@@ -549,7 +549,7 @@ class MapmakerApp {
     addCloudMap(map) {
         this.addDraft({ ...map, originalTrackKey: TRACKS[map.originalTrackKey] ? map.originalTrackKey : null });
         if (map.medalRow) this.medalRowByKey.set(map.trackKey, map.medalRow);
-        this.cloudKeyByKey.set(map.trackKey, map.trackKey);
+        this.cloudKeyByKey.set(map.trackKey, cloudMapId(map));
     }
 
     // Online, the cloud maps are the saved tracks, so they open clean. A map
@@ -631,12 +631,16 @@ class MapmakerApp {
 
     // The local Mapmaker opens a cloud map as an unsaved draft. Saving it adds
     // it to the game and deletes the cloud copy.
-    openCloudMap(trackKey) {
-        const map = this.cloudMaps.find((entry) => entry.trackKey === trackKey);
+    openCloudMap(cloudId) {
+        const map = this.cloudMaps.find((entry) => cloudMapId(entry) === cloudId);
         if (!map) return;
-        this.addCloudMap(map);
+        const existingKey = [...this.cloudKeyByKey].find(([, id]) => id === cloudId)?.[0];
+        const editedKeys = new Set([...this.state.dirtyTrackKeys, ...this.draftLoopsByKey.keys()]);
+        if (this.state.draftLoop.length) editedKeys.add(this.state.selectedTrackKey);
+        const draft = existingKey ? null : prepareCloudImport(map, this.state.tracks, editedKeys);
+        if (draft) this.addCloudMap(draft);
         this.trackPickerDialog.close();
-        this.loadTrack(trackKey);
+        this.loadTrack(existingKey ?? draft.trackKey);
         this.setStatus(`Opened ${map.track.name} from cloud maps. Save adds it to the game.`);
     }
 
@@ -645,7 +649,7 @@ class MapmakerApp {
         const cloudKey = this.cloudKeyByKey.get(trackKey);
         if (!cloudKey) return '';
         this.cloudKeyByKey.delete(trackKey);
-        this.cloudMaps = this.cloudMaps.filter((map) => map.trackKey !== cloudKey);
+        this.cloudMaps = this.cloudMaps.filter((map) => cloudMapId(map) !== cloudKey);
         try {
             await deleteCloudMap(cloudKey);
             return ' Deleted its cloud copy.';
@@ -1276,9 +1280,9 @@ class MapmakerApp {
             cloudItems.push(createText('h3', 'track-cards-heading', 'Cloud maps'));
             if (this.cloudMapsError) cloudItems.push(createText('p', 'field-hint', this.cloudMapsError));
             cloudItems.push(...cloudMaps.map((map) => createCard(
-                CLOUD_CARD_PREFIX + map.trackKey,
+                CLOUD_CARD_PREFIX + cloudMapId(map),
                 map.track,
-                `Saved ${new Date(map.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+                [map.workspaceId, `Saved ${new Date(map.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`].filter(Boolean).join(' · '),
             )));
             if (place !== 'cloud') cloudItems.push(createText('h3', 'track-cards-heading', 'Tracks'));
         }
@@ -2936,6 +2940,7 @@ class MapmakerApp {
     }
 
     onKeyDown(event) {
+        if (this.busy && !MAPMAKER_ONLINE && !this.creatorMode) return;
         if (event.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName)) {
             return;
         }
@@ -4331,6 +4336,8 @@ class MapmakerApp {
         this.busy = true;
         this.syncActionButtons();
         this.setStatus(`Saving ${this.track.name}...`);
+        const saveSurfaces = [document.querySelector('.maker-header'), document.querySelector('.maker-editor')];
+        saveSurfaces.forEach((element) => { element.inert = true; });
         try {
             const response = await fetch('/__mapmaker/save-track', {
                 method: 'POST',
@@ -4369,6 +4376,7 @@ class MapmakerApp {
             );
         } finally {
             this.busy = false;
+            saveSurfaces.forEach((element) => { element.inert = false; });
             this.syncActionButtons();
         }
     }
