@@ -734,6 +734,21 @@ describe('head-to-head service', () => {
         expect(reddit.submitCustomPost).not.toHaveBeenCalled();
     });
 
+    it('still creates the challenge when Reddit hides the player post history', async () => {
+        const service = makeService();
+        const preview = await service.preview({ sourceKind: 'campaign' }, context);
+        reddit.getPostsByUser.mockResolvedValueOnce({
+            all: async () => { throw new Error('5 NOT_FOUND: 404 Not Found'); },
+        });
+
+        const created = await service.create({
+            challengeToken: preview.body.challengeToken,
+        }, context);
+
+        expect(created).toMatchObject({ status: 200, body: { status: 'created' } });
+        expect(reddit.submitCustomPost).toHaveBeenCalledTimes(1);
+    });
+
     it('never reads the post data of a post that predates the preview', async () => {
         const service = makeService();
         const preview = await service.preview({ sourceKind: 'campaign' }, context);

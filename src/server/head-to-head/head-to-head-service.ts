@@ -521,14 +521,21 @@ async function activePost(identity: {
 async function recoverPost(
     preview: PreviewRecord,
 ): Promise<{ postId: `t3_${string}`; postUrl: string } | null> {
-    const listing = await (reddit as any).getPostsByUser({
-        username: preview.username,
-        sort: 'new',
-        timeframe: 'month',
-        limit: 100,
-        pageSize: 100,
-    });
-    const posts = typeof listing?.all === 'function' ? await listing.all() : [];
+    let posts: any[];
+    try {
+        const listing = await (reddit as any).getPostsByUser({
+            username: preview.username,
+            sort: 'new',
+            timeframe: 'month',
+            limit: 100,
+            pageSize: 100,
+        });
+        posts = typeof listing?.all === 'function' ? await listing.all() : [];
+    } catch (error) {
+        // Reddit hides some players' post history; post as normal.
+        console.warn('Challenge post history could not be read:', error);
+        return null;
+    }
     // Reddit dates posts to the second.
     const previewMs = Date.parse(preview.createdAt);
     const cutoffMs = Number.isFinite(previewMs) ? Math.floor(previewMs / 1000) * 1000 : NaN;
