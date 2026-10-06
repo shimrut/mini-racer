@@ -85,8 +85,12 @@ describe('stored Daily list', () => {
             .rejects.toThrow('no track called');
         await expect(schedule.saveDailySchedule([], { username: 'ModOne' }))
             .rejects.toThrow('at least one');
-        await expect(schedule.saveDailySchedule(['lapinLoop'], { username: 'ModOne' }))
+    });
+
+    it.each(['dirtyDancing', 'lapinLoop'])('refuses publishing the uncalibrated %s draft', async (trackKey) => {
+        await expect(schedule.saveDailySchedule([trackKey], { username: 'ModOne' }))
             .rejects.toThrow('Set all four medal times');
+        expect(await schedule.readDailySchedule()).toMatchObject({ source: 'app', revision: 0 });
     });
 
     it('keeps the latest Daily track, and refuses an old revision', async () => {

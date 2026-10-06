@@ -398,6 +398,12 @@ live session checks confirmed the choices for all six passwords.
    other track to that reviewed baseline; the complete current fingerprint is
    `6f18f61af1e9b08606be126a5a87efa6a4ec6ae9032e3a816345e002a8c00b52`
    before the production restorations below and subsequent authoring edits.
+   The 2026-10-06 subset refresh traced that later fingerprint. Dirt Snake and
+   Wild Crest were saved in `9a1214b9` after it was taken, and Broken Road and
+   Ridge Runner changed again in `78f10d49`. Those four stay out of the subset.
+   The other 147 tracks still match it
+   (`7edec9d084b1ff0ee26b203a64bb002913b0aa52ac6c3e233d90b551692b059b`).
+   The complete registry hash pins the four current shapes.
 7. Run the track, Daily GP, medal, simulation, Mapmaker, and build checks.
 
 ### Production v2.4.0 restoration — 2026-10-05

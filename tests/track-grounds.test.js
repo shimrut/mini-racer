@@ -15,6 +15,8 @@ import {
     isTrackGroundKey,
 } from '../game/track/grounds.js';
 import { TRACKS } from '../game/track/tracks.js';
+import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
+import { CAMPAIGN_ALL_SERIES } from '../game/campaign/manifest.js';
 import { Point } from '../game/track/geometry.js';
 import { KPH_PER_WORLD_UNIT } from '../game/car/handling.js';
 import { getTrackMedalThresholds } from '../game/medals/medal-timing.js';
@@ -334,10 +336,18 @@ describe('grip driving', () => {
 describe('ground tracks and the replay frame limit', () => {
     const limitSec = REPLAY_FRAMES_PER_LAP * CONFIG.fixedDt;
 
-    it('keeps a bronze lap on every ground track well under the replay frame limit', () => {
+    it('keeps a bronze lap on every calibrated ground track well under the replay frame limit', () => {
         for (const [trackKey, track] of Object.entries(TRACKS)) {
             if (getStoredTrackGroundKey(track) === null) continue;
             const thresholds = getTrackMedalThresholds(trackKey);
+            if (trackKey === 'dirtyDancing') {
+                expect(thresholds).toBeNull();
+                expect(TRACK_SCHEDULE_KEYS).not.toContain(trackKey);
+                expect(CAMPAIGN_ALL_SERIES.some((series) => (
+                    series.stages.some((stage) => stage.trackKey === trackKey)
+                ))).toBe(false);
+                continue;
+            }
             expect(thresholds, `${trackKey} needs medal times`).toBeTruthy();
             expect(thresholds.bronze, trackKey).toBeLessThan(limitSec * 0.6);
         }

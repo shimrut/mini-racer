@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { TRACK_CATALOG } from '../game/track/catalog.js';
+import { TRACK_CATALOG, TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
+import { CAMPAIGN_ALL_SERIES } from '../game/campaign/manifest.js';
 import {
     getMedalRowSlots,
     getWinOverlayAllMedalsUnlocked,
@@ -23,17 +24,36 @@ import {
     getCombinedMedalStackTiers,
 } from '../game/medals/medal-timing.js';
 
+// These unused built-in drafts still need authored medal calibration.
+const UNCALIBRATED_DRAFT_KEYS = ['dirtyDancing', 'lapinLoop'];
+
 describe('medals', () => {
     it('exports a medal icon factory for the browser', async () => {
         const { createMedalIconSvg } = await import('../game/medals/medal-icon.js');
         expect(typeof createMedalIconSvg).toBe('function');
     });
 
-    it('defines ordered thresholds for every track', () => {
+    it('keeps the two uncalibrated drafts out of Daily and every Campaign series', () => {
+        const missing = Object.keys(TRACK_CATALOG)
+            .filter((trackKey) => !getTrackMedalThresholds(trackKey)).sort();
+        expect(missing).toEqual(UNCALIBRATED_DRAFT_KEYS);
+        const campaignTrackKeys = CAMPAIGN_ALL_SERIES.flatMap((series) => (
+            series.stages.map((stage) => stage.trackKey)
+        ));
+        for (const trackKey of missing) {
+            expect(TRACK_SCHEDULE_KEYS).not.toContain(trackKey);
+            expect(campaignTrackKeys).not.toContain(trackKey);
+        }
+    });
+
+    it('defines ordered thresholds for every calibrated track', () => {
         const keys = Object.keys(TRACK_CATALOG).sort();
         for (const trackKey of keys) {
+            if (UNCALIBRATED_DRAFT_KEYS.includes(trackKey)) continue;
             const t = getTrackMedalThresholds(trackKey);
-            expect(t).toBeTruthy();
+            expect(t, trackKey).toBeTruthy();
+            expect(getAuthorMedalSeconds(trackKey), trackKey).toBeGreaterThan(0);
+            expect(getAuthorMedalSeconds(trackKey), trackKey).toBeLessThan(t.gold);
             expect(t.gold).toBeLessThanOrEqual(t.silver);
             expect(t.silver).toBeLessThanOrEqual(t.bronze);
         }

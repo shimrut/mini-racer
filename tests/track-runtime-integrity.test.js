@@ -309,8 +309,13 @@ describe('track runtime integrity', () => {
         );
         // Keep the unchanged subset pinned while excluding current authoring
         // edits/additions and the production restorations pinned separately below.
+        // Dirt Snake and Wild Crest were saved in 9a1214b9 after this fingerprint
+        // was taken. Broken Road and Ridge Runner were edited again in 78f10d49.
+        // Those four are excluded here; the complete registry hash pins their
+        // current shapes. Every other track still matches the reviewed fingerprint.
         const latestReshapedKeys = new Set([
             'dirtValley', 'smallSteps', 'lapinLoop', 'centralDistrict', 'roughCut', 'hillsideScramble',
+            'dirtSnake', 'wildCrest', 'brokenRoad', 'ridgeRunner',
             ...V240_TRACK_CONTRACTS.map(([trackKey]) => trackKey),
         ]);
         const latestAddedKeys = new Set(['grandSlam', 'dirtyDancing', 'greyHarbor', 'endlessLoop', 'crescentValley', 'seaCharger']);
@@ -319,7 +324,7 @@ describe('track runtime integrity', () => {
                 .filter(([trackKey]) => !latestReshapedKeys.has(trackKey) && !latestAddedKeys.has(trackKey)),
         );
         expect(hashTrackRegistry(unchangedSinceWindingLane)).toBe(
-            'c0b2320fed2a23574efccdf691c63a7b4d6ab1bada1cf6d83e49c228912404f9',
+            '7edec9d084b1ff0ee26b203a64bb002913b0aa52ac6c3e233d90b551692b059b',
         );
     });
 
