@@ -356,8 +356,9 @@ export class GarageUi {
             artwork = { image: this.carPreview.src, details, decalImages: new Map() };
             this.previewArtwork.set(car, artwork);
         }
+        const equipped = readPlayerCarSkinAssetName(skin.ground) === skin.assetName;
         for (const [id, button] of this.decalOptionButtons) {
-            const selected = id === (options.decalStyle ?? skin.assetName);
+            const selected = equipped && id === (options.decalStyle ?? skin.assetName);
             button.classList.toggle('is-selected', selected);
             button.setAttribute('aria-pressed', String(selected));
             if (!artwork.decalImages.has(id)) {
