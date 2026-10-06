@@ -103,7 +103,7 @@ typography declaration in `styles/result-details.css`: 1.25rem, italic, weight
 900 and 0.1em letter spacing. Completion-specific CSS owns only button layout.
 The first valid final-stage result reserves the Finished action immediately,
 with Home hidden while confirmation is pending. Canonical acceptance enables
-that same button; rejection restores Home. Replays of the completed final stage show Results; earlier-stage replays retain their existing actions.
+that same button; rejection restores Home. Replays of the completed final stage show Home on the left of Results; earlier-stage replays retain their existing actions.
 Share Results uses the existing result-share-panel preview, account disclosure,
 confirmation, retry and success controls. Escape cancels preparation/preview
 and restores the trigger; posting stays open until the response settles.

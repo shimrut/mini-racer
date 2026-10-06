@@ -391,7 +391,7 @@ flowchart LR
   blue, Grip purple and Mixed gray. Home opens the Campaign series list even
   with one live series. Tracks opens the completed series. The same **Results**
   label reopens the saved summary from a replay
-  of an already completed final stage, without replaying its celebration;
+  of an already completed final stage, with Home on its left and without replaying its celebration;
   earlier-stage replays keep their ordinary actions.
   A pending valid final-stage queue entry also reserves Results on a retry.
   Enabled Results never comes from unconfirmed progress, another player, or a reply that
