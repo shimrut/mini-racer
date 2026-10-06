@@ -628,8 +628,30 @@
     display: none;
 }
 
-#combined-medals-row .medal-svg--row-placeholder {
-    filter: saturate(0.4) brightness(0.8);
+#combined-medals-row .combined-medal-row-slot .medal-svg--row-placeholder {
+    opacity: 1;
+    filter: none;
+}
+
+#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline .medal-svg__shape {
+    stroke-width: 72;
+    stroke-dasharray: none;
+}
+
+#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
+    stroke: var(--medal-bronze);
+}
+
+#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--silver .medal-svg__shape {
+    stroke: var(--medal-silver);
+}
+
+#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--gold .medal-svg__shape {
+    stroke: var(--medal-gold);
+}
+
+#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--author .medal-svg__shape {
+    stroke: var(--medal-author);
 }
 
 @media (max-height: 640px) {
