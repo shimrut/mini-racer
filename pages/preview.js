@@ -179,6 +179,7 @@ async function applyTimeToBeat(el, trackKey, lapCount = 1) {
 }
 
 export function formatDailyPreviewTimeLabel(lapCount = 1) {
+    if (!Number.isInteger(lapCount) || lapCount <= 1) return 'TIME TO BEAT';
     return `${formatLapsLabel(lapCount).toUpperCase()} · TIME TO BEAT`;
 }
 

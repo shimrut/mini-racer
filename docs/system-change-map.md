@@ -980,11 +980,13 @@ These are useful, but they are not on the critical player path:
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable
   current-track launcher and explicitly ignores any frozen challenge payload.
-  Both show the scaled gold-medal threshold as the player-facing time to beat,
-  with the lap count immediately before `TIME TO BEAT` above the gold medal
-  artwork. The track name, time, and drawing appear before the car picture
-  loads. The stock car then drives from the back of the red dash to its place
-  past the start line, or appears already parked when reduced motion is on.
+  Both show the scaled gold-medal threshold as the player-facing time to beat
+  above the gold medal artwork. A one-lap Daily labels that target `TIME TO BEAT`.
+  A published Daily that still requires more than one lap keeps that lap count
+  immediately before `TIME TO BEAT`. The track name, time, and drawing appear
+  before the car picture loads. The stock car then drives from the back of the
+  red dash to its place past the start line, or appears already parked when
+  reduced motion is on.
   The Head to Head poster uses that same entrance. In-game schematic previews
   do not use that post-only treatment.
 - `pages/campaign.html`, `pages/campaign.js`, `pages/campaign.css`

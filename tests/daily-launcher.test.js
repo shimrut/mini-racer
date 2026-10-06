@@ -32,8 +32,8 @@ describe('current Daily launcher preview', () => {
         expect(dailyPosterCarTravelAt(0, { reduceMotion: true })).toBe(1);
     });
 
-    it('frames the target as laps followed by time to beat', () => {
-        expect(formatDailyPreviewTimeLabel(1)).toBe('1 LAP · TIME TO BEAT');
+    it('omits the lap count on a one-lap Daily and keeps it when more laps are required', () => {
+        expect(formatDailyPreviewTimeLabel(1)).toBe('TIME TO BEAT');
         expect(formatDailyPreviewTimeLabel(2)).toBe('2 LAPS · TIME TO BEAT');
     });
 });
