@@ -118,7 +118,7 @@ For a self-managed option, a DigitalOcean Basic VM can run Node and ordinary Red
 
 Additional candidates checked 2026-10-06 (official pages were unreachable from the research environment; figures come from search summaries and need confirming before purchase):
 
-- Hetzner CX23 (2 vCPU, 4 GB, EU): approximately €5.49/month after the April and June 2026 increases. Cheapest self-managed host for Node and Redis together. [Price change report](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do).
+- Hetzner CX23 (2 vCPU, 4 GB, EU): approximately €5.49/month after the April and June 2026 increases. Cheapest self-managed host for Node and Redis together. CX plans are in EU data centres; US players would see slower result confirmation and standings, not slower driving. [Price change report](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do).
 - Aiven for Valkey: Hobbyist approximately $19/month (1 CPU, 1 GB, remote backups, no region choice); Startup from approximately $60/month. [Pricing](https://aiven.io/pricing/valkey).
 - Redis Cloud Essentials: 1 GB approximately $20/month with backups and HA on paid tiers. Its 1 GB tier lists approximately 2,000 ops/sec, which may be tight at the traffic modelled below. [Plan details](https://redis.io/docs/latest/operate/rc/subscriptions/view-essentials-subscription/essentials-plan-details/).
 - Railway: no managed tier; self-run Redis billed at approximately $10/GB RAM and $20/vCPU per month on a $5 Hobby plan. [Pricing](https://railway.com/pricing).
