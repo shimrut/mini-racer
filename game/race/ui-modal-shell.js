@@ -187,8 +187,7 @@ export class ModalShell {
         const items = this.getGarageMenuItems();
         const container = this.getGarageMenuContainer();
         const firstOptionIndex = items.findIndex((item) => (
-            item.classList?.contains?.('garage-car-select')
-            || item.classList?.contains?.('garage-skin-option')
+            item.classList?.contains?.('garage-skin-option')
             || item.classList?.contains?.('garage-trail-option')
         ));
         const preferredElementIndex = preferredElement

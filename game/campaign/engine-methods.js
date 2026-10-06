@@ -204,12 +204,13 @@ function campaignRunCanFinishSeries(engine, stage) {
         && !isCampaignSeriesFinished(stage.seriesId, verified.progress?.resultsByRaceId));
 }
 
-// After the last stage, Results opens the finished screen.
-function campaignFinishedNextRace(engine, raceId, enabled) {
+// After the last stage, Results opens the finished screen. The first finish
+// replaces Home; a replay of an already completed series keeps Home beside it.
+function campaignFinishedNextRace(engine, raceId, enabled, { keepHome = false } = {}) {
     return {
         label: 'Results',
         enabled,
-        replaceMenu: true,
+        replaceMenu: !keepHome,
         action: () => engine.showReadyCampaignFinished(raceId),
     };
 }
@@ -1230,7 +1231,7 @@ export const campaignEngineMethods = {
                         action: () => void this.startCampaignNextStage(nextTarget.stage),
                     }
                     : revisit || finishesSeries
-                        ? campaignFinishedNextRace(this, stage.raceId, revisit)
+                        ? campaignFinishedNextRace(this, stage.raceId, revisit, { keepHome: revisit })
                         : null,
             },
         );
@@ -1256,9 +1257,11 @@ export const campaignEngineMethods = {
     // On the last stage, Results shows once the server confirms the series is
     // finished, and goes away when it does not.
     syncCampaignFinishedNext(raceId) {
-        const ready = this._campaignFinishedReady?.raceId === raceId;
+        const ready = this._campaignFinishedReady?.raceId === raceId
+            ? this._campaignFinishedReady
+            : null;
         this.modal.setCombinedNextRace?.(ready
-            ? campaignFinishedNextRace(this, raceId, true) : null);
+            ? campaignFinishedNextRace(this, raceId, true, { keepHome: ready.revisit }) : null);
     },
 
     showReadyCampaignFinished(raceId) {

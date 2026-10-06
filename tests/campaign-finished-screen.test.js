@@ -207,6 +207,9 @@ describe('the Campaign finished screen', () => {
         shell.setCombinedNextRace({ label: 'Results', replaceMenu: true, action: vi.fn() });
         expect(menu.hidden).toBe(true);
         expect(document.getElementById('combined-next-btn').textContent.trim()).toBe('RESULTS');
+        shell.setCombinedNextRace({ label: 'Results', replaceMenu: false, action: vi.fn() });
+        expect(menu.hidden).toBe(false);
+        expect(document.getElementById('combined-next-btn').textContent.trim()).toBe('RESULTS');
         shell.setCombinedNextRace({ label: 'Next', action: vi.fn() });
         expect(menu.hidden).toBe(false);
         shell.setCombinedNextRace(null);

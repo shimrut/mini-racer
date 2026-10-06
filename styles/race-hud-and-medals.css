@@ -350,24 +350,24 @@
     opacity: 0.68;
 }
 
-.combined-medal-row-slot--locked .medal-svg--outline .medal-svg__shape {
+.combined-hero-medal .combined-medal-row-slot--locked .medal-svg--outline .medal-svg__shape {
     stroke-dasharray: 12 34;
     stroke-width: 22;
 }
 
-.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
+.combined-hero-medal .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
     stroke: #7a726c;
 }
 
-.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--silver .medal-svg__shape {
+.combined-hero-medal .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--silver .medal-svg__shape {
     stroke: #8b939c;
 }
 
-.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--gold .medal-svg__shape {
+.combined-hero-medal .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--gold .medal-svg__shape {
     stroke: #8f8770;
 }
 
-.combined-medal-row-slot--locked .medal-svg--outline.medal-svg--author .medal-svg__shape {
+.combined-hero-medal .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--author .medal-svg__shape {
     stroke: #8e8aa8;
 }
 

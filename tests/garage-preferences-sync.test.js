@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RealTimeRacer } from '../game/engine.js';
 import { GarageUi } from '../game/settings/garage-ui.js';
-import { PLAYER_CAR_SKINS, readPlayerCarSkinAssetName } from '../game/car/player-car-skin.js';
+import { PLAYER_CAR_SKINS, readPlayerCarSkinAssetName, writePlayerCarSkinAssetName } from '../game/car/player-car-skin.js';
+import { writePlayerCarDecalStyle } from '../game/car/player-car-decals.js';
 import { readPlayerCarPaint, writePlayerCarPaint } from '../game/car/player-car-paint.js';
 import { readPlayerCarTrails, readPlayerTrailId, trailStrokeStyleForId } from '../game/car/player-trail.js';
 import { raceEngineMethods } from '../game/race/engine-methods.js';
@@ -126,6 +127,18 @@ describe('Garage saved-profile previews', () => {
         expect(readPlayerCarPaint('drawn/formula-red')).toEqual({});
         expect(onCarSkinChanged).toHaveBeenCalledWith('drawn/formula-gold');
         expect(engine.syncCarSpriteAsset).toHaveBeenCalledOnce();
+    });
+
+    it('equips the street car when a decal is chosen over a legacy car', () => {
+        writePlayerCarSkinAssetName('assets/cars/mr_mr_red.webp');
+        const garage = new GarageUi();
+        garage.activeGarageTab = 'street';
+        const street = garage.previewSkin;
+        expect(street.series).toBe('formula');
+        expect(readPlayerCarSkinAssetName('tarmac')).toBe('assets/cars/mr_mr_red.webp');
+        writePlayerCarDecalStyle(street.assetName, 'drawn/formula-gold');
+        garage.selectCarSkin(street.assetName);
+        expect(readPlayerCarSkinAssetName('tarmac')).toBe(street.assetName);
     });
 
     it('reconciles previously visited types when another account profile replaces their choices', async () => {

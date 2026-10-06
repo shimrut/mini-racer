@@ -1,3 +1,4 @@
+import { readPlayerCarSkinAssetName } from '../car/player-car-skin.js';
 import { getLargestPbGhostSizeReport } from "../ghost/pb-ghost-size-debug.js";
 import { setCommunityMapsFixtureForLocalDebug } from '../community/service.js';
 
@@ -16,7 +17,8 @@ export function renderGameToText(engine) {
     garage: engine.garage?.isGarageOpen?.() ? {
       tab: engine.garage.activeGarageTab,
       previewCar: engine.garage.previewSkin?.assetName ?? null,
-      equipped: document.querySelector('.garage-car-select')?.getAttribute('aria-pressed') === 'true',
+      equipped: Boolean(engine.garage.previewSkin
+        && readPlayerCarSkinAssetName(engine.garage.previewSkin.ground) === engine.garage.previewSkin.assetName),
       selectedColors: [...document.querySelectorAll('.garage-color-option[data-channel][aria-pressed="true"]')]
         .map((button) => ({ channel: button.dataset.channel, color: button.dataset.color })),
       trailCar: engine.garage.trailAssetName,

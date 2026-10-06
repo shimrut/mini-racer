@@ -564,8 +564,8 @@ describe('modal pause/finish menu keyboard nav', () => {
     it('includes car types, preview, paints and shared trails from only the visible Garage panels', () => {
         const tabs = ['street', 'circuit', 'dirt', 'snow', 'water', 'space', 'legacy']
             .map((type) => makeMenuButton(`garage-tab-${type}`));
-        const carSelect = makeMenuButton('select-car');
-        carSelect.classList.add('garage-car-select');
+        const decal = makeMenuButton('decal-style');
+        decal.classList.add('garage-skin-option', 'garage-decal-option');
         const paint = makeMenuButton('body-red');
         const disabledPaint = makeMenuButton('body-disabled');
         disabledPaint.disabled = true;
@@ -576,7 +576,7 @@ describe('modal pause/finish menu keyboard nav', () => {
         const back = makeMenuButton('garage-close-btn');
         const customPanel = { hidden: false };
         const legacyPanel = { hidden: true };
-        const customControls = [carSelect, paint, disabledPaint];
+        const customControls = [decal, paint, disabledPaint];
         for (const control of customControls) {
             control.closest = () => customPanel.hidden ? customPanel : null;
         }
@@ -597,11 +597,11 @@ describe('modal pause/finish menu keyboard nav', () => {
                 getGarageMenuContainer: ModalShell.prototype.getGarageMenuContainer,
             };
             expect(context.getGarageMenuItems()).toEqual([
-                ...tabs, carSelect, paint, trail,
+                ...tabs, decal, paint, trail,
             ]);
             ModalShell.prototype.resetGarageMenuKeyboardNav.call(context, { keepCue: true });
-            expect(carSelect.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
-            expect(carSelect.focus).toHaveBeenCalled();
+            expect(decal.classList.contains(MENU_SELECTED_CLASS)).toBe(true);
+            expect(decal.focus).toHaveBeenCalled();
 
             customPanel.hidden = true;
             legacyPanel.hidden = false;
@@ -617,12 +617,11 @@ describe('modal pause/finish menu keyboard nav', () => {
     it.each([false, true])('keeps the selected Garage tab focused on refresh with cue=%s', (keyboardNavActive) => {
         const street = makeMenuButton('garage-tab-street');
         const space = makeMenuButton('garage-tab-space');
-        const carSelect = makeMenuButton('select-car');
-        carSelect.classList.add('garage-car-select');
+        const decal = makeMenuButton('decal-style');
         const state = { keyboardNavActive, selectedIndex: 0 };
         const context = {
             _garageMenuKeyboardState: state,
-            getGarageMenuItems: () => [street, space, carSelect],
+            getGarageMenuItems: () => [street, space, decal],
             getGarageMenuContainer: () => null,
             resetGarageMenuKeyboardNav: ModalShell.prototype.resetGarageMenuKeyboardNav,
         };
@@ -635,7 +634,7 @@ describe('modal pause/finish menu keyboard nav', () => {
             expect(state.keyboardNavActive).toBe(keyboardNavActive);
             expect(space.focus).toHaveBeenCalledOnce();
             expect(street.focus).not.toHaveBeenCalled();
-            expect(carSelect.focus).not.toHaveBeenCalled();
+            expect(decal.focus).not.toHaveBeenCalled();
             expect(space.classList.contains(MENU_SELECTED_CLASS)).toBe(keyboardNavActive);
         } finally {
             global.document = originalDocument;

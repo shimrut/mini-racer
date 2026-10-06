@@ -73,9 +73,6 @@ describe('saved decal rendering integration', () => {
         const garage = new GarageUi();
         garage.bind();
         garage.carPreview = { src: '' };
-        garage.carName = {};
-        garage.carStatus = {};
-        garage.carSelect = { classList: { toggle() {} }, setAttribute() {} };
         garage.partPreviews = new Map(['main', 'accent', 'tertiary'].map(channel => [channel, createCanvas(192, 160)]));
         const palette = Array.from({ length: 7 }, () => ({
             dataset: {}, style: { setProperty() {} }, classList: { toggle() {} }, setAttribute() {},

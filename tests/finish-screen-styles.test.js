@@ -81,6 +81,15 @@ describe('finish screen styles', () => {
         expect(styles).toMatch(
             /#combined-medals-row \.combined-medal-row-slot \.medal-svg--hero\s*\{[^}]*width:\s*1\.28rem;/s,
         );
+        expect(styles).not.toMatch(
+            /#combined-medals-row[^{]*medal-svg__shape\s*\{[^}]*stroke-dasharray:/s,
+        );
+        expect(styles).toMatch(
+            /\.combined-hero-medal \.combined-medal-row-slot--locked \.medal-svg--outline \.medal-svg__shape\s*\{[^}]*stroke-dasharray:\s*12 34;/s,
+        );
+        expect(styles).toMatch(
+            /\.medal-svg--outline \.medal-svg__shape\s*\{[^}]*stroke-width:\s*32;/s,
+        );
         expect(styles).toMatch(
             /#modal-combined-view:not\(\.is-challenge-finish\) #combined-hero-medal\s*\{\s*display:\s*none;/,
         );

@@ -116,6 +116,13 @@ DigitalOcean managed Valkey and AWS ElastiCache are further options, with config
 
 For a self-managed option, a DigitalOcean Basic VM can run Node and ordinary Redis/Valkey together. Current regular VM hardware prices are $12/month for 2 GiB, $24 for 4 GiB, $48 for 8 GiB and $96 for 16 GiB. These are hardware prices, not tested capacity commitments. Weekly VM backups add 20%; database persistence, off-server backups, restore checks, upgrades and availability remain our responsibility. A VM image backup alone should not be treated as a validated database recovery plan. [VM pricing](https://www.digitalocean.com/pricing/droplets), [backup pricing](https://www.digitalocean.com/pricing/backups).
 
+Additional candidates checked 2026-10-06 (official pages were unreachable from the research environment; figures come from search summaries and need confirming before purchase):
+
+- Hetzner CX23 (2 vCPU, 4 GB, 40 GB NVMe, EU): user-observed console price €5.99/month on 2026-10-06, shown as not available in the selected location. At the modelled Reddit-size traffic, average load is approximately 0.1-0.25 CPU and a 3-5x peak hour approximately 0.3-1.3 CPU, assuming CPU speed similar to the benchmark machine; Redis without ghosts plus two Node processes fit in 4 GB. Run two Node processes to use both vCPUs. Cheapest self-managed host for Node and Redis together. CX plans are in EU data centres; US players would see slower result confirmation and standings, not slower driving. [Price change report](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do).
+- Aiven for Valkey: Hobbyist approximately $19/month (1 CPU, 1 GB, remote backups, no region choice); Startup from approximately $60/month. [Pricing](https://aiven.io/pricing/valkey).
+- Redis Cloud Essentials: 1 GB approximately $20/month with backups and HA on paid tiers. Its 1 GB tier lists approximately 2,000 ops/sec, which may be tight at the traffic modelled below. [Plan details](https://redis.io/docs/latest/operate/rc/subscriptions/view-essentials-subscription/essentials-plan-details/).
+- Railway: no managed tier; self-run Redis billed at approximately $10/GB RAM and $20/vCPU per month on a $5 Hobby plan. [Pricing](https://railway.com/pricing).
+
 ## Activity costs that storage does not predict
 
 Supabase Auth includes 100,000 monthly active users on Pro; additional MAUs cost $0.00325 each. Two hundred thousand accumulated player records do not incur that charge. Two hundred thousand MAUs using the paid auth product would add $325/month, before compute/traffic changes. This applies when using the metered auth service, not merely because the game has player rows. Anonymous auth sign-ins can also contribute to active-user counts. [Auth pricing](https://supabase.com/pricing).
@@ -176,6 +183,30 @@ Cloud Run request-based pricing has a free allowance equivalent to 2 million req
 Apple iCloud/GameKit saves and Google Play Games Saved Games are useful for personal progress/settings/PB backups. Private Apple saves depend on the player's iCloud account/storage; Google Saved Games data is free but each file is limited to 3 MB. They do not run this game's JavaScript replay validator or automatically provide one unified iOS/Android ranking. Optional platform leaderboards can display already validated scores while the game's shared backend remains authoritative. [Apple game saves](https://developer.apple.com/documentation/gamekit/saving-the-player-s-game-data-to-an-icloud-account), [Google Saved Games](https://developer.android.com/games/pgs/savedgames).
 
 CloudKit is broader than personal iCloud saves: it supports shared public records/assets and web APIs. An Android app can integrate through a web/API path, so it is inaccurate to say CloudKit is inaccessible outside Apple devices. Private-user access requires Apple's account authentication; server-to-server keys operate on the public database. A CloudKit-based shared backend would still need separately hosted validation and a ranking/identity design. It is not the preferred foundation for this game's common Android/iOS backend. [CloudKit overview](https://developer.apple.com/icloud/cloudkit/), [CloudKit web-service authentication](https://developer.apple.com/library/archive/documentation/DataManagement/Conceptual/CloudKitWebServicesReference/SettingUpWebServices.html).
+
+## Sizing at reported traffic (2026-10-06)
+
+User-reported inputs: approximately 15,000 DAU, 80,000 MAU and 260,000 stored players on the Reddit version. These players stay on Devvit; a standalone mobile backend starts with zero users, so the figures below describe a mobile audience that reaches today's Reddit size. Storage scaled from the earlier 0.8-0.9 GB report is approximately 1.0-1.1 GB, of which approximately 0.25-0.3 GB is non-ghost records.
+
+Replay validation CPU was benchmarked locally (Node 22, `validateDailyGpReplayDetailed` on six built-in tracks, synthetic steering, 30 runs each). Finished one-lap replays took approximately 10-22 ms; finished three-lap replays 39-47 ms. Replays that used the full frame budget without finishing took up to 43 ms for one lap and 141 ms for three laps. Worker CPU speed was not measured.
+
+Assumptions: 10-20 submitted finishes and 40-80 API requests per DAU per day (4.5-9 million validations and 18-36 million requests per month), 30-60 ms average validation CPU, and 2 ms CPU for other requests. These are planning inputs, not measured traffic.
+
+| Option | Approximate monthly cost at this traffic | Rewrite needed |
+| --- | ---: | --- |
+| Workers + D1 + R2 | $10-90 (Workers $10-25; D1 writes/rank reads $0-55; R2 ghost writes $0-9) | Redis locks, transactions and ranked boards move to SQL |
+| Node service + managed Valkey + R2 ghosts (Render) | $70-115 (two 1-CPU or one 2-CPU API $50-85, 1 GB Valkey $20, R2 $0-9) | Swap Devvit Redis client for a standard Redis client |
+| Single self-managed VM (Node + Redis) + R2 ghosts | $30-60 plus backup/ops work | Same as above |
+
+Server code is approximately 26,000 lines of TypeScript; 45 files call Redis, including 11 `watch` and 10 `multi` sites. The SQL rewrite is estimated at 2-4 additional weeks of manual work on top of the 2-5 week independent backend; with AI-assisted implementation the coding time is much shorter, leaving real-device and hosted-load testing as the main schedule cost. The lasting cost is maintenance: the Reddit version stays on Devvit Redis (42 server imports of `@devvit/redis`, 33 test files using fake Redis), so a D1 backend means two storage layers for every future data change. A Redis-backed mobile server can reuse the same server code and tests through a client adapter.
+
+Redis is not the main cost in the Node route: with ghosts in R2, about 0.3 GB of records fits the $20 1 GB tier, roughly $0.00025 per MAU. API compute is the larger share. Redis cost grows with stored data because it is held in RAM, so keeping ghosts out of Redis is what keeps it cheap. Pay-per-command Redis (Upstash PAYG, $2/million) is likely more expensive at this traffic, because each request makes several Redis calls. At launch, with no mobile players yet, a $12-24 VM can run Node and Redis together, or Workers can start at $5.
+
+### Cloudflare in front of a Hetzner origin
+
+Cloudflare's proxy can sit in front of a single Hetzner server: TLS ends near the player, DDoS protection applies, and a Cloudflare Tunnel keeps the origin off the public internet. Edge reads can cover ghost downloads (R2), the track catalog and Daily contract, and public standings pages. `readSharedStandingsPage` in `src/server/competition/competition-leaderboard.ts` already builds a player-independent page with a 10-second TTL, but `readSnapshot` merges it with the player's own row and no route sets `Cache-Control`, so edge caching needs a separate public-page response. Submits, personal rank, progress saves and sign-in still travel to the origin. Running validation in a Worker would offload CPU but would not remove that round trip, because the save still happens at the origin.
+
+Authentication at 80,000 MAU: verifying Sign in with Apple and Google tokens on our own server has no per-user fee. Supabase Auth Pro includes 100,000 MAU.
 
 ## Validation and next measurements
 
