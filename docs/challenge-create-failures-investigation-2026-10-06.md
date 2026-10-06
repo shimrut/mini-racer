@@ -47,6 +47,6 @@ Both Reddit refusals are already recognised by `isUserActionRefusedBeforePosting
 
 ## Fix plan
 
-1. Make the duplicate check best effort: if the post history cannot be read, log it and post as normal. Fixes cause 1 (69% of failures). Duplicate risk stays capped by the existing creation lock and three-posts-per-track daily limit.
+1. **Done.** Make the duplicate check best effort: if the post history cannot be read, log it and post as normal. Fixes cause 1 (69% of failures). Duplicate risk stays capped by the existing creation lock and three-posts-per-track daily limit.
 2. Catch Reddit's refusal around the post call, release the slot, and answer `user_action_unavailable` with a clear message. Causes 2 and 3 still fail, but players know it is Reddit and can try later.
 3. Add tests for both paths in `tests/server-head-to-head.test.js`.
