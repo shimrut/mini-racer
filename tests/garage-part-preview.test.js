@@ -29,9 +29,6 @@ describe('Garage part details', () => {
         const raceFrame = car.renderFrame();
         const garage = new GarageUi();
         garage.carPreview = { src: '' };
-        garage.carName = {};
-        garage.carStatus = {};
-        garage.carSelect = { classList: { toggle() {} }, setAttribute() {} };
         const prepare = vi.spyOn(garage, 'setShowcaseImage');
 
         garage.syncCustomPreview();
@@ -55,9 +52,6 @@ describe('Garage part details', () => {
     it('reuses prepared artwork for status refreshes and when returning to a previewed type', () => {
         const garage = new GarageUi();
         garage.carPreview = { src: '' };
-        garage.carName = {};
-        garage.carStatus = {};
-        garage.carSelect = { classList: { toggle() {} }, setAttribute() {} };
         garage.partPreviews = new Map(['main', 'accent', 'tertiary'].map((channel) => [channel, createCanvas(192, 160)]));
         const prepare = vi.spyOn(garage, 'setShowcaseImage');
         const regions = vi.spyOn(garage, 'findPaintDetails');

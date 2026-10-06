@@ -26,12 +26,12 @@ import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 
 const GARAGE_TYPES = Object.freeze([
-    { id: 'street', series: 'formula', ground: 'tarmac', name: 'Formula' },
-    { id: 'circuit', series: 'grip', ground: 'grip', name: 'Track' },
-    { id: 'dirt', series: 'dirt', ground: 'dirt', name: 'Rally' },
-    { id: 'snow', series: 'snow', ground: 'snow', name: 'Ice' },
-    { id: 'water', series: 'water', ground: 'water', name: 'Jet ski' },
-    { id: 'space', series: 'space', ground: 'space', name: 'Spaceship' },
+    { id: 'street', series: 'formula', ground: 'tarmac' },
+    { id: 'circuit', series: 'grip', ground: 'grip' },
+    { id: 'dirt', series: 'dirt', ground: 'dirt' },
+    { id: 'snow', series: 'snow', ground: 'snow' },
+    { id: 'water', series: 'water', ground: 'water' },
+    { id: 'space', series: 'space', ground: 'space' },
 ]);
 const GARAGE_TABS = Object.freeze([...GARAGE_TYPES.map(({ id }) => id), 'legacy']);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -212,18 +212,9 @@ export class GarageUi {
         stage.className = 'garage-car-stage';
         this.carPreview = document.createElement('img');
         this.carPreview.className = 'garage-car-preview';
-        this.carPreview.alt = '';
+        this.carPreview.alt = 'Car, top view';
         stage.appendChild(this.carPreview);
-        this.carSelect = document.createElement('button');
-        this.carSelect.type = 'button';
-        this.carSelect.className = 'garage-car-select';
-        this.carName = document.createElement('span');
-        this.carName.className = 'garage-car-name';
-        this.carStatus = document.createElement('span');
-        this.carStatus.className = 'garage-car-status';
-        this.carSelect.append(this.carName, this.carStatus);
-        this.carSelect.addEventListener('click', () => this.selectCarSkin(this.previewSkin?.assetName));
-        showcase.append(stage, this.carSelect);
+        showcase.appendChild(stage);
         const paintPanel = document.createElement('section');
         paintPanel.className = 'garage-paint-panel';
         paintPanel.setAttribute('aria-label', 'Car colors');
@@ -333,20 +324,11 @@ export class GarageUi {
     syncCustomPreview() {
         const skin = this.previewSkin;
         if (!skin || !this.carPreview) return;
-        const type = GARAGE_TYPES.find(({ id }) => id === this.activeGarageTab);
         const options = {
             paint: readPlayerCarPaint(skin.assetName),
             decalStyle: readPlayerCarDecalStyle(skin.assetName),
         };
-        const name = `${type.name} · ${skin.label}`;
         const car = getDrawnCar(skin.assetName, options);
-        this.carPreview.alt = `${name}, top view`;
-        this.carName.textContent = name;
-        const selected = readPlayerCarSkinAssetName(type.ground) === skin.assetName;
-        this.carSelect.classList.toggle('is-equipped', selected);
-        this.carSelect.setAttribute('aria-pressed', String(selected));
-        this.carStatus.textContent = selected ? 'Equipped' : 'Use car';
-        this.carSelect.setAttribute('aria-label', `${name}. ${selected ? 'Equipped' : 'Use car'}`);
         if (!car) return;
         this.buildDecalOptions(skin.assetName);
         let artwork = this.previewArtwork.get(car);
@@ -417,7 +399,7 @@ export class GarageUi {
                 button.setAttribute('aria-pressed', String(active));
             });
         }
-        // Equip/status changes reuse the prepared artwork. Only a different
+        // Paint and decal refreshes reuse the prepared artwork. Only a different
         // resolved car requires another PNG or painted detail.
         if (this.previewCar === car) return;
         this.previewCar = car;
