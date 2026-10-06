@@ -193,6 +193,8 @@ Assumptions: 10-20 submitted finishes and 40-80 API requests per DAU per day (4.
 
 Server code is approximately 26,000 lines of TypeScript; 45 files call Redis, including 11 `watch` and 10 `multi` sites. The SQL rewrite is estimated at 2-4 additional weeks on top of the 2-5 week independent backend. At this traffic, the $50-ish monthly saving from Workers does not repay that time quickly, so the Node + Valkey + R2 route is the faster launch option; Workers remains the lower-cost long-term option.
 
+Redis is not the main cost in the Node route: with ghosts in R2, about 0.3 GB of records fits the $20 1 GB tier, roughly $0.00025 per MAU. API compute is the larger share. Redis cost grows with stored data because it is held in RAM, so keeping ghosts out of Redis is what keeps it cheap. Pay-per-command Redis (Upstash PAYG, $2/million) is likely more expensive at this traffic, because each request makes several Redis calls. At launch, with no mobile players yet, a $12-24 VM can run Node and Redis together, or Workers can start at $5.
+
 Authentication at 80,000 MAU: verifying Sign in with Apple and Google tokens on our own server has no per-user fee. Supabase Auth Pro includes 100,000 MAU.
 
 ## Validation and next measurements
