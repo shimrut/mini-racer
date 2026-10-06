@@ -525,6 +525,36 @@ describe('verification queue', () => {
         expect(getNextVerificationAttemptAt()).toBe(null);
     });
 
+    it.each([
+        ['error', 10], ['error', 11], ['rejected', 10], ['rejected', 11],
+    ])('replaces a terminal Daily %s with an eligible %s-second run', (state, bestTime) => {
+        const challengeId = 'terminal-daily';
+        enqueueDailyChallengeVerification({ challengeId, bestTime: 10, replay: REPLAY });
+        if (state === 'error') markDailyChallengeVerificationError(challengeId, 'Replay rejected');
+        else markDailyChallengeVerificationRejected(challengeId);
+
+        const replay = { inputs: [{ frames: 2, left: true, right: false }] };
+        expect(enqueueDailyChallengeVerification({ challengeId, bestTime, replay })).toMatchObject({
+            enqueued: true,
+            entry: { bestTime, replay, verificationState: 'pending', submissionStage: 'submitting' },
+        });
+        expect(getDueDailyChallengeVerifications()).toHaveLength(1);
+    });
+
+    it.each([10, 11])('keeps the better pending Daily replay when retry is offered %s seconds', (bestTime) => {
+        const challengeId = 'pending-daily';
+        enqueueDailyChallengeVerification({ challengeId, bestTime: 10, replay: REPLAY });
+        const nextAttemptAt = Date.now() + 30_000;
+        markDailyChallengeVerificationPending(challengeId, nextAttemptAt, { submissionStage: 'retrying' });
+        const previous = getDailyChallengeVerificationEntry(challengeId);
+
+        expect(enqueueDailyChallengeVerification({
+            challengeId, bestTime, replay: { inputs: [{ frames: 2, left: true, right: false }] },
+        }).enqueued).toBe(false);
+        expect(getDailyChallengeVerificationEntry(challengeId)).toEqual(previous);
+        expect(getNextVerificationAttemptAt()).toBe(nextAttemptAt);
+    });
+
     it('does not replace an equal daily best time with a slower duplicate enqueue', () => {
         enqueueDailyChallengeVerification({
             challengeId: 'challenge-equal',

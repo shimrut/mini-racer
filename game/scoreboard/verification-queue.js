@@ -207,6 +207,7 @@ function cloneEntry(entry) {
 
 function isBetterDailyCandidate(nextEntry, previousEntry) {
   if (!previousEntry) return true;
+  if (previousEntry.verificationState !== "pending") return true;
   return Number(nextEntry.bestTime) < Number(previousEntry.bestTime);
 }
 

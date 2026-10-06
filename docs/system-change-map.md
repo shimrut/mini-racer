@@ -166,6 +166,7 @@ flowchart LR
 - `game/scoreboard/service.js` fetches leaderboard snapshots and submits best times.
 - `game/scoreboard/snapshot.js` owns the shared client-side snapshot shape, row/time normalization, empty state, and mutation-safe cache cloning used by both scoreboard and Daily GP flows.
 - `game/scoreboard/engine-methods.js` starts verification from the finish event, handles retry behavior until the competition deadline, and consumes the canonical challenge-PB record returned by an accepted submission.
+- Daily and Campaign verification queues allow a new eligible run to replace a terminal error or rejection even when it is equal or slower. Pending entries retain their better replay until a strictly faster candidate replaces them. Daily finish/HTTP recovery and reload regression coverage lives in `tests/daily-submit-recovery.test.js`; queue-state rules are covered in `tests/verification-queue.test.js`.
 - Finish-screen RANK first paint and live updates share `applyCombinedRankValue` in `game/race/result-flow.js`, so loading shows Submitting/Verifying status text and failures keep RANK visible with the error. After the win modal opens, a synchronous queue sync paints Verifying when an entry still exists; if accept finishes with no standings snapshot, loading clears and RANK hides.
 - Standings opened from the finish sheet always dismiss back to that finish sheet, even if an asynchronous standings refresh replaces the temporary close-mode flag.
 - Finish-screen opponent comparisons from Daily or Campaign standings use the
