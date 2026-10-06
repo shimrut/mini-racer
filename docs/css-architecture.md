@@ -178,7 +178,7 @@ Challenge. Its confirmation sheet shows
 the server-generated tiered copy as a text-only reply.
 Reduced motion turns the sequence off. Daily and Campaign put a
 status heading above the time in that same column — medal name, NEW BEST, or
-FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Empty medals on that row are solid outlines in the medal color, so an unearned set stays visible on the dark sheet. Racing a standings
+FINISHED. MEDALS, VS PB, and RANK stay the comparison rows. Empty medals on that row keep the same outline weight as other locked medals, drawn in the medal color so an unearned set stays visible on the dark sheet. Racing a standings
 ghost also shows VS #rank (or VS) above VS PB. Tapping MEDALS opens
 the same mini overlay as checkpoint splits, with each medal, its name, and its
 target time in one row.

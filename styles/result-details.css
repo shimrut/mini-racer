@@ -633,11 +633,6 @@
     filter: none;
 }
 
-#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline .medal-svg__shape {
-    stroke-width: 72;
-    stroke-dasharray: none;
-}
-
 #combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--bronze .medal-svg__shape {
     stroke: var(--medal-bronze);
 }

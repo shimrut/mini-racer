@@ -652,7 +652,7 @@ flowchart LR
   the same heading-to-row gap,
   button-edge alignment, and Mini/Racer entrance delayed by `--dur-finish-headline`,
   and reuse those left-label / right-value comparison rows
-  for MEDALS, VS PB, and RANK. Empty medals on that row are solid outlines in the medal color, so an unearned set stays visible on the dark sheet. Racing a standings ghost also shows VS opponent
+  for MEDALS, VS PB, and RANK. Empty medals on that row keep the same outline weight as other locked medals, drawn in the medal color so an unearned set stays visible on the dark sheet. Racing a standings ghost also shows VS opponent
   on that shared row. Tapping MEDALS on the finish screen, or the medal ladder
   on a Daily/Campaign poster, opens the shared mini overlay with each medal, its
   name, and its time stacked, matching checkpoint splits.

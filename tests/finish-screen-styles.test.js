@@ -81,8 +81,11 @@ describe('finish screen styles', () => {
         expect(styles).toMatch(
             /#combined-medals-row \.combined-medal-row-slot \.medal-svg--hero\s*\{[^}]*width:\s*1\.28rem;/s,
         );
+        expect(styles).not.toMatch(
+            /#combined-medals-row[^{]*medal-svg__shape\s*\{[^}]*stroke-width:/s,
+        );
         expect(styles).toMatch(
-            /#combined-medals-row \.combined-medal-row-slot--locked \.medal-svg--outline \.medal-svg__shape\s*\{[^}]*stroke-width:\s*72;[^}]*stroke-dasharray:\s*none;/s,
+            /\.combined-medal-row-slot--locked \.medal-svg--outline \.medal-svg__shape\s*\{[^}]*stroke-width:\s*22;/s,
         );
         expect(styles).toContain('#combined-medals-row .combined-medal-row-slot--locked .medal-svg--outline.medal-svg--gold .medal-svg__shape');
         expect(styles).toContain('stroke: var(--medal-gold);');
