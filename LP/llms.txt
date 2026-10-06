@@ -14,9 +14,9 @@ screen. Walls slow you down; they do not end the lap. Most laps run under a minu
 
 - Daily: everyone races the same track. It changes at midnight UTC and the last seven days stay open,
   each with its own board.
-- Campaign: Stages that do not expire. Each stage carries Bronze, Silver, Gold and Author target
-  times; beating one takes that medal, and medals unlock the next stage. Half Life's Author time is
-  11.27 seconds.
+- Campaign: 16 stages that do not expire, ending on Half Life. Each stage carries Bronze, Silver, Gold
+  and Author target times; beating one takes that medal, and medals unlock the next stage. Half Life's
+  Author time is 11.27 seconds.
 - Head to Head: race someone's saved run as a ghost until you beat it.
 
 ## Times
@@ -26,7 +26,7 @@ comes back as a ghost, and you can chase anyone else's the same way.
 
 ## Content
 
-Hand-built tracks. 23 cars and 8 trails, which change how you look and nothing else. Built on
+126 hand-built circuits. 23 cars and 8 trails, which change how you look and nothing else. Built on
 Devvit, Reddit's developer platform.
 
 ## Pages

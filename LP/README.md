@@ -49,10 +49,6 @@ window.LP_LINKS = {
 };
 ```
 
-## Numbers on the page
-
-The player and race counts (`.proof` in `index.html`) are typed in by hand; update them from Mod Analytics. The medal times (`.medals`) are Half Life's, from `game/medals/medal-times.json` (key `halfLife`).
-
 ## Generated assets
 
 `track.png` (hero background) is generated with the same custom-post preview track renderer as the Reddit post preview. `favicon.png` and `apple-touch-icon.png` are kept as committed files.
