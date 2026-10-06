@@ -116,6 +116,13 @@ DigitalOcean managed Valkey and AWS ElastiCache are further options, with config
 
 For a self-managed option, a DigitalOcean Basic VM can run Node and ordinary Redis/Valkey together. Current regular VM hardware prices are $12/month for 2 GiB, $24 for 4 GiB, $48 for 8 GiB and $96 for 16 GiB. These are hardware prices, not tested capacity commitments. Weekly VM backups add 20%; database persistence, off-server backups, restore checks, upgrades and availability remain our responsibility. A VM image backup alone should not be treated as a validated database recovery plan. [VM pricing](https://www.digitalocean.com/pricing/droplets), [backup pricing](https://www.digitalocean.com/pricing/backups).
 
+Additional candidates checked 2026-10-06 (official pages were unreachable from the research environment; figures come from search summaries and need confirming before purchase):
+
+- Hetzner CX23 (2 vCPU, 4 GB, EU): approximately €5.49/month after the April and June 2026 increases. Cheapest self-managed host for Node and Redis together. [Price change report](https://privatedevops.com/news/hetzner-june-2026-cloud-price-increase-what-to-do).
+- Aiven for Valkey: Hobbyist approximately $19/month (1 CPU, 1 GB, remote backups, no region choice); Startup from approximately $60/month. [Pricing](https://aiven.io/pricing/valkey).
+- Redis Cloud Essentials: 1 GB approximately $20/month with backups and HA on paid tiers. Its 1 GB tier lists approximately 2,000 ops/sec, which may be tight at the traffic modelled below. [Plan details](https://redis.io/docs/latest/operate/rc/subscriptions/view-essentials-subscription/essentials-plan-details/).
+- Railway: no managed tier; self-run Redis billed at approximately $10/GB RAM and $20/vCPU per month on a $5 Hobby plan. [Pricing](https://railway.com/pricing).
+
 ## Activity costs that storage does not predict
 
 Supabase Auth includes 100,000 monthly active users on Pro; additional MAUs cost $0.00325 each. Two hundred thousand accumulated player records do not incur that charge. Two hundred thousand MAUs using the paid auth product would add $325/month, before compute/traffic changes. This applies when using the metered auth service, not merely because the game has player rows. Anonymous auth sign-ins can also contribute to active-user counts. [Auth pricing](https://supabase.com/pricing).
