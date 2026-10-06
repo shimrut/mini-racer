@@ -94,6 +94,13 @@ red Share Results button, which takes initial keyboard focus. Home opens the
 Campaign series list; Tracks opens the completed series. Short-height spacing
 and reduced-motion rules keep the shared shell usable. Animated headings stay
 below the shared dialog in their own stacking context.
+The active completion view shares the race-results translucent backdrop in
+`styles/modal-and-result-shell.css`, showing the already rendered track through
+the same dark tint and blur. Its selector follows the active view, so other
+modal views retain their existing backdrop; reduced-transparency preferences
+use the shared stronger tint. Completion and race-result actions share one
+typography declaration in `styles/result-details.css`: 1.25rem, italic, weight
+900 and 0.1em letter spacing. Completion-specific CSS owns only button layout.
 The first valid final-stage result reserves the Finished action immediately,
 with Home hidden while confirmation is pending. Canonical acceptance enables
 that same button; rejection restores Home. Replays of the completed final stage show Results; earlier-stage replays retain their existing actions.
@@ -184,7 +191,12 @@ maintaining mode-specific card layouts:
 - `lobby-modes.css` owns the shared Daily/Campaign header in flow, the top-right
   toolbar, mode pane, bottom primary row, and the two-line Daily/Campaign Start
   Race action layout. A pending Start spinner sits to the left of that stack so
-  the button does not grow a third row.
+  the button does not grow a third row. The Campaign mode button has a fixed
+  `6.5rem` width and a label span that truncates long selected-series names with
+  an ellipsis. Its arrow points down on the Campaign series list and up otherwise;
+  Daily and the series list use the Campaign label. There is no dropdown. Selected
+  track name and laps remain in the right-hand subhead; narrow Campaign
+  track labels truncate with an ellipsis instead of extending past the edge.
 - `styles/lobby-and-garage.css` owns the shared primary-button typography,
   including the smaller header-font race-brief line with the bold selected track
   name, separator dot, and singular/plural lap count under Start Race.

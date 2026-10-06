@@ -1,5 +1,21 @@
 # Campaign finished screen investigation — 2026-10-04
 
+## Track backdrop and consistent button typography — 2026-10-06
+
+The active completion summary now uses the same translucent, blurred dark
+backdrop as race results, revealing the current track already rendered beneath
+the modal. This is scoped to the active completion view and reuses the existing
+reduced-transparency treatment. Home, Tracks and Share Results share the
+race-result buttons' 1.25rem italic typography, weight and letter spacing in one
+CSS declaration. The equal-width stacked actions and navigation remain intact.
+
+Validation: 144 focused tests and the production build pass. Local Chromium
+checks at 1440×900, 390×844, 320×568 and 844×390 verify the rendered track,
+matching computed button typography, visible stacked actions, keyboard
+navigation and backdrop scoping. Eleven existing preview cases also pass,
+including navigation and sharing cancellation/confirmation. Screenshots and
+standard game-client text state were inspected. No deployment was performed.
+
 ## Simplified completion summary — 2026-10-06
 
 The completion screen now removes the four medal-type icons/counts and keeps

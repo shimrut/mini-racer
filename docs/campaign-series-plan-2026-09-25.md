@@ -86,19 +86,24 @@ the design below instead.
   "TARMAC · 16 STAGES · 23/64 MEDALS". A series that has not reached its stage count is dimmed and says
   its ground and Coming soon, for example "DIRT · COMING SOON". An empty series shows a track of its ground (Country Road, Snow Circuit, Grip
   Circuit).
-- Choosing a series opens its stages (the carousel and Start Race). **Campaign** in the switch,
-  or **Escape**, goes back to the series screen. A return from a race opens the stages.
-- On the stages screen, the header shows the series name and medals. With two or more live
-  series it opens a quick-switch list. The subhead line stays the plain Daily line.
+- Choosing a series opens its stages (the carousel and Start Race). **Escape**
+  goes back to the series screen. A return from a race opens the stages.
+- On the series list, the mode button reads **Campaign** with a downward arrow.
+  On a selected series' stages, it shows that series' full name with an upward
+  arrow. The button keeps its fixed width; long names truncate visually with an
+  ellipsis, with the full name available to assistive technology and on hover.
+  Daily restores the **Campaign** label. It retains the normal Campaign/series-screen
+  action; there is no quick-switch dropdown. Track name and laps stay on the right.
 - The series screen hides the Standings and Tracks icons, because they need a stage.
+- The launcher post uses **Choose your series** above **Campaign**, with general
+  copy about earning medals and unlocking races through each series. It names no
+  specific series and gives no count of available series.
 - Files: `game/lobby/campaign-series-screen.js`, `game/lobby/campaign-series-picker.js`,
   `game/lobby/ui.js`, `pages/game.html`, `styles/lobby-modes.css`,
   `game/campaign/engine-methods.js`, `game/engine.js`, `game/campaign/series.json`.
 
 ## What is left
 
-1. **Launcher post copy.** `pages/campaign.html` says "The Numbers". Change it when Dirt goes
-   live.
-2. **Dirt content.** Build the dirt tracks. Set their medal times in the Mapmaker.
+1. **Dirt content.** Build the dirt tracks. Set their medal times in the Mapmaker.
    Dirt goes live on the first build with 1 stage. Formula Mini needs 2.
-3. **Optional:** a split of Campaign analytics by series.
+2. **Optional:** a split of Campaign analytics by series.

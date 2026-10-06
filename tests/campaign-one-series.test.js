@@ -91,7 +91,7 @@ describe('Campaign with one live series', () => {
 
         lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series: [NUMBERS] });
         await new Promise((resolve) => setTimeout(resolve, 5));
-        expect(document.querySelector('[data-campaign-series]').hidden).toBe(true);
+        expect(document.getElementById('lobby-switch-campaign-btn').hasAttribute('aria-haspopup')).toBe(false);
         expect(document.getElementById('campaign-series-list').hidden).toBe(true);
 
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));

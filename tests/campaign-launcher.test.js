@@ -35,10 +35,15 @@ function finishedRoot(postData = FINISHED_POST) {
 }
 
 describe('campaign launcher custom post', () => {
-    it('names the Campaign series The Numbers', () => {
+    it('introduces Campaign series without naming one or counting availability', () => {
         const markup = readFileSync(new URL('../pages/campaign.html', import.meta.url), 'utf8');
 
-        expect(markup).toContain('class="campaign-eyebrow">The Numbers</p>');
+        expect(markup).toContain('class="campaign-eyebrow">Choose your series</p>');
+        expect(markup).toContain('Earn medals and unlock new races as you progress through each series.');
+        const introduction = markup.match(/<section class="campaign-copy">([\s\S]*?)<\/section>/)?.[1];
+        expect(introduction).toBeDefined();
+        expect(introduction).not.toContain('The Numbers');
+        expect(introduction.replace(/<[^>]*>/g, '')).not.toMatch(/\d/);
         expect(markup).toContain('id="campaign-place"');
         expect(markup).not.toContain('id="campaign-medals"');
         expect(markup).not.toContain('data-campaign-medal');

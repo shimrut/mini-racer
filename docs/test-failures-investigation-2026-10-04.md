@@ -253,3 +253,27 @@ run does not replace the full-suite checkpoint above.
 Evidence: `/private/tmp/dailygp-v250-track-commit-tests-2026-10-05.log`,
 `/private/tmp/dailygp-v250-track-commit-typecheck-2026-10-05.log`, and
 `/private/tmp/dailygp-v250-track-commit-build-2026-10-05.log`.
+
+## Full working-tree checkpoint — 2026-10-06
+
+The checkpoint preserves the pending Gun Slinger restoration, Campaign series
+navigation and launcher copy, Campaign completion styling, and WebView packaging
+guard, together with their existing tests and documentation.
+
+`npm run test` passes typecheck and asset generation. With localhost access,
+the complete suite finishes with **4,524 passed / seven failed** across 344 files
+(340 passing / four failing). The failures are the two missing-medal assertions,
+four Country Road guest-transfer snapshot mismatches, and the historical registry
+subset fingerprint. All seven were reproduced in an isolated source archive of
+the pre-checkpoint HEAD `35ca476a`; the received registry hash is unchanged.
+No assertions, snapshots, or runtime code were edited during this validation.
+
+`npm run build` passes with the existing JSON import-attribute warning.
+The preceding source review also compiled all ten configured WebView entrypoints
+and the server bundle into a temporary output directory. The initial sandboxed
+suite was stopped after blocked localhost listeners; it is not counted as a
+completed run. This checkpoint does not publish to Reddit or change hosted Redis.
+
+Evidence: `/private/tmp/dailygp-precommit-tests-network-20261006.log`,
+`/private/tmp/dailygp-precommit-baseline-tests-20261006.log`, and
+`/private/tmp/dailygp-precommit-build-20261006.log`.

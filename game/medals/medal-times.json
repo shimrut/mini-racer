@@ -1018,5 +1018,11 @@
     "gold": 10,
     "silver": 10.2,
     "bronze": 10.6
+  },
+  "gunSlinger": {
+    "author": 9.15,
+    "gold": 9.39,
+    "silver": 9.72,
+    "bronze": 10.03
   }
 }

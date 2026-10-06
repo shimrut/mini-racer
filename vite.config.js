@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -10,6 +10,28 @@ import { DEBUG_MODULE_STUBS } from './tools/debug-module-stubs.js';
 // files do not link to them ('hidden'). To read an error from the live game,
 // load the map from this folder into the browser's developer tools.
 const CLIENT_SOURCEMAP_DIR = fileURLToPath(new URL('./dist/client-sourcemaps', import.meta.url));
+
+export function validateWebviewEntrypoints(entrypoints) {
+    const entries = [...new Set(Object.values(entrypoints).map((entry) => entry.entry))];
+    return {
+        name: 'mini-racer-validate-webview-entrypoints',
+        applyToEnvironment: (environment) => environment.name === 'client',
+        generateBundle: {
+            order: 'post',
+            handler(_options, bundle) {
+                const missing = entries.filter((entry) => !bundle[entry]);
+                if (missing.length) this.error(`Missing WebView entrypoints in bundle: ${missing.join(', ')}`);
+            },
+        },
+        writeBundle: {
+            order: 'post',
+            handler(options) {
+                const missing = entries.filter((entry) => !existsSync(path.join(options.dir, entry)));
+                if (missing.length) this.error(`Missing WebView entrypoints on disk: ${missing.join(', ')}`);
+            },
+        },
+    };
+}
 
 function stripDebugModules() {
     return {
@@ -47,6 +69,9 @@ export default defineConfig({
     plugins: [
         stripDebugModules(),
         keepClientSourceMapsLocal(),
+        validateWebviewEntrypoints(JSON.parse(
+            readFileSync(new URL('./devvit.json', import.meta.url), 'utf8'),
+        ).post.entrypoints),
         devvit({
             client: {
                 build: {

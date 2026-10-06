@@ -18,8 +18,7 @@ import { formatLapsLabel } from '../shared/laps-label.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { TRACK_GROUNDS, getStoredTrackGroundKey } from '../track/grounds.js';
 import { setButtonBlock, setText } from '../ui/dom.js';
-import { campaignHasSeriesChoice } from '../campaign/manifest.js';
-import { CampaignSeriesPicker } from './campaign-series-picker.js';
+import { campaignHasSeriesChoice, getCampaignSeries } from '../campaign/manifest.js';
 import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
 import { COMMUNITY_VISIBLE } from '../community/visibility.js';
 
@@ -112,7 +111,6 @@ export class LobbyUi {
         onLoadMoreCommunity = null,
         onRefreshCommunity = null,
         onStartCommunity = null,
-        onSelectCampaignSeries = null,
         onOpenCampaignSeries = null,
         onBackToCampaignSeries = null,
         onBack = null,
@@ -133,9 +131,6 @@ export class LobbyUi {
         this.onStartCommunity = onStartCommunity;
         this._openCampaignSeries = (seriesId) => onOpenCampaignSeries?.(seriesId);
         this.onBackToCampaignSeries = onBackToCampaignSeries;
-        this.seriesPicker = new CampaignSeriesPicker({
-            onSelect: (seriesId) => onSelectCampaignSeries?.(seriesId),
-        });
         this.onBack = onBack;
         this.onOpenStandings = onOpenStandings;
         this.onOpenTracks = onOpenTracks;
@@ -241,7 +236,6 @@ export class LobbyUi {
             if (!this.challengeState.canAccept) return;
             this.onAcceptChallenge?.(this.challengeState);
         });
-        this.seriesPicker.bind();
         document.addEventListener('keydown', this._keydownHandler, true);
         document.addEventListener('pointermove', this._pointerMoveHandler, true);
         globalThis.addEventListener?.('resize', () => {
@@ -476,13 +470,15 @@ export class LobbyUi {
     }
 
     syncLobbySubheadDetail() {
-        // On the Campaign screen the series choice takes the place of the track name,
-        // which the Start Race button also shows. With one live series, there is no choice.
-        const seriesShown = this.seriesPicker.sync(
-            this.mode === 'campaign' && !this.isCampaignSeriesView() && campaignHasSeriesChoice()
-                ? this.campaignState
-                : null,
-        );
+        const campaignButton = document.getElementById('lobby-switch-campaign-btn');
+        const selectedSeries = this.campaignState.series?.find(
+            (series) => series.id === this.campaignState.seriesId,
+        ) ?? getCampaignSeries(this.campaignState.seriesId);
+        const campaignLabel = this.mode === 'campaign' && !this.isCampaignSeriesView()
+            ? selectedSeries?.name?.trim() || 'Campaign'
+            : 'Campaign';
+        setText(campaignButton?.querySelector('.lobby-mode-switch__label'), campaignLabel);
+        if (campaignButton) campaignButton.title = campaignLabel;
         const querySelector = document.querySelector?.bind(document);
         const track = querySelector?.('[data-lobby-mode-track]') || null;
         const selection = querySelector?.('[data-lobby-mode-selection]') || null;
@@ -523,7 +519,7 @@ export class LobbyUi {
         }
         if (rule) rule.hidden = false;
         setSubheadSelection(selection, billingLabel, billingLaps, this.getGroundLabel(billingTrackKey));
-        if ((seriesShown || this.isCampaignSeriesView()) && selection) selection.hidden = true;
+        if (this.isCampaignSeriesView() && selection) selection.hidden = true;
     }
 
     // The ground name of a non-tarmac track, or null. The name lives in the
@@ -598,10 +594,6 @@ export class LobbyUi {
             document.querySelector?.('[data-lobby-mode-switch]'),
             '[data-lobby-action]',
         );
-        const seriesButton = this.mode === 'campaign' ? this.seriesPicker.button : null;
-        if (seriesButton && !seriesButton.disabled && this.seriesPicker.root?.hidden === false) {
-            toggle.push(seriesButton);
-        }
         if (this.isCampaignSeriesView()) {
             const seriesRows = collectVisibleActionButtons(this.campaignSeriesList, '[data-lobby-action]')
                 .filter((button) => !button.disabled)
@@ -759,10 +751,6 @@ export class LobbyUi {
 
     handleKeydown(event) {
         if (!this.overlay || this.overlay.style.display === 'none' || this.isKeyboardNavBlocked()) return;
-        if (this.seriesPicker.isOpen()) {
-            this.seriesPicker.handleKeydown(event);
-            return;
-        }
         if (event.key === 'Escape' && this.mode !== 'home') {
             event.preventDefault?.();
             event.stopPropagation?.();

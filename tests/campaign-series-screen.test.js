@@ -109,6 +109,37 @@ describe('Campaign series screen in the lobby', () => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     }
 
+    it('keeps Campaign as the normal series-screen action without a dropdown', () => {
+        const onSelectCampaign = vi.fn();
+        const lobby = mountLobby({ onSelectCampaign });
+        const series = [
+            { id: 'numbered-v1', name: 'Numbers', stageCount: 17, medalCount: 0 },
+            { id: 'dirt-v1', name: 'Mini Rally', stageCount: 10, medalCount: 0 },
+        ];
+        const button = document.getElementById('lobby-switch-campaign-btn');
+        for (const state of [
+            { view: 'stages', seriesId: 'numbered-v1', series },
+            { view: 'stages', seriesId: 'numbered-v1', series: [series[0]] },
+            { view: 'series', seriesId: 'numbered-v1', series },
+        ]) {
+            lobby.showCampaign(state);
+            button.click();
+            expect(button.hasAttribute('aria-haspopup')).toBe(false);
+            expect(document.getElementById('campaign-series-btn')).toBeNull();
+            expect(document.getElementById('campaign-series-menu')).toBeNull();
+        }
+        expect(onSelectCampaign).toHaveBeenCalledTimes(3);
+        lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series });
+        lobby.setCampaignSelectedStage({ trackName: 'Number Zero', laps: 2, unlocked: true });
+        const selection = document.querySelector('[data-lobby-mode-selection]');
+        expect(selection.hidden).toBe(false);
+        expect(selection.textContent).toContain('Number Zero');
+        expect(selection.textContent).toContain('2 Laps');
+        lobby.showDaily({});
+        button.click();
+        expect(onSelectCampaign).toHaveBeenCalledTimes(4);
+    });
+
     it('shows the series list and hides the stages and Start Race in the series view', () => {
         const lobby = mountLobby({});
         lobby.showCampaign({ view: 'series', seriesId: 'numbered-v1', series: [] });
@@ -116,12 +147,35 @@ describe('Campaign series screen in the lobby', () => {
         expect(document.getElementById('campaign-carousel').hidden).toBe(true);
         expect(document.getElementById('campaign-primary-btn').closest('.lobby-primary-row').hidden).toBe(true);
         expect(document.body.dataset.campaignView).toBe('series');
-        expect(document.querySelector('[data-campaign-series]').hidden).toBe(true);
+        expect(document.getElementById('lobby-switch-campaign-btn').hasAttribute('aria-haspopup')).toBe(false);
 
         lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series: [] });
         expect(document.getElementById('campaign-series-list').hidden).toBe(true);
         expect(document.getElementById('campaign-carousel').hidden).toBe(false);
         expect(document.body.dataset.campaignView).toBe('stages');
+    });
+
+    it('shows the selected series name and restores Campaign on the series list and Daily', () => {
+        const lobby = mountLobby({});
+        const series = [
+            { id: 'numbered-v1', name: 'Numbers', stageCount: 17, medalCount: 0 },
+            { id: 'dirt-v1', name: 'A very long Campaign series name', stageCount: 10, medalCount: 0 },
+        ];
+        const button = document.getElementById('lobby-switch-campaign-btn');
+        const label = button.querySelector('.lobby-mode-switch__label');
+        lobby.showCampaign({ view: 'series', seriesId: 'numbered-v1', series });
+        expect(label.textContent).toBe('Campaign');
+        lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series });
+        expect(label.textContent).toBe('Numbers');
+        lobby.showCampaign({ view: 'stages', seriesId: 'dirt-v1', series });
+        expect(label.textContent).toBe('A very long Campaign series name');
+        expect(button.title).toBe(label.textContent);
+        lobby.showCampaign({ view: 'series', seriesId: 'dirt-v1', series });
+        expect(label.textContent).toBe('Campaign');
+        lobby.showDaily();
+        expect(label.textContent).toBe('Campaign');
+        lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series: [] });
+        expect(label.textContent).toBe('Numbers');
     });
 
     it('goes from the stages back to the series on Escape, and from the series to Home', async () => {

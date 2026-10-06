@@ -403,6 +403,9 @@ flowchart LR
   the only aggregate leaderboard entry and shares the poster's rank, K-total
   and Top X% formatting. Accessible labels retain exact values. Home, Tracks
   and Share Results stack at full equal width without a refresh/retry button.
+  The active summary shares the race-results translucent track backdrop and
+  button typography through the existing modal/results CSS, without changing
+  track loading or result/navigation state.
   `game/campaign/aggregate.js` sums saved
   full-race PB milliseconds across every stage, requiring the final-stage medal
   and valid times throughout. Required laps are already included in each PB.
@@ -964,6 +967,15 @@ These are useful, but they are not on the critical player path:
   `docs/track-authoring.md`, **Online Mapmaker**.
 - `tools/runner.*`
   Bot checks for a saved track, at `tools/runner.html`.
+- `vite.config.js` checks every configured WebView entrypoint in the emitted
+  client bundle and on disk. A missing page fails both ordinary and watch builds.
+  On 2026-10-06, version `2.5.0.30` reported missing `pages/preview.html`;
+  inspection found only `pages/map-creator-playtest.html` in the local output.
+  Subsequent clean builds restored all ten entrypoints and their referenced
+  scripts/styles. The user rebuilt the client and confirmed the playtest in
+  `r/mini_racer_dev` works again. The cause of the earlier partial output is
+  still unconfirmed; the guard detects missing pages but does not establish
+  or repair that cause.
 - `pages/preview.html`, `pages/daily.html`, `pages/preview.js`, `pages/preview.css`
   Custom Reddit post preview surfaces. `default` receives immutable challenge
   data and remains bound to that dated Daily post; `daily` is the stable
@@ -976,8 +988,10 @@ These are useful, but they are not on the critical player path:
   The Head to Head poster uses that same entrance. In-game schematic previews
   do not use that post-only treatment.
 - `pages/campaign.html`, `pages/campaign.js`, `pages/campaign.css`
-  Stable Campaign launcher surface, branded as `The Numbers` above the Campaign
-  title. Its CTA stores the Campaign launch target and expands the shared
+  Stable Campaign launcher surface, with `Choose your series` above the Campaign
+  title and general copy about medals and unlocking races, without naming a
+  specific series or counting availability. Its CTA stores the Campaign launch
+  target and expands the shared
   `game` entrypoint. The `game` entrypoint itself is the stable lobby surface;
   launcher post metadata pins it to Home so stale one-use Daily/Campaign targets
   cannot change the destination.

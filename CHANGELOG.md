@@ -1,3 +1,5 @@
+- **Gun Slinger** returns with its v2.4.0 layout and medal times, between Winding Road and Lightning Hook in Daily. **Water Pistol** stays available at the end of Daily.
+
 - **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
 
 - Road width in Mapmaker now includes **Tight**, one step narrower than Narrow (5.5 cars, 3.77u). Narrow, Normal and Wide stay the same.

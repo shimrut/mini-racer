@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { validateWebviewEntrypoints } from '../vite.config.js';
 
 const packageJson = JSON.parse(
     readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
@@ -27,6 +28,18 @@ function findMacMetadata(directoryUrl) {
 }
 
 describe('release pipeline', () => {
+    it('rejects a partial WebView bundle before upload', () => {
+        const plugin = validateWebviewEntrypoints(devvitConfig.post.entrypoints);
+        const context = { error(message) { throw new Error(message); } };
+        const partial = { 'pages/map-creator-playtest.html': { type: 'asset' } };
+        expect(() => plugin.generateBundle.handler.call(context, {}, partial))
+            .toThrow(/Missing WebView entrypoints in bundle: pages\/preview\.html/);
+        const complete = Object.fromEntries(Object.values(devvitConfig.post.entrypoints)
+            .map(({ entry }) => [entry, { type: 'asset' }]));
+        expect(() => plugin.generateBundle.handler.call(context, {}, complete)).not.toThrow();
+        expect(plugin.applyToEnvironment({ name: 'server' })).toBe(false);
+    });
+
     it('keeps Reddit user attribution enabled for result comments and challenge posts', () => {
         expect(devvitConfig.permissions.reddit.asUser).toEqual(expect.arrayContaining([
             'SUBMIT_COMMENT',

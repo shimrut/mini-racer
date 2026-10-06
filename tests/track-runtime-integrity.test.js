@@ -19,6 +19,7 @@ const MEDAL_TIMES = JSON.parse(readFileSync(new URL('../game/medals/medal-times.
 // Extracted from the installed v2.4.0 server bundle, independently checked
 // against racer-v2-4 (e9a578eb). Pin the entire definitions, legacy fields included.
 const V240_TRACK_CONTRACTS = [
+    ['gunSlinger', 'e088f7afbf00b7b7aa1064a85bd2ec100307b8f57e0ce72fb63d485a76b89050', { author: 9.15, gold: 9.39, silver: 9.72, bronze: 10.03 }],
     ['brokenWing', 'e7c79e7b37bf692842b428dde318a9b9e9eb427634b8397dabfb0ab2cb8a6dc8', { author: 11.47, gold: 11.82, silver: 12.15, bronze: 12.41 }],
     ['twinWings', '648e054e784739b182f9c3672ae06d5ecf9b87fad322c81e304abb22db213e5d', { author: 10.71, gold: 10.96, silver: 11.22, bronze: 11.53 }],
     ['splitJaw', '7d59b5e236ad341c69789d38966bf3fe178836df8214c66bcf62efd2845b920c', { author: 15.05, gold: 15.25, silver: 15.55, bronze: 15.95 }],
@@ -248,6 +249,7 @@ describe('track runtime integrity', () => {
             'endlessLoop',
             'crescentValley',
             'seaCharger',
+            'gunSlinger',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -319,14 +321,31 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(unchangedSinceWindingLane)).toBe(
             'c0b2320fed2a23574efccdf691c63a7b4d6ab1bada1cf6d83e49c228912404f9',
         );
-        expect(hashTrackRegistry(TRACKS)).toBe(
-            '9266d047e6e1815e25618fe021b9439a2b6a64b64867f2bdfdf36bc2640c68d0',
-        );
     });
 
     it.each(V240_TRACK_CONTRACTS)('keeps %s identical to production v2.4.0', (trackKey, expectedHash, medalRow) => {
         expect(hashTrackRegistry(TRACKS[trackKey])).toBe(expectedHash);
         expect(MEDAL_TIMES[trackKey]).toEqual(medalRow);
+    });
+
+    it('restores Gun Slinger at its v2.4.0 Daily position and preserves Water Pistol', () => {
+        const index = TRACK_SCHEDULE_KEYS.indexOf('gunSlinger');
+        expect(index).toBe(88); // Daily position 89 in v2.4.0.
+        expect(TRACK_SCHEDULE_KEYS.slice(index - 1, index + 2)).toEqual([
+            'windingRoad', 'gunSlinger', 'lightningHook',
+        ]);
+        expect(TRACK_SCHEDULE_KEYS.at(-1)).toBe('waterPistol');
+        expect(hashTrackRegistry(TRACK_SCHEDULE_KEYS.filter((key) => (
+            key !== 'gunSlinger' && key !== 'waterPistol'
+        )))).toBe('fd4c78dbd38136623dc7155358ed3dfac8e2bab002765b39a56413e099e6fba2');
+        // Pin every existing track, including Water Pistol, before this restoration.
+        expect(hashTrackRegistry(Object.fromEntries(Object.entries(TRACKS)
+            .filter(([key]) => key !== 'gunSlinger')))).toBe(
+            '40f62fd7f1ba367e32766512b877a4aa014ff7c572d2506507e087ad9d255f4f',
+        );
+        expect(hashTrackRegistry(TRACKS)).toBe(
+            '31e461881c505623ee939b3aa7a479acbdb277494658608c6433f1b23e06e1e0',
+        );
     });
 
     // Expected shapes come from the original definitions: 0feab0e0 for Mountain

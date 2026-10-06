@@ -421,8 +421,8 @@ checkpoint heuristic rejects the published Slingshot Run layout. Any edited
 geometry or targets still runs the authoring checks, and unfinished roads or
 missing medal times remain inadmissible.
 
-The complete working-tree fingerprint, including the existing Sea Charger
-addition and independent Rough Cut/Hillside Scramble authoring edits, is now
+At that restoration, the complete working-tree fingerprint, including the
+existing Sea Charger addition and independent Rough Cut/Hillside Scramble edits, was
 `9266d047e6e1815e25618fe021b9439a2b6a64b64867f2bdfdf36bc2640c68d0`.
 The unchanged subset excludes those authoring edits and the nine independently
 pinned restorations. Numbers remains unchanged, with Endless Loop as its
@@ -434,6 +434,36 @@ errors, exact production assertions, Creator copy/admission, replay/track checks
 share rendering, typecheck and build. The full suite has 4,450 passing tests and
 six unrelated failures: two missing medal calibrations and four Country Road
 snapshot fingerprints from separate authoring work. Nothing was deployed.
+
+### Gun Slinger restoration — 2026-10-06
+
+Gun Slinger (`gunSlinger`) returns with the exact definition and medal row
+from `racer-v2-4` (`e9a578eb`), checked against the archived v2.4.0 release.
+Author/Gold/Silver/Bronze targets are 9.15/9.39/9.72/10.03 seconds. Legacy
+rendering fields remain in the production definition, as in the nine-track
+restoration above; Creator copying normalizes them.
+
+The user requested the original Daily slot (position 89) between Winding Road and Lightning
+Hook, rather than an appended slot. Water Pistol keeps its definition and
+medal row and moves to the end of the built-in Daily schedule. Every other
+existing track and its relative Daily order remains unchanged. This updates
+the app's built-in schedule; a Creator-managed Redis schedule still takes
+precedence, and published Daily history is not rewritten.
+
+Production identity and medal assertions pin Gun Slinger. A separate registry
+assertion pins every pre-restoration track, including Water Pistol, to the
+current baseline (`40f62fd7f1ba367e32766512b877a4aa014ff7c572d2506507e087ad9d255f4f`).
+The complete restored registry is
+`31e461881c505623ee939b3aa7a479acbdb277494658608c6433f1b23e06e1e0`.
+Its share preview uses the current renderer. Exact production equality and
+preservation checks pass. Chromium loads the restored track, starts a Daily
+race and steers with no runtime errors; race and share screenshots were
+inspected. Creator copying, Daily scheduling, simulation/replay and rendering
+checks pass, as do typecheck and build (with the existing JSON import-attribute
+warning). The full suite has 4,503 passing tests and the same seven failures
+present before restoration: two missing medal calibrations, four Country Road
+guest-transfer snapshots and the stale registry subset fingerprint from
+existing authoring edits. Nothing was deployed or written to hosted Redis.
 
 ## Campaign Series
 

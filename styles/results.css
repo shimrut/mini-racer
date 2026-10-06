@@ -118,10 +118,6 @@
     min-height: 3rem;
     width: 100%;
     padding: 0.7rem 0.4rem;
-    font-size: 1.15rem;
-    font-style: italic;
-    font-weight: 800;
-    letter-spacing: 0.01em;
 }
 
 #modal-campaign-finished-view .combined-action-btn:not(.combined-action-btn--primary) {

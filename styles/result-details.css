@@ -239,6 +239,7 @@
     display: none;
 }
 
+#modal-campaign-finished-view .combined-action-btn,
 #modal-combined-view .combined-action-btn {
     width: 100%;
     border-radius: var(--radius-full);

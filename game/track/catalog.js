@@ -173,6 +173,7 @@ export const TRACK_CATALOG = {
     endlessLoop: { name: "Endless Loop" },
     crescentValley: { name: "Crescent Valley" },
     seaCharger: { name: "Sea Charger" },
+    gunSlinger: { name: "Gun Slinger" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [
@@ -264,7 +265,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'hookLoop',
     'crookedArrow',
     'windingRoad',
-    'waterPistol',
+    'gunSlinger',
     'lightningHook',
     'doubleTrouble',
     'brokenWing',
@@ -311,6 +312,7 @@ export const TRACK_SCHEDULE_KEYS = [
     'windingLane',
     'greyHarbor',
     'crescentValley',
+    'waterPistol',
 ];
 
 export const DEFAULT_TRACK_KEY = 'circuit';

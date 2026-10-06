@@ -398,11 +398,6 @@ export class RealTimeRacer {
         seriesId,
       ),
       onBackToCampaignSeries: () => void this.invokeModeMethod("campaign", "backToCampaignSeries"),
-      onSelectCampaignSeries: (seriesId) => void this.invokeModeMethod(
-        "campaign",
-        "selectCampaignSeries",
-        seriesId,
-      ),
       onBack: () => this.showHomeLobby(),
       onOpenStandings: (mode) => this.openVisibleLobbyStandings(mode),
       onOpenTracks: (mode) => {

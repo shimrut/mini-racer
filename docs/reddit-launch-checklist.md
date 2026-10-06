@@ -17,6 +17,15 @@ Mini Racer is a **game**, so the most important launch requirements are:
 
 ## Launch checklist
 
+### WebView packaging
+
+- [ ] The final build contains every `post.entrypoints.*.entry` from `devvit.json`
+  under `dist/client`, including `pages/preview.html`. The client build now rejects
+  missing entrypoints in both its emitted bundle and output directory.
+- [ ] Upload only the completed build and open the installed version on Reddit.
+  A local Vite fixture or successful compiler exit does not confirm hosted assets.
+
+
 ### Product and UX
 
 - [ ] The in-feed launch card is clear at first glance and explains the action: race today’s challenge.
