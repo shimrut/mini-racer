@@ -628,10 +628,6 @@
     display: none;
 }
 
-#combined-medals-row .medal-svg--row-placeholder {
-    filter: saturate(0.4) brightness(0.8);
-}
-
 @media (max-height: 640px) {
     .leaderboard-summary__value {
         font-size: 1.1rem;

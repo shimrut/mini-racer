@@ -407,7 +407,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 ...unfinished,
                 progress: { resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'bronze') },
             },
-        })).toMatchObject({ label: 'Results', enabled: true });
+        })).toMatchObject({ label: 'Results', enabled: true, replaceMenu: false });
     });
 
     function campaignMedalResults(stages, lastMedal = null) {
@@ -473,7 +473,9 @@ describe('Campaign lobby and shared modal adapters', () => {
             },
         });
         context.showCampaignFinish(context.activeCampaignStage, { finalTime: 30, medal: null });
-        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({ label: 'Results', enabled: true });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({
+            label: 'Results', enabled: true, replaceMenu: false,
+        });
         expect(context._campaignFinishedReady).toMatchObject({ revisit: true });
         expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
         expect(campaignServiceMocks.submitCampaignRun).not.toHaveBeenCalled();
@@ -490,12 +492,16 @@ describe('Campaign lobby and shared modal adapters', () => {
         });
         const stage = context.activeCampaignStage;
         context.showCampaignFinish(stage, { finalTime: 20, medal: 'gold', submitted: true });
-        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({ label: 'Results', enabled: true });
+        expect(context.modal.showModal.mock.calls[0][3].nextRace).toMatchObject({
+            label: 'Results', enabled: true, replaceMenu: false,
+        });
         await confirmCampaignRun(context, stage.raceId, {
             accepted: true,
             progress: { campaignId: CAMPAIGN_NUMBERS_SERIES_ID, resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'gold') },
         });
-        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Results', enabled: true }));
+        expect(context.modal.setCombinedNextRace).toHaveBeenLastCalledWith(expect.objectContaining({
+            label: 'Results', enabled: true, replaceMenu: false,
+        }));
         expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
         expect(context._campaignFinishedReady).toMatchObject({ revisit: true });
         clearActivePlayerOwnerId();
@@ -568,7 +574,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         // The result screen stays; nothing opens until the player presses Finish.
         expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
-        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true });
+        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true, replaceMenu: true });
         finishedNext(context).action();
         expect(context.modal.showCampaignFinished).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -631,7 +637,7 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         expect(context.modal.showModal).toHaveBeenCalledOnce();
         expect(context.modal.showCampaignFinished).not.toHaveBeenCalled();
-        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true });
+        expect(finishedNext(context)).toMatchObject({ label: 'Results', enabled: true, replaceMenu: true });
         finishedNext(context).action();
         expect(context.modal.showCampaignFinished).toHaveBeenCalledOnce();
         clearActivePlayerOwnerId();
@@ -753,7 +759,7 @@ describe('Campaign lobby and shared modal adapters', () => {
                 resultsByRaceId: campaignMedalResults(NUMBERS_STAGES, 'gold'),
             },
         });
-        expect(finishedNext(repeat)).toMatchObject({ label: 'Results', enabled: true });
+        expect(finishedNext(repeat)).toMatchObject({ label: 'Results', enabled: true, replaceMenu: false });
         expect(repeat.modal.showCampaignFinished).not.toHaveBeenCalled();
 
         const retry = finishConfirmationContext();

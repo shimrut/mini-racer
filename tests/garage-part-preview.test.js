@@ -3,6 +3,8 @@ import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { DrawnCar } from '../game/car/drawn-car.js';
 import { GarageUi, getSpriteBounds } from '../game/settings/garage-ui.js';
 import { DRAWN_CAR_ASSET_NAMES } from '../game/car/drawn-car-skins.js';
+import { writePlayerCarDecalStyle } from '../game/car/player-car-decals.js';
+import { writePlayerCarSkinAssetName } from '../game/car/player-car-skin.js';
 import { getDrawnCar } from '../game/car/sprite.js';
 
 beforeEach(() => vi.stubGlobal('document', { createElement: () => createCanvas(1, 1) }));
@@ -29,9 +31,6 @@ describe('Garage part details', () => {
         const raceFrame = car.renderFrame();
         const garage = new GarageUi();
         garage.carPreview = { src: '' };
-        garage.carName = {};
-        garage.carStatus = {};
-        garage.carSelect = { classList: { toggle() {} }, setAttribute() {} };
         const prepare = vi.spyOn(garage, 'setShowcaseImage');
 
         garage.syncCustomPreview();
@@ -55,9 +54,6 @@ describe('Garage part details', () => {
     it('reuses prepared artwork for status refreshes and when returning to a previewed type', () => {
         const garage = new GarageUi();
         garage.carPreview = { src: '' };
-        garage.carName = {};
-        garage.carStatus = {};
-        garage.carSelect = { classList: { toggle() {} }, setAttribute() {} };
         garage.partPreviews = new Map(['main', 'accent', 'tertiary'].map((channel) => [channel, createCanvas(192, 160)]));
         const prepare = vi.spyOn(garage, 'setShowcaseImage');
         const regions = vi.spyOn(garage, 'findPaintDetails');
@@ -75,6 +71,39 @@ describe('Garage part details', () => {
         expect(prepare).toHaveBeenCalledTimes(2);
         expect(regions).toHaveBeenCalledTimes(2);
         expect(fit).toHaveBeenCalledTimes(6);
+    });
+
+    it('leaves every street decal unselected while a legacy car is equipped', () => {
+        const storage = new Map();
+        vi.stubGlobal('window', { localStorage: {
+            getItem: (key) => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, String(value)),
+            removeItem: (key) => storage.delete(key),
+        } });
+        writePlayerCarSkinAssetName('assets/cars/mr_mr_red.webp');
+        writePlayerCarDecalStyle('drawn/formula-red', 'drawn/formula-gold');
+        const garage = new GarageUi();
+        garage.carPreview = { src: '' };
+        garage.activeGarageTab = 'street';
+        const pressed = new Map();
+        const button = (id) => ({
+            classList: { toggle() {} },
+            setAttribute(name, value) {
+                if (name === 'aria-pressed') pressed.set(id, value);
+            },
+            querySelector: () => ({ src: '' }),
+        });
+        garage.decalOptionButtons.set('drawn/formula-red', button('drawn/formula-red'));
+        garage.decalOptionButtons.set('drawn/formula-gold', button('drawn/formula-gold'));
+
+        garage.syncCustomPreview();
+        expect(pressed.get('drawn/formula-red')).toBe('false');
+        expect(pressed.get('drawn/formula-gold')).toBe('false');
+
+        writePlayerCarSkinAssetName('drawn/formula-red');
+        garage.syncCustomPreview();
+        expect(pressed.get('drawn/formula-gold')).toBe('true');
+        expect(pressed.get('drawn/formula-red')).toBe('false');
     });
 
     it('shares bounds handling for transparent margins and an empty sprite', () => {
