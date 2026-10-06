@@ -191,6 +191,18 @@ async function authorizedRequest({ redditUsername, subredditName }: CampaignShar
     return { username, subredditName, canonicalPlayerId };
 }
 
+export async function markServerCampaignResultsSharePending({
+    raceId,
+    redditUsername,
+    subredditName,
+}: CampaignShareContext & { raceId?: unknown } = {}): Promise<void> {
+    const request = await authorizedRequest({ redditUsername, subredditName });
+    if ('status' in request) return;
+    const stage = getCampaignStage(raceId);
+    if (!stage) return;
+    await markRefreshPending(resultKey(stage.seriesId, request.subredditName, request.canonicalPlayerId));
+}
+
 // Read current saved results after taking the publication lock, rather than
 // writing the possibly older snapshot returned by a concurrent race submission.
 export async function refreshServerCampaignResultsShare({

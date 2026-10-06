@@ -111,6 +111,9 @@ flowchart LR
 - The startup coordinator reveals the selected mode's lobby after that mode's contract and track are ready. Start input remains gated until those are ready; `App.Ready` is reported once that lobby is visible. Each explicit player intent starts one Journey attempt (`initial_start`, `track_switch`, `restart`, `retry`, or `improve`); checkpoints provide monotonic progress, pause/resume use fixed interaction names, locally validated finishes end complete, and rejected finishes, explicit exits, or track switches end incomplete before the next start. Mid-run track switches replace the active Journey through `replaceActive` end-then-start sequencing. Automatic collision restart stays inside the active Journey because it is not an explicit player action.
 - `game/ui/loader.js` owns the status line and retry. The bar crawl lives in `styles/loading.css` and is not tied to startup phase percents. Dismissal removes the input-blocking class immediately and uses the shared 160ms motion token, without depending on animation frames that a hidden WebView may suspend.
 - Journey payloads contain no player ID, Reddit username, guest token, challenge ID, track key, replay, device details, or lap score. The official `/api/telemetry` router enriches Journey events in Devvit. Separate moderator summary counters live in one `dailygp:analytics:{scope}:summary` hash per community. Each race, challenge create, or podium event increments that hash, and the moderator page reads it through `/api/analytics/summary`. The first read copies older per-day counter hashes into the summary so existing charts stay. Daily presence hashes remain, because cohort return rates still check who came back on a specific day. Expiry on these keys is refreshed once per server process per UTC day, not on every event. Cohort starts are recorded separately for signed-in accounts and are derived against retained daily presence marks for exact UTC-day D1/D2/D3/D7/D14/D30 return rates; guests remain outside the cohort denominator. That same moderator summary also includes a Redis occupancy walk from `src/server/moderator/storage-usage.ts` (named keys only, sampled row sizes, 5-minute cache); Head to Head share previews and 10-minute post identity stay unlisted, while the durable Head to Head challenge catalog is counted with posts.
+- The race-start, podium and challenge analytics POSTs finish recording before
+  replying with 204, because Devvit does not guarantee server work after a reply.
+  Recording failures still log and return 204.
 
 ### Issued Challenge Analytics
 
@@ -440,12 +443,18 @@ flowchart LR
   recover missing final-track/surface metadata through public `GET /api/campaign/poster`,
   which loads only the published final track and does not read or change viewer
   progress, identity or standings. Unavailable time/artwork remains omitted. An accepted
-  race refreshes that post's medal counts, PB total (including same-tier improvements),
+  race only marks an existing shared post for refresh before replying (one Redis
+  read and at most one write, with no Reddit calls or refresh-lock wait). This also
+  covers accepted retries that repair progress without improving a PB. The game's
+  existing Campaign reload after saving, or a later Campaign open, refreshes that
+  post inside the bootstrap request using the returned `campaignId`, including
+  Numbers requests that omit `seriesId`. It updates medal counts, PB total (including same-tier improvements),
   artwork metadata, place and plain-text backup from the same finished-screen
   tally and the current board. A place is left unchanged while ranking is not
   ready, so a temporary gap does not wipe a posted place. If Reddit rejects the refresh, the
-  saved race still stands; opening that Campaign again tries the same post, as
-  does the next accepted race. Its **Play Campaign** carries the exact series ID into startup and
+  saved race still stands and the pending mark remains for another Campaign load.
+  Refresh is best effort: an overlapping older refresh can clear a newer mark,
+  leaving the public post stale until a later accepted save. Its **Play Campaign** carries the exact series ID into startup and
   selects the viewer's own last unlocked stage. Cold Creator IDs survive until
   their catalog arrives; unavailable series return an error instead of falling
   back to Numbers. A durable pre-submit claim prevents duplicate posts after an

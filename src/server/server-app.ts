@@ -128,7 +128,7 @@ import {
     submitServerCampaignRun,
 } from './campaign/campaign-store.js';
 import { createHeadToHeadService } from './head-to-head/head-to-head-service.js';
-import { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } from './campaign/campaign-share.js';
+import { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, markServerCampaignResultsSharePending, refreshServerCampaignResultsShare } from './campaign/campaign-share.js';
 import {
     confirmHeadToHeadBrag,
     previewHeadToHeadBrag,
@@ -262,6 +262,7 @@ function registerProductionRoutes(app: express.Application): void {
         getServerCampaignPbGhost: (input) => getServerCampaignPbGhost(input),
         previewServerCampaignResultsShare: (input) => previewServerCampaignResultsShare(input),
         confirmServerCampaignResultsShare: (input) => confirmServerCampaignResultsShare(input),
+        markServerCampaignResultsSharePending: (input) => markServerCampaignResultsSharePending(input),
         refreshServerCampaignResultsShare: (input) => refreshServerCampaignResultsShare(input),
         readContextSubredditName,
         describeStoredSeries: resolveStoredSeriesForRequest,

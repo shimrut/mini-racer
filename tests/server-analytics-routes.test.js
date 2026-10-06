@@ -168,6 +168,74 @@ describe('analytics route contracts', () => {
     });
 });
 
+describe('client analytics acknowledgement', () => {
+    const reports = [
+        {
+            path: '/api/analytics/race-start',
+            recorder: 'recordRaceStart',
+            body: { mode: 'campaign', playerId: 'guest-1', guestToken: 'token-1' },
+            recorded: { mode: 'campaign', playerId: 'guest-1', guestToken: 'token-1', redditUsername: 'RaceFan' },
+            failureLog: 'Failed to record Mini Racer race start:',
+        },
+        {
+            path: '/api/analytics/podium',
+            recorder: 'recordPodiumEvent',
+            body: { action: 'play' },
+            recorded: { action: 'play' },
+            failureLog: 'Failed to record Mini Racer podium analytics:',
+        },
+        {
+            path: '/api/analytics/challenge',
+            recorder: 'recordChallengeEvent',
+            body: { action: 'view' },
+            recorded: { action: 'view' },
+            failureLog: 'Failed to record Mini Racer challenge analytics:',
+        },
+    ];
+
+    it.each(reports)('waits for recording before replying to $path', async ({ path, recorder, body, recorded }) => {
+        let release;
+        const pending = new Promise((resolve) => { release = resolve; });
+        const record = vi.fn(() => pending);
+        const routes = new Map();
+        registerAnalyticsRoutes({
+            post: (route, handler) => routes.set(route, handler),
+            get: vi.fn(),
+        }, {
+            [recorder]: record,
+            getRequestUsername: () => 'RaceFan',
+        });
+        const res = { status: vi.fn().mockReturnThis(), end: vi.fn() };
+        const response = routes.get(path)({ body }, res);
+        try {
+            expect(record).toHaveBeenCalledWith(recorded);
+            expect(res.status).not.toHaveBeenCalled();
+            expect(res.end).not.toHaveBeenCalled();
+        } finally {
+            release();
+            await response;
+        }
+        expect(res.status).toHaveBeenCalledWith(204);
+        expect(res.end).toHaveBeenCalledOnce();
+    });
+
+    it.each(reports)('logs a recording failure and still replies 204 to $path', async ({ path, recorder, body, failureLog }) => {
+        const error = new Error('Redis unavailable');
+        const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, {
+            [recorder]: vi.fn(async () => { throw error; }),
+            getRequestUsername: () => 'RaceFan',
+        }));
+        const response = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        expect(response.status).toBe(204);
+        expect(logError).toHaveBeenCalledWith(failureLog, error);
+    });
+});
+
 describe('guest transfer diagnostic route', () => {
     function diagnosticDependencies(overrides = {}) {
         return {
@@ -288,27 +356,6 @@ describe('issued challenge analytics routes', () => {
             expect((await postEvent(baseUrl, { action })).status).toBe(400);
         }
         expect(services.recordChallengeEvent).not.toHaveBeenCalled();
-    });
-
-    it('acknowledges immediately while Redis recording is pending', async () => {
-        let release;
-        const pending = new Promise((resolve) => { release = resolve; });
-        const services = dependencies({ recordChallengeEvent: vi.fn(() => pending) });
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
-        try {
-            expect((await postEvent(baseUrl, { action: 'view' })).status).toBe(204);
-            expect(services.recordChallengeEvent).toHaveBeenCalledWith({ action: 'view' });
-        } finally {
-            release();
-        }
-    });
-
-    it('keeps Redis failure benign for the poster', async () => {
-        const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const services = dependencies({ recordChallengeEvent: vi.fn(async () => { throw new Error('Redis unavailable'); }) });
-        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
-        expect((await postEvent(baseUrl, { action: 'view' })).status).toBe(204);
-        await vi.waitFor(() => expect(logError).toHaveBeenCalled());
     });
 
     it('uses moderator context for the paginated listing', async () => {

@@ -30,7 +30,6 @@ export function registerAnalyticsRoutes(
             res.status(400).json({ error: 'Unsupported race start mode.' });
             return;
         }
-        res.status(204).end();
         try {
             await dependencies.recordRaceStart({
                 mode,
@@ -41,6 +40,7 @@ export function registerAnalyticsRoutes(
         } catch (error) {
             console.error('Failed to record Mini Racer race start:', error);
         }
+        res.status(204).end();
     });
 
     app.post('/api/analytics/podium', async (req, res) => {
@@ -49,12 +49,12 @@ export function registerAnalyticsRoutes(
             res.status(400).json({ error: 'Unsupported podium analytics action.' });
             return;
         }
-        res.status(204).end();
         try {
             await dependencies.recordPodiumEvent({ action });
         } catch (error) {
             console.error('Failed to record Mini Racer podium analytics:', error);
         }
+        res.status(204).end();
     });
 
     app.post('/api/analytics/challenge', async (req, res) => {
@@ -63,12 +63,12 @@ export function registerAnalyticsRoutes(
             res.status(400).json({ error: 'Unsupported challenge analytics action.' });
             return;
         }
-        res.status(204).end();
         try {
             await dependencies.recordChallengeEvent({ action });
         } catch (error) {
             console.error('Failed to record Mini Racer challenge analytics:', error);
         }
+        res.status(204).end();
     });
 
     app.get('/api/analytics/challenges', async (req, res: Response) => {

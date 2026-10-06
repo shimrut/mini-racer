@@ -18,6 +18,7 @@ export type CampaignRouteDependencies = {
     getServerCampaignPbGhost(input: Record<string, unknown>): Promise<ServiceResult>;
     previewServerCampaignResultsShare(input: Record<string, unknown>): Promise<ServiceResult>;
     confirmServerCampaignResultsShare(input: Record<string, unknown>): Promise<ServiceResult>;
+    markServerCampaignResultsSharePending(input: Record<string, unknown>): Promise<void>;
     refreshServerCampaignResultsShare(input: Record<string, unknown>): Promise<void>;
     readContextSubredditName(): string | null;
     // The published Creator series, and the placed stored tracks among these keys.
@@ -96,7 +97,7 @@ export function registerCampaignRoutes(
             if (result.status === 200) {
                 try {
                     await dependencies.refreshServerCampaignResultsShare?.({
-                        seriesId,
+                        seriesId: (result.body as { campaignId?: unknown })?.campaignId,
                         redditUsername: dependencies.getRequestUsername(),
                         subredditName: dependencies.readContextSubredditName?.(),
                         onlyIfPending: true,
@@ -165,13 +166,13 @@ export function registerCampaignRoutes(
             });
             if (result.status === 200 && (result.body as { accepted?: boolean })?.accepted === true) {
                 try {
-                    await dependencies.refreshServerCampaignResultsShare({
+                    await dependencies.markServerCampaignResultsSharePending({
                         raceId: req.body?.raceId,
                         redditUsername,
                         subredditName: dependencies.readContextSubredditName(),
                     });
                 } catch (error) {
-                    console.error('Campaign race saved, but its shared post could not be refreshed:', error);
+                    console.error('Campaign race saved, but its shared post could not be marked for refresh:', error);
                 }
             }
             send(res, result);

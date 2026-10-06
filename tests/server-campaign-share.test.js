@@ -43,7 +43,7 @@ vi.mock('../src/server/competition/competition-identity.js', () => ({ resolveAut
 vi.mock('../src/server/player/reddit-avatar.js', () => ({ resolveRedditAvatarUrl: mockAvatar }));
 vi.mock('../src/server/player/guest-retirement.js', () => ({ isProgressTransferPending: mockPending }));
 
-const { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, refreshServerCampaignResultsShare } = await import('../src/server/campaign/campaign-share.ts');
+const { getServerCampaignPoster, previewServerCampaignResultsShare, confirmServerCampaignResultsShare, markServerCampaignResultsSharePending, refreshServerCampaignResultsShare } = await import('../src/server/campaign/campaign-share.ts');
 const { campaignAggregateKeys } = await import('../src/server/campaign/campaign-aggregate-store.ts');
 const stages = getCampaignSeriesStages('numbered-v1');
 function rankBoard(rank, total) {
@@ -483,6 +483,67 @@ describe('Campaign result sharing', () => {
         await refreshServerCampaignResultsShare(refreshInput);
         expect(mockReddit.getPostById).not.toHaveBeenCalled();
         expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it('marks a shared post using only Redis, then refreshes fresh PBs on Campaign load', async () => {
+        mockResults.mockResolvedValue(timedResults());
+        const post = await publishedFixture();
+        const key = claimKey();
+        const published = JSON.parse(values.get(key));
+        vi.clearAllMocks();
+
+        await markServerCampaignResultsSharePending(refreshInput);
+        expect(mockRedis.get).toHaveBeenCalledExactlyOnceWith(key);
+        expect(mockRedis.set).toHaveBeenCalledExactlyOnceWith(key, JSON.stringify({ ...published, refreshPending: true }));
+        expect(mockResults).not.toHaveBeenCalled();
+        expect(mockPending).not.toHaveBeenCalled();
+        expect(mockReddit.getPostById).not.toHaveBeenCalled();
+        expect(mockReddit.getPostsByUser).not.toHaveBeenCalled();
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+
+        await markServerCampaignResultsSharePending(refreshInput);
+        expect(mockRedis.set).toHaveBeenCalledOnce();
+        mockResults.mockResolvedValue(timedResults(9_000));
+        await refreshServerCampaignResultsShare({ ...input, onlyIfPending: true });
+        expect(post.mergePostData).toHaveBeenCalledWith({ totalTimeMs: 9_000 * stages.length });
+        expect(post.setTextFallback).toHaveBeenCalledOnce();
+        expect(JSON.parse(values.get(key))).toEqual(published);
+    });
+
+    it('does not create a claim when marking an unshared result', async () => {
+        await markServerCampaignResultsSharePending(refreshInput);
+        expect(mockRedis.get).toHaveBeenCalledOnce();
+        expect(mockRedis.set).not.toHaveBeenCalled();
+        expect(mockReddit.getPostById).not.toHaveBeenCalled();
+        expect(mockReddit.submitCustomPost).not.toHaveBeenCalled();
+    });
+
+    it.each([{ redditUsername: 'OtherRacer' }, { subredditName: 'OtherCommunity' }])('scopes pending marks to the owner and community: %j', async (other) => {
+        await publishedFixture();
+        const published = values.get(claimKey());
+        vi.clearAllMocks();
+        if (other.redditUsername) mockIdentity.mockResolvedValue({ canonicalPlayerId: 'reddit:otherracer' });
+        await markServerCampaignResultsSharePending({ ...refreshInput, ...other });
+        expect(values.get(claimKey())).toBe(published);
+        expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it.each([{ redditUsername: null }, { subredditName: null }, { raceId: 'unavailable-race' }])('does no storage work for an invalid pending mark: %j', async (invalid) => {
+        await markServerCampaignResultsSharePending({ ...refreshInput, ...invalid });
+        expect(mockRedis.get).not.toHaveBeenCalled();
+        expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it('logs a pending mark failure without rejecting the saved race', async () => {
+        const error = new Error('Redis unavailable');
+        const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockRedis.get.mockRejectedValueOnce(error);
+        try {
+            await expect(markServerCampaignResultsSharePending(refreshInput)).resolves.toBeUndefined();
+            expect(errorLog).toHaveBeenCalledWith('A Campaign post refresh could not be marked for retry:', error);
+        } finally {
+            errorLog.mockRestore();
+        }
     });
 
     it('refuses a stored post belonging to another author', async () => {

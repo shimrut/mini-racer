@@ -38,6 +38,7 @@ function dependencies(overrides = {}) {
         getServerCampaignPbGhost: vi.fn(async () => ({ status: 200, body: { personalBest: null } })),
         previewServerCampaignResultsShare: vi.fn(async () => ({ status: 200, body: { status: 'ready', shareToken: 'preview-token' } })),
         confirmServerCampaignResultsShare: vi.fn(async () => ({ status: 200, body: { status: 'shared' } })),
+        markServerCampaignResultsSharePending: vi.fn(async () => {}),
         refreshServerCampaignResultsShare: vi.fn(async () => {}),
         readContextSubredditName: () => 'MiniRacer',
         ...overrides,
@@ -163,14 +164,40 @@ describe('Campaign route contracts', () => {
             replay: { inputs: [] },
         });
         expect(deps.submitServerCampaignRun.mock.calls[0]).toHaveLength(1);
-        expect(deps.refreshServerCampaignResultsShare).toHaveBeenCalledWith({
+        expect(deps.markServerCampaignResultsSharePending).toHaveBeenCalledWith({
             raceId: 'numbered-v1-00', redditUsername: 'RaceFan', subredditName: 'MiniRacer',
         });
+        expect(deps.refreshServerCampaignResultsShare).not.toHaveBeenCalled();
     });
 
-    it('keeps a saved race accepted when refreshing the shared post fails', async () => {
+    it.each([true, false])('marks an accepted save before replying when improved is %s', async (improved) => {
+        let release;
+        const pending = new Promise((resolve) => { release = resolve; });
+        const result = { accepted: true, improved };
+        const deps = dependencies({
+            submitServerCampaignRun: vi.fn(async () => ({ status: 200, body: result })),
+            markServerCampaignResultsSharePending: vi.fn(() => pending),
+        });
+        const routes = new Map();
+        registerCampaignRoutes({ post: (path, handler) => routes.set(path, handler), get: vi.fn() }, deps);
+        const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+        const response = routes.get('/api/campaign/submit')({ body: { raceId: 'numbered-v1-00' } }, res);
+        try {
+            await vi.waitFor(() => expect(deps.markServerCampaignResultsSharePending).toHaveBeenCalledOnce());
+            expect(res.status).not.toHaveBeenCalled();
+            expect(res.json).not.toHaveBeenCalled();
+            expect(deps.refreshServerCampaignResultsShare).not.toHaveBeenCalled();
+        } finally {
+            release();
+            await response;
+        }
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(result);
+    });
+
+    it('keeps a saved race accepted when marking the shared post fails', async () => {
         const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const deps = dependencies({ refreshServerCampaignResultsShare: vi.fn().mockRejectedValue(new Error('Reddit unavailable')) });
+        const deps = dependencies({ markServerCampaignResultsSharePending: vi.fn().mockRejectedValue(new Error('Redis unavailable')) });
         const baseUrl = await startApp(deps);
         const response = await fetch(`${baseUrl}/api/campaign/submit`, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raceId: 'numbered-v1-00' }),
@@ -181,12 +208,13 @@ describe('Campaign route contracts', () => {
         errorLog.mockRestore();
     });
 
-    it('does not refresh medals for a rejected race', async () => {
+    it('does not mark or refresh a shared post for a rejected race', async () => {
         const deps = dependencies({ submitServerCampaignRun: vi.fn(async () => ({ status: 400, body: { accepted: false } })) });
         const baseUrl = await startApp(deps);
         await fetch(`${baseUrl}/api/campaign/submit`, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ raceId: 'numbered-v1-00' }),
         });
+        expect(deps.markServerCampaignResultsSharePending).not.toHaveBeenCalled();
         expect(deps.refreshServerCampaignResultsShare).not.toHaveBeenCalled();
     });
 
@@ -194,7 +222,7 @@ describe('Campaign route contracts', () => {
         const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
         const deps = dependencies({ refreshServerCampaignResultsShare: vi.fn().mockRejectedValue(new Error('Reddit unavailable')) });
         const baseUrl = await startApp(deps);
-        const response = await fetch(`${baseUrl}/api/campaign/bootstrap?seriesId=numbered-v1`);
+        const response = await fetch(`${baseUrl}/api/campaign/bootstrap`);
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ campaignId: 'numbered-v1' });
         expect(deps.refreshServerCampaignResultsShare).toHaveBeenCalledWith({
@@ -202,6 +230,17 @@ describe('Campaign route contracts', () => {
         });
         expect(errorLog).toHaveBeenCalled();
         errorLog.mockRestore();
+    });
+
+    it('refreshes the series loaded by bootstrap instead of the query series', async () => {
+        const deps = dependencies({
+            getServerCampaignBootstrap: vi.fn(async () => ({ status: 200, body: { campaignId: 'loaded-series' } })),
+        });
+        const baseUrl = await startApp(deps);
+        expect((await fetch(`${baseUrl}/api/campaign/bootstrap?seriesId=requested-series`)).status).toBe(200);
+        expect(deps.refreshServerCampaignResultsShare).toHaveBeenCalledWith({
+            seriesId: 'loaded-series', redditUsername: 'RaceFan', subredditName: 'MiniRacer', onlyIfPending: true,
+        });
     });
 
     it('registers bootstrap, start, snapshot, and PB ghost endpoints', async () => {
