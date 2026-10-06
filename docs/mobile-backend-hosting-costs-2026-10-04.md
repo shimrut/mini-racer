@@ -177,6 +177,24 @@ Apple iCloud/GameKit saves and Google Play Games Saved Games are useful for pers
 
 CloudKit is broader than personal iCloud saves: it supports shared public records/assets and web APIs. An Android app can integrate through a web/API path, so it is inaccurate to say CloudKit is inaccessible outside Apple devices. Private-user access requires Apple's account authentication; server-to-server keys operate on the public database. A CloudKit-based shared backend would still need separately hosted validation and a ranking/identity design. It is not the preferred foundation for this game's common Android/iOS backend. [CloudKit overview](https://developer.apple.com/icloud/cloudkit/), [CloudKit web-service authentication](https://developer.apple.com/library/archive/documentation/DataManagement/Conceptual/CloudKitWebServicesReference/SettingUpWebServices.html).
 
+## Sizing at reported traffic (2026-10-06)
+
+User-reported inputs: approximately 15,000 DAU, 80,000 MAU and 260,000 stored players on the Reddit version. These players stay on Devvit; a standalone mobile backend starts with zero users, so the figures below describe a mobile audience that reaches today's Reddit size. Storage scaled from the earlier 0.8-0.9 GB report is approximately 1.0-1.1 GB, of which approximately 0.25-0.3 GB is non-ghost records.
+
+Replay validation CPU was benchmarked locally (Node 22, `validateDailyGpReplayDetailed` on six built-in tracks, synthetic steering, 30 runs each). Finished one-lap replays took approximately 10-22 ms; finished three-lap replays 39-47 ms. Replays that used the full frame budget without finishing took up to 43 ms for one lap and 141 ms for three laps. Worker CPU speed was not measured.
+
+Assumptions: 10-20 submitted finishes and 40-80 API requests per DAU per day (4.5-9 million validations and 18-36 million requests per month), 30-60 ms average validation CPU, and 2 ms CPU for other requests. These are planning inputs, not measured traffic.
+
+| Option | Approximate monthly cost at this traffic | Rewrite needed |
+| --- | ---: | --- |
+| Workers + D1 + R2 | $10-90 (Workers $10-25; D1 writes/rank reads $0-55; R2 ghost writes $0-9) | Redis locks, transactions and ranked boards move to SQL |
+| Node service + managed Valkey + R2 ghosts (Render) | $70-115 (two 1-CPU or one 2-CPU API $50-85, 1 GB Valkey $20, R2 $0-9) | Swap Devvit Redis client for a standard Redis client |
+| Single self-managed VM (Node + Redis) + R2 ghosts | $30-60 plus backup/ops work | Same as above |
+
+Server code is approximately 26,000 lines of TypeScript; 45 files call Redis, including 11 `watch` and 10 `multi` sites. The SQL rewrite is estimated at 2-4 additional weeks on top of the 2-5 week independent backend. At this traffic, the $50-ish monthly saving from Workers does not repay that time quickly, so the Node + Valkey + R2 route is the faster launch option; Workers remains the lower-cost long-term option.
+
+Authentication at 80,000 MAU: verifying Sign in with Apple and Google tokens on our own server has no per-user fee. Supabase Auth Pro includes 100,000 MAU.
+
 ## Validation and next measurements
 
 The [latency investigation](./mobile-backend-latency-investigation-2026-10-04.md) traces the current finish/standings paths and explains the Cloudflare query, placement, rank, replica-consistency and ghost-cache tradeoffs. No current-versus-Cloudflare response-time measurements are available; storage prices are not a latency forecast.

@@ -93,7 +93,7 @@ These are engineering judgments for one experienced developer, covering both pla
 | Independent online release with accounts, Daily, Campaign, saved progress, verified leaderboards, and ghosts | Medium to high | 6-12 weeks |
 | Broad parity including existing Reddit progress or shared rankings, challenge links/discovery, social replacements, and content/admin operations | High, with external dependencies | 10-16+ weeks |
 
-The server review alone suggests approximately 2-5 weeks for an independent online backend, or 4-8+ weeks for broad online/social/migration parity, before the rest of the mobile work. An engine/native rewrite would be a separate project measured in months, with extra work to preserve physics and verified times.
+The server review alone suggests approximately 2-5 weeks for an independent online backend (add approximately 2-4 weeks if moving from Redis to Cloudflare D1; see [hosting costs](./mobile-backend-hosting-costs-2026-10-04.md#sizing-at-reported-traffic-2026-10-06)), or 4-8+ weeks for broad online/social/migration parity, before the rest of the mobile work. An engine/native rewrite would be a separate project measured in months, with extra work to preserve physics and verified times.
 
 The main estimate uncertainty is the product boundary: independent mobile accounts and boards are simpler than sharing existing Reddit accounts, progress, and competitions. Phone performance is the other major unknown until the prototype runs on actual hardware.
 
