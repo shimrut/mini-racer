@@ -202,6 +202,10 @@ Server code is approximately 26,000 lines of TypeScript; 45 files call Redis, in
 
 Redis is not the main cost in the Node route: with ghosts in R2, about 0.3 GB of records fits the $20 1 GB tier, roughly $0.00025 per MAU. API compute is the larger share. Redis cost grows with stored data because it is held in RAM, so keeping ghosts out of Redis is what keeps it cheap. Pay-per-command Redis (Upstash PAYG, $2/million) is likely more expensive at this traffic, because each request makes several Redis calls. At launch, with no mobile players yet, a $12-24 VM can run Node and Redis together, or Workers can start at $5.
 
+### Cloudflare in front of a Hetzner origin
+
+Cloudflare's proxy can sit in front of a single Hetzner server: TLS ends near the player, DDoS protection applies, and a Cloudflare Tunnel keeps the origin off the public internet. Edge reads can cover ghost downloads (R2), the track catalog and Daily contract, and public standings pages. `readSharedStandingsPage` in `src/server/competition/competition-leaderboard.ts` already builds a player-independent page with a 10-second TTL, but `readSnapshot` merges it with the player's own row and no route sets `Cache-Control`, so edge caching needs a separate public-page response. Submits, personal rank, progress saves and sign-in still travel to the origin. Running validation in a Worker would offload CPU but would not remove that round trip, because the save still happens at the origin.
+
 Authentication at 80,000 MAU: verifying Sign in with Apple and Google tokens on our own server has no per-user fee. Supabase Auth Pro includes 100,000 MAU.
 
 ## Validation and next measurements
