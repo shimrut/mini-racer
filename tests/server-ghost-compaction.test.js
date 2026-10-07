@@ -270,6 +270,119 @@ describe("ghost compaction", () => {
     expect((await savedState()).steps.expired.checked).toBe(20);
   });
 
+  it("keeps a board with a skipped row open, and Run again packs the row once its sign-in ends", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const marked = await storeDay("2026-09-20");
+    const clean = await storeDay("2026-09-21");
+    await seed(marked, "guest:a", runText(1));
+    await seed(marked, "guest:b", runText(2));
+    await seed(clean, "guest:c", runText(3));
+    await redis.set(guestProgressSelectionPendingKey("guest:a"), "1");
+
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await runUntilIdle();
+    let step = (await compaction.readGhostCompactionState()).steps.expired;
+    expect(step).toMatchObject({ skipped: 1, doneKeys: [clean] });
+    expect(step.finishedAt).toBeTruthy();
+
+    await redis.del(guestProgressSelectionPendingKey("guest:a"));
+    const again = await compaction.setGhostCompactionStep("start", "expired", NOW);
+    expect(again.steps.expired.boards.map((board) => board.key)).toEqual([marked]);
+    await runUntilIdle();
+
+    expect((await stored(marked, "guest:a")).ghostPacked).toBeTruthy();
+    step = (await compaction.readGhostCompactionState()).steps.expired;
+    expect(step).toMatchObject({ skipped: 0 });
+    expect(step.doneKeys.sort()).toEqual([marked, clean].sort());
+  });
+
+  it("does not hold a board open for a row that was packed while the run read it", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    redis.setBeforeExec((keys) => {
+      if (!keys.includes(day)) return;
+      redis.setBeforeExec(null);
+      // A new best time, saved packed, lands before the commit.
+      void redis.hSet(day, { [field("guest:a")]: compaction.packedRunText(encodeRedisCompressedValue(runText(5))) });
+      redis.touch(day);
+    });
+
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await runUntilIdle();
+
+    expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ skipped: 0, doneKeys: [day] });
+  });
+
+  it("counts a skipped row once when a page is cut short and read again", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    for (let index = 0; index < 60; index += 1) await seed(day, `guest:${index}`, runText(index));
+    await redis.set(guestProgressSelectionPendingKey("guest:1"), "1");
+    let late = false;
+    const now = () => NOW.getTime() + (late ? 60_000 : 0);
+    // Time runs out after the first group of the page is saved.
+    redis.setBeforeExec((keys) => {
+      if (!keys.includes(day)) return;
+      redis.setBeforeExec(null);
+      late = true;
+    });
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await compaction.runGhostCompaction({ now });
+    expect((await compaction.readGhostCompactionState()).steps.expired.checked).toBe(0);
+
+    late = false;
+    await runUntilIdle();
+
+    expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ checked: 60, skipped: 1 });
+  });
+
+  it("reads every board again on the first Start of a step finished before skipped rows were counted", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify({
+      running: null,
+      writePacked: true,
+      steps: {
+        expired: {
+          boards: [{ key: day, total: 1 }], index: 1, cursor: 0, total: 1, checked: 1, packed: 0, savedBytes: 0,
+          doneKeys: [day], startedAt: NOW.toISOString(), finishedAt: NOW.toISOString(),
+        },
+      },
+    }));
+
+    const state = await compaction.setGhostCompactionStep("start", "expired", NOW);
+    expect(state.steps.expired.boards.map((board) => board.key)).toEqual([day]);
+    await runUntilIdle();
+
+    expect((await stored(day, "guest:a")).ghostPacked).toBeTruthy();
+    expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ skipTracked: true, doneKeys: [day] });
+  });
+
+  it("starts a step paused before skipped rows were counted again from its first row", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    for (let index = 0; index < 10; index += 1) await seed(day, `guest:${index}`, runText(index));
+    // Paused part-way: an earlier run left the first rows behind.
+    await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify({
+      running: null,
+      writePacked: true,
+      steps: {
+        expired: {
+          boards: [{ key: day, total: 10 }], index: 0, cursor: 5, total: 10, checked: 5, packed: 0, savedBytes: 0,
+          doneKeys: [], startedAt: NOW.toISOString(), finishedAt: null,
+        },
+      },
+    }));
+
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await runUntilIdle();
+
+    for (const index of [0, 4, 9]) expect((await stored(day, `guest:${index}`)).ghostPacked).toBeTruthy();
+    expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ checked: 10, packed: 10 });
+  });
+
   it("runs again over the days that expired since, and only those", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const first = await storeDay("2026-09-20");

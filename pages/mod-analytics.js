@@ -548,7 +548,8 @@ export function renderGhostCompaction(root, { state = null, busy = false, error 
                 progressBar(root, `${title}: ghosts checked`, checked, total),
                 element(root, 'p', 'analytics-note',
                     `${stage} · ${formatCount(checked)} of ${formatCount(total)} ghosts checked`
-                    + ` · ${formatCount(step.packed)} compacted · ${formatBytes(step.savedBytes)} saved`),
+                    + ` · ${formatCount(step.packed)} compacted · ${formatBytes(step.savedBytes)} saved`
+                    + (toCount(step.skipped) > 0 ? ` · ${formatCount(step.skipped)} skipped, for Run again` : '')),
             );
             nodes.push(row);
         }

@@ -260,13 +260,18 @@ describe('moderator analytics page', () => {
             running: null,
             writePacked: true,
             steps: {
-                expired: step({ total: 400, checked: 400, startedAt: '2026-10-07T10:00:00Z', finishedAt: '2026-10-07T11:00:00Z' }),
+                expired: step({
+                    total: 400, checked: 400, skipped: 3, startedAt: '2026-10-07T10:00:00Z', finishedAt: '2026-10-07T11:00:00Z',
+                }),
                 campaign: step({ total: 900, checked: 50, startedAt: '2026-10-07T11:05:00Z' }),
             },
         });
         expect(buttons(done.card)).toEqual([['Run again', false], ['Resume', false]]);
         expect(done.card.textContent).toContain('Done 2026-10-07');
+        expect(done.card.textContent).toContain('0 B saved · 3 skipped, for Run again');
         expect(done.card.textContent).toContain('Paused · 50 of 900 ghosts checked');
+        // A step with no skipped rows says nothing about them.
+        expect(done.card.textContent.match(/skipped/g)).toHaveLength(1);
     });
 
     it('starts a compaction step and shows the reason a start is refused', async () => {

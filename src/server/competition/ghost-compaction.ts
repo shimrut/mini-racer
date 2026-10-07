@@ -52,8 +52,16 @@ export type GhostCompactionStep = {
     checked: number;
     packed: number;
     savedBytes: number;
-    // Boards finished in any run of this step, so a new run skips them.
+    // Rows left as they were for a sign-in or a change, in this run, and on
+    // the current board. A board with such rows is read again by Run again.
+    skipped: number;
+    boardSkipped: number;
+    // Boards finished with no row skipped, in any run of this step, so a new
+    // run passes over them.
     doneKeys: string[];
+    // False for a step saved before skipped rows were counted: its doneKeys
+    // may hide skipped rows, so its next Start reads every board again.
+    skipTracked: boolean;
     startedAt: string | null;
     finishedAt: string | null;
 };
@@ -94,7 +102,10 @@ function emptyStep(): GhostCompactionStep {
         checked: 0,
         packed: 0,
         savedBytes: 0,
+        skipped: 0,
+        boardSkipped: 0,
         doneKeys: [],
+        skipTracked: false,
         startedAt: null,
         finishedAt: null,
     };
@@ -247,8 +258,11 @@ export async function setGhostCompactionStep(
             throw new GhostCompactionRefusal('Finish the step before this one first.');
         }
         const previous = current.steps[step];
-        const resume = Boolean(previous.startedAt && !previous.finishedAt);
-        const boards = resume ? previous.boards : await boardsFor(step, now.getTime(), previous.doneKeys);
+        // A step saved before skipped rows were counted starts again from the
+        // first board, even when it was paused part-way.
+        const resume = previous.skipTracked && Boolean(previous.startedAt && !previous.finishedAt);
+        const doneKeys = previous.skipTracked ? previous.doneKeys : [];
+        const boards = resume ? previous.boards : await boardsFor(step, now.getTime(), doneKeys);
         const nextStep: GhostCompactionStep = resume
             ? previous
             : {
@@ -260,6 +274,10 @@ export async function setGhostCompactionStep(
                 checked: 0,
                 packed: 0,
                 savedBytes: 0,
+                skipped: 0,
+                boardSkipped: 0,
+                doneKeys,
+                skipTracked: true,
                 startedAt: now.toISOString(),
                 finishedAt: null,
             };
@@ -359,16 +377,18 @@ function withStep(
 }
 
 // Packs one group of rows. A row is rewritten only if it still holds exactly
-// the text that was read and no sign-in owns its player.
+// the text that was read and no sign-in owns its player. A row left for a
+// sign-in, or one that changed and still holds a plain ghost, is skipped.
 async function packGroup(
     ctx: RunContext,
     name: GhostCompactionStepName,
     key: string,
     rows: { field: string; raw: string; next: string }[],
-): Promise<CommitResult> {
+): Promise<{ result: CommitResult; skipped: number }> {
     let writes: Record<string, string> = {};
     let saved = 0;
-    return commit(ctx, name, (state) => withStep(state, name, (step) => ({
+    let skipped = 0;
+    const result = await commit(ctx, name, (state) => withStep(state, name, (step) => ({
         ...step,
         packed: step.packed + Object.keys(writes).length,
         savedBytes: step.savedBytes + saved,
@@ -377,13 +397,22 @@ async function packGroup(
         check: async () => {
             writes = {};
             saved = 0;
+            skipped = 0;
             const fields = rows.map((row) => row.field);
             const [current, marks] = await Promise.all([
                 redis.hMGet(key, fields),
                 redis.mGet(fields.flatMap(markerKeys)),
             ]);
             rows.forEach((row, index) => {
-                if (current[index] !== row.raw || marks[index * 2] || marks[index * 2 + 1]) return;
+                if (current[index] !== row.raw) {
+                    // A row now packed, gone, or without a ghost needs nothing.
+                    if (packedRunText(current[index]) !== null) skipped += 1;
+                    return;
+                }
+                if (marks[index * 2] || marks[index * 2 + 1]) {
+                    skipped += 1;
+                    return;
+                }
                 writes[row.field] = row.next;
                 saved += Buffer.byteLength(row.raw, 'utf8') - Buffer.byteLength(row.next, 'utf8');
             });
@@ -392,6 +421,7 @@ async function packGroup(
             if (Object.keys(writes).length) await transaction.hSet(key, writes);
         },
     });
+    return { result, skipped };
 }
 
 // One page of the current board: pack its rows in groups, then save the scan
@@ -405,7 +435,7 @@ async function finishStep(ctx: RunContext, name: GhostCompactionStepName): Promi
     const finished = ctx.state.steps[name];
     console.log(
         `Ghost compaction: ${name} done: checked ${finished.checked}, packed ${finished.packed}, `
-        + `saved ${finished.savedBytes} bytes`,
+        + `skipped ${finished.skipped}, saved ${finished.savedBytes} bytes`,
     );
 }
 
@@ -420,25 +450,34 @@ async function workPage(ctx: RunContext, name: GhostCompactionStepName): Promise
     const rows = page.fieldValues
         .map(({ field, value }) => ({ field, raw: value, next: packedRunText(value) }))
         .filter((row): row is { field: string; raw: string; next: string } => row.next !== null);
+    // Skipped rows are saved with the scan position, so a page cut short and
+    // read again counts them once.
+    let pageSkipped = 0;
     for (let index = 0; index < rows.length; index += GROUP_SIZE) {
         if (ctx.now() > ctx.deadlineMs) return false;
         const group = rows.slice(index, index + GROUP_SIZE);
-        let result: CommitResult = 'conflict';
-        for (let attempt = 0; attempt < MAX_GROUP_COMMITS && result === 'conflict'; attempt += 1) {
-            result = await packGroup(ctx, name, board.key, group);
+        let outcome: { result: CommitResult; skipped: number } = { result: 'conflict', skipped: 0 };
+        for (let attempt = 0; attempt < MAX_GROUP_COMMITS && outcome.result === 'conflict'; attempt += 1) {
+            outcome = await packGroup(ctx, name, board.key, group);
         }
-        if (result !== 'saved') return false;
+        if (outcome.result !== 'saved') return false;
+        pageSkipped += outcome.skipped;
     }
     const finishedBoard = page.cursor === 0;
     const result = await commit(ctx, name, (state) => withStep(state, name, (current) => {
         const checked = current.checked + page.fieldValues.length;
-        if (!finishedBoard) return { ...current, cursor: page.cursor, checked };
+        const skipped = current.skipped + pageSkipped;
+        const boardSkipped = current.boardSkipped + pageSkipped;
+        if (!finishedBoard) return { ...current, cursor: page.cursor, checked, skipped, boardSkipped };
         return {
             ...current,
             index: current.index + 1,
             cursor: 0,
             checked,
-            doneKeys: [...current.doneKeys, board.key],
+            skipped,
+            boardSkipped: 0,
+            // A board with skipped rows stays open for Run again.
+            doneKeys: boardSkipped === 0 ? [...current.doneKeys, board.key] : current.doneKeys,
         };
     }));
     if (result !== 'saved') return false;
