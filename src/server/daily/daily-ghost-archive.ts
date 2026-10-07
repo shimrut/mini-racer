@@ -151,8 +151,11 @@ const SWEEP_LIST_PAGE = 200;
 // an upload whose stub is not committed yet, so it is kept for a later sweep.
 const SWEEP_GRACE_MS = 60 * 60 * 1000;
 const SWEEP_RETRY_MARGIN_MS = 5 * 60 * 1000;
-// After a damaged reference, the next sweep waits this long.
+// After a damaged reference or row, the next sweep waits this long.
 const SWEEP_DAMAGED_WAIT_MS = 24 * 60 * 60 * 1000;
+// Version 2 also saves the time and date of each run without a ghost, and
+// stops at a row it cannot read.
+const SWEEP_REFS_VERSION = 2;
 const WORKERS = 8;
 const STEP_MARGIN_MS = 1_000;
 const MAX_SLICE_COMMITS = 2;
@@ -161,6 +164,9 @@ type DayState = 'moving' | 'waiting' | 'done' | 'restoring' | 'restored';
 
 export type DailyGhostArchiveSweep = {
     phase: 'refs' | 'list';
+    // The rules its saved references were built with. A sweep built with older
+    // rules starts again before it deletes anything.
+    refsVersion?: number;
     modeSerial: number;
     startedAt: number;
     revision: number;
@@ -1057,6 +1063,7 @@ async function startSweep(ctx: RunContext, challengeId: string): Promise<boolean
         ...day,
         sweep: {
             phase: 'refs',
+            refsVersion: SWEEP_REFS_VERSION,
             modeSerial: ctx.serial,
             startedAt: ctx.clock.now(),
             revision,
@@ -1074,6 +1081,36 @@ async function startSweep(ctx: RunContext, challengeId: string): Promise<boolean
     });
 }
 
+// The name a run without a ghost is kept under in the saved refs: its time and
+// date. A stub that lost its reference still holds both, so the blob copy of
+// the same run is kept, whatever player name the copy carries.
+function sweepRunToken(value: Record<string, unknown>): string | null {
+    const { bestTimeMs, updatedAt } = value;
+    if (typeof bestTimeMs !== 'number' || !Number.isFinite(bestTimeMs) || typeof updatedAt !== 'string') return null;
+    return `run:${bestTimeMs}:${updatedAt}`;
+}
+
+type SweepRow =
+    | { kind: 'ref'; name: string }
+    | { kind: 'none' }
+    | { kind: 'damaged'; error: 'damaged_ref' | 'damaged_row' };
+
+// What the sweep keeps for one row of the day: the object its stub points to,
+// or the time and date of a run without a ghost. A row the sweep cannot read
+// safely stops it.
+function sweepRow(raw: unknown): SweepRow {
+    const run = readRun(raw);
+    if (!run) return { kind: 'damaged', error: 'damaged_row' };
+    if (run.value.ghostArchive !== undefined) {
+        return isPbGhostArchiveRef(run.value.ghostArchive)
+            ? { kind: 'ref', name: run.value.ghostArchive.key }
+            : { kind: 'damaged', error: 'damaged_ref' };
+    }
+    if (holdsFullGhost(run)) return { kind: 'none' };
+    const token = sweepRunToken(run.value);
+    return token ? { kind: 'ref', name: token } : { kind: 'damaged', error: 'damaged_row' };
+}
+
 // One page of the reference scan. The refs and the scan position are saved
 // together. At the end, the snapshot counts only if the day's revision did not
 // move while it was taken; otherwise the scan starts again.
@@ -1083,24 +1120,27 @@ async function sweepRefsStep(ctx: RunContext, challengeId: string): Promise<bool
     const page = await redis.hScan(challengeCollectionKey(challengeId), sweep.refsCursor, undefined, SCAN_COUNT);
     const refs: string[] = [];
     for (const row of page.fieldValues) {
-        const run = readRun(row.value);
-        if (!run || run.value.ghostArchive === undefined) continue;
-        if (!isPbGhostArchiveRef(run.value.ghostArchive)) {
-            // A reference that cannot be read could hide a live object. Delete nothing.
-            console.error('Daily ghost sweep stopped: damaged reference', challengeId, row.field);
+        const found = sweepRow(row.value);
+        if (found.kind === 'damaged') {
+            // A row that cannot be read could hide a live object. Delete nothing.
+            console.error(
+                `Daily ghost sweep stopped: ${found.error === 'damaged_ref' ? 'damaged reference' : 'damaged row'}`,
+                challengeId,
+                row.field,
+            );
             await saveDay(ctx, challengeId, {
                 ...day,
                 sweep: null,
                 sweepNeeded: true,
                 nextSweepAt: ctx.clock.now() + SWEEP_DAMAGED_WAIT_MS,
-                lastError: 'damaged_ref',
+                lastError: found.error,
             }, async (transaction) => {
                 await transaction.del(dailyGhostArchiveSweepRefsKey(challengeId));
             });
             ctx.stuck.add(challengeId);
             return false;
         }
-        refs.push(run.value.ghostArchive.key);
+        if (found.kind === 'ref') refs.push(found.name);
     }
     let next: DailyGhostArchiveSweep = { ...sweep, refsCursor: page.cursor };
     let restart = false;
@@ -1118,9 +1158,22 @@ async function sweepRefsStep(ctx: RunContext, challengeId: string): Promise<bool
         if (restart) {
             await transaction.del(refsKey);
         } else if (refs.length) {
-            await transaction.hSet(refsKey, Object.fromEntries(refs.map((key) => [key, '1'])));
+            await transaction.hSet(refsKey, Object.fromEntries(refs.map((name) => [name, '1'])));
         }
     });
+}
+
+// The saved-refs name of the run a blob copy holds, or null when the copy is
+// not a run with a time and a date. Throws when the copy cannot be read now.
+async function copyRunToken(ctx: RunContext, key: string): Promise<{ gone: boolean; token: string | null }> {
+    const copy = await ctx.session.get(key);
+    if (copy === null) return { gone: true, token: null };
+    try {
+        const value = parseJsonObject(gunzipSync(copy).toString('utf8'));
+        return { gone: false, token: value ? sweepRunToken(value) : null };
+    } catch (_error) {
+        return { gone: false, token: null };
+    }
 }
 
 async function saveSweepProgress(
@@ -1211,9 +1264,28 @@ async function sweepListStep(ctx: RunContext, challengeId: string): Promise<bool
                 };
                 continue;
             }
-            if (!ctx.session.hasTimeFor(1) || ctx.clock.now() > ctx.startUntilMs) {
+            // Read the copy, then delete it: two calls.
+            if (!ctx.session.hasTimeFor(2) || ctx.clock.now() > ctx.startUntilMs) {
                 stopped = true;
                 break;
+            }
+            let copy: { gone: boolean; token: string | null };
+            try {
+                copy = await copyRunToken(ctx, object.key);
+            } catch (error) {
+                if (!(error instanceof BlobDeadlineError)) console.error('Daily ghost sweep read failed:', challengeId, error);
+                stopped = true;
+                break;
+            }
+            if (copy.gone) {
+                sweep = { ...sweep, lastKey: object.key };
+                continue;
+            }
+            // A run without a ghost, with the same time and date, may be a stub
+            // that lost its reference: its copy stays.
+            if (copy.token && await redis.hGet(refsKey, copy.token)) {
+                sweep = { ...sweep, kept: sweep.kept + 1, keptBytes: sweep.keptBytes + object.size, lastKey: object.key };
+                continue;
             }
             try {
                 await ctx.session.delete(object.key);
@@ -1236,7 +1308,8 @@ async function sweepListStep(ctx: RunContext, challengeId: string): Promise<bool
 
 async function workSweep(ctx: RunContext, challengeId: string): Promise<void> {
     const day = ctx.days.get(challengeId)!;
-    if (!day.sweep || day.sweep.modeSerial !== ctx.serial) {
+    // A sweep from another mode, or built with older rules, starts again.
+    if (!day.sweep || day.sweep.modeSerial !== ctx.serial || day.sweep.refsVersion !== SWEEP_REFS_VERSION) {
         if (!await startSweep(ctx, challengeId)) {
             ctx.stuck.add(challengeId);
             return;

@@ -929,6 +929,101 @@ describe("sweeping blob copies that no stub points to", () => {
     expect(day.nextSweepAt).toBeGreaterThan(clock.now() + HOUR_MS);
   });
 
+  async function askForSweep() {
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+  }
+
+  const { updatedAt: _date, ...noDate } = JSON.parse(noGhostRunText(31000));
+  for (const [label, raw] of [
+    ["an empty value", ""],
+    ["a value that cannot be read", "__gz:b64__:not-a-gzip-envelope"],
+    ["a run without a ghost and without a date", JSON.stringify(noDate)],
+  ]) {
+    it(`stops the sweep at ${label} and deletes nothing`, async () => {
+      const [key] = await moveDay(["guest:a"]);
+      blobs.setLastModified(key, clock.now() - 2 * DAY_MS);
+      const orphan = putOrphan("old-orphan", 2 * DAY_MS);
+      await redis.hSet(pbKey(), { [field("reddit:damaged")]: raw });
+      await askForSweep();
+
+      clock.advance(60_000);
+      await runArchive(clock, blobs);
+
+      expect(blobs.objects.has(orphan)).toBe(true);
+      expect(blobs.objects.has(key)).toBe(true);
+      expect(await dayRecord()).toMatchObject({ sweep: null, sweepNeeded: true, lastError: "damaged_row" });
+      expect(await totals()).toMatchObject({ deleted: 0 });
+    });
+  }
+
+  it("keeps the copy of a stub that lost its reference after a sign-in copied it, and deletes other orphans", async () => {
+    const [guestKey] = await moveDay(["guest:a"]);
+    // The account's copy of the guest's stub loses its reference by outside damage.
+    const { ghostArchive: _lost, ...stripped } = await runValue("guest:a");
+    await redis.hSet(pbKey(), { [field("reddit:a")]: encodeRedisCompressedValue(JSON.stringify(stripped)) });
+    await redis.hDel(pbKey(), [field("guest:a")]);
+    blobs.setLastModified(guestKey, clock.now() - 2 * DAY_MS);
+    const orphan = putOrphan("old-orphan", 2 * DAY_MS);
+    await askForSweep();
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+
+    expect(blobs.objects.has(guestKey)).toBe(true);
+    expect(blobs.objects.has(orphan)).toBe(false);
+    expect(await dayRecord()).toMatchObject({ sweep: null, sweepNeeded: false, blob: { objects: 1 } });
+  });
+
+  it("builds new refs for a sweep saved before the current rules, before it deletes anything", async () => {
+    const [key] = await moveDay(["guest:a"]);
+    blobs.setLastModified(key, clock.now() - 2 * DAY_MS);
+    // A sweep from the earlier code, in its list phase, whose refs miss the live copy.
+    await redis.hSet(archive.dailyGhostArchiveSweepRefsKey(DAY_ID), { "daily-ghosts/v1/other": "1" });
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({
+        ...(await dayRecord()),
+        sweep: {
+          phase: "list", modeSerial: (await totals()).modeSerial, startedAt: clock.now(), revision: 0,
+          refsCursor: 0, pageToken: null, nextToken: null, lastKey: null, kept: 0, keptBytes: 0,
+          youngOrphanUntil: 0, deleted: 0,
+        },
+      }),
+    });
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+
+    expect(blobs.objects.has(key)).toBe(true);
+    expect(await dayRecord()).toMatchObject({ sweep: null, sweepNeeded: false, blob: { objects: 1 } });
+    expect(await totals()).toMatchObject({ deleted: 0 });
+  });
+
+  it("deletes nothing when it cannot read an orphan first, and goes on from that object later", async () => {
+    await moveDay(["guest:a"]);
+    const first = putOrphan("a-orphan", 2 * DAY_MS);
+    const second = putOrphan("b-orphan", 2 * DAY_MS);
+    blobs.faults.get = (key) => (key === first ? "fail" : null);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await askForSweep();
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+    expect(blobs.objects.has(first)).toBe(true);
+    expect(blobs.objects.has(second)).toBe(true);
+    // The listing stopped before the orphan it could not read.
+    const { sweep } = await dayRecord();
+    expect(sweep.phase).toBe("list");
+    expect(sweep.lastKey === null || sweep.lastKey < first).toBe(true);
+
+    blobs.faults.get = null;
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+    expect(blobs.objects.has(first)).toBe(false);
+    expect(blobs.objects.has(second)).toBe(false);
+  });
+
   it("runs no held work on a day while its sweep runs, and asks for a sweep before a held upload", async () => {
     await moveDay(["guest:a"]);
     const text = fullRunText(29000, 5);
