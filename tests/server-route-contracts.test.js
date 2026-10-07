@@ -584,6 +584,23 @@ describe('server route contracts', () => {
         expect(await readJson(failed)).toEqual({ ok: false, error: 'Scheduled raced list fill run failed' });
     });
 
+    it('runs the Daily ghost archive from its scheduler task and reports a failed run', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const report = { status: 'worked', moved: 3, restored: 0, held: 1, failed: 0, passesEnded: 1 };
+        const runDailyGhostArchive = vi.fn()
+            .mockResolvedValueOnce(report)
+            .mockRejectedValueOnce(new Error('blob storage unavailable'));
+        const baseUrl = await startApp((app) => registerInternalRoutes(app, { runDailyGhostArchive }));
+
+        const worked = await fetch(`${baseUrl}/internal/scheduler/daily-ghost-archive`, { method: 'POST' });
+        expect(worked.status).toBe(200);
+        expect(await readJson(worked)).toEqual({ ok: true, ...report });
+
+        const failed = await fetch(`${baseUrl}/internal/scheduler/daily-ghost-archive`, { method: 'POST' });
+        expect(failed.status).toBe(500);
+        expect(await readJson(failed)).toEqual({ ok: false, error: 'Scheduled Daily ghost archive run failed' });
+    });
+
     it('preserves daily-post moderator menu success responses and side effects', async () => {
         const enableDailyAutopost = vi.fn();
         const deleteDailyAutopostSubscription = vi.fn();

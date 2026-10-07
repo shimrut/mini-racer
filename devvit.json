@@ -185,6 +185,10 @@
       "mini-racer-raced-list-fill": {
         "endpoint": "/internal/scheduler/raced-list-fill",
         "cron": "* * * * *"
+      },
+      "mini-racer-daily-ghost-archive": {
+        "endpoint": "/internal/scheduler/daily-ghost-archive",
+        "cron": "* * * * *"
       }
     }
   },

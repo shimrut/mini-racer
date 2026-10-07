@@ -1,5 +1,6 @@
 import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
+import type { DailyGhostArchiveReport } from '../daily/daily-ghost-archive.js';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../podium/daily-podium-model.js';
 import type { LauncherPostKind } from '../posts/launcher-post-store.js';
@@ -52,6 +53,7 @@ export type InternalRouteDependencies = {
     assertModeratorForSubreddit(subredditName: string): Promise<string>;
     ensureCommunityCreatorPostForSubreddit(subredditName: string): Promise<PostResult>;
     runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
+    runDailyGhostArchive(): Promise<DailyGhostArchiveReport>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
         saved: number;
@@ -406,6 +408,18 @@ export function registerInternalRoutes(
         } catch (error) {
             console.error('Failed scheduled raced list fill run:', error);
             res.status(500).json({ ok: false, error: 'Scheduled raced list fill run failed' });
+        }
+    });
+
+    // Moves the ghosts of old Daily days to blob storage. Its mode is set in
+    // daily-ghost-archive.ts; while it is 'off', a run does nothing.
+    app.post('/internal/scheduler/daily-ghost-archive', async (_req, res) => {
+        try {
+            const result = await dependencies.runDailyGhostArchive();
+            res.status(200).json({ ok: true, ...result });
+        } catch (error) {
+            console.error('Failed scheduled Daily ghost archive run:', error);
+            res.status(500).json({ ok: false, error: 'Scheduled Daily ghost archive run failed' });
         }
     });
 
