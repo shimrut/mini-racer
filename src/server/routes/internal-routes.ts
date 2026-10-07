@@ -1,13 +1,6 @@
 import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
-import {
-    DAILY_GHOST_ARCHIVE_CHOICES,
-    isDailyGhostArchiveChoice,
-    type DailyGhostArchiveChoice,
-    type DailyGhostArchiveReport,
-    type DailyGhostArchiveSetting,
-    type DailyGhostArchiveStatus,
-} from '../daily/daily-ghost-archive.js';
+import type { DailyGhostArchiveReport } from '../daily/daily-ghost-archive.js';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../podium/daily-podium-model.js';
 import type { LauncherPostKind } from '../posts/launcher-post-store.js';
@@ -61,8 +54,6 @@ export type InternalRouteDependencies = {
     ensureCommunityCreatorPostForSubreddit(subredditName: string): Promise<PostResult>;
     runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
     runDailyGhostArchive(): Promise<DailyGhostArchiveReport>;
-    readDailyGhostArchiveStatus(): Promise<DailyGhostArchiveStatus>;
-    saveDailyGhostArchiveSetting(choice: DailyGhostArchiveChoice, changedBy: string): Promise<DailyGhostArchiveSetting>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
         saved: number;
@@ -110,25 +101,6 @@ function registerMenuAction(
             ));
         }
     });
-}
-
-export const DAILY_GHOST_ARCHIVE_FORM_NAME = 'dailyGhostArchive';
-
-function choiceLabel(choice: DailyGhostArchiveChoice): string {
-    return DAILY_GHOST_ARCHIVE_CHOICES.find((item) => item.value === choice)?.label ?? choice;
-}
-
-// The state of the move, in a few words, for the top of the form.
-function describeDailyGhostArchive(status: DailyGhostArchiveStatus): string {
-    const count = (value: number) => Math.max(0, Math.trunc(Number(value) || 0)).toLocaleString('en-US');
-    const megabytes = (value: number) => `${(Math.max(0, Number(value) || 0) / (1024 * 1024)).toFixed(1)} MB`;
-    return [
-        `Now: ${choiceLabel(status.choice)}.`,
-        `Moved ${count(status.moved)} runs, ${megabytes(status.freed)} out of Redis.`,
-        `${count(status.days.done)} days done, ${count(status.waitingDays)} waiting, ${count(status.held)} runs held.`,
-        `Blob storage: ${megabytes(status.blob.bytes)}.`,
-        status.blobError ? `Blob storage refused the last request: ${status.blobError.message}` : '',
-    ].filter(Boolean).join(' ');
 }
 
 export function registerInternalRoutes(
@@ -439,72 +411,9 @@ export function registerInternalRoutes(
         }
     });
 
-    // The moderator's switch for the move of old Daily ghosts: a form with the
-    // current state and the four choices. Each subreddit install has its own.
-    registerMenuAction(
-        app,
-        dependencies,
-        '/internal/menu/daily-ghost-archive',
-        {
-            missingContextMessage: 'Reddit did not provide a subreddit context for this install.',
-            failureLogMessage: 'Failed to open the Daily ghost move form:',
-            failureToastPrefix: 'Could not open the Daily ghost move',
-        },
-        async (subredditName, res) => {
-            await dependencies.assertModeratorForSubreddit(subredditName);
-            const status = await dependencies.readDailyGhostArchiveStatus();
-            res.json({
-                showForm: {
-                    name: DAILY_GHOST_ARCHIVE_FORM_NAME,
-                    form: {
-                        title: 'Old Daily ghosts',
-                        description: describeDailyGhostArchive(status),
-                        acceptLabel: 'Save',
-                        fields: [{
-                            type: 'select',
-                            name: 'choice',
-                            label: 'Keep the ghosts of finished Daily days',
-                            helpText: 'A day moves from 06:00 UTC on its 8th day. Times and splits stay in Redis.',
-                            options: DAILY_GHOST_ARCHIVE_CHOICES.map(({ value, label }) => ({ value, label })),
-                            defaultValue: [status.choice],
-                            required: true,
-                        }],
-                    },
-                },
-            });
-        },
-    );
-
-    app.post('/internal/form/daily-ghost-archive', async (req, res) => {
-        try {
-            const subredditName = await dependencies.resolveMenuTargetSubredditName('');
-            if (!subredditName) {
-                res.json(createMenuToast('Reddit did not provide a subreddit context for this install.'));
-                return;
-            }
-            const username = await dependencies.assertModeratorForSubreddit(subredditName);
-            const picked = (req.body as { choice?: unknown } | undefined)?.choice;
-            const choice = Array.isArray(picked) ? picked[0] : picked;
-            if (!isDailyGhostArchiveChoice(choice)) {
-                res.json(createMenuToast('Pick one of the choices.'));
-                return;
-            }
-            await dependencies.saveDailyGhostArchiveSetting(choice, username);
-            console.log(`Daily ghost move set to ${choice} by u/${username} in r/${subredditName}.`);
-            res.json(createMenuToast(
-                choice === 'off'
-                    ? 'Old Daily ghosts: Off. Nothing moves.'
-                    : `Old Daily ghosts: ${choiceLabel(choice)}. It starts within a minute.`,
-                'success',
-            ));
-        } catch (error) {
-            console.error('Failed to save the Daily ghost move choice:', error);
-            res.json(createMenuToast(`Could not save the choice: ${getErrorMessage(error)}`));
-        }
-    });
-
-    // Moves the ghosts of old Daily days to blob storage, as the moderator chose
-    // in the menu. While the choice is 'Off', a run does nothing.
+    // Moves the ghosts of old Daily days to blob storage, as a moderator chose
+    // on the Storage tab of the analytics page. While the choice is Off, a run
+    // does nothing.
     app.post('/internal/scheduler/daily-ghost-archive', async (_req, res) => {
         try {
             const result = await dependencies.runDailyGhostArchive();

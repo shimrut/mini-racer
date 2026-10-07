@@ -164,13 +164,6 @@
         "endpoint": "/internal/menu/mod-analytics-open"
       },
       {
-        "label": "Move old Daily ghosts",
-        "description": "Choose whether the ghosts of finished Daily days move to blob storage",
-        "location": "subreddit",
-        "forUserType": "moderator",
-        "endpoint": "/internal/menu/daily-ghost-archive"
-      },
-      {
         "label": "Open Mini Racer Creator",
         "description": "Make tracks, the Daily list and Campaign series",
         "location": "subreddit",
@@ -178,9 +171,6 @@
         "endpoint": "/internal/menu/community-creator-open"
       }
     ]
-  },
-  "forms": {
-    "dailyGhostArchive": "/internal/form/daily-ghost-archive"
   },
   "scheduler": {
     "tasks": {

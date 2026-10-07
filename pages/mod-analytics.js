@@ -2,6 +2,8 @@ import { setText } from '../game/ui/dom.js';
 const SUMMARY_URL = '/api/analytics/summary';
 const CHALLENGES_URL = '/api/analytics/challenges';
 const STORAGE_URL = '/api/analytics/storage';
+const GHOST_MOVE_URL = '/api/analytics/ghost-archive';
+const GHOST_MOVE_POLL_MS = 5_000;
 const TABS = ['players', 'challenges', 'storage'];
 const TAB_MEMORY_KEY = 'MiniRacerAnalyticsTab';
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -487,38 +489,134 @@ function racedListFillText(fill) {
     return null;
 }
 
+const DAILY_GHOST_CHOICES = [
+    ['off', 'Off'],
+    ['trial', 'Move one day'],
+    ['all', 'Move all'],
+    ['restore', 'Restore'],
+];
+
 // The move of old Daily ghosts to blob storage. Blob figures come from the
 // last sweep of each day; Redis figures count payload, not Redis memory.
-const DAILY_GHOST_CHOICE_LABELS = {
-    off: 'Off',
-    trial: 'Move one day (trial)',
-    all: 'Move all old days',
-    restore: 'Restore all to Redis',
-};
-
-function dailyGhostArchiveText(status) {
-    if (!status || typeof status !== 'object') return null;
-    const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
-    if (status.choice === 'off' && touched === 0 && !status.blobError) return null;
-    const mode = ` (${DAILY_GHOST_CHOICE_LABELS[status.choice] ?? 'Off'})`;
-    const parts = [
-        `moved ${formatCount(status.moved)} (Redis payload removed ${formatBytes(status.freed)})`,
-    ];
-    if (toCount(status.restored) > 0) parts.push(`restored ${formatCount(status.restored)}`);
-    parts.push(`held ${formatCount(status.held)}`, `waiting ${formatCount(status.waitingDays)} days`);
-    const blob = status.blob ?? {};
-    parts.push(`blob ${formatBytes(blob.bytes)} in ${formatCount(blob.objects)} objects`
-        + ` (measured on ${formatCount(blob.measuredDays)} of ${formatCount(touched)} days)`);
-    if (status.blobError?.message) parts.push(`blob storage refused: ${String(status.blobError.message).slice(0, 160)}`);
-    return `Old Daily ghosts${mode}: ${parts.join(' · ')}`;
+export function renderGhostMove(root, { status = null, busy = false, error = null, onChoose } = {}) {
+    const section = root.getElementById('analytics-ghost-move');
+    if (!section) return;
+    const heading = cardHeading(root, 'Old Daily ghosts to blob storage');
+    const choices = element(root, 'div', 'analytics-periods');
+    choices.setAttribute('role', 'group');
+    choices.setAttribute('aria-label', 'Ghost move choice');
+    for (const [value, label] of DAILY_GHOST_CHOICES) {
+        const button = element(root, 'button', 'analytics-period', label);
+        button.type = 'button';
+        button.disabled = busy || !status;
+        button.setAttribute('aria-pressed', String(status?.choice === value));
+        button.addEventListener('click', () => { void onChoose?.(value); });
+        choices.append(button);
+    }
+    heading.append(choices);
+    const nodes = [heading];
+    if (status) {
+        const eligible = toCount(status.eligibleDays);
+        const done = toCount(status.days?.done);
+        const share = eligible > 0 ? percent(done, eligible) : 0;
+        const bar = element(root, 'div', 'analytics-progress');
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-label', 'Finished Daily days moved');
+        bar.setAttribute('aria-valuemin', '0');
+        bar.setAttribute('aria-valuemax', String(eligible));
+        bar.setAttribute('aria-valuenow', String(done));
+        const fill = element(root, 'div', 'analytics-progress__fill');
+        fill.style.width = `${share}%`;
+        bar.append(fill);
+        const blob = status.blob ?? {};
+        const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
+        const lines = [
+            `${formatCount(done)} of ${formatCount(eligible)} finished days done · ${formatCount(status.waitingDays)} waiting`,
+            `Moved ${formatCount(status.moved)} runs · Redis payload removed ${formatBytes(status.freed)}`
+                + (toCount(status.restored) > 0 ? ` · restored ${formatCount(status.restored)}` : ''),
+            `Held ${formatCount(status.held)} runs · blob ${formatBytes(blob.bytes)} in ${formatCount(blob.objects)} objects`
+                + ` (measured on ${formatCount(blob.measuredDays)} of ${formatCount(touched)} days)`,
+        ];
+        nodes.push(bar, ...lines.map((text) => element(root, 'p', 'analytics-note', text)));
+        if (status.blobError?.message) {
+            const refused = element(root, 'p', 'analytics-status', `Blob storage refused: ${String(status.blobError.message).slice(0, 200)}`);
+            refused.dataset.state = 'error';
+            nodes.push(refused);
+        }
+    }
+    if (error) {
+        const failed = element(root, 'p', 'analytics-status', error);
+        failed.dataset.state = 'error';
+        nodes.push(failed);
+    }
+    section.replaceChildren(...nodes);
+    section.hidden = false;
+    section.setAttribute('aria-busy', String(busy));
 }
 
-function renderStorage(doc, storage, racedListFill = null, dailyGhostArchive = null) {
+async function readGhostMoveResponse(response) {
+    if (response.status === 403) return { error: 'Moderator access required.' };
+    if (!response.ok) return { error: 'Could not load the ghost move.' };
+    return { status: await response.json() };
+}
+
+export function createGhostMoveController(root, fetchImpl = fetch, { pollMs = GHOST_MOVE_POLL_MS } = {}) {
+    let status = null;
+    let busy = false;
+    let error = null;
+    let timer = null;
+    const render = () => renderGhostMove(root, { status, busy, error, onChoose: choose });
+    async function refresh() {
+        try {
+            const result = await readGhostMoveResponse(await fetchImpl(GHOST_MOVE_URL));
+            if (result.error) error = result.error;
+            else {
+                status = result.status;
+                error = null;
+            }
+        } catch (_error) {
+            error = 'Could not load the ghost move.';
+        }
+        render();
+    }
+    async function choose(choice) {
+        if (busy) return;
+        busy = true;
+        render();
+        try {
+            const result = await readGhostMoveResponse(await fetchImpl(GHOST_MOVE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ choice }),
+            }));
+            if (result.error) error = result.error;
+            else {
+                status = result.status;
+                error = null;
+            }
+        } catch (_error) {
+            error = 'Could not save the choice.';
+        } finally {
+            busy = false;
+            render();
+        }
+    }
+    // The tab repeats the read every few seconds while it is open.
+    function setActive(active) {
+        if (active && timer === null) {
+            void refresh();
+            timer = setInterval(() => { void refresh(); }, pollMs);
+        } else if (!active && timer !== null) {
+            clearInterval(timer);
+            timer = null;
+        }
+    }
+    return { refresh, choose, setActive };
+}
+
+function renderStorage(doc, storage, racedListFill = null) {
     const fillText = racedListFillText(racedListFill);
-    const archiveText = dailyGhostArchiveText(dailyGhostArchive);
-    const fillNode = [fillText, archiveText]
-        .filter(Boolean)
-        .map((text) => element(doc, 'p', 'analytics-note', text));
+    const fillNode = fillText ? [element(doc, 'p', 'analytics-note', fillText)] : [];
     if (!storage || typeof storage !== 'object') {
         return [
             cardHeading(doc, 'Redis'),
@@ -880,7 +978,7 @@ export function renderAnalyticsSummary(root, summary) {
 
 // The Players sections, and the other tabs' cards, which an access error
 // must clear too.
-const LOCKED_SECTION_IDS = [...SECTION_IDS, 'analytics-challenges', 'analytics-storage'];
+const LOCKED_SECTION_IDS = [...SECTION_IDS, 'analytics-challenges', 'analytics-storage', 'analytics-ghost-move'];
 
 export function renderAnalyticsMessage(root, message, state = 'error') {
     const status = root.getElementById('analytics-status');
@@ -912,12 +1010,7 @@ export async function loadAnalyticsSummary(fetchImpl = fetch) {
 export function renderStorageSummary(root, payload) {
     const section = root.getElementById('analytics-storage');
     if (!section) return;
-    section.replaceChildren(...renderStorage(
-        root,
-        payload?.storage,
-        payload?.racedListFill,
-        payload?.dailyGhostArchive,
-    ));
+    section.replaceChildren(...renderStorage(root, payload?.storage, payload?.racedListFill));
     section.hidden = false;
 }
 
@@ -997,9 +1090,11 @@ export function setupAnalyticsTabs(root, { onOpen } = {}) {
 export async function bootAnalytics(root = document, fetchImpl = fetch) {
     const challenges = createChallengeAnalyticsController(root, fetchImpl);
     const storage = createStorageTabController(root, fetchImpl);
+    const ghostMove = createGhostMoveController(root, fetchImpl);
     const opened = new Set();
     const tabs = setupAnalyticsTabs(root, {
         onOpen: (name) => {
+            ghostMove.setActive(name === 'storage');
             if (opened.has(name)) return;
             opened.add(name);
             if (name === 'challenges') void challenges.loadMore();

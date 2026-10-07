@@ -10,19 +10,17 @@ describe('moderator analytics payloads', () => {
         await expect(getModeratorAnalyticsSummary({ getSummary: async () => summary })).resolves.toEqual(summary);
     });
 
-    it('loads Redis occupancy, the raced-list fill and the ghost move for the Storage tab', async () => {
+    it('loads Redis occupancy and the raced-list fill for the Storage tab', async () => {
         const storage = { totalBytes: 2048, groups: [] };
         const racedListFill = { state: 'working', boardsDone: 3, boards: 40 };
-        const dailyGhostArchive = { choice: 'all', moved: 12 };
 
         await expect(getModeratorStorageSummary({
             getStorage: async () => storage,
             getRacedListFill: async () => racedListFill,
-            getDailyGhostArchive: async () => dailyGhostArchive,
-        })).resolves.toEqual({ storage, racedListFill, dailyGhostArchive });
+        })).resolves.toEqual({ storage, racedListFill });
     });
 
-    it('keeps each Storage part when another one fails', async () => {
+    it('keeps each Storage part when the other one fails', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const racedListFill = { state: 'done' };
 
@@ -31,9 +29,6 @@ describe('moderator analytics payloads', () => {
                 throw new Error('Redis walk failed');
             },
             getRacedListFill: async () => racedListFill,
-            getDailyGhostArchive: async () => {
-                throw new Error('Redis read failed');
-            },
-        })).resolves.toEqual({ storage: null, racedListFill, dailyGhostArchive: null });
+        })).resolves.toEqual({ storage: null, racedListFill });
     });
 });

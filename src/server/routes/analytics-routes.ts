@@ -1,4 +1,5 @@
 import type { Application, Response } from 'express';
+import { isDailyGhostArchiveChoice, type DailyGhostArchiveChoice } from '../daily/daily-ghost-archive.js';
 
 export type AnalyticsRouteDependencies = {
     resolveAnalyticsToolSubredditName(): Promise<string | null>;
@@ -14,6 +15,8 @@ export type AnalyticsRouteDependencies = {
     recordChallengeEvent(input: { action: unknown }): Promise<void>;
     getChallengeAnalyticsPage(subredditName: string, offset: number, period: 'today' | 'lifetime'): Promise<unknown>;
     getStorageSummary(): Promise<unknown>;
+    readDailyGhostArchiveStatus(): Promise<unknown>;
+    saveDailyGhostArchiveSetting(choice: DailyGhostArchiveChoice, changedBy: string): Promise<unknown>;
 };
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
@@ -137,6 +140,49 @@ export function registerAnalyticsRoutes(
             const message = error instanceof Error && error.message ? error.message : 'Storage summary failed';
             const status = message.includes('Moderator access required') ? 403 : 500;
             if (status !== 403) console.error('Failed to load Mini Racer storage summary:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    // The move of old Daily ghosts to blob storage: its progress, and the
+    // moderator's choice. Each install keeps its own choice.
+    app.get('/api/analytics/ghost-archive', async (_req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            res.status(200).json(await dependencies.readDailyGhostArchiveStatus());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Ghost move status failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to load the Daily ghost move status:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    app.post('/api/analytics/ghost-archive', async (req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            const username = await dependencies.assertModeratorForSubreddit(subredditName);
+            const choice = req.body?.choice;
+            if (!isDailyGhostArchiveChoice(choice)) {
+                res.status(400).json({ error: 'Unknown ghost move choice.' });
+                return;
+            }
+            await dependencies.saveDailyGhostArchiveSetting(choice, username);
+            console.log(`Daily ghost move set to ${choice} by u/${username} in r/${subredditName}.`);
+            res.status(200).json(await dependencies.readDailyGhostArchiveStatus());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Ghost move choice failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to save the Daily ghost move choice:', error);
             res.status(status).json({ error: message });
         }
     });

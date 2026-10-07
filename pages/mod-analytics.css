@@ -563,6 +563,19 @@ h1 {
     cursor: pointer;
 }
 
+.analytics-progress {
+    height: 0.5rem;
+    margin: 0.7rem 0 0.45rem;
+    border-radius: 999px;
+    background: var(--line);
+    overflow: hidden;
+}
+
+.analytics-progress__fill {
+    height: 100%;
+    background: var(--accent);
+}
+
 .analytics-tabs {
     width: max-content;
     max-width: 100%;

@@ -380,6 +380,45 @@ describe('issued challenge analytics routes', () => {
         expect(services.getChallengeAnalyticsPage).toHaveBeenCalledTimes(1);
     });
 
+    it('reads the ghost move for moderators, and saves a valid choice with the moderator name', async () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const status = { choice: 'trial', moved: 3 };
+        const services = dependencies({
+            readDailyGhostArchiveStatus: vi.fn(async () => status),
+            saveDailyGhostArchiveSetting: vi.fn(async () => {}),
+        });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const post = (choice) => fetch(`${baseUrl}/api/analytics/ghost-archive`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ choice }),
+        });
+
+        const read = await fetch(`${baseUrl}/api/analytics/ghost-archive`);
+        expect(read.status).toBe(200);
+        expect(await read.json()).toEqual(status);
+        const saved = await post('all');
+        expect(saved.status).toBe(200);
+        expect(services.saveDailyGhostArchiveSetting).toHaveBeenCalledWith('all', 'RaceMod');
+        expect((await post('sideways')).status).toBe(400);
+        expect(services.saveDailyGhostArchiveSetting).toHaveBeenCalledTimes(1);
+
+        const denied = dependencies({
+            readDailyGhostArchiveStatus: vi.fn(async () => status),
+            saveDailyGhostArchiveSetting: vi.fn(async () => {}),
+            assertModeratorForSubreddit: vi.fn(async () => { throw new Error('Moderator access required for r/MiniRacer.'); }),
+        });
+        const deniedUrl = await startApp((app) => registerAnalyticsRoutes(app, denied));
+        expect((await fetch(`${deniedUrl}/api/analytics/ghost-archive`)).status).toBe(403);
+        const deniedPost = await fetch(`${deniedUrl}/api/analytics/ghost-archive`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ choice: 'all' }),
+        });
+        expect(deniedPost.status).toBe(403);
+        expect(denied.saveDailyGhostArchiveSetting).not.toHaveBeenCalled();
+    });
+
     it('serves the Storage tab to moderators only', async () => {
         const payload = { storage: { totalBytes: 10, groups: [] }, racedListFill: null, dailyGhostArchive: null };
         const services = dependencies({ getStorageSummary: vi.fn(async () => payload) });

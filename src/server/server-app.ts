@@ -237,6 +237,8 @@ function registerProductionRoutes(app: express.Application): void {
             getChallengeAnalyticsPage(subredditName, offset, { period })
         ),
         getStorageSummary: () => getModeratorStorageSummary(),
+        readDailyGhostArchiveStatus: () => readDailyGhostArchiveStatus(),
+        saveDailyGhostArchiveSetting: (choice, changedBy) => saveDailyGhostArchiveSetting(choice, changedBy),
     });
     registerPlayerRoutes(app, {
         getRequestUsername,
@@ -336,8 +338,6 @@ function registerProductionRoutes(app: express.Application): void {
             return result;
         },
         runDailyGhostArchive: () => runDailyGhostArchive(),
-        readDailyGhostArchiveStatus: () => readDailyGhostArchiveStatus(),
-        saveDailyGhostArchiveSetting: (choice, changedBy) => saveDailyGhostArchiveSetting(choice, changedBy),
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

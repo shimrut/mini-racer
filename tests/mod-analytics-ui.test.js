@@ -3,9 +3,11 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
     bootAnalytics,
+    createGhostMoveController,
     loadAnalyticsSummary,
     renderAnalyticsMessage,
     renderAnalyticsSummary,
+    renderGhostMove,
     renderStorageSummary,
 } from '../pages/mod-analytics.js';
 
@@ -186,40 +188,72 @@ describe('moderator analytics page', () => {
         }
     });
 
-    it('shows how far the move of old Daily ghosts has come, and nothing while it never ran', () => {
+    it('shows the ghost move with its choice, a progress bar and the figures', () => {
         const status = {
             choice: 'all',
             mode: 'move',
             days: { moving: 1, waiting: 0, done: 4, restoring: 0, restored: 0 },
-            waitingDays: 2,
+            eligibleDays: 8,
+            waitingDays: 4,
             moved: 12345,
             restored: 0,
             freed: 3 * 1024 * 1024,
             deleted: 7,
             held: 3,
             blob: { bytes: 2.5 * 1024 * 1024, objects: 12000, measuredDays: 4 },
+            blobError: { message: 'app not allowed to use blob storage', at: '2026-10-07T07:43:00.000Z' },
         };
-        for (const [dailyGhostArchive, text] of [
-            [status, 'Old Daily ghosts (Move all old days): moved 12,345 (Redis payload removed 3.0 MB) · held 3'
-                + ' · waiting 2 days · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)'],
-            [{ ...status, choice: 'restore', mode: 'restore', restored: 40 }, 'Old Daily ghosts (Restore all to Redis): moved 12,345'],
-        ]) {
-            const { window } = analyticsDom();
-            renderStorageSummary(window.document, ({
-                storage: { totalBytes: 1536, groups: [] },
-                dailyGhostArchive,
-            }));
-            expect(window.document.getElementById('analytics-storage').textContent).toContain(text);
-        }
-
         const { window } = analyticsDom();
-        renderStorageSummary(window.document, ({
-            storage: { totalBytes: 1536, groups: [] },
-            dailyGhostArchive: {
-                ...status, choice: 'off', mode: 'off', days: { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 },
-            },
-        }));
-        expect(window.document.getElementById('analytics-storage').textContent).not.toContain('Old Daily ghosts');
+        const onChoose = vi.fn();
+        renderGhostMove(window.document, { status, onChoose });
+        const card = window.document.getElementById('analytics-ghost-move');
+
+        expect(card.hidden).toBe(false);
+        const pressed = [...card.querySelectorAll('button[aria-pressed="true"]')].map((node) => node.textContent);
+        expect(pressed).toEqual(['Move all']);
+        const bar = card.querySelector('[role="progressbar"]');
+        expect(bar.getAttribute('aria-valuenow')).toBe('4');
+        expect(bar.getAttribute('aria-valuemax')).toBe('8');
+        expect(card.querySelector('.analytics-progress__fill').style.width).toBe('50%');
+        expect(card.textContent).toContain('4 of 8 finished days done · 4 waiting');
+        expect(card.textContent).toContain('Moved 12,345 runs · Redis payload removed 3.0 MB');
+        expect(card.textContent).toContain('Held 3 runs · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)');
+        expect(card.textContent).toContain('Blob storage refused: app not allowed to use blob storage');
+
+        [...card.querySelectorAll('button')].find((node) => node.textContent === 'Restore').click();
+        expect(onChoose).toHaveBeenCalledWith('restore');
+    });
+
+    it('saves a choice and reads the move again only while the Storage tab is open', async () => {
+        vi.useFakeTimers();
+        try {
+            const { window } = analyticsDom();
+            const status = { choice: 'off', days: {}, eligibleDays: 0, blob: {} };
+            const fetchImpl = vi.fn(async (_url, init) => ({
+                status: 200,
+                ok: true,
+                json: async () => (init?.method === 'POST' ? { ...status, choice: JSON.parse(init.body).choice } : status),
+            }));
+            const controller = createGhostMoveController(window.document, fetchImpl, { pollMs: 1000 });
+
+            controller.setActive(true);
+            await vi.advanceTimersByTimeAsync(2500);
+            expect(fetchImpl).toHaveBeenCalledTimes(3);
+            await controller.choose('trial');
+            expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/ghost-archive', expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ choice: 'trial' }),
+            }));
+            const pressed = window.document.querySelector('#analytics-ghost-move button[aria-pressed="true"]');
+            expect(pressed.textContent).toBe('Move one day');
+
+            controller.setActive(false);
+            const calls = fetchImpl.mock.calls.length;
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(fetchImpl).toHaveBeenCalledTimes(calls);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('shows Unavailable on the Storage tab when the size walk failed', () => {
@@ -354,8 +388,10 @@ describe('moderator analytics page', () => {
             status: 200,
             ok: true,
             json: async () => (url.startsWith('/api/analytics/storage')
-                ? { storage: { totalBytes: 2048, groups: [] }, racedListFill: null, dailyGhostArchive: null }
-                : url.startsWith('/api/analytics/challenges')
+                ? { storage: { totalBytes: 2048, groups: [] }, racedListFill: null }
+                : url.startsWith('/api/analytics/ghost-archive')
+                    ? { choice: 'off', days: {}, eligibleDays: 0, blob: {} }
+                    : url.startsWith('/api/analytics/challenges')
                     ? { date: '2026-08-15', items: [], nextOffset: null }
                     : summaryFixture()),
         }));
@@ -373,10 +409,10 @@ describe('moderator analytics page', () => {
         expect(panel('storage').hidden).toBe(false);
         expect(panel('players').hidden).toBe(true);
         tab('challenges').click();
-        tab('storage').click();
-        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(4));
         expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
             '/api/analytics/summary',
+            '/api/analytics/ghost-archive',
             '/api/analytics/storage',
             '/api/analytics/challenges?offset=0&period=today',
         ]);

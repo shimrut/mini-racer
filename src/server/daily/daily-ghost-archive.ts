@@ -1326,7 +1326,8 @@ export type DailyGhostArchiveStatus = {
     choice: DailyGhostArchiveChoice;
     mode: DailyGhostArchiveMode;
     days: Record<DayState, number>;
-    // Days past their 8th-day start that are not yet done.
+    // Days past their 8th-day start, and those of them not yet done.
+    eligibleDays: number;
     waitingDays: number;
     moved: number;
     restored: number;
@@ -1374,13 +1375,13 @@ export async function readDailyGhostArchiveStatus(nowMs = Date.now()): Promise<D
         .map(async ([id]) => (
             await redis.hScan(dailyGhostArchiveHeldKey(id), 0, undefined, HELD_COUNT_LIMIT)
         ).fieldValues.length));
-    const waitingDays = storedDays.filter(({ id, availableUntilMs }) => (
-        availableUntilMs + PODIUM_WINDOW_MS <= nowMs && days.get(id)?.state !== 'done'
-    )).length;
+    const eligible = storedDays.filter(({ availableUntilMs }) => availableUntilMs + PODIUM_WINDOW_MS <= nowMs);
+    const waitingDays = eligible.filter(({ id }) => days.get(id)?.state !== 'done').length;
     return {
         choice: setting.choice,
         mode,
         days: counts,
+        eligibleDays: eligible.length,
         waitingDays,
         moved: totals.moved,
         restored: totals.restored,

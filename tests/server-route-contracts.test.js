@@ -601,65 +601,6 @@ describe('server route contracts', () => {
         expect(await readJson(failed)).toEqual({ ok: false, error: 'Scheduled Daily ghost archive run failed' });
     });
 
-    it('opens the Daily ghost move form for a moderator, with the current choice', async () => {
-        const status = {
-            choice: 'trial', mode: 'move', days: { moving: 0, waiting: 0, done: 1, restoring: 0, restored: 0 },
-            waitingDays: 40, moved: 12000, restored: 0, freed: 15 * 1024 * 1024, deleted: 0, held: 2,
-            blob: { bytes: 11 * 1024 * 1024, objects: 12000, measuredDays: 1 },
-        };
-        const assertModeratorForSubreddit = vi.fn(async () => 'mod-name');
-        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
-            resolveMenuTargetSubredditName: async () => 'mini_racer',
-            assertModeratorForSubreddit,
-            readDailyGhostArchiveStatus: async () => status,
-        }));
-
-        const response = await fetch(`${baseUrl}/internal/menu/daily-ghost-archive`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ targetId: 't5_abc' }),
-        });
-        const body = await readJson(response);
-
-        expect(assertModeratorForSubreddit).toHaveBeenCalledWith('mini_racer');
-        expect(body.showForm.name).toBe('dailyGhostArchive');
-        expect(body.showForm.form.description).toContain('Now: Move one day (trial).');
-        expect(body.showForm.form.description).toContain('Moved 12,000 runs, 15.0 MB out of Redis.');
-        const [field] = body.showForm.form.fields;
-        expect(field).toMatchObject({ type: 'select', name: 'choice', defaultValue: ['trial'] });
-        expect(field.options.map((option) => option.value)).toEqual(['off', 'trial', 'all', 'restore']);
-    });
-
-    it('saves the Daily ghost move choice of a moderator only', async () => {
-        vi.spyOn(console, 'log').mockImplementation(() => {});
-        vi.spyOn(console, 'error').mockImplementation(() => {});
-        const saveDailyGhostArchiveSetting = vi.fn(async (choice, changedBy) => ({ choice, changedBy }));
-        let moderator = true;
-        const baseUrl = await startApp((app) => registerInternalRoutes(app, {
-            resolveMenuTargetSubredditName: async () => 'mini_racer',
-            assertModeratorForSubreddit: async () => {
-                if (!moderator) throw new Error('Moderator access required for r/mini_racer.');
-                return 'mod-name';
-            },
-            saveDailyGhostArchiveSetting,
-        }));
-        const submit = (choice) => fetch(`${baseUrl}/internal/form/daily-ghost-archive`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ choice }),
-        }).then(readJson);
-
-        expect(await submit(['all'])).toEqual({
-            showToast: { text: 'Old Daily ghosts: Move all old days. It starts within a minute.', appearance: 'success' },
-        });
-        expect(saveDailyGhostArchiveSetting).toHaveBeenCalledWith('all', 'mod-name');
-
-        expect((await submit(['sideways'])).showToast.text).toBe('Pick one of the choices.');
-        moderator = false;
-        expect((await submit(['off'])).showToast.text).toContain('Moderator access required');
-        expect(saveDailyGhostArchiveSetting).toHaveBeenCalledTimes(1);
-    });
-
     it('preserves daily-post moderator menu success responses and side effects', async () => {
         const enableDailyAutopost = vi.fn();
         const deleteDailyAutopostSubscription = vi.fn();
