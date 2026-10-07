@@ -453,6 +453,68 @@ describe("moving old Daily ghosts to blob storage", () => {
     expect(status.blob.bytes).toBe(blobs.objects.get(blobs.keys()[0]).bytes.byteLength);
   });
 
+  it("passes over old days without ghosts, so a one-day trial moves a day that has them", async () => {
+    // The oldest day has no ghost hash, the next only a best time without a
+    // ghost; the third and fourth hold real ghosts.
+    const noRuns = DAY_ID;
+    const noGhost = await storeDay("2026-09-21");
+    const firstReal = await storeDay("2026-09-22");
+    const secondReal = await storeDay("2026-09-23");
+    await seedRun("reddit:seeded", noGhostRunText(31000), noGhost);
+    await seedRun("guest:a", fullRunText(30000), firstReal);
+    await seedRun("guest:a", fullRunText(30000), secondReal);
+    clock.advance(3 * DAY_MS);
+
+    await runArchive(clock, blobs, { dayLimit: 1 });
+    clock.advance(60_000);
+    await runArchive(clock, blobs, { dayLimit: 1 });
+
+    expect(await dayRecord(noRuns)).toMatchObject({ state: "done", moved: 0 });
+    expect(await dayRecord(noGhost)).toMatchObject({ state: "done", moved: 0 });
+    expect(await dayRecord(firstReal)).toMatchObject({ state: "done", moved: 1 });
+    expect((await runValue("guest:a", firstReal)).ghost).toBeNull();
+    expect(await dayRecord(secondReal)).toBeNull();
+    expect((await runValue("guest:a", secondReal)).ghost).not.toBeNull();
+  });
+
+  it("stops at a refused first request with every day as it was, and says why once an hour", async () => {
+    const text = fullRunText(30000);
+    await seedRun("guest:a", text);
+    blobs.faults.list = "fail";
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await runArchive(clock, blobs)).toMatchObject({ status: "blob_refused", moved: 0 });
+    clock.advance(60_000);
+    expect(await runArchive(clock, blobs)).toMatchObject({ status: "blob_refused" });
+
+    expect(await runText("guest:a")).toBe(text);
+    expect(await dayRecord()).toBeNull();
+    expect(await redis.get(archive.DAILY_GHOST_ARCHIVE_TOTALS_KEY)).toBeFalsy();
+    expect(await heldNames()).toEqual({});
+    expect(blobs.count("put")).toBe(0);
+    const refusals = errors.mock.calls.filter(([text]) => String(text).includes("blob storage refused"));
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0][1]).toBe("blob list failed");
+    expect((await archive.readDailyGhostArchiveStatus(clock.now())).blobError)
+      .toMatchObject({ message: "blob list failed" });
+
+    blobs.faults.list = null;
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+    expect((await runValue("guest:a")).ghost).toBeNull();
+    expect((await archive.readDailyGhostArchiveStatus(clock.now())).blobError).toBeNull();
+  });
+
+  it("logs what blob storage said when an upload fails", async () => {
+    await seedRun("guest:a", fullRunText(30000));
+    blobs.faults.put = "fail";
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await runArchive(clock, blobs);
+
+    expect(errors).toHaveBeenCalledWith("Daily ghost archive failed:", DAY_ID, "upload", "blob put failed");
+  });
+
   it("does nothing while off", async () => {
     const text = fullRunText(30000);
     await seedRun("guest:a", text);

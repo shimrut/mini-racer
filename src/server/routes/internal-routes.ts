@@ -127,7 +127,8 @@ function describeDailyGhostArchive(status: DailyGhostArchiveStatus): string {
         `Moved ${count(status.moved)} runs, ${megabytes(status.freed)} out of Redis.`,
         `${count(status.days.done)} days done, ${count(status.waitingDays)} waiting, ${count(status.held)} runs held.`,
         `Blob storage: ${megabytes(status.blob.bytes)}.`,
-    ].join(' ');
+        status.blobError ? `Blob storage refused the last request: ${status.blobError.message}` : '',
+    ].filter(Boolean).join(' ');
 }
 
 export function registerInternalRoutes(

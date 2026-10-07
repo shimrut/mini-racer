@@ -79,6 +79,11 @@ export const DAILY_GHOST_ARCHIVE_LOCK_KEY = `${KEY_PREFIX}:lock`;
 export const DAILY_GHOST_ARCHIVE_DAYS_KEY = `${KEY_PREFIX}:days`;
 export const DAILY_GHOST_ARCHIVE_TOTALS_KEY = `${KEY_PREFIX}:totals`;
 export const DAILY_GHOST_ARCHIVE_SETTING_KEY = `${KEY_PREFIX}:setting`;
+// The last refusal from blob storage, shown on the moderator page until a
+// request goes through again.
+export const DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY = `${KEY_PREFIX}:blob-error`;
+const BLOB_ERROR_LOGGED_KEY = `${KEY_PREFIX}:blob-error-logged`;
+const BLOB_ERROR_LOG_EVERY_MS = 60 * 60 * 1000;
 
 export type DailyGhostArchiveSetting = {
     choice: DailyGhostArchiveChoice;
@@ -356,7 +361,7 @@ type RunContext = {
 };
 
 export type DailyGhostArchiveReport = {
-    status: 'off' | 'busy' | 'worked' | 'lock_lost';
+    status: 'off' | 'busy' | 'worked' | 'lock_lost' | 'blob_refused';
     moved: number;
     restored: number;
     held: number;
@@ -508,6 +513,8 @@ type Conversion = {
 };
 
 type SliceOutcome = {
+    // What blob storage said the first time a call failed, for the log.
+    firstError?: string;
     ready: Conversion[];
     // Rows that need nothing: gone, already in the wanted form, or not a run.
     drop: string[];
@@ -515,6 +522,10 @@ type SliceOutcome = {
     // Rows whose player had a sign-in in progress before any blob call.
     marked?: string[];
 };
+
+function errorText(error: unknown): string {
+    return (error instanceof Error ? error.message : String(error)).slice(0, 300);
+}
 
 function failureCode(error: unknown, step: 'upload' | 'confirm_read'): string | null {
     if (error instanceof BlobDeadlineError) return null;
@@ -561,7 +572,10 @@ async function prepareMoves(
             await ctx.session.put(key, new Uint8Array(gzipSync(Buffer.from(text, 'utf8'))));
         } catch (error) {
             const code = failureCode(error, 'upload');
-            if (code) outcome.failed.push({ name, code });
+            if (code) {
+                outcome.failed.push({ name, code });
+                outcome.firstError ??= errorText(error);
+            }
             return;
         }
         if (!ctx.session.hasTimeFor(1)) return;
@@ -570,7 +584,10 @@ async function prepareMoves(
             copy = await ctx.session.get(key);
         } catch (error) {
             const code = failureCode(error, 'confirm_read');
-            if (code) outcome.failed.push({ name, code });
+            if (code) {
+                outcome.failed.push({ name, code });
+                outcome.firstError ??= errorText(error);
+            }
             return;
         }
         let copyText: string | null = null;
@@ -618,7 +635,10 @@ async function prepareRestores(
             copy = await ctx.session.get(ref.key);
         } catch (error) {
             const code = failureCode(error, 'confirm_read');
-            if (code) outcome.failed.push({ name, code });
+            if (code) {
+                outcome.failed.push({ name, code });
+                outcome.firstError ??= errorText(error);
+            }
             return;
         }
         if (copy === null) {
@@ -743,6 +763,7 @@ async function commitSlice(
                 'Daily ghost archive failed:',
                 challengeId,
                 outcome.failed.map((item) => item.code).join(','),
+                outcome.firstError ?? '',
             );
         }
     }
@@ -861,15 +882,23 @@ function pickRestoreDay(
     return null;
 }
 
+// A day counts toward the day limit once it holds ghosts. A finished day where
+// nothing needed moving does not count, so a one-day trial passes over empty
+// old days and reaches a day with real ghosts.
+function countsTowardDayLimit(day: DailyGhostArchiveDay): boolean {
+    return day.active || day.state !== 'done' || day.moved > 0 || day.hasHeld || day.failedThisPass > 0;
+}
+
 function pickMoveDay(
     ctx: RunContext,
     eligible: readonly StoredDay[],
     dayLimit: number | null,
 ): { challengeId: string; action: PassAction } | null {
+    const counted = [...ctx.days.values()].filter(countsTowardDayLimit).length;
     for (const { id } of eligible) {
         if (ctx.stuck.has(id)) continue;
         const day = ctx.days.get(id);
-        if (!day && dayLimit !== null && ctx.days.size >= dayLimit) continue;
+        if (!day && dayLimit !== null && counted >= dayLimit) continue;
         const action = moveAction(day, ctx);
         if (action) return { challengeId: id, action };
     }
@@ -1135,6 +1164,33 @@ async function workSweep(ctx: RunContext, challengeId: string): Promise<void> {
     }
 }
 
+// One small request before any day changes. When blob storage refuses it, the
+// run stops with every day as it was, keeps the reason for the moderator page,
+// and logs it at most once an hour.
+async function blobStorageRefusal(ctx: RunContext): Promise<string | null> {
+    try {
+        await ctx.session.list(`${BLOB_PREFIX}/`, null, 1);
+    } catch (error) {
+        const message = errorText(error);
+        await redis.set(DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY, JSON.stringify({
+            message,
+            at: new Date(ctx.clock.now()).toISOString(),
+        }));
+        // A Redis expiry runs on real time.
+        const first = await redis.set(BLOB_ERROR_LOGGED_KEY, '1', {
+            nx: true,
+            expiration: new Date(Date.now() + BLOB_ERROR_LOG_EVERY_MS),
+        });
+        if (first) console.error('Daily ghost archive stopped: blob storage refused the first request:', message);
+        return message;
+    }
+    if (await redis.get(DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY)) {
+        await redis.del(DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY);
+        await redis.del(BLOB_ERROR_LOGGED_KEY);
+    }
+    return null;
+}
+
 // Hourly: reopens done days whose revision changed, then works the held lists.
 async function runUpkeep(ctx: RunContext): Promise<void> {
     if (!await saveTotals(ctx, { ...ctx.totals, upkeepAt: ctx.clock.now() })) return;
@@ -1215,6 +1271,8 @@ export async function runDailyGhostArchive({
             report: { ...report, status: 'worked' },
         };
 
+        if (await blobStorageRefusal(ctx)) return { ...report, status: 'blob_refused' };
+
         // A new mode cancels saved pages and sweeps as each day is touched.
         let totals = ctx.totals;
         if (totals.lastMode !== mode) totals = { ...totals, lastMode: mode, modeSerial: totals.modeSerial + 1 };
@@ -1279,17 +1337,21 @@ export type DailyGhostArchiveStatus = {
     held: number;
     // Measured by the last finished sweep of each day.
     blob: { bytes: number; objects: number; measuredDays: number };
+    // The last refusal from blob storage, until a request goes through.
+    blobError: { message: string; at: string } | null;
 };
 
 const HELD_COUNT_LIMIT = 1000;
 
 export async function readDailyGhostArchiveStatus(nowMs = Date.now()): Promise<DailyGhostArchiveStatus> {
-    const [rawTotals, rawDays, storedDays, setting] = await Promise.all([
+    const [rawTotals, rawDays, storedDays, setting, rawBlobError] = await Promise.all([
         redis.get(DAILY_GHOST_ARCHIVE_TOTALS_KEY),
         redis.hGetAll(DAILY_GHOST_ARCHIVE_DAYS_KEY),
         readStoredDays(),
         readDailyGhostArchiveSetting(),
+        redis.get(DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY),
     ]);
+    const blobError = parseJsonObject(rawBlobError);
     const { mode } = dailyGhostArchiveRunFor(setting.choice);
     const totals = parseTotals(rawTotals);
     const days = new Map<string, DailyGhostArchiveDay>();
@@ -1326,6 +1388,9 @@ export async function readDailyGhostArchiveStatus(nowMs = Date.now()): Promise<D
         deleted: totals.deleted,
         held: heldCounts.reduce((sum, count) => sum + count, 0),
         blob,
+        blobError: typeof blobError?.message === 'string'
+            ? { message: blobError.message, at: String(blobError.at ?? '') }
+            : null,
     };
 }
 

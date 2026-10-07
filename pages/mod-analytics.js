@@ -497,7 +497,7 @@ const DAILY_GHOST_CHOICE_LABELS = {
 function dailyGhostArchiveText(status) {
     if (!status || typeof status !== 'object') return null;
     const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
-    if (status.choice === 'off' && touched === 0) return null;
+    if (status.choice === 'off' && touched === 0 && !status.blobError) return null;
     const mode = ` (${DAILY_GHOST_CHOICE_LABELS[status.choice] ?? 'Off'})`;
     const parts = [
         `moved ${formatCount(status.moved)} (Redis payload removed ${formatBytes(status.freed)})`,
@@ -507,6 +507,7 @@ function dailyGhostArchiveText(status) {
     const blob = status.blob ?? {};
     parts.push(`blob ${formatBytes(blob.bytes)} in ${formatCount(blob.objects)} objects`
         + ` (measured on ${formatCount(blob.measuredDays)} of ${formatCount(touched)} days)`);
+    if (status.blobError?.message) parts.push(`blob storage refused: ${String(status.blobError.message).slice(0, 160)}`);
     return `Old Daily ghosts${mode}: ${parts.join(' · ')}`;
 }
 
