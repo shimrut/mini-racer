@@ -152,8 +152,19 @@ function summaryLockKey(scope: string): string {
     return scopedKey(scope, 'summary-lock');
 }
 
+function cohortFillLockKey(scope: string): string {
+    return scopedKey(scope, 'cohort-fill-lock');
+}
+
 const SUMMARY_READY = 'ready';
 const COHORT_OFFSETS = [1, 2, 3, 7, 14, 30] as const;
+// Cohort counts are kept as players race from the day the new counting first served the page.
+// Days before that are counted once from the day player lists, a few days at a time.
+const COHORTS_LIVE_FROM = 'cohorts-live-from';
+const COHORTS_FILLED_THROUGH = 'cohorts-filled-through';
+const COHORT_FILL_PAGE = 5000;
+const COHORT_FILL_DAYS_AT_ONCE = 8;
+const COHORT_FILL_BUDGET_MS = 15_000;
 const SUMMARY_LOCK_MS = 3 * 60 * 1000;
 const SUMMARY_WRITE_BATCH = 200;
 
@@ -635,14 +646,8 @@ function summarizeBucket(
     return bucket;
 }
 
-type LoadedAnalyticsDay = {
-    day: AnalyticsDay;
-    rawPlayers: Record<string, string>;
-};
-
 type LegacyBucket = {
     bucket: LoadedBucket;
-    rawPlayers: Record<string, string>;
     hasPresence: boolean;
     hasCounters: boolean;
 };
@@ -666,7 +671,6 @@ async function loadLegacyBucket(
     const counts = hashRecord(counters);
     return {
         bucket: summarizeBucket(presence, modes, counts),
-        rawPlayers: presence,
         hasPresence: Object.keys(presence).length > 0 || Object.keys(modes).length > 0,
         hasCounters: Object.keys(counts).length > 0,
     };
@@ -796,63 +800,119 @@ async function migrateSummary(scope: string, now: Date): Promise<boolean> {
     }
 }
 
-function cohortRetention(
-    members: string[],
-    cohortDate: string,
-    offset: number,
-    to: string,
-    activityByDate: Map<string, Record<string, string>>,
-): AnalyticsCohortRetention {
-    const targetDate = addUtcDays(cohortDate, offset);
-    if (targetDate > to) return { retained: null, rate: null };
-
-    const active = activityByDate.get(targetDate) || {};
-    const retained = members.reduce((count, playerId) => (
-        Object.prototype.hasOwnProperty.call(active, playerId)
-            && active[playerId] !== PLAYER_GUEST
-            ? count + 1
-            : count
-    ), 0);
-    return {
-        retained,
-        rate: Math.round((retained / members.length) * 1000) / 10,
-    };
+function cohortFieldsOwnedBy(date: string, from: string): string[] {
+    return [
+        cohortField(date),
+        ...COHORT_OFFSETS
+            .map((offset) => ({ offset, cohortDate: addUtcDays(date, -offset) }))
+            .filter(({ cohortDate }) => cohortDate >= from)
+            .map(({ offset, cohortDate }) => cohortReturnField(cohortDate, offset)),
+    ];
 }
 
-function buildCohorts(
-    rawCohortStarts: Record<string, string> | undefined,
-    loadedDays: LoadedAnalyticsDay[],
+async function countCohortDay(
+    scope: string,
+    date: string,
     from: string,
+): Promise<Map<string, number>> {
+    const counts = new Map(cohortFieldsOwnedBy(date, from).map((field) => [field, 0]));
+    const seen = new Set<string>();
+    let cursor = 0;
+    do {
+        const page = await redis.hScan(dayPlayersKey(scope, date), cursor, undefined, COHORT_FILL_PAGE);
+        // HSCAN can return a field twice.
+        const players: string[] = [];
+        for (const { field, value } of page.fieldValues) {
+            if (value === PLAYER_GUEST || !field.startsWith('reddit:') || seen.has(field)) continue;
+            seen.add(field);
+            players.push(field);
+        }
+        for (let index = 0; index < players.length; index += COHORT_FILL_PAGE) {
+            const starts = await redis.hMGet(
+                cohortStartsKey(scope),
+                players.slice(index, index + COHORT_FILL_PAGE),
+            );
+            for (const start of starts) {
+                const field = start === date ? cohortField(date) : cohortReturnFieldFor(start, date);
+                if (field && counts.has(field)) counts.set(field, (counts.get(field) || 0) + 1);
+            }
+        }
+        cursor = page.cursor;
+    } while (cursor !== 0);
+    return counts;
+}
+
+async function fillCohortCounts(scope: string, now: Date): Promise<void> {
+    const key = summaryKey(scope);
+    const { from, to, dates } = analyticsWindow(now);
+    const [liveFrom, filledThrough] = await redis.hMGet(key, [COHORTS_LIVE_FROM, COHORTS_FILLED_THROUGH]);
+    if (!isUtcDate(liveFrom)) await redis.hSetNX(key, COHORTS_LIVE_FROM, to);
+    const yesterday = addUtcDays(to, -1);
+    const fillEnd = isUtcDate(liveFrom) && liveFrom < yesterday ? liveFrom : yesterday;
+    if ((filledThrough ?? '') >= fillEnd) return;
+
+    const acquired = await redis.set(cohortFillLockKey(scope), '1', {
+        nx: true,
+        expiration: new Date(Date.now() + SUMMARY_LOCK_MS),
+    });
+    if (!acquired) return;
+
+    try {
+        const done = (await redis.hGet(key, COHORTS_FILLED_THROUGH)) ?? '';
+        const pending = dates.filter((date) => date > done && date <= fillEnd);
+        const startedAt = Date.now();
+        for (let index = 0; index < pending.length; index += COHORT_FILL_DAYS_AT_ONCE) {
+            if (Date.now() - startedAt > COHORT_FILL_BUDGET_MS) return;
+            const batch = pending.slice(index, index + COHORT_FILL_DAYS_AT_ONCE);
+            const counts = await Promise.all(batch.map((date) => countCohortDay(scope, date, from)));
+            const fields: Record<string, string> = {};
+            const empty: string[] = [];
+            for (const [field, count] of counts.flatMap((dayCounts) => [...dayCounts])) {
+                if (count > 0) fields[field] = String(count);
+                else empty.push(field);
+            }
+            if (Object.keys(fields).length > 0) await writeSummaryFields(key, fields);
+            if (empty.length > 0) await redis.hDel(key, empty);
+            await redis.hSet(key, { [COHORTS_FILLED_THROUGH]: batch[batch.length - 1] });
+        }
+    } finally {
+        await redis.del(cohortFillLockKey(scope));
+    }
+}
+
+function readCohorts(
+    summary: Record<string, string>,
+    dates: readonly string[],
     to: string,
 ): AnalyticsCohort[] {
-    const membersByDate = new Map<string, string[]>();
-    for (const [playerId, cohortDate] of Object.entries(rawCohortStarts || {})) {
-        if (
-            !playerId.startsWith('reddit:')
-            || !isUtcDate(cohortDate)
-            || cohortDate < from
-            || cohortDate > to
-        ) continue;
-        const members = membersByDate.get(cohortDate) || [];
-        members.push(playerId);
-        membersByDate.set(cohortDate, members);
-    }
-
-    const activityByDate = new Map(
-        loadedDays.map(({ day, rawPlayers }) => [day.date, rawPlayers]),
-    );
-    return [...membersByDate.entries()]
-        .sort(([first], [second]) => first.localeCompare(second))
-        .map(([date, members]) => ({
+    const filledThrough = summary[COHORTS_FILLED_THROUGH] ?? '';
+    const liveFrom = summary[COHORTS_LIVE_FROM] ?? '';
+    // A day the fill has not reached yet holds only part of its count.
+    const counted = (date: string) => date <= filledThrough || date >= liveFrom;
+    const retention = (
+        cohortDate: string,
+        offset: number,
+        players: number,
+    ): AnalyticsCohortRetention => {
+        const returnDate = addUtcDays(cohortDate, offset);
+        if (returnDate > to || !counted(returnDate)) return { retained: null, rate: null };
+        const retained = toCount(summary[cohortReturnField(cohortDate, offset)]);
+        return { retained, rate: Math.round((retained / players) * 1000) / 10 };
+    };
+    return dates.flatMap((date) => {
+        const players = toCount(summary[cohortField(date)]);
+        if (players === 0 || !counted(date)) return [];
+        return [{
             date,
-            players: members.length,
-            d1: cohortRetention(members, date, 1, to, activityByDate),
-            d2: cohortRetention(members, date, 2, to, activityByDate),
-            d3: cohortRetention(members, date, 3, to, activityByDate),
-            d7: cohortRetention(members, date, 7, to, activityByDate),
-            d14: cohortRetention(members, date, 14, to, activityByDate),
-            d30: cohortRetention(members, date, 30, to, activityByDate),
-        }));
+            players,
+            d1: retention(date, 1, players),
+            d2: retention(date, 2, players),
+            d3: retention(date, 3, players),
+            d7: retention(date, 7, players),
+            d14: retention(date, 14, players),
+            d30: retention(date, 30, players),
+        }];
+    });
 }
 
 function visibleMonth(month: AnalyticsMonth): boolean {
@@ -864,23 +924,14 @@ function visibleMonth(month: AnalyticsMonth): boolean {
 
 async function buildSummaryFromHash(scope: string, now: Date): Promise<AnalyticsSummary> {
     const { from, to, dates, months } = analyticsWindow(now);
-    const [rawSummary, playerHashes, cohortStarts] = await Promise.all([
-        redis.hGetAll(summaryKey(scope)),
-        Promise.all(dates.map((date) => redis.hGetAll(dayPlayersKey(scope, date)))),
-        redis.hGetAll(cohortStartsKey(scope)),
-    ]);
-    const summary = hashRecord(rawSummary);
-    const loadedDays = dates.map((date, index) => ({
-        day: { date, ...readSummaryBucket(summary, daySummaryPrefix(date)) },
-        rawPlayers: hashRecord(playerHashes[index]),
-    }));
-    const days = loadedDays.map(({ day }) => day);
+    const summary = hashRecord(await redis.hGetAll(summaryKey(scope)));
+    const days = dates.map((date) => ({ date, ...readSummaryBucket(summary, daySummaryPrefix(date)) }));
     return {
         from,
         to,
         today: days[days.length - 1] ?? emptyAnalyticsDay(to),
         days,
-        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
+        cohorts: readCohorts(summary, dates, to),
         months: months
             .map((month) => ({ month, ...readSummaryBucket(summary, monthSummaryPrefix(month)) }))
             .filter(visibleMonth),
@@ -889,7 +940,7 @@ async function buildSummaryFromHash(scope: string, now: Date): Promise<Analytics
 
 async function buildLegacySummary(scope: string, now: Date): Promise<AnalyticsSummary> {
     const { from, to, dates, months } = analyticsWindow(now);
-    const [days, monthBuckets, cohortStarts] = await Promise.all([
+    const [days, monthBuckets, rawSummary] = await Promise.all([
         Promise.all(dates.map((date) => loadLegacyBucket(
             dayPlayersKey(scope, date),
             dayModePlayersKey(scope, date),
@@ -900,18 +951,15 @@ async function buildLegacySummary(scope: string, now: Date): Promise<AnalyticsSu
             monthModePlayersKey(scope, month),
             monthCountersKey(scope, month),
         ))),
-        redis.hGetAll(cohortStartsKey(scope)),
+        redis.hGetAll(summaryKey(scope)),
     ]);
-    const loadedDays = dates.map((date, index) => ({
-        day: { date, ...days[index].bucket },
-        rawPlayers: days[index].rawPlayers,
-    }));
+    const loadedDays = dates.map((date, index) => ({ date, ...days[index].bucket }));
     return {
         from,
         to,
-        today: loadedDays[loadedDays.length - 1]?.day ?? emptyAnalyticsDay(to),
-        days: loadedDays.map(({ day }) => day),
-        cohorts: buildCohorts(cohortStarts, loadedDays, from, to),
+        today: loadedDays[loadedDays.length - 1] ?? emptyAnalyticsDay(to),
+        days: loadedDays,
+        cohorts: readCohorts(hashRecord(rawSummary), dates, to),
         months: months
             .map((month, index) => ({ month, ...monthBuckets[index].bucket }))
             .filter(visibleMonth),
@@ -930,6 +978,11 @@ export async function getServerAnalyticsSummary({
     if (ready !== '1') {
         const migrated = await migrateSummary(scope, now);
         if (!migrated) return buildLegacySummary(scope, now);
+    }
+    try {
+        await fillCohortCounts(scope, now);
+    } catch (error) {
+        logAnalyticsFailure('cohort fill', error);
     }
     return buildSummaryFromHash(scope, now);
 }

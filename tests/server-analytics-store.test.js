@@ -25,6 +25,15 @@ const mockRedis = {
     }),
     hGetAll: vi.fn(async (key) => Object.fromEntries(hashes.get(key) ?? [])),
     hGet: vi.fn(async (key, field) => hashes.get(key)?.get(field)),
+    hMGet: vi.fn(async (key, fields) => fields.map((field) => hashes.get(key)?.get(field) ?? null)),
+    hScan: vi.fn(async (key, cursor, _pattern, count = 10) => {
+        const entries = [...(hashes.get(key) ?? new Map())];
+        const next = cursor + count;
+        return {
+            cursor: next >= entries.length ? 0 : next,
+            fieldValues: entries.slice(cursor, next).map(([field, value]) => ({ field, value })),
+        };
+    }),
     hDel: vi.fn(async (key, fields) => {
         const hash = hashes.get(key);
         if (!hash) return 0;
@@ -564,8 +573,8 @@ describe('server analytics store', () => {
         expect(second.today.players).toBe(1);
     });
 
-    it('reads the chart from the summary hash and day lists only for cohorts', async () => {
-        const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
+    it('reads only the summary hash once the cohort counts are filled', async () => {
+        const { recordAnalyticsRace, getServerAnalyticsSummary, summaryKey } = await store();
         const now = day('2026-08-15T12:00:00.000Z');
 
         await recordAnalyticsRace({
@@ -577,15 +586,166 @@ describe('server analytics store', () => {
         });
         await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
         mockRedis.hGetAll.mockClear();
+        mockRedis.hScan.mockClear();
+        mockRedis.hMGet.mockClear();
+        mockRedis.hSetNX.mockClear();
 
         const summary = await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
-        const keys = mockRedis.hGetAll.mock.calls.map((call) => call[0]);
 
         expect(summary.today.players).toBe(1);
-        expect(keys.filter((key) => key.endsWith(':summary'))).toHaveLength(1);
-        expect(keys.filter((key) => key.endsWith(':players'))).toHaveLength(365);
-        expect(keys.filter((key) => key.endsWith(':cohort-starts'))).toHaveLength(1);
-        expect(keys.some((key) => key.includes(':mode-players') || key.includes(':counters') || key.includes(':m:'))).toBe(false);
+        expect(summary.cohorts.map((cohort) => cohort.date)).toEqual(['2026-08-15']);
+        expect(mockRedis.hGetAll.mock.calls.map((call) => call[0])).toEqual([summaryKey(SUBREDDIT)]);
+        expect(mockRedis.hScan).not.toHaveBeenCalled();
+        expect(mockRedis.hMGet.mock.calls.map((call) => call[0])).toEqual([summaryKey(SUBREDDIT)]);
+        expect(mockRedis.hSetNX).not.toHaveBeenCalled();
+    });
+
+    it('counts cohorts once from the day lists that older code saved', async () => {
+        const {
+            cohortStartsKey,
+            dayPlayersKey,
+            getServerAnalyticsSummary,
+            summaryKey,
+        } = await store();
+        await mockRedis.hSet(summaryKey(SUBREDDIT), { ready: '1' });
+        await mockRedis.hSet(cohortStartsKey(SUBREDDIT), {
+            'reddit:alpha': '2026-08-01',
+            'reddit:beta': '2026-08-01',
+            'reddit:gamma': '2026-08-03',
+        });
+        const dayList = (date, entries) => mockRedis.hSet(dayPlayersKey(SUBREDDIT, date), entries);
+        await dayList('2026-08-01', { 'reddit:alpha': 'n', 'reddit:beta': 'n', 'guest:visitor': 'g' });
+        await dayList('2026-08-02', { 'reddit:alpha': 'r' });
+        await dayList('2026-08-03', { 'reddit:gamma': 'n', 'reddit:beta': 'r' });
+        await dayList('2026-08-08', { 'reddit:alpha': 'r', 'reddit:beta': 'r', 'reddit:gamma': 'r' });
+        const scan = mockRedis.hScan.getMockImplementation();
+        mockRedis.hScan.mockImplementation(async (key, ...rest) => {
+            const page = await scan(key, ...rest);
+            return key === dayPlayersKey(SUBREDDIT, '2026-08-01')
+                ? { ...page, fieldValues: [...page.fieldValues, ...page.fieldValues] }
+                : page;
+        });
+
+        try {
+            const summary = await getServerAnalyticsSummary({
+                subredditName: SUBREDDIT,
+                now: day('2026-08-10T12:00:00.000Z'),
+            });
+
+            expect(summary.cohorts).toEqual([
+                {
+                    date: '2026-08-01',
+                    players: 2,
+                    d1: { retained: 1, rate: 50 },
+                    d2: { retained: 1, rate: 50 },
+                    d3: { retained: 0, rate: 0 },
+                    d7: { retained: 2, rate: 100 },
+                    d14: { retained: null, rate: null },
+                    d30: { retained: null, rate: null },
+                },
+                {
+                    date: '2026-08-03',
+                    players: 1,
+                    d1: { retained: 0, rate: 0 },
+                    d2: { retained: 0, rate: 0 },
+                    d3: { retained: 0, rate: 0 },
+                    d7: { retained: 0, rate: 0 },
+                    d14: { retained: null, rate: null },
+                    d30: { retained: null, rate: null },
+                },
+            ]);
+            const wholeReads = mockRedis.hGetAll.mock.calls.map((call) => call[0]);
+            expect(wholeReads).not.toContain(cohortStartsKey(SUBREDDIT));
+            expect(wholeReads.some((key) => key.endsWith(':players'))).toBe(false);
+        } finally {
+            mockRedis.hScan.mockImplementation(scan);
+        }
+    });
+
+    it('counts the first day of the new counting again from its day list the next day', async () => {
+        const {
+            cohortStartsKey,
+            dayPlayersKey,
+            getServerAnalyticsSummary,
+            recordAnalyticsRace,
+            summaryKey,
+        } = await store();
+        await mockRedis.hSet(summaryKey(SUBREDDIT), { ready: '1' });
+        await mockRedis.hSet(cohortStartsKey(SUBREDDIT), {
+            'reddit:alpha': '2026-08-14',
+            'reddit:early': '2026-08-15',
+        });
+        await mockRedis.hSet(dayPlayersKey(SUBREDDIT, '2026-08-14'), { 'reddit:alpha': 'n' });
+        await mockRedis.hSet(dayPlayersKey(SUBREDDIT, '2026-08-15'), {
+            'reddit:alpha': 'r',
+            'reddit:early': 'n',
+        });
+
+        await recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId: 'reddit:late',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T18:00:00.000Z'),
+        });
+        const sameDay = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T23:00:00.000Z'),
+        });
+        const nextDay = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-16T09:00:00.000Z'),
+        });
+
+        expect(sameDay.cohorts.map(({ date, players }) => ({ date, players }))).toEqual([
+            { date: '2026-08-14', players: 1 },
+            { date: '2026-08-15', players: 1 },
+        ]);
+        expect(nextDay.cohorts.map(({ date, players, d1 }) => ({ date, players, d1 }))).toEqual([
+            { date: '2026-08-14', players: 1, d1: { retained: 1, rate: 100 } },
+            { date: '2026-08-15', players: 2, d1: { retained: 0, rate: 0 } },
+        ]);
+    });
+
+    it('hides days the fill has not counted and continues the fill on the next load', async () => {
+        const {
+            cohortStartsKey,
+            dayPlayersKey,
+            getServerAnalyticsSummary,
+            summaryKey,
+        } = await store();
+        const now = day('2026-08-10T12:00:00.000Z');
+        await mockRedis.hSet(summaryKey(SUBREDDIT), { ready: '1' });
+        await mockRedis.hSet(cohortStartsKey(SUBREDDIT), { 'reddit:alpha': '2026-08-01' });
+        await mockRedis.hSet(dayPlayersKey(SUBREDDIT, '2026-08-01'), { 'reddit:alpha': 'n' });
+        await mockRedis.hSet(dayPlayersKey(SUBREDDIT, '2026-08-02'), { 'reddit:alpha': 'r' });
+        const scan = mockRedis.hScan.getMockImplementation();
+        mockRedis.hScan.mockImplementation(async (key, ...rest) => {
+            if (key === dayPlayersKey(SUBREDDIT, '2026-08-02')) throw new Error('redis busy');
+            return scan(key, ...rest);
+        });
+        const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            const first = await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
+            expect(first.cohorts.find((cohort) => cohort.date === '2026-08-01')?.d1.retained ?? null)
+                .toBeNull();
+            expect(errors.mock.calls.some(([message]) => String(message).includes('cohort fill'))).toBe(true);
+        } finally {
+            mockRedis.hScan.mockImplementation(scan);
+        }
+
+        const second = await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
+        expect(second.cohorts).toEqual([{
+            date: '2026-08-01',
+            players: 1,
+            d1: { retained: 1, rate: 100 },
+            d2: { retained: 0, rate: 0 },
+            d3: { retained: 0, rate: 0 },
+            d7: { retained: 0, rate: 0 },
+            d14: { retained: null, rate: null },
+            d30: { retained: null, rate: null },
+        }]);
     });
 
     it('swallows redis failures so gameplay callers stay unblocked', async () => {
