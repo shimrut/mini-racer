@@ -712,3 +712,224 @@ describe("sweeping blob copies that no stub points to", () => {
     expect(blobs.objects.has(lateCopy[0])).toBe(true);
   });
 });
+
+describe("restoring moved ghosts and switching modes", () => {
+  let blobs;
+  let clock;
+
+  beforeEach(async () => {
+    redis.reset();
+    clock = createClock(MOVE_AT);
+    blobs = createBlobTestStore({ now: () => clock.now() });
+    await storeDay(DAY);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function seedPlayers(players) {
+    const texts = {};
+    for (const [index, player] of players.entries()) {
+      texts[player] = fullRunText(30000 + index, index);
+      await seedRun(player, texts[player]);
+    }
+    return texts;
+  }
+
+  function restoreRun(options = {}) {
+    clock.advance(60_000);
+    return runArchive(clock, blobs, { mode: "restore", ...options });
+  }
+
+  function moveRun(options = {}) {
+    clock.advance(60_000);
+    return runArchive(clock, blobs, { mode: "move", ...options });
+  }
+
+  it("writes every moved ghost of a done day back exactly, and keeps the blob copies", async () => {
+    const texts = await seedPlayers(["guest:a", "reddit:b"]);
+    await runArchive(clock, blobs);
+    const keys = blobs.keys();
+
+    const report = await restoreRun();
+
+    expect(report).toMatchObject({ restored: 2 });
+    for (const [player, text] of Object.entries(texts)) expect(await runText(player)).toBe(text);
+    expect(blobs.keys()).toEqual(keys);
+    expect(await dayRecord()).toMatchObject({ state: "restored", active: false, restored: 2 });
+    expect(await totals()).toMatchObject({ moved: 2, restored: 2 });
+  });
+
+  it("restores a day that was only partly moved", async () => {
+    const players = Array.from({ length: 40 }, (_value, index) => `guest:${index}`);
+    const texts = await seedPlayers(players);
+    // Slow blob calls: the first request moves only part of the day.
+    const slow = Object.fromEntries(Object.entries(blobs.store).map(([name, call]) => [name, async (...args) => {
+      clock.advance(1_000);
+      return call(...args);
+    }]));
+    await archive.runDailyGhostArchive({ mode: "move", dayLimit: null, store: slow, clock, maxCallsPerSecond: 1000 });
+    const partly = await dayRecord();
+    expect(partly).toMatchObject({ state: "moving", active: true });
+    expect(partly.moved).toBeGreaterThan(0);
+    expect(partly.moved).toBeLessThan(40);
+
+    for (let request = 0; request < 5 && (await dayRecord()).state !== "restored"; request += 1) await restoreRun();
+
+    for (const player of players) expect(await runText(player)).toBe(texts[player]);
+    expect(await dayRecord()).toMatchObject({ state: "restored" });
+  });
+
+  it("gives an account the full ghost of a stub that a sign-in copied to it", async () => {
+    const texts = await seedPlayers(["guest:a"]);
+    await runArchive(clock, blobs);
+    await redis.hSet(pbKey(), { [field("reddit:a")]: await redis.hGet(pbKey(), field("guest:a")) });
+    await redis.hDel(pbKey(), [field("guest:a")]);
+    await redis.incrBy(revisionKey(), 2);
+
+    for (let request = 0; request < 3 && (await dayRecord()).state !== "restored"; request += 1) {
+      await restoreRun();
+      clock.advance(HOUR_MS);
+    }
+
+    expect(await runText("reddit:a")).toBe(texts["guest:a"]);
+    expect(await dayRecord()).toMatchObject({ state: "restored" });
+  });
+
+  it("keeps a stub whose copy is missing or does not match, and the day keeps restoring", async () => {
+    const texts = await seedPlayers(["guest:a", "guest:b"]);
+    await runArchive(clock, blobs);
+    const stubA = await runText("guest:a");
+    blobs.objects.delete((await runValue("guest:a")).ghostArchive.key);
+    blobs.faults.get = (key) => (key.includes(field("guest:b")) ? "corrupt" : null);
+
+    await restoreRun();
+
+    expect(await runText("guest:a")).toBe(stubA);
+    expect((await runValue("guest:b")).ghost).toBeNull();
+    expect(await heldNames()).toEqual({
+      [field("guest:a")]: "failed:missing",
+      [field("guest:b")]: "failed:restore_mismatch",
+    });
+    expect(await dayRecord()).toMatchObject({ state: "restoring", active: false });
+
+    blobs.faults.get = null;
+    clock.advance(HOUR_MS);
+    await restoreRun();
+    expect(await runText("guest:b")).toBe(texts["guest:b"]);
+    expect(await runText("guest:a")).toBe(stubA);
+  });
+
+  it("restores a held stub only after its sign-in ends", async () => {
+    const texts = await seedPlayers(["guest:a"]);
+    await runArchive(clock, blobs);
+    await redis.set(guestProgressSelectionPendingKey("guest:a"), "1");
+
+    await restoreRun();
+    expect((await runValue("guest:a")).ghost).toBeNull();
+    expect(await heldNames()).toEqual({ [field("guest:a")]: "signin" });
+    expect(await dayRecord()).toMatchObject({ state: "restoring" });
+
+    await redis.del(guestProgressSelectionPendingKey("guest:a"));
+    for (let request = 0; request < 3 && (await dayRecord()).state !== "restored"; request += 1) {
+      clock.advance(HOUR_MS);
+      await restoreRun();
+    }
+    expect(await runText("guest:a")).toBe(texts["guest:a"]);
+    expect(await dayRecord()).toMatchObject({ state: "restored" });
+  });
+
+  for (const phase of ["refs", "list"]) {
+    it(`cancels a ${phase} sweep on a switch to restore, and a later move starts a new sweep`, async () => {
+      await seedPlayers(["guest:a", "reddit:b"]);
+      await runArchive(clock, blobs);
+      const measured = (await dayRecord()).blob;
+      expect(measured).toMatchObject({ objects: 2 });
+      // A sweep is open in this phase, with saved refs and a listing position.
+      await redis.hSet(archive.dailyGhostArchiveSweepRefsKey(DAY_ID), { "daily-ghosts/v1/old": "1" });
+      await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+        [DAY_ID]: JSON.stringify({
+          ...(await dayRecord()),
+          hasHeld: true,
+          sweep: {
+            phase, modeSerial: 1, startedAt: clock.now(), revision: 0, refsCursor: 0,
+            pageToken: "old-token", nextToken: null, lastKey: "daily-ghosts/v1/z", kept: 7, keptBytes: 70,
+            youngOrphanUntil: 0, deleted: 0,
+          },
+        }),
+      });
+      await redis.set(guestProgressSelectionPendingKey("guest:a"), "1");
+      await redis.hSet(archive.dailyGhostArchiveHeldKey(DAY_ID), { [field("guest:a")]: "signin" });
+
+      await restoreRun();
+      let day = await dayRecord();
+      expect(day.sweep).toBeNull();
+      expect(day.blob).toEqual(measured);
+      expect(await redis.hGetAll(archive.dailyGhostArchiveSweepRefsKey(DAY_ID))).toEqual({});
+      expect((await runValue("guest:a")).ghost).toBeNull();
+
+      await redis.del(guestProgressSelectionPendingKey("guest:a"));
+      for (let request = 0; request < 3 && (await dayRecord()).state !== "restored"; request += 1) {
+        clock.advance(HOUR_MS);
+        await restoreRun();
+      }
+      expect((await runValue("guest:a")).ghost).not.toBeNull();
+      expect(await dayRecord()).toMatchObject({ state: "restored" });
+
+      const lists = [];
+      const list = blobs.store.list;
+      blobs.store.list = async (prefix, token, maxKeys, signal) => {
+        lists.push(token);
+        return list(prefix, token, maxKeys, signal);
+      };
+      await moveRun();
+      day = await dayRecord();
+      expect(day).toMatchObject({ state: "done", sweep: null, sweepNeeded: false });
+      expect(lists[0]).toBeNull();
+      expect(day.blob.measuredAt).toBeGreaterThan(measured.measuredAt);
+    });
+  }
+
+  it("drops a held full ghost on a switch to restore, so a marker that never clears cannot block it", async () => {
+    const texts = await seedPlayers(["guest:a", "guest:b"]);
+    await redis.set(guestProgressSelectionPendingKey("guest:a"), "1");
+    await runArchive(clock, blobs);
+    expect(await heldNames()).toEqual({ [field("guest:a")]: "signin" });
+    // A held name whose row is gone, and a stub held in move.
+    await redis.hSet(archive.dailyGhostArchiveHeldKey(DAY_ID), {
+      [field("guest:gone")]: "failed:upload",
+      [field("guest:b")]: "failed:upload",
+    });
+
+    for (let request = 0; request < 4 && (await dayRecord()).state !== "restored"; request += 1) {
+      clock.advance(HOUR_MS);
+      await restoreRun();
+    }
+
+    expect(await runText("guest:a")).toBe(texts["guest:a"]);
+    expect(await runText("guest:b")).toBe(texts["guest:b"]);
+    expect(await heldNames()).toEqual({});
+    expect(await dayRecord()).toMatchObject({ state: "restored" });
+  });
+
+  it("follows the mode table for new and restored days, and moves again after a restore", async () => {
+    const texts = await seedPlayers(["guest:a"]);
+    await restoreRun();
+    expect(await dayRecord()).toBeNull();
+    expect(await runText("guest:a")).toBe(texts["guest:a"]);
+
+    await moveRun();
+    const firstKey = (await runValue("guest:a")).ghostArchive.key;
+    await restoreRun();
+    expect(await dayRecord()).toMatchObject({ state: "restored" });
+    const passes = (await dayRecord()).pass;
+    await restoreRun();
+    expect((await dayRecord()).pass).toBe(passes);
+
+    await moveRun();
+    expect((await runValue("guest:a")).ghostArchive.key).toBe(firstKey);
+    expect(await dayRecord()).toMatchObject({ state: "done", pass: passes + 1 });
+    expect(blobs.keys()).toEqual([firstKey]);
+  });
+});

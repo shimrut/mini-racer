@@ -41,9 +41,10 @@ import {
 // revision in the same transaction, so a pass that ends on the revision it
 // started with has seen every row.
 
-export type DailyGhostArchiveMode = 'off' | 'move';
+export type DailyGhostArchiveMode = 'off' | 'move' | 'restore';
 
-// Changed by deploy. 'off' does nothing, and pauses a sweep.
+// Changed by deploy. 'off' does nothing, and pauses a sweep. 'restore' writes
+// every moved ghost back to Redis from its blob copy and deletes nothing.
 export const DAILY_GHOST_ARCHIVE_MODE: DailyGhostArchiveMode = 'off';
 // How many days the job may start. 1 for the first live day, then null.
 export const DAILY_GHOST_ARCHIVE_DAY_LIMIT: number | null = 1;
@@ -320,11 +321,12 @@ function canStep(ctx: RunContext): boolean {
     return !ctx.lockLost && ctx.clock.now() + STEP_MARGIN_MS <= ctx.startUntilMs;
 }
 
-// A ghost needs an upload and a read-back; both must end by the deadline.
-function canStartGhost(ctx: RunContext): boolean {
+// A moved ghost needs an upload and a read-back; a restored one needs one
+// read. All of a ghost's calls must end by the deadline.
+function canStartGhost(ctx: RunContext, calls = ctx.mode === 'restore' ? 1 : 2): boolean {
     return !ctx.lockLost
         && ctx.clock.now() <= ctx.startUntilMs
-        && ctx.session.hasTimeFor(2);
+        && ctx.session.hasTimeFor(calls);
 }
 
 function canCommit(ctx: RunContext): boolean {
@@ -540,6 +542,63 @@ async function prepareMoves(
     return outcome;
 }
 
+// Reads each stub's blob copy and checks it: the sha256 of the text, and the
+// same best time and save time as the stub. Only a matching copy is ready to
+// go back into Redis.
+async function prepareRestores(
+    ctx: RunContext,
+    names: readonly string[],
+    raws: readonly (string | null | undefined)[],
+): Promise<SliceOutcome> {
+    const outcome: SliceOutcome = { ready: [], drop: [], failed: [] };
+    const candidates: { name: string; raw: string; stub: Record<string, unknown>; ref: PbGhostArchiveRef }[] = [];
+    names.forEach((name, index) => {
+        const raw = raws[index];
+        const run = readRun(raw);
+        if (typeof raw !== 'string' || !isStub(run)) {
+            outcome.drop.push(name);
+        } else {
+            candidates.push({ name, raw, stub: run!.value, ref: run!.value.ghostArchive as PbGhostArchiveRef });
+        }
+    });
+
+    await forEachWorker(candidates, async ({ name, raw, stub, ref }) => {
+        if (!canStartGhost(ctx, 1)) return;
+        let copy: Uint8Array | null;
+        try {
+            copy = await ctx.session.get(ref.key);
+        } catch (error) {
+            const code = failureCode(error, 'confirm_read');
+            if (code) outcome.failed.push({ name, code });
+            return;
+        }
+        if (copy === null) {
+            outcome.failed.push({ name, code: 'missing' });
+            return;
+        }
+        let text: string | null = null;
+        try {
+            text = gunzipSync(copy).toString('utf8');
+        } catch (_error) {
+            text = null;
+        }
+        const full = text === null ? null : parseJsonObject(text);
+        if (
+            text === null
+            || sha256Hex(text) !== ref.sha256
+            || !full
+            || full.bestTimeMs !== stub.bestTimeMs
+            || full.updatedAt !== stub.updatedAt
+            || !isValidPbGhostTrace(full.ghost)
+        ) {
+            outcome.failed.push({ name, code: 'restore_mismatch' });
+            return;
+        }
+        outcome.ready.push({ name, expectedRaw: raw, nextRaw: encodeRedisCompressedValue(text) });
+    });
+    return outcome;
+}
+
 // Writes the confirmed changes of one slice, with its progress and counts, in
 // one transaction. A run is changed only when it still holds the text that
 // was copied and no sign-in owns its player. Names that were not started stay
@@ -646,24 +705,42 @@ async function prepareSlice(
     names: readonly string[],
 ): Promise<SliceOutcome> {
     const raws = await redis.hMGet(challengeCollectionKey(challengeId), [...names]);
-    return prepareMoves(ctx, challengeId, names, raws);
+    return ctx.mode === 'move'
+        ? prepareMoves(ctx, challengeId, names, raws)
+        : prepareRestores(ctx, names, raws);
 }
 
+// A move pass is done when the revision did not move. A restore pass ends the
+// restore only when, besides, it left no stub behind and the held list is
+// empty; a stub whose owner never finishes signing in keeps the day restoring.
 async function endPass(ctx: RunContext, challengeId: string): Promise<boolean> {
     const day = ctx.days.get(challengeId)!;
     const revision = await readRevision(challengeId);
-    const clean = revision === day.passRevision;
-    const next: DailyGhostArchiveDay = clean
-        ? { ...day, state: 'done', active: false, doneRevision: revision }
-        : { ...day, state: 'waiting', active: false, nextPassAt: ctx.clock.now() + PASS_RETRY_MS };
+    let clean = revision === day.passRevision;
+    if (day.mode === 'restore' && clean) {
+        const held = await redis.hScan(dailyGhostArchiveHeldKey(challengeId), 0, undefined, 1);
+        clean = day.heldThisPass === 0 && day.failedThisPass === 0 && held.fieldValues.length === 0;
+    }
+    const retryAt = ctx.clock.now() + PASS_RETRY_MS;
+    let next: DailyGhostArchiveDay;
+    if (day.mode === 'move') {
+        next = clean
+            ? { ...day, state: 'done', active: false, doneRevision: revision }
+            : { ...day, state: 'waiting', active: false, nextPassAt: retryAt };
+    } else {
+        next = clean
+            ? { ...day, state: 'restored', active: false }
+            : { ...day, state: 'restoring', active: false, nextPassAt: retryAt };
+    }
     const saved = await saveDay(ctx, challengeId, next, async (transaction) => {
         await transaction.del(dailyGhostArchivePageKey(challengeId));
     });
     if (saved) {
         ctx.report.passesEnded += 1;
         console.log(
-            `Daily ghost archive: ${challengeId} pass ${day.pass}: moved ${day.moved}, `
-            + `held ${day.heldThisPass}, failed ${day.failedThisPass}, ${clean ? 'done' : 'again'}`,
+            `Daily ghost archive: ${challengeId} ${day.mode} pass ${day.pass}: moved ${day.moved}, `
+            + `restored ${day.restored}, held ${day.heldThisPass}, failed ${day.failedThisPass}, `
+            + `${clean ? next.state : 'again'}`,
         );
     }
     return saved;
@@ -706,6 +783,25 @@ function moveAction(day: DailyGhostArchiveDay | undefined, ctx: RunContext): Pas
     if (day.modeSerial !== ctx.serial) return 'start';
     if (day.state === 'moving' && day.active) return 'continue';
     return day.nextPassAt <= ctx.clock.now() ? 'start' : null;
+}
+
+function restoreAction(day: DailyGhostArchiveDay | undefined, ctx: RunContext): PassAction | null {
+    if (!day || day.state === 'restored') return null;
+    if (day.state !== 'restoring') return 'start';
+    if (day.active) return day.modeSerial === ctx.serial ? 'continue' : 'start';
+    return day.nextPassAt <= ctx.clock.now() ? 'start' : null;
+}
+
+function pickRestoreDay(
+    ctx: RunContext,
+    eligible: readonly StoredDay[],
+): { challengeId: string; action: PassAction } | null {
+    for (const { id } of eligible) {
+        if (ctx.stuck.has(id)) continue;
+        const action = restoreAction(ctx.days.get(id), ctx);
+        if (action) return { challengeId: id, action };
+    }
+    return null;
 }
 
 function pickMoveDay(
@@ -757,7 +853,9 @@ async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     }
     if (!canStartGhost(ctx)) return;
     const freeRaws = free.map((name) => raws[names.indexOf(name)]);
-    const outcome = await prepareMoves(ctx, challengeId, free, freeRaws);
+    const outcome = ctx.mode === 'move'
+        ? await prepareMoves(ctx, challengeId, free, freeRaws)
+        : await prepareRestores(ctx, free, freeRaws);
     outcome.drop.push(...drop);
     for (let attempt = 0; attempt < MAX_SLICE_COMMITS && !ctx.lockLost; attempt += 1) {
         if (await commitSlice(ctx, challengeId, 'held', outcome)) return;
@@ -1074,9 +1172,10 @@ export async function runDailyGhostArchive({
         }
 
         const eligible = storedDays.filter((day) => day.availableUntilMs + PODIUM_WINDOW_MS <= clock.now());
-        while (canStep(ctx) && ctx.mode === 'move') {
-            const next = pickMoveDay(ctx, eligible, dayLimit);
+        while (canStep(ctx)) {
+            const next = ctx.mode === 'move' ? pickMoveDay(ctx, eligible, dayLimit) : pickRestoreDay(ctx, eligible);
             if (!next) {
+                if (ctx.mode !== 'move') break;
                 // Sweeps run only when no move pass is ready.
                 const sweepDay = pickSweepDay(ctx, eligible);
                 if (!sweepDay) break;
