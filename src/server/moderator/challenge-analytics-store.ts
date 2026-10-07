@@ -18,6 +18,16 @@ const LEGACY_PREFIX = 'miniracer:challenge-analytics:v1';
 const PREFIX = 'miniracer:challenge-analytics:v2';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CHALLENGE_ANALYTICS_PAGE_SIZE = 25;
+// The page sorts every indexed track by views, so it reads them all; the
+// catalog has a few hundred tracks at most.
+const MAX_INDEXED_TRACKS = 5_000;
+const VIEW_READ_BATCH = 100;
+
+export type ChallengeAnalyticsPeriod = 'today' | 'lifetime';
+
+export function isChallengeAnalyticsPeriod(value: unknown): value is ChallengeAnalyticsPeriod {
+    return value === 'today' || value === 'lifetime';
+}
 export const CHALLENGE_TRACK_ANALYTICS_DAILY_RETENTION_DAYS = 2;
 
 export type ChallengeAnalyticsMetrics = {
@@ -145,20 +155,60 @@ function metrics(values: (string | null)[], uniqueViewers: number): ChallengeAna
     return { views: count(values[0]), uniqueViewers: count(uniqueViewers), clicks: acceptClicks + ownOpens, acceptClicks, ownOpens };
 }
 
+async function readViewCounts(key: string, fields: readonly string[]): Promise<number[]> {
+    const counts: number[] = [];
+    for (let index = 0; index < fields.length; index += VIEW_READ_BATCH) {
+        const values = await redis.hMGet(key, fields.slice(index, index + VIEW_READ_BATCH));
+        counts.push(...values.map(count));
+    }
+    return counts;
+}
+
+// Most viewed first in the chosen period. Ties go to the other period, then
+// to the track key, so the order is stable from page to page.
+async function rankTracksByViews(
+    subredditName: string,
+    date: string,
+    period: ChallengeAnalyticsPeriod,
+): Promise<string[]> {
+    const indexed = (await redis.zRange(
+        challengeTrackAnalyticsIndexKey(subredditName),
+        0,
+        MAX_INDEXED_TRACKS - 1,
+        { by: 'rank' },
+    )).map(({ member }) => member).filter((key) => TRACK_KEY_RE.test(key));
+    if (!indexed.length) return [];
+    const viewFields = indexed.map((trackKey) => challengeTrackAnalyticsCounterFields(trackKey).views);
+    const [todayViews, lifetimeViews] = await Promise.all([
+        readViewCounts(challengeTrackAnalyticsCountsKey(subredditName, date), viewFields),
+        readViewCounts(challengeTrackAnalyticsCountsKey(subredditName), viewFields),
+    ]);
+    return indexed
+        .map((trackKey, index) => ({
+            trackKey,
+            first: period === 'today' ? todayViews[index] : lifetimeViews[index],
+            second: period === 'today' ? lifetimeViews[index] : todayViews[index],
+        }))
+        .sort((a, b) => b.first - a.first || b.second - a.second || a.trackKey.localeCompare(b.trackKey))
+        .map(({ trackKey }) => trackKey);
+}
+
 export async function getChallengeAnalyticsPage(
     subredditName: string,
     offset: number,
-    { now = new Date() }: { now?: Date } = {},
-): Promise<{ date: string; items: ChallengeAnalyticsRow[]; nextOffset: number | null }> {
+    { now = new Date(), period = 'today' }: { now?: Date; period?: ChallengeAnalyticsPeriod } = {},
+): Promise<{ date: string; period: ChallengeAnalyticsPeriod; items: ChallengeAnalyticsRow[]; nextOffset: number | null }> {
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > Number.MAX_SAFE_INTEGER - CHALLENGE_ANALYTICS_PAGE_SIZE) {
         throw new Error('Invalid challenge analytics offset.');
     }
     const date = now.toISOString().slice(0, 10);
     await migrateLegacyChallengeAnalytics(subredditName);
-    const rows = await redis.zRange(challengeTrackAnalyticsIndexKey(subredditName), offset, offset + CHALLENGE_ANALYTICS_PAGE_SIZE, { by: 'rank' });
-    const tracks = rows.slice(0, CHALLENGE_ANALYTICS_PAGE_SIZE).map(({ member }) => member).filter((key) => TRACK_KEY_RE.test(key));
-    const nextOffset = rows.length > CHALLENGE_ANALYTICS_PAGE_SIZE ? offset + CHALLENGE_ANALYTICS_PAGE_SIZE : null;
-    if (!tracks.length) return { date, items: [], nextOffset };
+    const ranked = await rankTracksByViews(subredditName, date, period);
+    const tracks = ranked.slice(offset, offset + CHALLENGE_ANALYTICS_PAGE_SIZE);
+    const nextOffset = offset + CHALLENGE_ANALYTICS_PAGE_SIZE < ranked.length
+        ? offset + CHALLENGE_ANALYTICS_PAGE_SIZE
+        : null;
+    if (!tracks.length) return { date, period, items: [], nextOffset };
     // The middleware loads the index, not these stored track records.
     await loadStoredTracks(tracks);
     const fields = tracks.map((trackKey) => challengeTrackAnalyticsCounterFields(trackKey));
@@ -172,6 +222,7 @@ export async function getChallengeAnalyticsPage(
     const lifetime = await redis.hMGet(challengeTrackAnalyticsCountsKey(subredditName), fields.flatMap((field) => [field.views, field.acceptClicks, field.ownOpens, field.trackingStartedAt]));
     return {
         date,
+        period,
         items: tracks.map((trackKey, index) => {
             const startedAt = lifetime[index * 4 + 3];
             return {

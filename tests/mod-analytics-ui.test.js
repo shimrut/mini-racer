@@ -2,9 +2,11 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    bootAnalytics,
     loadAnalyticsSummary,
     renderAnalyticsMessage,
     renderAnalyticsSummary,
+    renderStorageSummary,
 } from '../pages/mod-analytics.js';
 
 function analyticsDom() {
@@ -131,7 +133,6 @@ describe('moderator analytics page', () => {
         expect(document.getElementById('analytics-days').textContent).toContain('Aug 15');
         expect(document.querySelector('.analytics-table')).toBeTruthy();
         expect(document.querySelector('#analytics-days .analytics-table__today th').textContent).toBe('Aug 15');
-        expect(document.getElementById('analytics-storage').textContent).toContain('Unavailable');
         expect(document.querySelector('.analytics-summary')).toBeTruthy();
         expect(document.querySelectorAll('.analytics-kpi')).toHaveLength(6);
         expect(document.querySelectorAll('.analytics-spark')).toHaveLength(0);
@@ -177,7 +178,7 @@ describe('moderator analytics page', () => {
             [{ state: 'done', completedAt: '2026-09-27T10:00:00.000Z', boards: 1400 }, 'Old races recorded: done'],
         ]) {
             const { window } = analyticsDom();
-            renderAnalyticsSummary(window.document, summaryFixture({
+            renderStorageSummary(window.document, ({
                 storage: { totalBytes: 1536, groups: [] },
                 racedListFill,
             }));
@@ -204,7 +205,7 @@ describe('moderator analytics page', () => {
             [{ ...status, choice: 'restore', mode: 'restore', restored: 40 }, 'Old Daily ghosts (Restore all to Redis): moved 12,345'],
         ]) {
             const { window } = analyticsDom();
-            renderAnalyticsSummary(window.document, summaryFixture({
+            renderStorageSummary(window.document, ({
                 storage: { totalBytes: 1536, groups: [] },
                 dailyGhostArchive,
             }));
@@ -212,7 +213,7 @@ describe('moderator analytics page', () => {
         }
 
         const { window } = analyticsDom();
-        renderAnalyticsSummary(window.document, summaryFixture({
+        renderStorageSummary(window.document, ({
             storage: { totalBytes: 1536, groups: [] },
             dailyGhostArchive: {
                 ...status, choice: 'off', mode: 'off', days: { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 },
@@ -221,9 +222,15 @@ describe('moderator analytics page', () => {
         expect(window.document.getElementById('analytics-storage').textContent).not.toContain('Old Daily ghosts');
     });
 
+    it('shows Unavailable on the Storage tab when the size walk failed', () => {
+        const { window } = analyticsDom();
+        renderStorageSummary(window.document, { storage: null });
+        expect(window.document.getElementById('analytics-storage').textContent).toContain('Unavailable');
+    });
+
     it('shows Redis occupancy by family when the summary includes it', () => {
         const { window } = analyticsDom();
-        renderAnalyticsSummary(window.document, summaryFixture({
+        renderStorageSummary(window.document, ({
             storage: {
                 totalBytes: 1536,
                 groups: [
@@ -335,8 +342,47 @@ describe('moderator analytics page', () => {
         renderAnalyticsSummary(window.document, summaryFixture());
 
         for (const id of ['analytics-windows', 'analytics-main', 'analytics-trend', 'analytics-modes',
-            'analytics-cohorts', 'analytics-months', 'analytics-storage', 'analytics-days']) {
+            'analytics-cohorts', 'analytics-months', 'analytics-days']) {
             expect(window.document.getElementById(id).hidden).toBe(false);
         }
+    });
+
+    it('opens on Players and loads each other tab once, the first time it opens', async () => {
+        const { window } = analyticsDom();
+        const { document } = window;
+        const fetchImpl = vi.fn(async (url) => ({
+            status: 200,
+            ok: true,
+            json: async () => (url.startsWith('/api/analytics/storage')
+                ? { storage: { totalBytes: 2048, groups: [] }, racedListFill: null, dailyGhostArchive: null }
+                : url.startsWith('/api/analytics/challenges')
+                    ? { date: '2026-08-15', items: [], nextOffset: null }
+                    : summaryFixture()),
+        }));
+        const tab = (name) => document.getElementById(`analytics-tab-${name}`);
+        const panel = (name) => document.getElementById(`analytics-panel-${name}`);
+
+        await bootAnalytics(document, fetchImpl);
+        expect(tab('players').getAttribute('aria-selected')).toBe('true');
+        expect(panel('players').hidden).toBe(false);
+        expect(panel('storage').hidden).toBe(true);
+        expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual(['/api/analytics/summary']);
+
+        tab('storage').click();
+        await vi.waitFor(() => expect(document.getElementById('analytics-storage').textContent).toContain('2.0 KB'));
+        expect(panel('storage').hidden).toBe(false);
+        expect(panel('players').hidden).toBe(true);
+        tab('challenges').click();
+        tab('storage').click();
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
+        expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+            '/api/analytics/summary',
+            '/api/analytics/storage',
+            '/api/analytics/challenges?offset=0&period=today',
+        ]);
+
+        tab('storage').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight' }));
+        expect(tab('players').getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(tab('players'));
     });
 });

@@ -366,14 +366,43 @@ describe('issued challenge analytics routes', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual(result);
         expect(services.assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
-        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 25);
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 25, 'today');
+    });
+
+    it('passes the period that the list is sorted by, and rejects any other value', async () => {
+        const services = dependencies();
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        expect((await fetch(`${baseUrl}/api/analytics/challenges?offset=0&period=lifetime`)).status).toBe(200);
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 0, 'lifetime');
+        for (const value of ['week', '', 'Lifetime']) {
+            expect((await fetch(`${baseUrl}/api/analytics/challenges?offset=0&period=${value}`)).status).toBe(400);
+        }
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves the Storage tab to moderators only', async () => {
+        const payload = { storage: { totalBytes: 10, groups: [] }, racedListFill: null, dailyGhostArchive: null };
+        const services = dependencies({ getStorageSummary: vi.fn(async () => payload) });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const response = await fetch(`${baseUrl}/api/analytics/storage`);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(payload);
+        expect(services.assertModeratorForSubreddit).toHaveBeenCalledWith('MiniRacer');
+
+        const denied = dependencies({
+            getStorageSummary: vi.fn(async () => payload),
+            assertModeratorForSubreddit: vi.fn(async () => { throw new Error('Moderator access required for r/MiniRacer.'); }),
+        });
+        const deniedUrl = await startApp((app) => registerAnalyticsRoutes(app, denied));
+        expect((await fetch(`${deniedUrl}/api/analytics/storage`)).status).toBe(403);
+        expect(denied.getStorageSummary).not.toHaveBeenCalled();
     });
 
     it('defaults to the first track page and does not require a client identity', async () => {
         const services = dependencies();
         const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
         expect((await fetch(`${baseUrl}/api/analytics/challenges`)).status).toBe(200);
-        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 0);
+        expect(services.getChallengeAnalyticsPage).toHaveBeenCalledWith('MiniRacer', 0, 'today');
     });
 
     it('denies non-moderators before reading catalog or counts', async () => {

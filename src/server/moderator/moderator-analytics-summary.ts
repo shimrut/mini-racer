@@ -3,19 +3,27 @@ import { getServerStorageUsage } from './storage-usage.js';
 import { readRacedListFillStatus } from '../player/raced-list-fill.js';
 import { readDailyGhostArchiveStatus } from '../daily/daily-ghost-archive.js';
 
+// The Players tab: player counts only.
 export async function getModeratorAnalyticsSummary({
     getSummary = getServerAnalyticsSummary,
+}: {
+    getSummary?: typeof getServerAnalyticsSummary;
+} = {}) {
+    return getSummary();
+}
+
+// The Storage tab: the Redis size, the raced-list fill, and the ghost move.
+// Each part fails on its own, so one failure leaves the others shown.
+export async function getModeratorStorageSummary({
     getStorage = getServerStorageUsage,
     getRacedListFill = readRacedListFillStatus,
     getDailyGhostArchive = () => readDailyGhostArchiveStatus(),
 }: {
-    getSummary?: typeof getServerAnalyticsSummary;
     getStorage?: typeof getServerStorageUsage;
     getRacedListFill?: typeof readRacedListFillStatus;
     getDailyGhostArchive?: () => ReturnType<typeof readDailyGhostArchiveStatus>;
 } = {}) {
-    const [summary, storage, racedListFill, dailyGhostArchive] = await Promise.all([
-        getSummary(),
+    const [storage, racedListFill, dailyGhostArchive] = await Promise.all([
         getStorage().catch((error) => {
             console.error('Failed to measure Mini Racer Redis storage:', error);
             return null;
@@ -29,5 +37,5 @@ export async function getModeratorAnalyticsSummary({
             return null;
         }),
     ]);
-    return { ...summary, storage, racedListFill, dailyGhostArchive };
+    return { storage, racedListFill, dailyGhostArchive };
 }

@@ -12,7 +12,8 @@ export type AnalyticsRouteDependencies = {
     recordRaceStart(input: Record<string, unknown>): Promise<void>;
     recordPodiumEvent(input: Record<string, unknown>): Promise<void>;
     recordChallengeEvent(input: { action: unknown }): Promise<void>;
-    getChallengeAnalyticsPage(subredditName: string, offset: number): Promise<unknown>;
+    getChallengeAnalyticsPage(subredditName: string, offset: number, period: 'today' | 'lifetime'): Promise<unknown>;
+    getStorageSummary(): Promise<unknown>;
 };
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
@@ -87,7 +88,12 @@ export function registerAnalyticsRoutes(
                 res.status(400).json({ error: 'Invalid challenge analytics offset.' });
                 return;
             }
-            res.status(200).json(await dependencies.getChallengeAnalyticsPage(subredditName, offset));
+            const rawPeriod = req.query.period ?? 'today';
+            if (rawPeriod !== 'today' && rawPeriod !== 'lifetime') {
+                res.status(400).json({ error: 'Invalid challenge analytics period.' });
+                return;
+            }
+            res.status(200).json(await dependencies.getChallengeAnalyticsPage(subredditName, offset, rawPeriod));
         } catch (error) {
             const message = error instanceof Error && error.message ? error.message : 'Challenge analytics failed';
             const status = message.includes('Moderator access required') ? 403 : 500;
@@ -112,6 +118,25 @@ export function registerAnalyticsRoutes(
                 ? error.message
                 : 'Analytics summary failed';
             const status = message.includes('Moderator access required') ? 403 : 500;
+            res.status(status).json({ error: message });
+        }
+    });
+
+    // The Storage tab: the Redis size walk and the ghost move, read only when
+    // the tab opens, so the Players tab does not wait for the walk.
+    app.get('/api/analytics/storage', async (_req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            res.status(200).json(await dependencies.getStorageSummary());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Storage summary failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to load Mini Racer storage summary:', error);
             res.status(status).json({ error: message });
         }
     });

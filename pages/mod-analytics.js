@@ -1,17 +1,19 @@
 import { setText } from '../game/ui/dom.js';
 const SUMMARY_URL = '/api/analytics/summary';
 const CHALLENGES_URL = '/api/analytics/challenges';
+const STORAGE_URL = '/api/analytics/storage';
+const TABS = ['players', 'challenges', 'storage'];
+const TAB_MEMORY_KEY = 'MiniRacerAnalyticsTab';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// The sections of the Players tab.
 const SECTION_IDS = [
     'analytics-windows',
     'analytics-main',
     'analytics-trend',
     'analytics-modes',
-    'analytics-challenges',
     'analytics-cohorts',
     'analytics-months',
-    'analytics-storage',
     'analytics-days',
 ];
 const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
@@ -674,8 +676,8 @@ export function renderChallengeAnalytics(root, {
     const nodes = [
         heading,
         element(root, 'p', 'analytics-note analytics-challenges__note', selectedPeriod === 'today'
-            ? (date ? `Today · ${date} UTC` : 'Today · UTC')
-            : 'Lifetime · includes today'),
+            ? `${date ? `Today · ${date} UTC` : 'Today · UTC'} · most viewed first`
+            : 'Lifetime · includes today · most viewed first'),
     ];
     if (items.length > 0) {
         const table = element(root, 'table', 'analytics-table analytics-table--challenges');
@@ -735,8 +737,8 @@ export function renderChallengeAnalytics(root, {
     section.setAttribute('aria-busy', String(loading));
 }
 
-export async function loadChallengeAnalyticsPage(fetchImpl = fetch, offset = 0) {
-    const response = await fetchImpl(`${CHALLENGES_URL}?offset=${offset}`);
+export async function loadChallengeAnalyticsPage(fetchImpl = fetch, offset = 0, period = 'today') {
+    const response = await fetchImpl(`${CHALLENGES_URL}?offset=${offset}&period=${period === 'lifetime' ? 'lifetime' : 'today'}`);
     if (response.status === 403) return { error: 'Moderator access required.' };
     if (response.status === 400) return { error: 'Challenge counts need a subreddit context.' };
     if (!response.ok) return { error: 'Could not load challenge counts.' };
@@ -761,7 +763,13 @@ export function createChallengeAnalyticsController(root, fetchImpl = fetch) {
     const render = () => renderChallengeAnalytics(root, {
         items, date, period, nextOffset, loaded, loading, error,
         onLoadMore: loadMore, onRefresh: refresh,
-        onPeriodChange: (value) => { period = value; render(); },
+        // The server sorts by the chosen period, so a new period reloads the list.
+        onPeriodChange: (value) => {
+            if (value === period) return;
+            period = value;
+            render();
+            void Promise.resolve(pending).then(() => request(true));
+        },
     });
     function request(reset) {
         if (loading) return pending;
@@ -770,14 +778,17 @@ export function createChallengeAnalyticsController(root, fetchImpl = fetch) {
         loading = true;
         error = null;
         render();
+        const requestedPeriod = period;
         pending = (async () => {
             try {
-                let page = await loadChallengeAnalyticsPage(fetchImpl, offset);
+                let page = await loadChallengeAnalyticsPage(fetchImpl, offset, requestedPeriod);
                 // Pages on a new UTC day cannot append to the previous day's rows.
                 if (!page.error && offset > 0 && page.date !== date) {
                     reset = true;
-                    page = await loadChallengeAnalyticsPage(fetchImpl, 0);
+                    page = await loadChallengeAnalyticsPage(fetchImpl, 0, requestedPeriod);
                 }
+                // A period chosen during the request is loaded by the next one.
+                if (requestedPeriod !== period) return;
                 if (page.error) {
                     error = page.error;
                     retryReset = reset;
@@ -826,7 +837,6 @@ export function renderAnalyticsSummary(root, summary) {
     const modesNode = root.getElementById('analytics-modes');
     const cohortsNode = root.getElementById('analytics-cohorts');
     const monthsNode = root.getElementById('analytics-months');
-    const storageNode = root.getElementById('analytics-storage');
     const daysNode = root.getElementById('analytics-days');
     const stored = Array.isArray(summary?.days) ? summary.days : [];
     const months = Array.isArray(summary?.months) ? summary.months : [];
@@ -857,12 +867,6 @@ export function renderAnalyticsSummary(root, summary) {
     modesNode.replaceChildren(...renderModes(root, days));
     cohortsNode?.replaceChildren(...renderCohorts(root, cohorts));
     monthsNode.replaceChildren(...renderMonths(root, months));
-    storageNode?.replaceChildren(...renderStorage(
-        root,
-        summary?.storage,
-        summary?.racedListFill,
-        summary?.dailyGhostArchive,
-    ));
 
     const dayHead = cardHeading(root, 'Daily breakdown');
     if (stored.length === 0) {
@@ -874,11 +878,15 @@ export function renderAnalyticsSummary(root, summary) {
     revealSections(root);
 }
 
+// The Players sections, and the other tabs' cards, which an access error
+// must clear too.
+const LOCKED_SECTION_IDS = [...SECTION_IDS, 'analytics-challenges', 'analytics-storage'];
+
 export function renderAnalyticsMessage(root, message, state = 'error') {
     const status = root.getElementById('analytics-status');
     setText(status, message);
     if (state) status?.setAttribute('data-state', state);
-    for (const id of SECTION_IDS) {
+    for (const id of LOCKED_SECTION_IDS) {
         const node = root.getElementById(id);
         if (node) {
             if (id !== 'analytics-main') node.replaceChildren();
@@ -901,7 +909,104 @@ export async function loadAnalyticsSummary(fetchImpl = fetch) {
     return { summary: await response.json() };
 }
 
+export function renderStorageSummary(root, payload) {
+    const section = root.getElementById('analytics-storage');
+    if (!section) return;
+    section.replaceChildren(...renderStorage(
+        root,
+        payload?.storage,
+        payload?.racedListFill,
+        payload?.dailyGhostArchive,
+    ));
+    section.hidden = false;
+}
+
+export async function loadStorageSummary(fetchImpl = fetch) {
+    const response = await fetchImpl(STORAGE_URL);
+    if (response.status === 403) return { error: 'Moderator access required.' };
+    if (response.status === 400) return { error: 'Storage needs a subreddit context.' };
+    if (!response.ok) return { error: 'Could not load storage.' };
+    return { payload: await response.json() };
+}
+
+export function createStorageTabController(root, fetchImpl = fetch) {
+    const status = root.getElementById('analytics-storage-status');
+    async function load() {
+        setText(status, 'Loading storage…');
+        status?.removeAttribute('data-state');
+        try {
+            const result = await loadStorageSummary(fetchImpl);
+            if (result.error) {
+                setText(status, result.error);
+                status?.setAttribute('data-state', 'error');
+                return;
+            }
+            setText(status, '');
+            renderStorageSummary(root, result.payload);
+        } catch (_error) {
+            setText(status, 'Could not load storage.');
+            status?.setAttribute('data-state', 'error');
+        }
+    }
+    return { load };
+}
+
+function rememberedTab() {
+    try {
+        const saved = globalThis.localStorage?.getItem(TAB_MEMORY_KEY);
+        return TABS.includes(saved) ? saved : 'players';
+    } catch (_error) {
+        return 'players';
+    }
+}
+
+// Three tabs. Each tab's data loads the first time the tab opens, so the
+// Players tab does not wait for the Redis size walk.
+export function setupAnalyticsTabs(root, { onOpen } = {}) {
+    const tabs = TABS.map((name) => root.getElementById(`analytics-tab-${name}`));
+    function select(name, { focus = false } = {}) {
+        if (!TABS.includes(name)) return;
+        TABS.forEach((tabName, index) => {
+            const tab = tabs[index];
+            if (!tab) return;
+            const selected = tabName === name;
+            tab.setAttribute('aria-selected', String(selected));
+            tab.tabIndex = selected ? 0 : -1;
+            const panel = root.getElementById(tab.getAttribute('aria-controls'));
+            if (panel) panel.hidden = !selected;
+            if (selected && focus) tab.focus();
+        });
+        try {
+            globalThis.localStorage?.setItem(TAB_MEMORY_KEY, name);
+        } catch (_error) {
+        }
+        onOpen?.(name);
+    }
+    tabs.forEach((tab, index) => {
+        tab?.addEventListener('click', () => select(TABS[index]));
+        tab?.addEventListener('keydown', (event) => {
+            const moves = { ArrowRight: 1, ArrowLeft: -1, Home: -index, End: TABS.length - 1 - index };
+            if (!(event.key in moves)) return;
+            event.preventDefault();
+            select(TABS[(index + moves[event.key] + TABS.length) % TABS.length], { focus: true });
+        });
+    });
+    return { select };
+}
+
 export async function bootAnalytics(root = document, fetchImpl = fetch) {
+    const challenges = createChallengeAnalyticsController(root, fetchImpl);
+    const storage = createStorageTabController(root, fetchImpl);
+    const opened = new Set();
+    const tabs = setupAnalyticsTabs(root, {
+        onOpen: (name) => {
+            if (opened.has(name)) return;
+            opened.add(name);
+            if (name === 'challenges') void challenges.loadMore();
+            if (name === 'storage') void storage.load();
+        },
+    });
+    tabs.select(rememberedTab());
     try {
         const result = await loadAnalyticsSummary(fetchImpl);
         if (result.error) {
@@ -909,7 +1014,6 @@ export async function bootAnalytics(root = document, fetchImpl = fetch) {
             return;
         }
         renderAnalyticsSummary(root, result.summary);
-        await createChallengeAnalyticsController(root, fetchImpl).loadMore();
     } catch (_error) {
         renderAnalyticsMessage(root, 'Could not load the summary.');
     }

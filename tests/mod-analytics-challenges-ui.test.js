@@ -160,7 +160,7 @@ describe('challenge track analytics loading', () => {
         const payload = page([trackFixture()], 25);
         const fetchImpl = vi.fn(async () => response(payload));
         await expect(loadChallengeAnalyticsPage(fetchImpl, 0)).resolves.toEqual(payload);
-        expect(fetchImpl).toHaveBeenCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenCalledWith('/api/analytics/challenges?offset=0&period=today');
         for (const [status, error] of [
             [403, 'Moderator access required.'],
             [400, 'Challenge counts need a subreddit context.'],
@@ -196,7 +196,7 @@ describe('challenge track analytics loading', () => {
         button(document, 'Load more').click();
         expect(controller.loadMore()).toBe(secondLoad);
         expect(fetchImpl).toHaveBeenCalledTimes(2);
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=25');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=25&period=today');
         second.resolve(response(page([
             trackFixture(), trackFixture({ trackKey: 'centralDistrict', trackName: 'Central District' }),
         ])));
@@ -222,7 +222,7 @@ describe('challenge track analytics loading', () => {
             .toBe('Could not load challenge counts.');
         button(document, 'Retry').click();
         await vi.waitFor(() => expect(trackRows(document)).toHaveLength(2));
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=25');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=25&period=today');
     });
 
     it('Refresh replaces all paginated rows and keeps the selected period', async () => {
@@ -237,11 +237,28 @@ describe('challenge track analytics loading', () => {
         button(document, 'Lifetime').click();
         button(document, 'Refresh').click();
         await vi.waitFor(() => expect(trackRows(document)).toHaveLength(1));
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=lifetime');
         expect(rowCounts(trackRows(document)[0])).toEqual(['9,000', '0', '0']);
         expect(button(document, 'Lifetime').getAttribute('aria-pressed')).toBe('true');
         button(document, 'Today').click();
         expect(document.getElementById('analytics-challenges').textContent).toContain('2026-10-06 UTC');
+    });
+
+    it('reloads the list from the top in the new order when the period changes', async () => {
+        const { window: { document } } = analyticsDom();
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(response(page([trackFixture(), trackFixture({ trackKey: 'b', trackName: 'Busy Today' })], 25)))
+            .mockResolvedValueOnce(response(page([trackFixture({ trackKey: 'c', trackName: 'Busy Lifetime' })])));
+        const controller = createChallengeAnalyticsController(document, fetchImpl);
+        await controller.loadMore();
+        expect(trackRows(document)).toHaveLength(2);
+
+        button(document, 'Lifetime').click();
+        await vi.waitFor(() => expect(trackRows(document)).toHaveLength(1));
+
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=lifetime');
+        expect(trackRows(document)[0].textContent).toContain('Busy Lifetime');
+        expect(document.getElementById('analytics-challenges').textContent).toContain('most viewed first');
     });
 
     it('preserves the previous date and rows when Refresh fails and Retry reloads from zero', async () => {
@@ -257,7 +274,7 @@ describe('challenge track analytics loading', () => {
         expect(document.getElementById('analytics-challenges').textContent).toContain('2026-10-05 UTC');
         button(document, 'Retry').click();
         await vi.waitFor(() => expect(rowCounts(trackRows(document)[0])).toEqual(['0', '0', '0']));
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=today');
         expect(document.getElementById('analytics-challenges').textContent).toContain('2026-10-06 UTC');
     });
 
@@ -272,7 +289,7 @@ describe('challenge track analytics loading', () => {
         await controller.loadMore();
         const loading = controller.loadMore();
         await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3));
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=today');
         expect(document.getElementById('analytics-challenges').textContent).not.toContain('Wrong Page');
         expect(trackRows(document)).toHaveLength(1);
         nextDay.resolve(response(page([trackFixture({ today: counts() })], null, '2026-10-06')));
@@ -295,7 +312,7 @@ describe('challenge track analytics loading', () => {
         expect(trackRows(document)).toHaveLength(1);
         expect(document.getElementById('analytics-challenges').textContent).toContain('2026-10-05 UTC');
         await controller.loadMore();
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=today');
         expect(trackRows(document)).toHaveLength(1);
         expect(trackRows(document)[0].textContent).toContain('New Day Track');
         expect(document.getElementById('analytics-challenges').textContent).not.toContain('Mountain Pass');
@@ -311,9 +328,12 @@ describe('challenge track analytics loading', () => {
         expect(document.getElementById('analytics-windows').hidden).toBe(false);
         expect(document.getElementById('analytics-windows').textContent).toContain('9');
         expect(document.getElementById('analytics-status').textContent).toBe('');
+        // Challenge counts load when their tab opens.
+        document.getElementById('analytics-tab-challenges').click();
+        await vi.waitFor(() => expect(button(document, 'Retry')).toBeTruthy());
         button(document, 'Retry').click();
         await vi.waitFor(() => expect(trackRows(document)).toHaveLength(1));
-        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/challenges?offset=0&period=today');
     });
 
     it('does not request challenge counts when the summary denies moderator access', async () => {

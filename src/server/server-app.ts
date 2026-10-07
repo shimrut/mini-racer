@@ -59,7 +59,7 @@ import { ensureMiniRacerLauncherPostForSubreddit } from './posts/launcher-post-s
 import { resolveMenuTargetSubredditName, assertModeratorForSubreddit } from './moderator/moderator-access.js';
 import { recordAnalyticsPodiumEvent } from './moderator/analytics-store.js';
 import { getChallengeAnalyticsPage, recordChallengeAnalyticsEvent } from './moderator/challenge-analytics-store.js';
-import { getModeratorAnalyticsSummary } from './moderator/moderator-analytics-summary.js';
+import { getModeratorAnalyticsSummary, getModeratorStorageSummary } from './moderator/moderator-analytics-summary.js';
 import {
     ensureModeratorAnalyticsPostForSubreddit,
     resolveAnalyticsToolSubredditName,
@@ -233,7 +233,10 @@ function registerProductionRoutes(app: express.Application): void {
         recordRaceStart: (input) => recordServerRaceStart(input),
         recordPodiumEvent: (input) => recordAnalyticsPodiumEvent(input),
         recordChallengeEvent: recordChallengeAnalyticsEvent,
-        getChallengeAnalyticsPage,
+        getChallengeAnalyticsPage: (subredditName, offset, period) => (
+            getChallengeAnalyticsPage(subredditName, offset, { period })
+        ),
+        getStorageSummary: () => getModeratorStorageSummary(),
     });
     registerPlayerRoutes(app, {
         getRequestUsername,

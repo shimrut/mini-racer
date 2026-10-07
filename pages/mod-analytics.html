@@ -25,20 +25,38 @@
             </div>
         </header>
 
-        <p id="analytics-status" class="analytics-status" role="status">Loading summary…</p>
-
-        <section id="analytics-windows" class="analytics-summary" aria-label="Today at a glance" hidden></section>
-
-        <div id="analytics-main" class="analytics-main" hidden>
-            <section id="analytics-trend" class="analytics-card" aria-label="Players per day"></section>
-            <section id="analytics-modes" class="analytics-card" aria-label="Modes today"></section>
+        <div class="analytics-periods analytics-tabs" role="tablist" aria-label="Analytics sections">
+            <button type="button" class="analytics-period" role="tab" id="analytics-tab-players"
+                aria-controls="analytics-panel-players" aria-selected="true">Players</button>
+            <button type="button" class="analytics-period" role="tab" id="analytics-tab-challenges"
+                aria-controls="analytics-panel-challenges" aria-selected="false" tabindex="-1">Challenges</button>
+            <button type="button" class="analytics-period" role="tab" id="analytics-tab-storage"
+                aria-controls="analytics-panel-storage" aria-selected="false" tabindex="-1">Storage</button>
         </div>
 
-        <section id="analytics-challenges" class="analytics-card" aria-label="Challenges by track" hidden></section>
-        <section id="analytics-cohorts" class="analytics-card" aria-label="Cohort retention, exact UTC-day return for signed-in racers" hidden></section>
-        <section id="analytics-months" class="analytics-card" aria-label="Players per month" hidden></section>
-        <section id="analytics-storage" class="analytics-card" aria-label="Redis storage" hidden></section>
-        <section id="analytics-days" class="analytics-card" aria-label="Daily breakdown" hidden></section>
+        <div id="analytics-panel-players" class="analytics-panel" role="tabpanel" aria-labelledby="analytics-tab-players">
+            <p id="analytics-status" class="analytics-status" role="status">Loading summary…</p>
+
+            <section id="analytics-windows" class="analytics-summary" aria-label="Today at a glance" hidden></section>
+
+            <div id="analytics-main" class="analytics-main" hidden>
+                <section id="analytics-trend" class="analytics-card" aria-label="Players per day"></section>
+                <section id="analytics-modes" class="analytics-card" aria-label="Modes today"></section>
+            </div>
+
+            <section id="analytics-cohorts" class="analytics-card" aria-label="Cohort retention, exact UTC-day return for signed-in racers" hidden></section>
+            <section id="analytics-months" class="analytics-card" aria-label="Players per month" hidden></section>
+            <section id="analytics-days" class="analytics-card" aria-label="Daily breakdown" hidden></section>
+        </div>
+
+        <div id="analytics-panel-challenges" class="analytics-panel" role="tabpanel" aria-labelledby="analytics-tab-challenges" hidden>
+            <section id="analytics-challenges" class="analytics-card" aria-label="Challenges by track" hidden></section>
+        </div>
+
+        <div id="analytics-panel-storage" class="analytics-panel" role="tabpanel" aria-labelledby="analytics-tab-storage" hidden>
+            <p id="analytics-storage-status" class="analytics-status" role="status"></p>
+            <section id="analytics-storage" class="analytics-card" aria-label="Redis storage" hidden></section>
+        </div>
     </main>
 </body>
 

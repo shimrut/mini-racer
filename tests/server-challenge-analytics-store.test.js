@@ -254,7 +254,7 @@ describe('challenge analytics by track', () => {
     });
 
     it('returns an explicit UTC date for an empty track index', async () => {
-        expect(await page()).toEqual({ date: DATE, items: [], nextOffset: null });
+        expect(await page()).toEqual({ date: DATE, period: 'today', items: [], nextOffset: null });
         expect(migrateLegacyChallengeAnalytics).toHaveBeenCalledWith('MiniRacer');
         expect(loadStoredTracks).not.toHaveBeenCalled();
     });
@@ -265,13 +265,33 @@ describe('challenge analytics by track', () => {
         expect(first.items).toHaveLength(25); expect(first.items[0].trackKey).toBe('track000');
         expect(first.items[0]).toMatchObject({ today: ZERO, lifetime: ZERO, trackingStartedAt: null });
         expect(first.nextOffset).toBe(25);
-        expect(redis.zRange).toHaveBeenCalledWith(challengeTrackAnalyticsIndexKey('MiniRacer'), 0, 25, { by: 'rank' });
+        expect(redis.zRange).toHaveBeenCalledWith(challengeTrackAnalyticsIndexKey('MiniRacer'), 0, 4999, { by: 'rank' });
         expect(loadStoredTracks).toHaveBeenCalledWith(first.items.map(({ trackKey }) => trackKey));
         expect(redis.hMGet.mock.calls.every(([, fields]) => fields.length <= 100)).toBe(true);
         expect(redis.hLen).toHaveBeenCalledTimes(50); expect(redis.hGetAll).not.toHaveBeenCalled();
         const second = await page(25); const last = await page(second.nextOffset);
         expect(second.items[0].trackKey).toBe('track025');
         expect(last.items).toHaveLength(10); expect(last.items[0].trackKey).toBe('track050'); expect(last.nextOffset).toBeNull();
+    });
+
+    it('lists the most viewed tracks first in the chosen period', async () => {
+        const [quiet, busyToday, busyLifetime] = Object.keys(TRACKS).slice(0, 3);
+        sortedSets.set(challengeTrackAnalyticsIndexKey('MiniRacer'), [quiet, busyToday, busyLifetime]
+            .map((member) => ({ member, score: 0 })));
+        const views = (trackKey) => challengeTrackAnalyticsCounterFields(trackKey).views;
+        hashFor(challengeTrackAnalyticsCountsKey('MiniRacer', DATE)).set(views(busyToday), '50');
+        hashFor(challengeTrackAnalyticsCountsKey('MiniRacer', DATE)).set(views(busyLifetime), '5');
+        hashFor(challengeTrackAnalyticsCountsKey('MiniRacer')).set(views(busyToday), '60');
+        hashFor(challengeTrackAnalyticsCountsKey('MiniRacer')).set(views(busyLifetime), '900');
+
+        const today = await page();
+        const lifetime = await getChallengeAnalyticsPage('MiniRacer', 0, { now: NOW, period: 'lifetime' });
+
+        expect(today.period).toBe('today');
+        expect(today.items.map((item) => item.trackKey)).toEqual([busyToday, busyLifetime, quiet]);
+        expect(lifetime.period).toBe('lifetime');
+        expect(lifetime.items.map((item) => item.trackKey)).toEqual([busyLifetime, busyToday, quiet]);
+        expect(lifetime.items[0].lifetime.views).toBe(900);
     });
 
     it('returns both periods with split click counters and no viewer identities', async () => {
