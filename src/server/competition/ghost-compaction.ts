@@ -328,6 +328,13 @@ function isOwnRun(state: GhostCompactionState, name: GhostCompactionStepName, ru
     return state.running === name && state.steps[name].runId === runId;
 }
 
+// True when a failed request's error describes the state: the failed step is
+// still in the run the request started on, and that step runs, or no step is
+// running. While another step runs, the error is only logged.
+function errorBelongsToState(state: GhostCompactionState, name: GhostCompactionStepName, runId: number): boolean {
+    return state.steps[name].runId === runId && (state.running === null || state.running === name);
+}
+
 class StepStoppedError extends Error {}
 
 type CommitResult = 'saved' | 'conflict' | 'stopped';
@@ -527,11 +534,11 @@ export async function runGhostCompaction({ now = () => Date.now() }: { now?: () 
         console.error('Ghost compaction failed:', error);
         const lastError = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
         const failedStep = name;
-        // Only the error is added, and only while the step is still in the run
-        // that failed, running or paused: a Pause saved meanwhile stays, and a
-        // new run does not get an old run's error.
+        // Only the error is added, and only when it describes the state now: a
+        // Pause saved meanwhile stays, a new run does not get an old run's
+        // error, and another running step does not get it either.
         if (failedStep) {
-            await updateState(async (current) => (current.steps[failedStep].runId === ctx.runId
+            await updateState(async (current) => (errorBelongsToState(current, failedStep, ctx.runId)
                 ? { ...current, lastError }
                 : current)).catch(() => {});
         }

@@ -529,6 +529,32 @@ describe("ghost compaction", () => {
     expect(state.steps.expired).toMatchObject({ runId: 3, cursor: 5, checked: 5, packed: 4 });
   });
 
+  it("does not show a paused step's late error while another step runs", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    // Expired finishes once, so Campaign may run.
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await runUntilIdle();
+    const [stage] = CAMPAIGN_LIVE_STAGES;
+    await seed(toCampaignCompetition(stage.seriesId, stage).pbHashKey, "guest:c", runText(2));
+    await compaction.setGhostCompactionStep("start", "campaign", NOW);
+    // A day that expired since gives Expired real work on Run again.
+    const later = await storeDay("2026-09-25");
+    await seed(later, "guest:b", runText(3));
+    vi.spyOn(redis, "hScan").mockImplementationOnce(async () => {
+      // While a Campaign request reads, a moderator pauses Campaign and starts Expired.
+      await compaction.setGhostCompactionStep("pause", "campaign", NOW);
+      await compaction.setGhostCompactionStep("start", "expired", NOW);
+      throw new Error("Redis read failed");
+    });
+
+    await compaction.runGhostCompaction({ now: () => NOW.getTime() });
+
+    expect(await compaction.readGhostCompactionState()).toMatchObject({ running: "expired", lastError: null });
+  });
+
   it("runs again over the days that expired since, and only those", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const first = await storeDay("2026-09-20");
