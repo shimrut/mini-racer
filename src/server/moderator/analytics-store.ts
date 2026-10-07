@@ -165,6 +165,8 @@ const COHORTS_FILLED_THROUGH = 'cohorts-filled-through';
 const COHORT_FILL_PAGE = 5000;
 const COHORT_FILL_DAYS_AT_ONCE = 8;
 const COHORT_FILL_BUDGET_MS = 15_000;
+// A race that started before midnight can still add its counts just after midnight.
+const COHORT_FILL_SETTLE_MS = 5 * 60 * 1000;
 const SUMMARY_LOCK_MS = 3 * 60 * 1000;
 const SUMMARY_WRITE_BATCH = 200;
 
@@ -847,8 +849,11 @@ async function fillCohortCounts(scope: string, now: Date): Promise<void> {
     const { from, to, dates } = analyticsWindow(now);
     const [liveFrom, filledThrough] = await redis.hMGet(key, [COHORTS_LIVE_FROM, COHORTS_FILLED_THROUGH]);
     if (!isUtcDate(liveFrom)) await redis.hSetNX(key, COHORTS_LIVE_FROM, to);
-    const yesterday = addUtcDays(to, -1);
-    const fillEnd = isUtcDate(liveFrom) && liveFrom < yesterday ? liveFrom : yesterday;
+    const lastSettledDay = addUtcDays(
+        formatUtcChallengeDate(new Date(now.getTime() - COHORT_FILL_SETTLE_MS)),
+        -1,
+    );
+    const fillEnd = isUtcDate(liveFrom) && liveFrom < lastSettledDay ? liveFrom : lastSettledDay;
     if ((filledThrough ?? '') >= fillEnd) return;
 
     const acquired = await redis.set(cohortFillLockKey(scope), '1', {

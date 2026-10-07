@@ -707,6 +707,60 @@ describe('server analytics store', () => {
         ]);
     });
 
+    it('does not count a race twice when the fill runs just after midnight', async () => {
+        const {
+            cohortStartsKey,
+            dayPlayersKey,
+            getServerAnalyticsSummary,
+            recordAnalyticsRace,
+            summaryKey,
+        } = await store();
+        await mockRedis.hSet(summaryKey(SUBREDDIT), { ready: '1' });
+        await mockRedis.hSet(cohortStartsKey(SUBREDDIT), { 'reddit:alpha': '2026-08-14' });
+        await mockRedis.hSet(dayPlayersKey(SUBREDDIT, '2026-08-14'), { 'reddit:alpha': 'n' });
+        await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T12:00:00.000Z'),
+        });
+
+        const increment = mockRedis.hIncrBy.getMockImplementation();
+        let reachIncrement;
+        let releaseIncrement;
+        const atIncrement = new Promise((resolve) => { reachIncrement = resolve; });
+        const released = new Promise((resolve) => { releaseIncrement = resolve; });
+        mockRedis.hIncrBy.mockImplementation(async (...args) => {
+            reachIncrement();
+            await released;
+            return increment(...args);
+        });
+        let racing;
+        try {
+            racing = recordAnalyticsRace({
+                mode: 'daily',
+                action: 'start',
+                playerId: 'reddit:alpha',
+                subredditName: SUBREDDIT,
+                now: day('2026-08-15T23:59:59.000Z'),
+            });
+            await atIncrement;
+        } finally {
+            mockRedis.hIncrBy.mockImplementation(increment);
+        }
+        await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-16T00:00:01.000Z'),
+        });
+        releaseIncrement();
+        await racing;
+
+        const later = await getServerAnalyticsSummary({
+            subredditName: SUBREDDIT,
+            now: day('2026-08-16T00:10:00.000Z'),
+        });
+        expect(later.cohorts.find((cohort) => cohort.date === '2026-08-14')?.d1)
+            .toEqual({ retained: 1, rate: 100 });
+    });
+
     it('hides days the fill has not counted and continues the fill on the next load', async () => {
         const {
             cohortStartsKey,
