@@ -570,7 +570,11 @@ export function renderGhostCompaction(root, { state = null, busy = false, error 
 
 async function readCompactionResponse(response) {
     if (response.status === 403) return { error: 'Moderator access required.' };
-    if (response.status === 409) return { error: 'Finish the step before this one first.' };
+    if (response.status === 409) {
+        // The server says why: another step runs, or an earlier one is not finished.
+        const body = await response.json().catch(() => null);
+        return { error: typeof body?.error === 'string' && body.error ? body.error : 'Finish the step before this one first.' };
+    }
     if (!response.ok) return { error: 'Could not load ghost compaction.' };
     return { state: await response.json() };
 }

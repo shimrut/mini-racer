@@ -442,8 +442,15 @@ describe('issued challenge analytics routes', () => {
         expect((await post({ action: 'start', step: 'live' })).status).toBe(400);
         expect((await post({ action: 'delete', step: 'expired' })).status).toBe(400);
 
-        services.setGhostCompactionStep.mockRejectedValueOnce(new Error('Finish the step before this one first.'));
-        expect((await post({ action: 'start', step: 'campaign' })).status).toBe(409);
+        // A refused Start answers 409 with the reason.
+        for (const reason of ['Finish the step before this one first.', 'Another step is running.']) {
+            services.setGhostCompactionStep.mockRejectedValueOnce(
+                Object.assign(new Error(reason), { name: 'GhostCompactionRefusal' }),
+            );
+            const refused = await post({ action: 'start', step: 'campaign' });
+            expect(refused.status).toBe(409);
+            expect(await refused.json()).toEqual({ error: reason });
+        }
     });
 
     it('serves the Storage tab to moderators only', async () => {

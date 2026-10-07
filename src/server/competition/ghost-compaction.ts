@@ -15,6 +15,8 @@ import {
     acquireRedisLock,
     beginOwnedRedisLockTransaction,
     releaseRedisLock,
+    safelyDiscard,
+    safelyUnwatch,
     type RedisLock,
 } from '../redis/redis-lock.js';
 import { isRedisTransactionConflict } from '../redis/redis-transaction-conflict.js';
@@ -73,6 +75,15 @@ const WORK_MS = 22_000;
 const SCAN_COUNT = 200;
 const GROUP_SIZE = 25;
 const MAX_GROUP_COMMITS = 3;
+const MAX_STATE_UPDATES = 3;
+
+// A Start or a Pause the state does not allow. The page shows its message.
+export class GhostCompactionRefusal extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'GhostCompactionRefusal';
+    }
+}
 
 function emptyStep(): GhostCompactionStep {
     return {
@@ -119,6 +130,42 @@ function parseState(raw: unknown): GhostCompactionState {
 
 export async function readGhostCompactionState(): Promise<GhostCompactionState> {
     return parseState(await redis.get(GHOST_COMPACTION_STATE_KEY));
+}
+
+// Changes the state in a transaction that watches it, so a change saved in
+// the meantime is never written over: `decide` gets the state as it is now and
+// returns the next one, or the same object to change nothing. It may refuse by
+// throwing; the watch is then dropped.
+async function updateState(
+    decide: (current: GhostCompactionState) => Promise<GhostCompactionState>,
+): Promise<GhostCompactionState> {
+    for (let attempt = 0; attempt < MAX_STATE_UPDATES; attempt += 1) {
+        const transaction = await redis.watch(GHOST_COMPACTION_STATE_KEY);
+        let current: GhostCompactionState;
+        let next: GhostCompactionState;
+        try {
+            // Transaction-client reads queue; read the base client.
+            current = parseState(await redis.get(GHOST_COMPACTION_STATE_KEY));
+            next = await decide(current);
+        } catch (error) {
+            await safelyUnwatch(transaction);
+            throw error;
+        }
+        if (next === current) {
+            await safelyUnwatch(transaction);
+            return current;
+        }
+        try {
+            await transaction.multi();
+            await transaction.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify(next));
+            const results = await transaction.exec();
+            if (Array.isArray(results) && results.length > 0) return next;
+        } catch (error) {
+            await safelyDiscard(transaction);
+            if (!isRedisTransactionConflict(error)) throw error;
+        }
+    }
+    throw new Error('Ghost compaction changed meanwhile. Try again.');
 }
 
 // The text a row is stored with when its ghost is packed, or null when the
@@ -177,52 +224,59 @@ async function boardsFor(step: GhostCompactionStepName, nowMs: number, doneKeys:
 export type GhostCompactionAction = 'start' | 'pause';
 
 // Starts a step (or runs it again over boards it has not finished), or pauses
-// the running step. A step starts only after the steps before it finished once.
+// the running step. A step starts only after the steps before it finished
+// once, and never while another step runs. Every choice is made on the state
+// as it is when it is saved.
 export async function setGhostCompactionStep(
     action: GhostCompactionAction,
     step: GhostCompactionStepName,
     now = new Date(),
 ): Promise<GhostCompactionState> {
-    const state = await readGhostCompactionState();
     if (action === 'pause') {
-        const next = { ...state, running: state.running === step ? null : state.running, updatedAt: now.toISOString() };
-        await redis.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify(next));
-        return next;
+        return updateState(async (current) => (current.running === step
+            ? { ...current, running: null, updatedAt: now.toISOString() }
+            : current));
     }
-    const before = GHOST_COMPACTION_STEPS.slice(0, GHOST_COMPACTION_STEPS.indexOf(step));
-    if (before.some((name) => !state.steps[name].finishedAt)) {
-        throw new Error('Finish the step before this one first.');
-    }
-    const current = state.steps[step];
-    const resume = Boolean(current.startedAt && !current.finishedAt);
-    const boards = resume ? current.boards : await boardsFor(step, now.getTime(), current.doneKeys);
-    const nextStep: GhostCompactionStep = resume
-        ? current
-        : {
+    let started = false;
+    const next = await updateState(async (current) => {
+        started = false;
+        if (current.running === step) return current;
+        if (current.running) throw new GhostCompactionRefusal('Another step is running.');
+        const before = GHOST_COMPACTION_STEPS.slice(0, GHOST_COMPACTION_STEPS.indexOf(step));
+        if (before.some((name) => !current.steps[name].finishedAt)) {
+            throw new GhostCompactionRefusal('Finish the step before this one first.');
+        }
+        const previous = current.steps[step];
+        const resume = Boolean(previous.startedAt && !previous.finishedAt);
+        const boards = resume ? previous.boards : await boardsFor(step, now.getTime(), previous.doneKeys);
+        const nextStep: GhostCompactionStep = resume
+            ? previous
+            : {
+                ...previous,
+                boards,
+                index: 0,
+                cursor: 0,
+                total: boards.reduce((sum, board) => sum + board.total, 0),
+                checked: 0,
+                packed: 0,
+                savedBytes: 0,
+                startedAt: now.toISOString(),
+                finishedAt: null,
+            };
+        // A run with nothing left to do is finished at once.
+        if (!resume && boards.length === 0) nextStep.finishedAt = now.toISOString();
+        started = true;
+        return {
             ...current,
-            boards,
-            index: 0,
-            cursor: 0,
-            total: boards.reduce((sum, board) => sum + board.total, 0),
-            checked: 0,
-            packed: 0,
-            savedBytes: 0,
-            startedAt: now.toISOString(),
-            finishedAt: null,
+            running: nextStep.finishedAt ? null : step,
+            writePacked: true,
+            steps: { ...current.steps, [step]: nextStep },
+            lastError: null,
+            updatedAt: now.toISOString(),
         };
-    // A run with nothing left to do is finished at once.
-    if (!resume && boards.length === 0) nextStep.finishedAt = now.toISOString();
-    const next: GhostCompactionState = {
-        ...state,
-        running: nextStep.finishedAt ? null : step,
-        writePacked: true,
-        steps: { ...state.steps, [step]: nextStep },
-        lastError: null,
-        updatedAt: now.toISOString(),
-    };
+    });
     // Every server reads packed ghosts by now; new best times are saved packed too.
-    await turnOnPackedGhostWrites(now.getTime());
-    await redis.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify(next));
+    if (started) await turnOnPackedGhostWrites(now.getTime());
     return next;
 }
 
@@ -414,10 +468,9 @@ export async function runGhostCompaction({ now = () => Date.now() }: { now?: () 
         return { status: 'worked' };
     } catch (error) {
         console.error('Ghost compaction failed:', error);
-        await redis.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify({
-            ...ctx.state,
-            lastError: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
-        })).catch(() => {});
+        const lastError = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
+        // Only the error is added: a Pause saved meanwhile stays.
+        await updateState(async (current) => ({ ...current, lastError })).catch(() => {});
         return { status: 'worked' };
     } finally {
         await releaseRedisLock(lock, redis).catch((error) => {

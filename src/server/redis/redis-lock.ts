@@ -23,14 +23,14 @@ function ttlSeconds(ttlMs: number): number {
 // Reddit caps concurrent Redis transactions.
 const RELEASE_CONCURRENCY = 1;
 
-async function safelyUnwatch(transaction: TxClientLike): Promise<void> {
+export async function safelyUnwatch(transaction: TxClientLike): Promise<void> {
     try {
         await transaction.unwatch();
     } catch (_error) {
     }
 }
 
-async function safelyDiscard(transaction: TxClientLike): Promise<void> {
+export async function safelyDiscard(transaction: TxClientLike): Promise<void> {
     try {
         await transaction.discard();
     } catch (_discardError) {

@@ -269,12 +269,13 @@ describe('moderator analytics page', () => {
         expect(done.card.textContent).toContain('Paused · 50 of 900 ghosts checked');
     });
 
-    it('starts a compaction step and shows the refusal for a step out of order', async () => {
+    it('starts a compaction step and shows the reason a start is refused', async () => {
         const { window } = analyticsDom();
         const state = { running: null, writePacked: false, steps: { expired: {}, campaign: {} } };
         const fetchImpl = vi.fn()
             .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ ...state, running: 'expired' }) })
-            .mockResolvedValueOnce({ status: 409, ok: false, json: async () => ({}) });
+            .mockResolvedValueOnce({ status: 409, ok: false, json: async () => ({}) })
+            .mockResolvedValueOnce({ status: 409, ok: false, json: async () => ({ error: 'Another step is running.' }) });
         const controller = createGhostCompactionController(window.document, fetchImpl);
 
         await controller.act('start', 'expired');
@@ -287,6 +288,9 @@ describe('moderator analytics page', () => {
 
         await controller.act('start', 'campaign');
         expect(card.textContent).toContain('Finish the step before this one first.');
+        // The server's reason is shown when it gives one.
+        await controller.act('start', 'campaign');
+        expect(card.textContent).toContain('Another step is running.');
     });
 
     it('saves a choice and reads the move again only while the Storage tab is open', async () => {

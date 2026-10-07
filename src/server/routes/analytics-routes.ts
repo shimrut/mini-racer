@@ -226,9 +226,10 @@ export function registerAnalyticsRoutes(
             res.status(200).json(state);
         } catch (error) {
             const message = error instanceof Error && error.message ? error.message : 'Ghost compaction action failed';
+            // A refused Start: another step runs, or an earlier step is not finished.
             const status = message.includes('Moderator access required')
                 ? 403
-                : message.includes('Finish the step before this one') ? 409 : 500;
+                : error instanceof Error && error.name === 'GhostCompactionRefusal' ? 409 : 500;
             if (status === 500) console.error('Failed to change the ghost compaction step:', error);
             res.status(status).json({ error: message });
         }

@@ -169,6 +169,107 @@ describe("ghost compaction", () => {
     expect((await stored(day, "guest:3")).ghostPacked).toBeUndefined();
   });
 
+  async function savedState() {
+    return JSON.parse(await redis.get(compaction.GHOST_COMPACTION_STATE_KEY));
+  }
+
+  // Records the keys of each watch that was dropped without a commit.
+  function recordUnwatches() {
+    const watch = redis.watch.bind(redis);
+    const unwatched = [];
+    vi.spyOn(redis, "watch").mockImplementation(async (...keys) => {
+      const transaction = await watch(...keys);
+      return { ...transaction, unwatch: async () => { unwatched.push(keys); } };
+    });
+    return unwatched;
+  }
+
+  it("keeps a Pause saved during a run when the run then fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    vi.spyOn(redis, "hScan").mockImplementationOnce(async () => {
+      await compaction.setGhostCompactionStep("pause", "expired", NOW);
+      throw new Error("Redis read failed");
+    });
+
+    await compaction.runGhostCompaction({ now: () => NOW.getTime() });
+
+    const state = await compaction.readGhostCompactionState();
+    expect(state.running).toBeNull();
+    expect(state.lastError).toBe("Redis read failed");
+  });
+
+  it("pauses on the state as it is when saved, so progress saved meanwhile stays", async () => {
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    const progressed = await savedState();
+    progressed.steps.expired.checked = 50;
+    redis.setBeforeExec((keys) => {
+      if (!keys.includes(compaction.GHOST_COMPACTION_STATE_KEY)) return;
+      redis.setBeforeExec(null);
+      // A run's commit lands between the Pause's read and its write.
+      void redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify(progressed));
+    });
+
+    const state = await compaction.setGhostCompactionStep("pause", "expired", NOW);
+
+    expect(state.running).toBeNull();
+    expect((await savedState()).steps.expired.checked).toBe(50);
+  });
+
+  it("refuses to start a step while another runs, and leaves the state and no watch behind", async () => {
+    await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify({
+      running: "campaign",
+      writePacked: true,
+      steps: { expired: { finishedAt: NOW.toISOString(), startedAt: NOW.toISOString() }, campaign: { startedAt: NOW.toISOString() } },
+    }));
+    const before = await redis.get(compaction.GHOST_COMPACTION_STATE_KEY);
+    const unwatched = recordUnwatches();
+
+    await expect(compaction.setGhostCompactionStep("start", "expired", NOW)).rejects.toMatchObject({
+      name: "GhostCompactionRefusal",
+      message: "Another step is running.",
+    });
+
+    expect(await redis.get(compaction.GHOST_COMPACTION_STATE_KEY)).toBe(before);
+    expect(unwatched).toEqual([[compaction.GHOST_COMPACTION_STATE_KEY]]);
+  });
+
+  it("drops the watch when a Start fails while it reads the boards", async () => {
+    vi.spyOn(redis, "hGetAll").mockRejectedValueOnce(new Error("Redis read failed"));
+    const unwatched = recordUnwatches();
+
+    await expect(compaction.setGhostCompactionStep("start", "expired", NOW)).rejects.toThrow("Redis read failed");
+
+    expect(unwatched).toEqual([[compaction.GHOST_COMPACTION_STATE_KEY]]);
+    expect(await redis.get(compaction.GHOST_COMPACTION_STATE_KEY)).toBeFalsy();
+  });
+
+  it("decides a Start on the state saved meanwhile", async () => {
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    await compaction.setGhostCompactionStep("start", "expired", NOW);
+    await compaction.setGhostCompactionStep("pause", "expired", NOW);
+    const resumed = await savedState();
+    resumed.running = "expired";
+    resumed.steps.expired.checked = 20;
+    redis.setBeforeExec((keys) => {
+      if (!keys.includes(compaction.GHOST_COMPACTION_STATE_KEY)) return;
+      redis.setBeforeExec(null);
+      // Another moderator resumed the step, and a run saved progress.
+      void redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify(resumed));
+    });
+
+    const state = await compaction.setGhostCompactionStep("start", "expired", NOW);
+
+    expect(state.running).toBe("expired");
+    expect(state.steps.expired.checked).toBe(20);
+    expect((await savedState()).steps.expired.checked).toBe(20);
+  });
+
   it("runs again over the days that expired since, and only those", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const first = await storeDay("2026-09-20");
