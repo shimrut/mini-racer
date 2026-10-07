@@ -153,6 +153,7 @@ function summaryLockKey(scope: string): string {
 }
 
 const SUMMARY_READY = 'ready';
+const COHORT_OFFSETS = [1, 2, 3, 7, 14, 30] as const;
 const SUMMARY_LOCK_MS = 3 * 60 * 1000;
 const SUMMARY_WRITE_BATCH = 200;
 
@@ -310,6 +311,28 @@ function wasCreated(result: unknown): boolean {
     return result === 1 || result === true;
 }
 
+function cohortField(cohortDate: string): string {
+    return `${daySummaryPrefix(cohortDate)}cohort`;
+}
+
+function cohortReturnField(cohortDate: string, offset: number): string {
+    return `${daySummaryPrefix(cohortDate)}cohort:d${offset}`;
+}
+
+function utcDaysBetween(from: string, to: string): number {
+    return Math.round(
+        (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / DAY_MS,
+    );
+}
+
+function cohortReturnFieldFor(cohortDate: unknown, date: string): string | null {
+    if (!isUtcDate(cohortDate)) return null;
+    const offset = utcDaysBetween(cohortDate, date);
+    return (COHORT_OFFSETS as readonly number[]).includes(offset)
+        ? cohortReturnField(cohortDate, offset)
+        : null;
+}
+
 function summaryMetricSuffixes(): string[] {
     return [
         'players',
@@ -324,6 +347,8 @@ function summaryMetricSuffixes(): string[] {
         'challenge:create',
         'podium:play',
         'podium:replay',
+        'cohort',
+        ...COHORT_OFFSETS.map((offset) => `cohort:d${offset}`),
     ];
 }
 
@@ -341,11 +366,25 @@ async function incrementSummary(scope: string, fields: readonly string[]): Promi
     await Promise.all(fields.map((field) => redis.hIncrBy(key, field, 1)));
 }
 
+async function readCohortReturnField(
+    scope: string,
+    playerId: string,
+    date: string,
+): Promise<string | null> {
+    try {
+        return cohortReturnFieldFor(await redis.hGet(cohortStartsKey(scope), playerId), date);
+    } catch (error) {
+        logAnalyticsFailure('cohort return', error);
+        return null;
+    }
+}
+
 async function markPlayerPresence(
     scope: string,
     date: string,
     mode: AnalyticsMode,
     player: { id: string; isGuest: boolean },
+    cohortStarted: boolean,
 ): Promise<void> {
     const month = toMonth(date);
     const modeField = `${mode}:${player.id}`;
@@ -372,6 +411,10 @@ async function markPlayerPresence(
     if (wasCreated(monthMode) && mark !== PLAYER_GUEST) {
         fields.push(`${monthSummaryPrefix(month)}${mode}:players`);
     }
+    if (wasCreated(dayPlayer) && mark !== PLAYER_GUEST && !cohortStarted) {
+        const returnField = await readCohortReturnField(scope, player.id, date);
+        if (returnField) fields.push(returnField);
+    }
     await incrementSummary(scope, fields);
 }
 
@@ -379,12 +422,15 @@ async function markCohortStart(
     scope: string,
     date: string,
     player: { id: string; isGuest: boolean },
-): Promise<void> {
-    if (player.isGuest) return;
+): Promise<boolean> {
+    if (player.isGuest) return false;
     try {
-        await redis.hSetNX(cohortStartsKey(scope), player.id, date);
+        if (!wasCreated(await redis.hSetNX(cohortStartsKey(scope), player.id, date))) return false;
+        await incrementSummary(scope, [cohortField(date)]);
+        return true;
     } catch (error) {
         logAnalyticsFailure('cohort start', error);
+        return false;
     }
 }
 
@@ -484,8 +530,8 @@ export async function recordAnalyticsRace({
         const scope = sanitizeScope(subredditName ?? readScopeFromContext());
         const date = formatUtcChallengeDate(now);
 
-        await markCohortStart(scope, date, player);
-        await markPlayerPresence(scope, date, normalizedMode, player);
+        const cohortStarted = await markCohortStart(scope, date, player);
+        await markPlayerPresence(scope, date, normalizedMode, player, cohortStarted);
         await bumpCounter(scope, date, countField(normalizedMode, normalizedAction));
         await finishAnalyticsWrite(scope, date, raceRetentionKeys(scope, date));
     } catch (error) {

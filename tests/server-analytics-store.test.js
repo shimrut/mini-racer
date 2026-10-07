@@ -212,6 +212,57 @@ describe('server analytics store', () => {
         });
     });
 
+    it('counts first races and returns in the summary hash when players race', async () => {
+        const { recordAnalyticsRace, summaryKey } = await store();
+        const race = (playerId, iso) => recordAnalyticsRace({
+            mode: 'daily',
+            action: 'start',
+            playerId,
+            subredditName: SUBREDDIT,
+            now: day(iso),
+        });
+
+        await race('reddit:alpha', '2026-08-01T09:00:00.000Z');
+        await race('reddit:alpha', '2026-08-01T10:00:00.000Z');
+        await race('reddit:beta', '2026-08-01T11:00:00.000Z');
+        await race('guest:visitor', '2026-08-01T12:00:00.000Z');
+        await race('reddit:alpha', '2026-08-02T09:00:00.000Z');
+        await race('reddit:alpha', '2026-08-02T10:00:00.000Z');
+        await race('reddit:alpha', '2026-08-05T09:00:00.000Z');
+        await race('reddit:beta', '2026-08-08T09:00:00.000Z');
+        await race('guest:visitor', '2026-08-08T09:00:00.000Z');
+
+        const summary = Object.fromEntries(hashes.get(summaryKey(SUBREDDIT)));
+        const cohortFields = Object.fromEntries(
+            Object.entries(summary).filter(([field]) => field.includes(':cohort')),
+        );
+        expect(cohortFields).toEqual({
+            'd:2026-08-01:cohort': '2',
+            'd:2026-08-01:cohort:d1': '1',
+            'd:2026-08-01:cohort:d7': '1',
+        });
+    });
+
+    it('trims cohort counts with the other expired day counts', async () => {
+        const { recordAnalyticsPodiumEvent, summaryKey } = await store();
+        await mockRedis.hSet(summaryKey(SUBREDDIT), {
+            'd:2025-08-15:cohort': '4',
+            'd:2025-08-15:cohort:d30': '1',
+            'd:2026-08-01:cohort': '2',
+        });
+
+        await recordAnalyticsPodiumEvent({
+            action: 'play',
+            subredditName: SUBREDDIT,
+            now: day('2026-08-15T09:00:00.000Z'),
+        });
+
+        const fields = [...hashes.get(summaryKey(SUBREDDIT)).keys()];
+        expect(fields).toContain('d:2026-08-01:cohort');
+        expect(fields).not.toContain('d:2025-08-15:cohort');
+        expect(fields).not.toContain('d:2025-08-15:cohort:d30');
+    });
+
     it('does not use a profile historical firstSeenAt as the cohort date', async () => {
         const { recordAnalyticsRace, getServerAnalyticsSummary } = await store();
         profiles.set('reddit:veteran', { firstSeenAt: '2026-06-02T10:00:00.000Z' });
