@@ -448,3 +448,267 @@ describe("moving old Daily ghosts to blob storage", () => {
     expect(page.length).toBeGreaterThan(0);
   });
 });
+
+describe("sweeping blob copies that no stub points to", () => {
+  let blobs;
+  let clock;
+
+  beforeEach(async () => {
+    redis.reset();
+    clock = createClock(MOVE_AT);
+    blobs = createBlobTestStore({ now: () => clock.now() });
+    await storeDay(DAY);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function moveDay(players) {
+    for (const [index, player] of players.entries()) await seedRun(player, fullRunText(30000 + index, index));
+    await runArchive(clock, blobs);
+    return Promise.all(players.map(async (player) => (await runValue(player)).ghostArchive.key));
+  }
+
+  function putOrphan(name, ageMs) {
+    const key = `daily-ghosts/v1/${DAY_ID}/${name}.gz`;
+    blobs.objects.set(key, { bytes: new Uint8Array([1, 2, 3]), lastModifiedMs: clock.now() - ageMs });
+    return key;
+  }
+
+  it("deletes old orphans after a day is done, keeps live copies, and measures what is left", async () => {
+    const orphan = putOrphan("old-orphan", 2 * DAY_MS);
+    const keys = await moveDay(["guest:a", "reddit:b"]);
+
+    expect(blobs.objects.has(orphan)).toBe(false);
+    for (const key of keys) expect(blobs.objects.has(key)).toBe(true);
+    const day = await dayRecord();
+    expect(day).toMatchObject({ state: "done", sweep: null, sweepNeeded: false, nextSweepAt: null });
+    expect(day.blob).toMatchObject({ objects: 2 });
+    expect(day.blob.bytes).toBe(keys.reduce((sum, key) => sum + blobs.objects.get(key).bytes.byteLength, 0));
+    expect(await totals()).toMatchObject({ deleted: 1 });
+    expect(await redis.hGetAll(archive.dailyGhostArchiveSweepRefsKey(DAY_ID))).toEqual({});
+  });
+
+  it("keeps a young orphan, and deletes it in a later sweep without any other change", async () => {
+    await moveDay(["guest:a"]);
+    const young = putOrphan("young-orphan", 0);
+    // A held upload to the done day asks for a sweep.
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+    expect(blobs.objects.has(young)).toBe(true);
+    const due = (await dayRecord()).nextSweepAt;
+    expect(due).toBeGreaterThan(clock.now());
+
+    clock.advance(due - clock.now() + 1);
+    await runArchive(clock, blobs);
+    expect(blobs.objects.has(young)).toBe(false);
+    expect(await dayRecord()).toMatchObject({ nextSweepAt: null, blob: { objects: 1 } });
+  });
+
+  it("keeps a copy that a sign-in shared with an account after the guest's stub is gone", async () => {
+    const [guestKey] = await moveDay(["guest:a"]);
+    // The transfer copies the guest's stub to the account and deletes the guest.
+    await redis.hSet(pbKey(), { [field("reddit:a")]: await redis.hGet(pbKey(), field("guest:a")) });
+    await redis.hDel(pbKey(), [field("guest:a")]);
+    await redis.incrBy(revisionKey(), 2);
+
+    clock.advance(HOUR_MS);
+    await runArchive(clock, blobs);
+    clock.advance(DAY_MS);
+    await runArchive(clock, blobs);
+
+    expect(await dayRecord()).toMatchObject({ state: "done", pass: 2, sweepNeeded: false });
+    expect(blobs.objects.has(guestKey)).toBe(true);
+    expect((await runValue("reddit:a")).ghostArchive.key).toBe(guestKey);
+  });
+
+  it("deletes a guest's copy after the guest's stub was removed by a clean-up", async () => {
+    const [guestKey, accountKey] = await moveDay(["guest:gone", "reddit:b"]);
+    await redis.hDel(pbKey(), [field("guest:gone")]);
+    await redis.incrBy(revisionKey(), 1);
+    // The copy is older than the next sweep's snapshot by more than the grace.
+    blobs.setLastModified(guestKey, clock.now() - 2 * HOUR_MS);
+
+    clock.advance(HOUR_MS);
+    await runArchive(clock, blobs);
+
+    expect(blobs.objects.has(guestKey)).toBe(false);
+    expect(blobs.objects.has(accountKey)).toBe(true);
+  });
+
+  it("starts the reference scan again when a sign-in moves a stub during it, and deletes nothing", async () => {
+    const [guestKey] = await moveDay(["guest:a"]);
+    blobs.setLastModified(guestKey, clock.now() - 2 * DAY_MS);
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+    const hScan = redis.hScan.bind(redis);
+    let moved = false;
+    vi.spyOn(redis, "hScan").mockImplementation(async (key, cursor, pattern, count) => {
+      const page = await hScan(key, cursor, pattern, count);
+      if (key === pbKey() && !moved) {
+        moved = true;
+        // Read before the move: the page still shows the guest. Then the
+        // transfer copies the stub to the account and deletes the guest.
+        await redis.hSet(pbKey(), { [field("reddit:a")]: await redis.hGet(pbKey(), field("guest:a")) });
+        await redis.hDel(pbKey(), [field("guest:a")]);
+        await redis.incrBy(revisionKey(), 2);
+      }
+      return page;
+    });
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+
+    expect(moved).toBe(true);
+    expect(blobs.objects.has(guestKey)).toBe(true);
+    expect(await totals()).toMatchObject({ deleted: 0 });
+  });
+
+  it("keeps the copy when a clean-up is refused during a sign-in that copies the guest's stub later", async () => {
+    const { cleanupExpiredDailyGuests } = await import("../src/server/daily/daily-guest-cleanup.ts");
+    const { DAILY_GUEST_EXPIRY_KEY, racedListKey } = await import("../src/server/player/raced-list.ts");
+    const [guestKey] = await moveDay(["guest:old"]);
+    blobs.setLastModified(guestKey, clock.now() - 2 * DAY_MS);
+    await redis.zAdd(DAILY_GUEST_EXPIRY_KEY, { member: "guest:old", score: 1 });
+    await redis.hSet(racedListKey("guest:old"), { [`daily:${DAY_ID}`]: "1" });
+    // The sign-in marks the guest and reads its stub.
+    await redis.set(guestProgressSelectionPendingKey("guest:old"), "1");
+    const readStub = await redis.hGet(pbKey(), field("guest:old"));
+
+    expect(await cleanupExpiredDailyGuests(clock.now())).toBe(0);
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+    // The sign-in now writes the stub it read to the account.
+    await redis.hSet(pbKey(), { [field("reddit:new")]: readStub });
+
+    expect(await redis.hGet(pbKey(), field("guest:old"))).toBe(readStub);
+    expect(blobs.objects.has(guestKey)).toBe(true);
+  });
+
+  it("continues a long listing across requests, resumes inside a page, and counts each object once", async () => {
+    const keys = await moveDay(["guest:a", "reddit:b"]);
+    for (const key of keys) blobs.setLastModified(key, clock.now() - 2 * DAY_MS);
+    const orphans = Array.from({ length: 450 }, (_value, index) => putOrphan(`orphan-${String(index).padStart(3, "0")}`, 2 * DAY_MS));
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+    // Each blob call takes 100 ms, so one request cannot finish the sweep.
+    const store = blobs.store;
+    const slow = Object.fromEntries(Object.entries(store).map(([name, call]) => [name, async (...args) => {
+      clock.advance(100);
+      return call(...args);
+    }]));
+
+    let requests = 0;
+    for (; requests < 20 && (await dayRecord()).sweepNeeded; requests += 1) {
+      clock.advance(60_000);
+      await archive.runDailyGhostArchive({
+        mode: "move", dayLimit: null, store: slow, clock, maxCallsPerSecond: 1000,
+      });
+    }
+
+    expect(requests).toBeGreaterThan(1);
+    for (const orphan of orphans) expect(blobs.objects.has(orphan)).toBe(false);
+    expect(blobs.count("delete")).toBe(450);
+    expect(await totals()).toMatchObject({ deleted: 450 });
+    expect((await dayRecord()).blob).toMatchObject({ objects: 2 });
+  });
+
+  it("starts the listing again when S3 refuses the saved token, with the same refs", async () => {
+    const keys = await moveDay(["guest:a", "reddit:b"]);
+    const orphans = Array.from({ length: 250 }, (_value, index) => putOrphan(`orphan-${String(index).padStart(3, "0")}`, 2 * DAY_MS));
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+    // The first page is read, then every saved token is refused once.
+    const list = blobs.store.list;
+    let refused = false;
+    const store = {
+      ...blobs.store,
+      list: async (prefix, token, maxKeys, signal) => {
+        if (token && !refused) {
+          refused = true;
+          throw new (await import("../src/server/blob/blob-store.ts")).BlobListTokenRejectedError();
+        }
+        return list(prefix, token, maxKeys, signal);
+      },
+    };
+
+    clock.advance(60_000);
+    await archive.runDailyGhostArchive({ mode: "move", dayLimit: null, store, clock, maxCallsPerSecond: 1000 });
+
+    expect(refused).toBe(true);
+    for (const orphan of orphans) expect(blobs.objects.has(orphan)).toBe(false);
+    for (const key of keys) expect(blobs.objects.has(key)).toBe(true);
+    expect((await dayRecord()).blob).toMatchObject({ objects: 2 });
+    expect(await totals()).toMatchObject({ deleted: 250 });
+  });
+
+  it("stops the sweep at a damaged reference and deletes nothing", async () => {
+    await moveDay(["guest:a"]);
+    const orphan = putOrphan("old-orphan", 2 * DAY_MS);
+    const stub = await runValue("guest:a");
+    await redis.hSet(pbKey(), { [field("guest:a")]: JSON.stringify({ ...stub, ghostArchive: { v: 1, key: "" } }) });
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, {
+      [DAY_ID]: JSON.stringify({ ...(await dayRecord()), sweepNeeded: true }),
+    });
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs);
+
+    expect(blobs.objects.has(orphan)).toBe(true);
+    const day = await dayRecord();
+    expect(day).toMatchObject({ sweep: null, sweepNeeded: true, lastError: "damaged_ref" });
+    expect(day.nextSweepAt).toBeGreaterThan(clock.now() + HOUR_MS);
+  });
+
+  it("runs no held work on a day while its sweep runs, and asks for a sweep before a held upload", async () => {
+    await moveDay(["guest:a"]);
+    const text = fullRunText(29000, 5);
+    await seedRun("guest:late", text);
+    await redis.hSet(archive.dailyGhostArchiveHeldKey(DAY_ID), { [field("guest:late")]: "signin" });
+    // A sweep is open on the day.
+    const sweeping = {
+      ...(await dayRecord()),
+      hasHeld: true,
+      sweep: {
+        phase: "list", modeSerial: 1, startedAt: clock.now(), revision: 0, refsCursor: 0,
+        pageToken: null, nextToken: null, lastKey: null, kept: 0, keptBytes: 0, youngOrphanUntil: 0, deleted: 0,
+      },
+    };
+    await redis.hSet(archive.DAILY_GHOST_ARCHIVE_DAYS_KEY, { [DAY_ID]: JSON.stringify(sweeping) });
+    vi.spyOn(redis, "hScan");
+
+    clock.advance(HOUR_MS);
+    await runArchive(clock, blobs);
+    expect(await runText("guest:late")).toBe(text);
+
+    // The next held upload fails to commit. The day asked for a sweep first,
+    // so a sweep runs, keeps the young copy, and comes back for it later.
+    redis.setBeforeExec((keys) => {
+      if (keys.includes(pbKey())) redis.touch(pbKey());
+    });
+    clock.advance(HOUR_MS);
+    await runArchive(clock, blobs);
+    redis.setBeforeExec(null);
+    expect(await runText("guest:late")).toBe(text);
+    const lateCopy = blobs.keys(`daily-ghosts/v1/${DAY_ID}/${field("guest:late")}-`);
+    expect(lateCopy).toHaveLength(1);
+    const day = await dayRecord();
+    expect(day.nextSweepAt).toBeGreaterThan(clock.now());
+
+    // The commit works later; the copy is then referenced and stays.
+    clock.advance(day.nextSweepAt - clock.now() + 1);
+    await runArchive(clock, blobs);
+    expect((await runValue("guest:late")).ghostArchive.key).toBe(lateCopy[0]);
+    expect(blobs.objects.has(lateCopy[0])).toBe(true);
+  });
+});

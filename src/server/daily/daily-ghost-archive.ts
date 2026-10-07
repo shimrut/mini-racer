@@ -4,6 +4,7 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 import {
     BlobCallTimeoutError,
     BlobDeadlineError,
+    BlobListTokenRejectedError,
     createBlobSession,
     createDevvitBlobStore,
     SYSTEM_BLOB_CLOCK,
@@ -90,11 +91,33 @@ const PASS_RETRY_MS = 60 * 60 * 1000;
 const PODIUM_WINDOW_MS = 6 * 60 * 60 * 1000;
 const SCAN_COUNT = 200;
 const SLICE_SIZE = 25;
+const SWEEP_LIST_PAGE = 200;
+// An unreferenced object this much younger than the sweep's snapshot may be
+// an upload whose stub is not committed yet, so it is kept for a later sweep.
+const SWEEP_GRACE_MS = 60 * 60 * 1000;
+const SWEEP_RETRY_MARGIN_MS = 5 * 60 * 1000;
+// After a damaged reference, the next sweep waits this long.
+const SWEEP_DAMAGED_WAIT_MS = 24 * 60 * 60 * 1000;
 const WORKERS = 8;
 const STEP_MARGIN_MS = 1_000;
 const MAX_SLICE_COMMITS = 2;
 
 type DayState = 'moving' | 'waiting' | 'done' | 'restoring' | 'restored';
+
+export type DailyGhostArchiveSweep = {
+    phase: 'refs' | 'list';
+    modeSerial: number;
+    startedAt: number;
+    revision: number;
+    refsCursor: number;
+    pageToken: string | null;
+    nextToken: string | null;
+    lastKey: string | null;
+    kept: number;
+    keptBytes: number;
+    youngOrphanUntil: number;
+    deleted: number;
+};
 type Direction = 'move' | 'restore';
 
 export type DailyGhostArchiveDay = {
@@ -114,7 +137,7 @@ export type DailyGhostArchiveDay = {
     failedThisPass: number;
     sweepNeeded: boolean;
     nextSweepAt: number | null;
-    sweep: null;
+    sweep: DailyGhostArchiveSweep | null;
     blob: { objects: number; bytes: number; measuredAt: number } | null;
     moved: number;
     restored: number;
@@ -741,6 +764,222 @@ async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     }
 }
 
+
+// ---- Sweep: delete blob copies that no stub of their day points to. ----
+
+function sweepIsDue(day: DailyGhostArchiveDay, nowMs: number): boolean {
+    if (day.state !== 'done' || day.active) return false;
+    if (day.sweep) return true;
+    const asked = day.blob === null || day.sweepNeeded || day.nextSweepAt !== null;
+    return asked && (day.nextSweepAt === null || day.nextSweepAt <= nowMs);
+}
+
+function pickSweepDay(ctx: RunContext, eligible: readonly StoredDay[]): string | null {
+    for (const { id } of eligible) {
+        const day = ctx.days.get(id);
+        if (day && !ctx.stuck.has(id) && sweepIsDue(day, ctx.clock.now())) return id;
+    }
+    return null;
+}
+
+async function startSweep(ctx: RunContext, challengeId: string): Promise<boolean> {
+    const day = ctx.days.get(challengeId)!;
+    const revision = await readRevision(challengeId);
+    return saveDay(ctx, challengeId, {
+        ...day,
+        sweep: {
+            phase: 'refs',
+            modeSerial: ctx.serial,
+            startedAt: ctx.clock.now(),
+            revision,
+            refsCursor: 0,
+            pageToken: null,
+            nextToken: null,
+            lastKey: null,
+            kept: 0,
+            keptBytes: 0,
+            youngOrphanUntil: 0,
+            deleted: 0,
+        },
+    }, async (transaction) => {
+        await transaction.del(dailyGhostArchiveSweepRefsKey(challengeId));
+    });
+}
+
+// One page of the reference scan. The refs and the scan position are saved
+// together. At the end, the snapshot counts only if the day's revision did not
+// move while it was taken; otherwise the scan starts again.
+async function sweepRefsStep(ctx: RunContext, challengeId: string): Promise<boolean> {
+    const day = ctx.days.get(challengeId)!;
+    const sweep = day.sweep!;
+    const page = await redis.hScan(challengeCollectionKey(challengeId), sweep.refsCursor, undefined, SCAN_COUNT);
+    const refs: string[] = [];
+    for (const row of page.fieldValues) {
+        const run = readRun(row.value);
+        if (!run || run.value.ghostArchive === undefined) continue;
+        if (!isPbGhostArchiveRef(run.value.ghostArchive)) {
+            // A reference that cannot be read could hide a live object. Delete nothing.
+            console.error('Daily ghost sweep stopped: damaged reference', challengeId, row.field);
+            await saveDay(ctx, challengeId, {
+                ...day,
+                sweep: null,
+                sweepNeeded: true,
+                nextSweepAt: ctx.clock.now() + SWEEP_DAMAGED_WAIT_MS,
+                lastError: 'damaged_ref',
+            }, async (transaction) => {
+                await transaction.del(dailyGhostArchiveSweepRefsKey(challengeId));
+            });
+            ctx.stuck.add(challengeId);
+            return false;
+        }
+        refs.push(run.value.ghostArchive.key);
+    }
+    let next: DailyGhostArchiveSweep = { ...sweep, refsCursor: page.cursor };
+    let restart = false;
+    if (page.cursor === 0) {
+        const revision = await readRevision(challengeId);
+        if (revision === sweep.revision) {
+            next = { ...next, phase: 'list' };
+        } else {
+            restart = true;
+            next = { ...next, refsCursor: 0, startedAt: ctx.clock.now(), revision };
+        }
+    }
+    return saveDay(ctx, challengeId, { ...day, sweep: next }, async (transaction) => {
+        const refsKey = dailyGhostArchiveSweepRefsKey(challengeId);
+        if (restart) {
+            await transaction.del(refsKey);
+        } else if (refs.length) {
+            await transaction.hSet(refsKey, Object.fromEntries(refs.map((key) => [key, '1'])));
+        }
+    });
+}
+
+async function saveSweepProgress(
+    ctx: RunContext,
+    challengeId: string,
+    sweep: DailyGhostArchiveSweep,
+    deletedNow: number,
+): Promise<boolean> {
+    const day = ctx.days.get(challengeId)!;
+    const nextDay = { ...day, sweep, updatedAt: ctx.clock.now() };
+    const nextTotals = { ...ctx.totals, deleted: ctx.totals.deleted + deletedNow };
+    const saved = await commitOwned(ctx, async (transaction) => {
+        await transaction.hSet(DAILY_GHOST_ARCHIVE_DAYS_KEY, { [challengeId]: JSON.stringify(nextDay) });
+        await transaction.set(DAILY_GHOST_ARCHIVE_TOTALS_KEY, JSON.stringify(nextTotals));
+    });
+    if (saved) {
+        ctx.days.set(challengeId, nextDay);
+        ctx.totals = nextTotals;
+    }
+    return saved;
+}
+
+async function finishSweep(ctx: RunContext, challengeId: string, sweep: DailyGhostArchiveSweep): Promise<boolean> {
+    const day = ctx.days.get(challengeId)!;
+    const saved = await saveDay(ctx, challengeId, {
+        ...day,
+        sweep: null,
+        sweepNeeded: false,
+        nextSweepAt: sweep.youngOrphanUntil > 0 ? sweep.youngOrphanUntil + SWEEP_RETRY_MARGIN_MS : null,
+        blob: { objects: sweep.kept, bytes: sweep.keptBytes, measuredAt: ctx.clock.now() },
+    }, async (transaction) => {
+        await transaction.del(dailyGhostArchiveSweepRefsKey(challengeId));
+    });
+    if (saved) {
+        console.log(
+            `Daily ghost sweep: ${challengeId} deleted ${sweep.deleted}, kept ${sweep.kept}`
+            + ` (${sweep.keptBytes} bytes)`,
+        );
+    }
+    return saved;
+}
+
+// One listing page, in key order. An object is kept when a stub points to it,
+// or when it is not older than the snapshot by the grace time. Progress is
+// saved after each batch, so a page cut short resumes after `lastKey`.
+async function sweepListStep(ctx: RunContext, challengeId: string): Promise<boolean> {
+    let sweep = ctx.days.get(challengeId)!.sweep!;
+    if (!ctx.session.hasTimeFor(1)) return false;
+    let page;
+    try {
+        page = await ctx.session.list(dailyGhostBlobPrefix(challengeId), sweep.pageToken, SWEEP_LIST_PAGE);
+    } catch (error) {
+        if (error instanceof BlobListTokenRejectedError) {
+            // Start the listing again with the same refs. Deletions stay done.
+            return saveSweepProgress(ctx, challengeId, {
+                ...sweep,
+                pageToken: null,
+                nextToken: null,
+                lastKey: null,
+                kept: 0,
+                keptBytes: 0,
+                youngOrphanUntil: 0,
+            }, 0);
+        }
+        if (!(error instanceof BlobDeadlineError)) console.error('Daily ghost sweep listing failed:', challengeId, error);
+        ctx.stuck.add(challengeId);
+        return false;
+    }
+    sweep = { ...sweep, nextToken: page.nextToken };
+    const objects = page.objects.filter((object) => sweep.lastKey === null || object.key > sweep.lastKey);
+    const refsKey = dailyGhostArchiveSweepRefsKey(challengeId);
+    for (let index = 0; index < objects.length; index += SLICE_SIZE) {
+        const batch = objects.slice(index, index + SLICE_SIZE);
+        const referenced = await redis.hMGet(refsKey, batch.map((object) => object.key));
+        let deletedNow = 0;
+        let stopped = false;
+        for (const [position, object] of batch.entries()) {
+            const young = object.lastModifiedMs >= sweep.startedAt - SWEEP_GRACE_MS;
+            if (referenced[position] || young) {
+                sweep = {
+                    ...sweep,
+                    kept: sweep.kept + 1,
+                    keptBytes: sweep.keptBytes + object.size,
+                    youngOrphanUntil: !referenced[position]
+                        ? Math.max(sweep.youngOrphanUntil, object.lastModifiedMs + SWEEP_GRACE_MS)
+                        : sweep.youngOrphanUntil,
+                    lastKey: object.key,
+                };
+                continue;
+            }
+            if (!ctx.session.hasTimeFor(1) || ctx.clock.now() > ctx.startUntilMs) {
+                stopped = true;
+                break;
+            }
+            try {
+                await ctx.session.delete(object.key);
+            } catch (error) {
+                if (!(error instanceof BlobDeadlineError)) console.error('Daily ghost sweep delete failed:', challengeId, error);
+                stopped = true;
+                break;
+            }
+            deletedNow += 1;
+            sweep = { ...sweep, deleted: sweep.deleted + 1, lastKey: object.key };
+        }
+        if (!await saveSweepProgress(ctx, challengeId, sweep, deletedNow)) return false;
+        if (stopped) return false;
+    }
+    // The page is done: go on with the token of the response just read.
+    sweep = { ...sweep, pageToken: page.nextToken, nextToken: null, lastKey: null };
+    if (page.nextToken === null) return finishSweep(ctx, challengeId, sweep);
+    return saveSweepProgress(ctx, challengeId, sweep, 0);
+}
+
+async function workSweep(ctx: RunContext, challengeId: string): Promise<void> {
+    const day = ctx.days.get(challengeId)!;
+    if (!day.sweep || day.sweep.modeSerial !== ctx.serial) {
+        if (!await startSweep(ctx, challengeId)) {
+            ctx.stuck.add(challengeId);
+            return;
+        }
+    }
+    while (canStep(ctx) && ctx.days.get(challengeId)?.sweep) {
+        const step = ctx.days.get(challengeId)!.sweep!.phase === 'refs' ? sweepRefsStep : sweepListStep;
+        if (!await step(ctx, challengeId)) return;
+    }
+}
+
 // Hourly: reopens done days whose revision changed, then works the held lists.
 async function runUpkeep(ctx: RunContext): Promise<void> {
     if (!await saveTotals(ctx, { ...ctx.totals, upkeepAt: ctx.clock.now() })) return;
@@ -837,7 +1076,14 @@ export async function runDailyGhostArchive({
         const eligible = storedDays.filter((day) => day.availableUntilMs + PODIUM_WINDOW_MS <= clock.now());
         while (canStep(ctx) && ctx.mode === 'move') {
             const next = pickMoveDay(ctx, eligible, dayLimit);
-            if (!next) break;
+            if (!next) {
+                // Sweeps run only when no move pass is ready.
+                const sweepDay = pickSweepDay(ctx, eligible);
+                if (!sweepDay) break;
+                await workSweep(ctx, sweepDay);
+                if (ctx.days.get(sweepDay)?.sweep && !ctx.stuck.has(sweepDay)) break;
+                continue;
+            }
             if (next.action === 'start' && !await startPass(ctx, next.challengeId)) {
                 ctx.stuck.add(next.challengeId);
                 continue;
