@@ -106,6 +106,35 @@ function summaryFixture(overrides = {}) {
 }
 
 describe('moderator analytics page', () => {
+    it('shows the newest 10 cohort days and adds 10 older days with Load more', () => {
+        const { window } = analyticsDom();
+        const blank = { retained: null, rate: null };
+        const cohorts = Array.from({ length: 23 }, (_, index) => ({
+            date: `2026-07-${String(index + 1).padStart(2, '0')}`,
+            players: index + 1,
+            d1: blank, d2: blank, d3: blank, d7: blank, d14: blank, d30: blank,
+        }));
+        renderAnalyticsSummary(window.document, summaryFixture({ cohorts }));
+        const { document } = window;
+        const rowDates = () => [...document.querySelectorAll('.analytics-table--cohorts tbody th')]
+            .map((cell) => cell.title);
+        const loadMore = () => document.querySelector('#analytics-cohorts .analytics-button');
+
+        expect(rowDates()).toHaveLength(10);
+        expect(rowDates()[0]).toBe('2026-07-23');
+        expect(rowDates()[9]).toBe('2026-07-14');
+
+        loadMore().click();
+        expect(rowDates()).toHaveLength(20);
+        expect(rowDates()[19]).toBe('2026-07-04');
+        expect(document.activeElement).toBe(loadMore());
+
+        loadMore().click();
+        expect(rowDates()).toHaveLength(23);
+        expect(rowDates()[22]).toBe('2026-07-01');
+        expect(loadMore()).toBeNull();
+    });
+
     it('renders the summary panel, chart, modes, months, and daily rows', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture());

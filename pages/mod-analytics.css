@@ -618,7 +618,8 @@ h1 {
     color: var(--ink);
 }
 
-.analytics-challenges__actions {
+.analytics-challenges__actions,
+.analytics-cohorts__actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -643,7 +644,8 @@ h1 {
     cursor: pointer;
 }
 
-.analytics-challenges__actions .analytics-button:first-of-type {
+.analytics-challenges__actions .analytics-button:first-of-type,
+.analytics-cohorts__actions .analytics-button:first-of-type {
     margin-left: auto;
 }
 

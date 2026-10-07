@@ -21,6 +21,7 @@ const SECTION_IDS = [
 ];
 const MODE_LABELS = { daily: 'Daily', campaign: 'Campaign', challenge: 'Challenge' };
 const ANALYTICS_CHART_DAYS = 45;
+const COHORT_ROWS = 10;
 
 function toCount(value) {
     const count = Number(value);
@@ -377,7 +378,7 @@ function cohortMetricText(metric) {
     return `${formatRate(metric.rate)} (${formatCount(metric.retained)})`;
 }
 
-function renderCohorts(doc, cohorts) {
+function renderCohorts(doc, cohorts, shown = COHORT_ROWS, onLoadMore) {
     const nodes = [
         cardHeading(doc, 'Cohort retention'),
         element(doc, 'p', 'analytics-note', 'Exact UTC-day return · signed-in racers only'),
@@ -404,7 +405,7 @@ function renderCohorts(doc, cohorts) {
 
     const body = element(doc, 'tbody');
     const latest = cohorts[cohorts.length - 1]?.date;
-    for (const cohort of [...cohorts].reverse()) {
+    for (const cohort of [...cohorts].reverse().slice(0, shown)) {
         const row = element(doc, 'tr');
         if (cohort?.date && cohort.date === latest) row.className = 'analytics-table__latest';
         const date = element(doc, 'th', undefined, formatShortDate(cohort?.date) || 'Unknown');
@@ -424,6 +425,14 @@ function renderCohorts(doc, cohorts) {
     const wrap = element(doc, 'div', 'analytics-table-wrap');
     wrap.append(table);
     nodes.push(wrap);
+    if (cohorts.length > shown) {
+        const actions = element(doc, 'div', 'analytics-cohorts__actions');
+        const button = element(doc, 'button', 'analytics-button', 'Load more');
+        button.type = 'button';
+        button.addEventListener('click', () => { onLoadMore?.(); });
+        actions.append(button);
+        nodes.push(actions);
+    }
     return nodes;
 }
 
@@ -1098,7 +1107,13 @@ export function renderAnalyticsSummary(root, summary) {
     }
 
     modesNode.replaceChildren(...renderModes(root, days));
-    cohortsNode?.replaceChildren(...renderCohorts(root, cohorts));
+    const showCohorts = (shown) => {
+        cohortsNode?.replaceChildren(...renderCohorts(root, cohorts, shown, () => {
+            showCohorts(shown + COHORT_ROWS);
+            cohortsNode?.querySelector('.analytics-cohorts__actions .analytics-button')?.focus();
+        }));
+    };
+    showCohorts(COHORT_ROWS);
     monthsNode.replaceChildren(...renderMonths(root, months));
 
     const dayHead = cardHeading(root, 'Daily breakdown');
