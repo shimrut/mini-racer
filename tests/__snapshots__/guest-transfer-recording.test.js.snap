@@ -19998,7 +19998,7 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
   "changes": {
     "campaign:numbered-v1:leaderboard:numbered-v1-02:standings-revision": {
       "after": {
-        "string": "1",
+        "string": "2",
       },
       "before": null,
     },
@@ -20242,7 +20242,7 @@ exports[`guest transfer recordings > the guest holds a personal best where the a
     "dailygp:leaderboard:daily-gp-2026-09-24:standings-revision": {
       "after": {
         "expiresInSeconds": 1576497600,
-        "string": "1",
+        "string": "2",
       },
       "before": {
         "expiresInSeconds": 1576497600,
@@ -20556,7 +20556,7 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
   "changes": {
     "campaign:numbered-v1:leaderboard:numbered-v1-01:standings-revision": {
       "after": {
-        "string": "1",
+        "string": "2",
       },
       "before": null,
     },
@@ -20813,7 +20813,7 @@ exports[`guest transfer recordings > the guest holds only personal bests (merge)
     "dailygp:leaderboard:daily-gp-2026-09-25:standings-revision": {
       "after": {
         "expiresInSeconds": 1576584000,
-        "string": "1",
+        "string": "2",
       },
       "before": {
         "expiresInSeconds": 1576584000,

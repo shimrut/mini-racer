@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideBoardMerge, timeFitsBoard } from '../src/server/guest-transfer/board-merge.ts';
+import { boardMergeWrite, decideBoardMerge, timeFitsBoard } from '../src/server/guest-transfer/board-merge.ts';
 
 const BOARD = { trackKey: 'circuit', lapCount: 2 };
 const GUEST = 'guest:board';
@@ -101,5 +101,43 @@ describe('one board in a guest transfer', () => {
         expect(decide({ guestPb: pb(30000), redditPb: pb(30000) }).guestPbWins).toBe(false);
         expect(decide({ guestPb: pb(29000) }).guestPbWins).toBe(true);
         expect(decide({ redditPb: pb(29000) }).guestPbWins).toBe(false);
+    });
+});
+
+describe('the writes of one board', () => {
+    const COMPETITION = {
+        mode: 'daily',
+        id: 'daily-gp-2026-09-27',
+        trackKey: 'circuit',
+        entryHashKey: 'board:entries',
+        leaderboardKey: 'board:ranks',
+        standingsRevisionKey: 'board:revision',
+        pbHashKey: 'board:pbs',
+    };
+
+    async function queued(mutate) {
+        const commands = [];
+        const transaction = new Proxy({}, {
+            get: (_target, name) => async (key) => {
+                commands.push([name, key]);
+            },
+        });
+        await mutate(transaction);
+        return commands;
+    }
+
+    // The move of old Daily ghosts reads the revision to know that a day's rows
+    // changed, so a personal best copied alone must raise it too.
+    it('raises the standings revision when it copies a personal best without an entry', async () => {
+        const commands = await queued(boardMergeWrite(COMPETITION, ACCOUNT, null, 'pb'));
+        expect(commands).toHaveLength(3);
+        expect(commands).toContainEqual(['hSet', 'board:pbs']);
+        expect(commands).toContainEqual(['incrBy', 'board:revision']);
+    });
+
+    it('raises the revision once and queues at most 5 commands with an entry', async () => {
+        const commands = await queued(boardMergeWrite(COMPETITION, ACCOUNT, time(ACCOUNT, 30000), 'pb'));
+        expect(commands.length).toBeLessThanOrEqual(5);
+        expect(commands.filter(([name]) => name === 'incrBy')).toEqual([['incrBy', 'board:revision']]);
     });
 });

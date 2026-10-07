@@ -84,7 +84,12 @@ export function decideBoardMerge({
 
 // The writes of one board, or null when the board needs none. It queues at
 // most 5 commands: an account entry is never a guest's, so writeEntry queues
-// 4 (with the raced list), and the personal best queues 1.
+// 4 (with the raced list), and the personal best queues 1. A personal best
+// copied without an entry queues 3.
+//
+// Every write that changes a board's rows raises its standings revision.
+// writeEntry does it for an entry; a personal best copied alone does it here.
+// The move of old Daily ghosts reads the revision to know that a day changed.
 export function boardMergeWrite(
     competition: Competition,
     redditPlayerId: string,
@@ -100,7 +105,10 @@ export function boardMergeWrite(
             await transaction.hSet(competition.pbHashKey, {
                 [playerFieldHash(redditPlayerId)]: guestPbValue,
             });
-            if (!entryToWrite) await queueRacedBoard(transaction, redditPlayerId, competition);
+            if (!entryToWrite) {
+                await queueRacedBoard(transaction, redditPlayerId, competition);
+                await transaction.incrBy(competition.standingsRevisionKey, 1);
+            }
         }
     };
 }
