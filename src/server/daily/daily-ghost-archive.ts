@@ -144,6 +144,8 @@ const PASS_RETRY_MS = 60 * 60 * 1000;
 const PODIUM_WINDOW_MS = 6 * 60 * 60 * 1000;
 const SCAN_COUNT = 200;
 const SLICE_SIZE = 25;
+// One hourly turn of a held list reads at most this many scan pages.
+const HELD_PAGE_LIMIT = 4;
 const SWEEP_LIST_PAGE = 200;
 // An unreferenced object this much younger than the sweep's snapshot may be
 // an upload whose stub is not committed yet, so it is kept for a later sweep.
@@ -186,6 +188,10 @@ export type DailyGhostArchiveDay = {
     nextPassAt: number;
     doneRevision: number | null;
     hasHeld: boolean;
+    // Where the hourly work on the held list goes on: a scan page, and the
+    // last name taken from it. Names behind a stuck name get their turn.
+    heldCursor: number;
+    heldAfter: string | null;
     heldThisPass: number;
     failedThisPass: number;
     sweepNeeded: boolean;
@@ -234,6 +240,8 @@ function emptyDay(): DailyGhostArchiveDay {
         nextPassAt: 0,
         doneRevision: null,
         hasHeld: false,
+        heldCursor: 0,
+        heldAfter: null,
         heldThisPass: 0,
         failedThisPass: 0,
         sweepNeeded: false,
@@ -674,12 +682,14 @@ async function prepareRestores(
 // Writes the confirmed changes of one slice, with its progress and counts, in
 // one transaction. A run is changed only when it still holds the text that
 // was copied and no sign-in owns its player. Names that were not started stay
-// in their list.
+// in their list. `dayPatch` is saved with the day, such as the held list's
+// position.
 async function commitSlice(
     ctx: RunContext,
     challengeId: string,
     source: 'page' | 'held',
     outcome: SliceOutcome,
+    dayPatch: Partial<DailyGhostArchiveDay> = {},
 ): Promise<boolean> {
     const pbKey = challengeCollectionKey(challengeId);
     const sourceKey = source === 'page' ? dailyGhostArchivePageKey(challengeId) : dailyGhostArchiveHeldKey(challengeId);
@@ -714,6 +724,7 @@ async function commitSlice(
             : { restored: day.restored + converted.length };
         const nextDay: DailyGhostArchiveDay = {
             ...day,
+            ...dayPatch,
             ...counts,
             freed: day.freed + freed,
             hasHeld: day.hasHeld || Object.keys(heldReasons).length > 0,
@@ -912,19 +923,73 @@ function pickMoveDay(
     return null;
 }
 
-// The held list of one day: up to one slice of names. A name whose row is gone
-// or already in the wanted form is dropped first. Only a row that still needs
-// a change has its marks checked; a marked owner keeps the name.
+type HeldPick = {
+    names: string[];
+    // The page the names came from, and the name the page was read after.
+    cursor: number;
+    after: string | null;
+};
+
+// The next names of a held list, going on from the day's saved position. Each
+// page's names are taken in name order, after the last name taken from it.
+// When a page has no more, the next page is read, and after the last page the
+// list starts again from the top, once in a call.
+async function pickHeldNames(heldKey: string, day: DailyGhostArchiveDay): Promise<HeldPick> {
+    let cursor = day.heldCursor;
+    let after = day.heldAfter;
+    let wrapped = false;
+    for (let read = 0; read < HELD_PAGE_LIMIT; read += 1) {
+        const page = await redis.hScan(heldKey, cursor, undefined, SLICE_SIZE);
+        const names = page.fieldValues
+            .map((row) => row.field)
+            .filter((name) => after === null || name > after)
+            .sort()
+            .slice(0, SLICE_SIZE);
+        if (names.length) return { names, cursor, after };
+        if (page.cursor !== 0) {
+            cursor = page.cursor;
+            after = null;
+            continue;
+        }
+        // The last page. A read from the top that found nothing ends the turn.
+        if (wrapped || (cursor === 0 && after === null)) break;
+        cursor = 0;
+        after = null;
+        wrapped = true;
+    }
+    return { names: [], cursor, after };
+}
+
+// The last of `names` up to which every name was dealt with, so the next turn
+// goes on after it. Names not started for lack of time come first next turn.
+function heldPosition(pick: HeldPick, handled: ReadonlySet<string>): Partial<DailyGhostArchiveDay> {
+    let after = pick.after;
+    for (const name of pick.names) {
+        if (!handled.has(name)) break;
+        after = name;
+    }
+    return { heldCursor: pick.cursor, heldAfter: after };
+}
+
+// The held list of one day: up to one slice of names, from where the last
+// turn stopped. A name whose row is gone or already in the wanted form is
+// dropped first. Only a row that still needs a change has its marks checked;
+// a marked owner keeps the name.
 async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     const day = ctx.days.get(challengeId);
     if (!day || day.sweep) return;
     const heldKey = dailyGhostArchiveHeldKey(challengeId);
-    const names = (await redis.hScan(heldKey, 0, undefined, SLICE_SIZE))
-        .fieldValues.map((row) => row.field).slice(0, SLICE_SIZE);
-    if (!names.length) {
-        await saveDay(ctx, challengeId, { ...day, hasHeld: false });
+    const pick = await pickHeldNames(heldKey, day);
+    if (!pick.names.length) {
+        if (!Number(await redis.hLen(heldKey))) {
+            await saveDay(ctx, challengeId, { ...day, hasHeld: false, heldCursor: 0, heldAfter: null });
+        } else {
+            // Only scanned: the next turn goes on from here.
+            await saveDay(ctx, challengeId, { ...day, heldCursor: pick.cursor, heldAfter: pick.after });
+        }
         return;
     }
+    const { names } = pick;
     const raws = await redis.hMGet(challengeCollectionKey(challengeId), names);
     const drop: string[] = [];
     const needs: string[] = [];
@@ -934,9 +999,14 @@ async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     });
     const marks = needs.length ? await redis.mGet(needs.flatMap(markerKeys)) : [];
     const free = needs.filter((_name, index) => !marks[index * 2] && !marks[index * 2 + 1]);
+    const marked = needs.filter((name) => !free.includes(name));
     if (!free.length) {
+        // Every name was dropped or is still marked.
+        const position = heldPosition(pick, new Set(names));
         if (drop.length) {
-            await commitSlice(ctx, challengeId, 'held', { ready: [], drop, failed: [] });
+            await commitSlice(ctx, challengeId, 'held', { ready: [], drop, failed: [] }, position);
+        } else {
+            await saveDay(ctx, challengeId, { ...day, ...position });
         }
         return;
     }
@@ -949,9 +1019,16 @@ async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     const outcome = ctx.mode === 'move'
         ? await prepareMoves(ctx, challengeId, free, freeRaws)
         : await prepareRestores(ctx, free, freeRaws);
+    const position = heldPosition(pick, new Set([
+        ...drop,
+        ...marked,
+        ...outcome.drop,
+        ...outcome.ready.map((item) => item.name),
+        ...outcome.failed.map((item) => item.name),
+    ]));
     outcome.drop.push(...drop);
     for (let attempt = 0; attempt < MAX_SLICE_COMMITS && !ctx.lockLost; attempt += 1) {
-        if (await commitSlice(ctx, challengeId, 'held', outcome)) return;
+        if (await commitSlice(ctx, challengeId, 'held', outcome, position)) return;
     }
 }
 

@@ -603,6 +603,111 @@ describe("moving old Daily ghosts to blob storage", () => {
   });
 });
 
+describe("working the held list in turns", () => {
+  let blobs;
+  let clock;
+  let players;
+
+  beforeEach(async () => {
+    redis.reset();
+    clock = createClock(MOVE_AT);
+    blobs = createBlobTestStore({ now: () => clock.now() });
+    await storeDay(DAY);
+    // 30 runs, all held for a sign-in on the first pass.
+    players = Array.from({ length: 30 }, (_value, index) => `guest:${index}`);
+    for (const [index, player] of players.entries()) {
+      await seedRun(player, fullRunText(30000 + index, index));
+      await redis.set(guestProgressSelectionPendingKey(player), "1");
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function playerOf(name) {
+    return players.find((player) => field(player) === name);
+  }
+
+  async function hourly(options = {}) {
+    clock.advance(HOUR_MS);
+    return runArchive(clock, blobs, options);
+  }
+
+  async function heldPosition() {
+    const { heldCursor, heldAfter } = await dayRecord();
+    return { heldCursor, heldAfter };
+  }
+
+  // The test double pages a hash in insertion order, 25 names to a page.
+  function pages(order) {
+    return [[...order.slice(0, 25)].sort(), [...order.slice(25)].sort()];
+  }
+
+  it("moves the names behind 25 stuck ones in a later hour", async () => {
+    await runArchive(clock, blobs);
+    const order = Object.keys(await heldNames());
+    expect(order).toHaveLength(30);
+    // The first 25 names in scan order keep a sign-in that never ends.
+    const late = order.slice(25);
+    for (const name of late) await redis.del(guestProgressSelectionPendingKey(playerOf(name)));
+
+    for (let hour = 0; hour < 3; hour += 1) await hourly();
+
+    for (const name of late) expect((await runValue(playerOf(name))).ghost).toBeNull();
+    for (const name of order.slice(0, 25)) expect((await runValue(playerOf(name))).ghost).not.toBeNull();
+    expect(Object.keys(await heldNames()).sort()).toEqual(order.slice(0, 25).sort());
+  });
+
+  it("goes on after the last name taken, starts each page and each round afresh", async () => {
+    await runArchive(clock, blobs);
+    const [first, second] = pages(Object.keys(await heldNames()));
+
+    await hourly();
+    expect(await heldPosition()).toEqual({ heldCursor: 0, heldAfter: first.at(-1) });
+    // The next page is read from its first name.
+    await hourly();
+    expect(await heldPosition()).toEqual({ heldCursor: 25, heldAfter: second.at(-1) });
+    // After the last page, the list starts again from the top.
+    await hourly();
+    expect(await heldPosition()).toEqual({ heldCursor: 0, heldAfter: first.at(-1) });
+  });
+
+  it("saves the position of a turn that only scanned", async () => {
+    await runArchive(clock, blobs);
+    const heldKey = archive.dailyGhostArchiveHeldKey(DAY_ID);
+    const scan = redis.hScan.bind(redis);
+    // Real Redis may answer a page with no names and a cursor to go on from.
+    vi.spyOn(redis, "hScan").mockImplementation(async (key, cursor, pattern, count) => (
+      key === heldKey && cursor < 40 ? { cursor: cursor + 10, fieldValues: [] } : scan(key, cursor, pattern, count)
+    ));
+
+    await hourly();
+
+    expect(await heldPosition()).toEqual({ heldCursor: 40, heldAfter: null });
+    expect(await redis.hLen(heldKey)).toBe(30);
+  });
+
+  it("keeps its place when held names are deleted between hours", async () => {
+    await runArchive(clock, blobs);
+    const [first] = pages(Object.keys(await heldNames()));
+    await hourly();
+    const { heldAfter } = await heldPosition();
+    // Sign-ins end for some names, and their rows go: the names drop out.
+    const gone = [first[3], heldAfter];
+    for (const name of gone) {
+      await redis.del(guestProgressSelectionPendingKey(playerOf(name)));
+      await redis.hDel(pbKey(), [name]);
+    }
+
+    for (let hour = 0; hour < 3; hour += 1) await hourly();
+
+    const held = Object.keys(await heldNames());
+    expect(held).toHaveLength(28);
+    for (const name of gone) expect(held).not.toContain(name);
+  });
+});
+
 describe("sweeping blob copies that no stub points to", () => {
   let blobs;
   let clock;
