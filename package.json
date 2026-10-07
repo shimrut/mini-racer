@@ -25,7 +25,9 @@
     "mutation:dry-run": "stryker run --dryRunOnly"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1147.0",
     "@devvit/analytics": "0.14.7",
+    "@devvit/blob": "0.14.7",
     "@devvit/redis": "0.14.7",
     "@devvit/web": "0.14.7",
     "express": "^5.1.0"
