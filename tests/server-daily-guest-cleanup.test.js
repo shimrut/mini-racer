@@ -103,4 +103,38 @@ describe("Daily guest clean-up", () => {
     expect(await cleanupExpiredDailyGuests(startMs + YEAR_MS)).toBe(0);
     expect(await holdsRows(guest, DAYS[0])).toBe(true);
   });
+
+  // A transfer reads the guest's rows after it sets its mark, and copies them
+  // later. A row deleted after the mark could come back as a stale copy.
+  it("stops when a transfer marks the guest after the first check", async () => {
+    const guest = "guest:marked-after-check";
+    const startMs = Date.parse("2026-01-02T00:00:00.000Z");
+    await raceDays(guest, DAYS, startMs);
+    const hKeys = redis.hKeys.bind(redis);
+    const spy = vi.spyOn(redis, "hKeys").mockImplementation(async (key) => {
+      if (key === racedListKey(guest)) await redis.set(guestProgressSelectionPendingKey(guest), "1");
+      return hKeys(key);
+    });
+
+    try {
+      expect(await cleanupExpiredDailyGuests(startMs + YEAR_MS)).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+    for (const day of DAYS) expect(await holdsRows(guest, day)).toBe(true);
+  });
+
+  it("stops when a transfer marks the guest just before a delete commits", async () => {
+    const guest = "guest:marked-before-commit";
+    const startMs = Date.parse("2026-01-02T00:00:00.000Z");
+    await raceDays(guest, DAYS, startMs);
+    redis.setBeforeExec(() => {
+      redis.setBeforeExec(null);
+      void redis.set(guestProgressSelectionPendingKey(guest), "1");
+    });
+
+    expect(await cleanupExpiredDailyGuests(startMs + YEAR_MS)).toBe(0);
+    for (const day of DAYS) expect(await holdsRows(guest, day)).toBe(true);
+    expect(await redis.zScore(DAILY_GUEST_EXPIRY_KEY, guest)).toBeTruthy();
+  });
 });

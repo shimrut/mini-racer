@@ -6,7 +6,10 @@ import {
 } from './daily-gp-model.js';
 import { challengeCollectionKey } from '../competition/pb-ghost-store.js';
 import { competitionHoldsPlayerRows } from '../competition/competition-leaderboard.js';
-import { isGuestProgressSelectionPending } from '../player/guest-retirement.js';
+import {
+    guestProgressSelectionPendingKey,
+    isGuestProgressSelectionPending,
+} from '../player/guest-retirement.js';
 import { DAILY_GUEST_EXPIRY_KEY, racedListKey } from '../player/raced-list.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 import { isRedisTransactionConflict } from '../redis/redis-transaction-conflict.js';
@@ -30,18 +33,27 @@ function dailyBoard(challengeId: string) {
     };
 }
 
-// Runs `mutate` only while the guest is still expired. It watches the expiry
-// list and the raced list, which every Daily write of the guest changes.
-// Returns false when the guest raced again or a write got in first.
+// Runs `mutate` only while the guest is still expired and no transfer owns
+// them. It watches the expiry list and the raced list, which every Daily write
+// of the guest changes, and the transfer mark. A transfer reads the guest's
+// rows after it sets the mark and copies them later, so a row deleted after
+// the mark could come back as a copy of what was read.
+// Returns false when the guest raced again, a transfer started, or a write
+// got in first.
 async function writeWhileExpired(
     guestPlayerId: string,
     nowMs: number,
     mutate: (transaction: Awaited<ReturnType<typeof redis.watch>>) => Promise<void>,
 ): Promise<boolean> {
-    const transaction = await redis.watch(DAILY_GUEST_EXPIRY_KEY, racedListKey(guestPlayerId));
+    const pendingKey = guestProgressSelectionPendingKey(guestPlayerId);
+    const transaction = await redis.watch(DAILY_GUEST_EXPIRY_KEY, racedListKey(guestPlayerId), pendingKey);
     try {
-        const score = await redis.zScore(DAILY_GUEST_EXPIRY_KEY, guestPlayerId);
-        if (!Number.isFinite(Number(score)) || Number(score) > nowMs) {
+        // Transaction-client reads queue; read the base client.
+        const [score, pending] = await Promise.all([
+            redis.zScore(DAILY_GUEST_EXPIRY_KEY, guestPlayerId),
+            redis.get(pendingKey),
+        ]);
+        if (pending || !Number.isFinite(Number(score)) || Number(score) > nowMs) {
             await transaction.unwatch();
             return false;
         }
