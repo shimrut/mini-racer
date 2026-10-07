@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
+import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
 // Records what today's guest transfer stores, for a table of player cases.
 // Each case seeds a guest and an account, shows the choice screen, runs the
@@ -498,6 +499,45 @@ describe('guest transfer recordings', () => {
             playerId: redditPlayerId, competition, track: TRACKS[challenge.trackKey],
         })).toMatchObject({ bestTimeMs, lapCount, rulesRevision: 1 });
     });
+
+    // The move of old Daily ghosts leaves a record with `ghost: null` and a
+    // reference to the blob copy. A transfer must copy that text unchanged, so
+    // the account's record still points at the ghost.
+    for (const choice of ['merge', 'account']) {
+        it(`copies a moved ghost's record unchanged on an old day (${choice})`, async () => {
+            const guestPlayerId = 'guest:recorded';
+            const redditPlayerId = 'reddit:recorded';
+            const { archived } = await seedDays(1);
+            await seedDay(archived[0], guestPlayerId, { entryMs: 41000, pbMs: 41000 });
+            const competition = toDailyCompetition(archived[0]);
+            const field = (playerId) => createHash('sha256').update(playerId, 'utf8').digest('base64url');
+            const stored = JSON.parse(decodeCompressedValue(
+                await redis.hGet(competition.pbHashKey, field(guestPlayerId)),
+            ));
+            const stub = JSON.stringify({
+                ...stored,
+                ghost: null,
+                ghostArchive: {
+                    v: 1,
+                    key: `daily-ghosts/v1/${archived[0].id}/${field(guestPlayerId)}-0123456789abcdef.gz`,
+                    sha256: 'b'.repeat(64),
+                },
+            });
+            await redis.hSet(competition.pbHashKey, { [field(guestPlayerId)]: stub });
+            await markFillReady();
+
+            const run = await runTransfer(guestPlayerId, redditPlayerId, choice);
+
+            expect(run.replies.at(-1)).toMatchObject({ status: 'completed' });
+            expect(await redis.hGet(competition.pbHashKey, field(guestPlayerId))).toBeFalsy();
+            const accountRaw = await redis.hGet(competition.pbHashKey, field(redditPlayerId));
+            if (choice === 'merge') {
+                expect(JSON.parse(decodeCompressedValue(accountRaw))).toEqual(JSON.parse(stub));
+            } else {
+                expect(accountRaw).toBeFalsy();
+            }
+        });
+    }
 
     // A transfer that stops at any saved step, and then runs again, must end
     // with the same stored data as a transfer that never stopped.
