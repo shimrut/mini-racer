@@ -205,7 +205,7 @@ describe('server analytics store', () => {
 
         const summary = await getServerAnalyticsSummary({
             subredditName: SUBREDDIT,
-            now: day('2026-08-31T23:00:00.000Z'),
+            now: day('2026-09-01T09:00:00.000Z'),
         });
         const cohort = summary.cohorts.find((entry) => entry.date === '2026-08-01');
 
@@ -286,7 +286,7 @@ describe('server analytics store', () => {
 
         const summary = await getServerAnalyticsSummary({
             subredditName: SUBREDDIT,
-            now: day('2026-08-15T23:00:00.000Z'),
+            now: day('2026-08-16T09:00:00.000Z'),
         });
 
         expect(summary.cohorts).toEqual([{
@@ -582,7 +582,7 @@ describe('server analytics store', () => {
             action: 'start',
             playerId: 'reddit:racefan',
             subredditName: SUBREDDIT,
-            now,
+            now: day('2026-08-14T12:00:00.000Z'),
         });
         await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
         mockRedis.hGetAll.mockClear();
@@ -592,8 +592,8 @@ describe('server analytics store', () => {
 
         const summary = await getServerAnalyticsSummary({ subredditName: SUBREDDIT, now });
 
-        expect(summary.today.players).toBe(1);
-        expect(summary.cohorts.map((cohort) => cohort.date)).toEqual(['2026-08-15']);
+        expect(dayFor(summary, '2026-08-14').players).toBe(1);
+        expect(summary.cohorts.map((cohort) => cohort.date)).toEqual(['2026-08-14']);
         expect(mockRedis.hGetAll.mock.calls.map((call) => call[0])).toEqual([summaryKey(SUBREDDIT)]);
         expect(mockRedis.hScan).not.toHaveBeenCalled();
         expect(mockRedis.hMGet.mock.calls.map((call) => call[0])).toEqual([summaryKey(SUBREDDIT)]);
@@ -649,7 +649,7 @@ describe('server analytics store', () => {
                     d1: { retained: 0, rate: 0 },
                     d2: { retained: 0, rate: 0 },
                     d3: { retained: 0, rate: 0 },
-                    d7: { retained: 0, rate: 0 },
+                    d7: { retained: null, rate: null },
                     d14: { retained: null, rate: null },
                     d30: { retained: null, rate: null },
                 },
@@ -662,7 +662,7 @@ describe('server analytics store', () => {
         }
     });
 
-    it('counts the first day of the new counting again from its day list the next day', async () => {
+    it('shows the first day of the new counting only after the fill counts it the next day', async () => {
         const {
             cohortStartsKey,
             dayPlayersKey,
@@ -697,9 +697,8 @@ describe('server analytics store', () => {
             now: day('2026-08-16T09:00:00.000Z'),
         });
 
-        expect(sameDay.cohorts.map(({ date, players }) => ({ date, players }))).toEqual([
-            { date: '2026-08-14', players: 1 },
-            { date: '2026-08-15', players: 1 },
+        expect(sameDay.cohorts.map(({ date, players, d1 }) => ({ date, players, d1 }))).toEqual([
+            { date: '2026-08-14', players: 1, d1: { retained: null, rate: null } },
         ]);
         expect(nextDay.cohorts.map(({ date, players, d1 }) => ({ date, players, d1 }))).toEqual([
             { date: '2026-08-14', players: 1, d1: { retained: 1, rate: 100 } },

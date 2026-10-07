@@ -892,8 +892,9 @@ function readCohorts(
 ): AnalyticsCohort[] {
     const filledThrough = summary[COHORTS_FILLED_THROUGH] ?? '';
     const liveFrom = summary[COHORTS_LIVE_FROM] ?? '';
-    // A day the fill has not reached yet holds only part of its count.
-    const counted = (date: string) => date <= filledThrough || date >= liveFrom;
+    // A day the fill has not reached yet holds only part of its count. The first day of
+    // the new counting can miss races from before the upload, so it also waits for the fill.
+    const counted = (date: string) => date <= filledThrough || date > liveFrom;
     const retention = (
         cohortDate: string,
         offset: number,
