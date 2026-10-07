@@ -6,15 +6,26 @@ import { readGuestPromotionTarget } from './car-unlock-store.js';
 export type GuestIdentityStatus = 'active' | 'guest_promotion_pending' | 'guest_identity_retired';
 
 export function guestProgressSelectionPendingKey(canonicalGuestPlayerId: string): string {
-    return `dailygp:guest-progress-selection-pending:v1:${createHash('sha256')
+    return guestProgressSelectionPendingKeyForHash(createHash('sha256')
         .update(canonicalGuestPlayerId, 'utf8')
-        .digest('base64url')}`;
+        .digest('base64url'));
 }
 
 export function guestProgressSelectionAccountPendingKey(redditPlayerId: string): string {
-    return `dailygp:guest-progress-selection-account-pending:v1:${createHash('sha256')
+    return guestProgressSelectionAccountPendingKeyForHash(createHash('sha256')
         .update(redditPlayerId, 'utf8')
-        .digest('base64url')}`;
+        .digest('base64url'));
+}
+
+// The same two marks, from the player's coded name. The coded name is also the
+// field of the player's personal best (playerFieldHash), so a job that holds
+// only that field can still find both marks.
+export function guestProgressSelectionPendingKeyForHash(playerHash: string): string {
+    return `dailygp:guest-progress-selection-pending:v1:${playerHash}`;
+}
+
+export function guestProgressSelectionAccountPendingKeyForHash(playerHash: string): string {
+    return `dailygp:guest-progress-selection-account-pending:v1:${playerHash}`;
 }
 
 export function guestProgressTransferReceiptKey(transferId: string): string {
