@@ -383,6 +383,81 @@ describe("ghost compaction", () => {
     expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ checked: 10, packed: 10 });
   });
 
+  // A step the earlier code left running on its last page: its next Start is
+  // a new run, while a request may still work on the old one.
+  async function storeLegacyRunningStep(day, rows) {
+    await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify({
+      running: "expired",
+      writePacked: true,
+      steps: {
+        expired: {
+          boards: [{ key: day, total: rows }], index: 0, cursor: rows - 1, total: rows, checked: rows - 1,
+          packed: 0, savedBytes: 0, doneKeys: [], startedAt: NOW.toISOString(), finishedAt: null,
+        },
+      },
+    }));
+  }
+
+  it("lets no request save into a new run of its step started while it worked", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    for (let index = 0; index < 201; index += 1) await seed(day, `guest:${index}`, runText(index));
+    await storeLegacyRunningStep(day, 201);
+    const scan = redis.hScan.bind(redis);
+    let restarted = false;
+    vi.spyOn(redis, "hScan").mockImplementation(async (key, cursor, pattern, count) => {
+      const page = await scan(key, cursor, pattern, count);
+      if (key === day && !restarted) {
+        restarted = true;
+        // While the request reads its last page, a moderator pauses and starts again.
+        await compaction.setGhostCompactionStep("pause", "expired", NOW);
+        await compaction.setGhostCompactionStep("start", "expired", NOW);
+      }
+      return page;
+    });
+
+    await compaction.runGhostCompaction({ now: () => NOW.getTime() });
+
+    let step = (await compaction.readGhostCompactionState()).steps.expired;
+    expect(step).toMatchObject({ runId: 1, index: 0, cursor: 0, checked: 0, packed: 0, doneKeys: [] });
+    expect((await stored(day, "guest:200")).ghostPacked).toBeUndefined();
+
+    await runUntilIdle();
+    step = (await compaction.readGhostCompactionState()).steps.expired;
+    expect(step).toMatchObject({ runId: 1, checked: 201, packed: 201, doneKeys: [day] });
+    for (const index of [0, 199, 200]) expect((await stored(day, `guest:${index}`)).ghostPacked).toBeTruthy();
+  });
+
+  it("does not give a new run the error of a request that worked on the old one", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    for (let index = 0; index < 3; index += 1) await seed(day, `guest:${index}`, runText(index));
+    await storeLegacyRunningStep(day, 3);
+    vi.spyOn(redis, "hScan").mockImplementationOnce(async () => {
+      await compaction.setGhostCompactionStep("pause", "expired", NOW);
+      await compaction.setGhostCompactionStep("start", "expired", NOW);
+      throw new Error("Redis read failed");
+    });
+
+    await compaction.runGhostCompaction({ now: () => NOW.getTime() });
+
+    const state = await compaction.readGhostCompactionState();
+    expect(state).toMatchObject({ running: "expired", lastError: null });
+    expect(state.steps.expired.runId).toBe(1);
+  });
+
+  it("keeps the run number on Resume, and raises it for each new run", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+
+    expect((await compaction.setGhostCompactionStep("start", "expired", NOW)).steps.expired.runId).toBe(1);
+    await compaction.setGhostCompactionStep("pause", "expired", NOW);
+    expect((await compaction.setGhostCompactionStep("start", "expired", NOW)).steps.expired.runId).toBe(1);
+    await runUntilIdle();
+    expect((await compaction.setGhostCompactionStep("start", "expired", NOW)).steps.expired.runId).toBe(2);
+  });
+
   it("runs again over the days that expired since, and only those", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const first = await storeDay("2026-09-20");

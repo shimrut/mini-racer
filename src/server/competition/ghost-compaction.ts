@@ -45,6 +45,9 @@ type Board = {
 };
 
 export type GhostCompactionStep = {
+    // Raised for every new run of the step, and kept on Resume. A request
+    // saves only into the run it started on.
+    runId: number;
     boards: Board[];
     index: number;
     cursor: number;
@@ -95,6 +98,7 @@ export class GhostCompactionRefusal extends Error {
 
 function emptyStep(): GhostCompactionStep {
     return {
+        runId: 0,
         boards: [],
         index: 0,
         cursor: 0,
@@ -267,6 +271,7 @@ export async function setGhostCompactionStep(
             ? previous
             : {
                 ...previous,
+                runId: previous.runId + 1,
                 boards,
                 index: 0,
                 cursor: 0,
@@ -308,18 +313,25 @@ function markerKeys(field: string): string[] {
 type RunContext = {
     lock: RedisLock;
     state: GhostCompactionState;
+    // The run this request works on, kept apart from the state it reads.
+    runId: number;
     deadlineMs: number;
     now: () => number;
 };
+
+// True while the state still runs this step, in the run the request started on.
+function isOwnRun(state: GhostCompactionState, name: GhostCompactionStepName, runId: number): boolean {
+    return state.running === name && state.steps[name].runId === runId;
+}
 
 class StepStoppedError extends Error {}
 
 type CommitResult = 'saved' | 'conflict' | 'stopped';
 
 // Saves the state with the given writes in one transaction that holds the
-// lock. After WATCH it reads the state again, so a pause saved meanwhile is
-// never written over: when the step is no longer running, nothing is saved.
-// `check` then decides the writes.
+// lock. After WATCH it reads the state again, so a pause or a new run saved
+// meanwhile is never written over: when the request's run is no longer
+// running, nothing is saved. `check` then decides the writes.
 async function commit(
     ctx: RunContext,
     name: GhostCompactionStepName,
@@ -340,7 +352,7 @@ async function commit(
             watchedKeys: [GHOST_COMPACTION_STATE_KEY, ...watchedKeys],
             check: async () => {
                 ctx.state = parseState(await redis.get(GHOST_COMPACTION_STATE_KEY));
-                if (ctx.state.running !== name) throw new StepStoppedError();
+                if (!isOwnRun(ctx.state, name, ctx.runId)) throw new StepStoppedError();
                 await check?.();
             },
         });
@@ -495,21 +507,30 @@ export async function runGhostCompaction({ now = () => Date.now() }: { now?: () 
     if (!state.running) return { status: 'idle' };
     const lock = await acquireRedisLock(LOCK_KEY, LOCK_TTL_MS, redis);
     if (!lock) return { status: 'busy' };
-    const ctx: RunContext = { lock, state, deadlineMs: now() + WORK_MS, now };
+    const ctx: RunContext = { lock, state, runId: 0, deadlineMs: now() + WORK_MS, now };
+    let name: GhostCompactionStepName | null = null;
     try {
         // The state is read again under the lock: a pause may have come in.
         ctx.state = await readGhostCompactionState();
-        const name = ctx.state.running;
+        name = ctx.state.running;
         if (!name) return { status: 'idle' };
-        while (now() <= ctx.deadlineMs && ctx.state.running === name) {
+        ctx.runId = ctx.state.steps[name].runId;
+        while (now() <= ctx.deadlineMs && isOwnRun(ctx.state, name, ctx.runId)) {
             if (!await workPage(ctx, name)) break;
         }
         return { status: 'worked' };
     } catch (error) {
         console.error('Ghost compaction failed:', error);
         const lastError = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
-        // Only the error is added: a Pause saved meanwhile stays.
-        await updateState(async (current) => ({ ...current, lastError })).catch(() => {});
+        const failedStep = name;
+        // Only the error is added, and only while the step is still in the run
+        // that failed, running or paused: a Pause saved meanwhile stays, and a
+        // new run does not get an old run's error.
+        if (failedStep) {
+            await updateState(async (current) => (current.steps[failedStep].runId === ctx.runId
+                ? { ...current, lastError }
+                : current)).catch(() => {});
+        }
         return { status: 'worked' };
     } finally {
         await releaseRedisLock(lock, redis).catch((error) => {
