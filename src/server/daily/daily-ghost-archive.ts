@@ -694,13 +694,17 @@ async function commitSlice(
     const committed = await commitOwned(ctx, async (transaction) => {
         const day = ctx.days.get(challengeId)!;
         const converted = Object.keys(writes);
-        const remove = [...outcome.drop, ...converted, ...changed];
+        const remove = [...outcome.drop, ...converted];
         const heldReasons: Record<string, string> = {};
         for (const { name, code } of outcome.failed) heldReasons[name] = `failed:${code}`;
         const held = [...signin, ...(outcome.marked ?? [])];
         if (source === 'page') {
-            remove.push(...outcome.failed.map((item) => item.name), ...held);
+            // A row that changed after it was copied (packed by the ghost
+            // compaction, or written by a sign-in) is tried again from the held
+            // list, so a finished day never keeps a full ghost behind.
+            remove.push(...outcome.failed.map((item) => item.name), ...held, ...changed);
             for (const name of held) heldReasons[name] = 'signin';
+            for (const name of changed) heldReasons[name] = 'changed';
         }
         if (converted.length) await transaction.hSet(pbKey, writes);
         if (remove.length) await transaction.hDel(sourceKey, remove);

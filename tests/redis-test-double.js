@@ -163,6 +163,11 @@ export class RedisTestDouble {
     return fields.map((field) => hash.get(field) ?? null);
   }
 
+  async hLen(key) {
+    this._isExpired(key);
+    return this.hashes.get(key)?.size ?? 0;
+  }
+
   async hKeys(key) {
     this._isExpired(key);
     return [...(this.hashes.get(key)?.keys() || [])];

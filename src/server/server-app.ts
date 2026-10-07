@@ -5,6 +5,12 @@ import {
     runDailyGhostArchive,
     saveDailyGhostArchiveSetting,
 } from './daily/daily-ghost-archive.js';
+import {
+    isGhostCompactionStepName,
+    readGhostCompactionState,
+    runGhostCompaction,
+    setGhostCompactionStep,
+} from './competition/ghost-compaction.js';
 import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
 import { isDailyGpChallengePlayable } from './daily/daily-gp-model.js';
 import {
@@ -239,6 +245,9 @@ function registerProductionRoutes(app: express.Application): void {
         getStorageSummary: () => getModeratorStorageSummary(),
         readDailyGhostArchiveStatus: () => readDailyGhostArchiveStatus(),
         saveDailyGhostArchiveSetting: (choice, changedBy) => saveDailyGhostArchiveSetting(choice, changedBy),
+        readGhostCompactionState: () => readGhostCompactionState(),
+        setGhostCompactionStep: (action, step) => setGhostCompactionStep(action, step),
+        isGhostCompactionStepName,
     });
     registerPlayerRoutes(app, {
         getRequestUsername,
@@ -338,6 +347,7 @@ function registerProductionRoutes(app: express.Application): void {
             return result;
         },
         runDailyGhostArchive: () => runDailyGhostArchive(),
+        runGhostCompaction: () => runGhostCompaction(),
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

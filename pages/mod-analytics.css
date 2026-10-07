@@ -576,6 +576,27 @@ h1 {
     background: var(--accent);
 }
 
+.analytics-step {
+    padding: 0.7rem 0 0.2rem;
+    border-top: 1px solid var(--line);
+}
+
+.analytics-step:first-of-type {
+    border-top: 0;
+}
+
+.analytics-step__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.analytics-step__title {
+    margin: 0;
+    font: 600 0.86rem var(--display);
+}
+
 .analytics-tabs {
     width: max-content;
     max-width: 100%;

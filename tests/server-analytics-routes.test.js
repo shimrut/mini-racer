@@ -419,6 +419,33 @@ describe('issued challenge analytics routes', () => {
         expect(denied.saveDailyGhostArchiveSetting).not.toHaveBeenCalled();
     });
 
+    it('reads and changes the ghost compaction steps for moderators', async () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const state = { running: null, writePacked: false, steps: {} };
+        const services = dependencies({
+            readGhostCompactionState: vi.fn(async () => state),
+            setGhostCompactionStep: vi.fn(async (action, step) => ({ ...state, running: action === 'start' ? step : null })),
+            isGhostCompactionStepName: (value) => value === 'expired' || value === 'campaign',
+        });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const post = (body) => fetch(`${baseUrl}/api/analytics/ghost-compaction`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        expect(await (await fetch(`${baseUrl}/api/analytics/ghost-compaction`)).json()).toEqual(state);
+        const started = await post({ action: 'start', step: 'expired' });
+        expect(started.status).toBe(200);
+        expect((await started.json()).running).toBe('expired');
+        expect(services.setGhostCompactionStep).toHaveBeenCalledWith('start', 'expired');
+        expect((await post({ action: 'start', step: 'live' })).status).toBe(400);
+        expect((await post({ action: 'delete', step: 'expired' })).status).toBe(400);
+
+        services.setGhostCompactionStep.mockRejectedValueOnce(new Error('Finish the step before this one first.'));
+        expect((await post({ action: 'start', step: 'campaign' })).status).toBe(409);
+    });
+
     it('serves the Storage tab to moderators only', async () => {
         const payload = { storage: { totalBytes: 10, groups: [] }, racedListFill: null, dailyGhostArchive: null };
         const services = dependencies({ getStorageSummary: vi.fn(async () => payload) });

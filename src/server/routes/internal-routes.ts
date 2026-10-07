@@ -1,6 +1,7 @@
 import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
 import type { DailyGhostArchiveReport } from '../daily/daily-ghost-archive.js';
+import type { GhostCompactionReport } from '../competition/ghost-compaction.js';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../podium/daily-podium-model.js';
 import type { LauncherPostKind } from '../posts/launcher-post-store.js';
@@ -54,6 +55,7 @@ export type InternalRouteDependencies = {
     ensureCommunityCreatorPostForSubreddit(subredditName: string): Promise<PostResult>;
     runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
     runDailyGhostArchive(): Promise<DailyGhostArchiveReport>;
+    runGhostCompaction(): Promise<GhostCompactionReport>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
         saved: number;
@@ -421,6 +423,18 @@ export function registerInternalRoutes(
         } catch (error) {
             console.error('Failed scheduled Daily ghost archive run:', error);
             res.status(500).json({ ok: false, error: 'Scheduled Daily ghost archive run failed' });
+        }
+    });
+
+    // Packs stored ghosts while a moderator has a compaction step running on
+    // the Storage tab. Otherwise a run only reads the state.
+    app.post('/internal/scheduler/ghost-compaction', async (_req, res) => {
+        try {
+            const result = await dependencies.runGhostCompaction();
+            res.status(200).json({ ok: true, ...result });
+        } catch (error) {
+            console.error('Failed scheduled ghost compaction run:', error);
+            res.status(500).json({ ok: false, error: 'Scheduled ghost compaction run failed' });
         }
     });
 

@@ -11,8 +11,8 @@ import {
     releaseRedisLock,
     type RedisLock,
 } from '../redis/redis-lock.js';
-import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
 import { storedRunGhost } from './pb-ghost-pack.js';
+import { encodeStoredPbRecord, shouldWritePackedGhosts } from './pb-ghost-write.js';
 import { normalizeLapCompletionTimesSec } from '../../../game/shared/lap-completion-times.js';
 import type {
     ObsoleteReason,
@@ -397,13 +397,14 @@ export async function upsertPlayerTrackPersonalBest({
         }
 
         const record = winner.record;
+        const writePacked = await shouldWritePackedGhosts();
         const transaction = await beginOwnedRedisLockTransaction(lock, redis);
         if (!transaction) {
             throw new Error('Personal best lock ownership was lost.');
         }
         const collectionKey = competition.pbHashKey;
         await transaction.hSet(collectionKey, {
-            [playerFieldHash(playerId)]: encodeRedisCompressedValue(JSON.stringify(record)),
+            [playerFieldHash(playerId)]: encodeStoredPbRecord(record, writePacked),
         });
         if (ttlSeconds != null) {
             await transaction.expire(collectionKey, ttlSeconds);

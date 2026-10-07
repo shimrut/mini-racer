@@ -17,6 +17,9 @@ export type AnalyticsRouteDependencies = {
     getStorageSummary(): Promise<unknown>;
     readDailyGhostArchiveStatus(): Promise<unknown>;
     saveDailyGhostArchiveSetting(choice: DailyGhostArchiveChoice, changedBy: string): Promise<unknown>;
+    readGhostCompactionState(): Promise<unknown>;
+    setGhostCompactionStep(action: 'start' | 'pause', step: 'expired' | 'campaign'): Promise<unknown>;
+    isGhostCompactionStepName(value: unknown): value is 'expired' | 'campaign';
 };
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
@@ -183,6 +186,50 @@ export function registerAnalyticsRoutes(
             const message = error instanceof Error && error.message ? error.message : 'Ghost move choice failed';
             const status = message.includes('Moderator access required') ? 403 : 500;
             if (status !== 403) console.error('Failed to save the Daily ghost move choice:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    // Ghost compaction: its steps and progress, and Start or Pause for a step.
+    app.get('/api/analytics/ghost-compaction', async (_req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            res.status(200).json(await dependencies.readGhostCompactionState());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Ghost compaction status failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to load the ghost compaction status:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    app.post('/api/analytics/ghost-compaction', async (req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            const username = await dependencies.assertModeratorForSubreddit(subredditName);
+            const { action, step } = req.body ?? {};
+            if ((action !== 'start' && action !== 'pause') || !dependencies.isGhostCompactionStepName(step)) {
+                res.status(400).json({ error: 'Unknown ghost compaction action.' });
+                return;
+            }
+            const state = await dependencies.setGhostCompactionStep(action, step);
+            console.log(`Ghost compaction ${action} ${step} by u/${username} in r/${subredditName}.`);
+            res.status(200).json(state);
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Ghost compaction action failed';
+            const status = message.includes('Moderator access required')
+                ? 403
+                : message.includes('Finish the step before this one') ? 409 : 500;
+            if (status === 500) console.error('Failed to change the ghost compaction step:', error);
             res.status(status).json({ error: message });
         }
     });

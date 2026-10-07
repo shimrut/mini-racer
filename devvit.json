@@ -189,6 +189,10 @@
       "mini-racer-daily-ghost-archive": {
         "endpoint": "/internal/scheduler/daily-ghost-archive",
         "cron": "* * * * *"
+      },
+      "mini-racer-ghost-compaction": {
+        "endpoint": "/internal/scheduler/ghost-compaction",
+        "cron": "* * * * *"
       }
     }
   },

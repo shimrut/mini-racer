@@ -3,10 +3,12 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
     bootAnalytics,
+    createGhostCompactionController,
     createGhostMoveController,
     loadAnalyticsSummary,
     renderAnalyticsMessage,
     renderAnalyticsSummary,
+    renderGhostCompaction,
     renderGhostMove,
     renderStorageSummary,
 } from '../pages/mod-analytics.js';
@@ -224,6 +226,69 @@ describe('moderator analytics page', () => {
         expect(onChoose).toHaveBeenCalledWith('restore');
     });
 
+    it('shows each compaction step with its progress and the one action it allows', () => {
+        const step = (overrides = {}) => ({
+            total: 0, checked: 0, packed: 0, savedBytes: 0, startedAt: null, finishedAt: null, ...overrides,
+        });
+        const buttons = (card) => [...card.querySelectorAll('button')].map((node) => [node.textContent, node.disabled]);
+        const render = (state) => {
+            const { window } = analyticsDom();
+            const onAction = vi.fn();
+            renderGhostCompaction(window.document, { state, onAction });
+            return { card: window.document.getElementById('analytics-ghost-compaction'), onAction };
+        };
+
+        const fresh = render({ running: null, writePacked: false, steps: { expired: step(), campaign: step() } });
+        expect(buttons(fresh.card)).toEqual([['Start', false], ['Start', true]]);
+        expect(fresh.card.textContent).toContain('New best times are saved compact from the first Start.');
+
+        const running = render({
+            running: 'expired',
+            writePacked: true,
+            steps: {
+                expired: step({ total: 400, checked: 100, packed: 90, savedBytes: 120 * 1024, startedAt: '2026-10-07T10:00:00Z' }),
+                campaign: step(),
+            },
+        });
+        expect(buttons(running.card)).toEqual([['Pause', false], ['Start', true]]);
+        expect(running.card.textContent).toContain('Running · 100 of 400 ghosts checked · 90 compacted · 120 KB saved');
+        expect(running.card.querySelector('.analytics-progress__fill').style.width).toBe('25%');
+        running.card.querySelector('button').click();
+        expect(running.onAction).toHaveBeenCalledWith('pause', 'expired');
+
+        const done = render({
+            running: null,
+            writePacked: true,
+            steps: {
+                expired: step({ total: 400, checked: 400, startedAt: '2026-10-07T10:00:00Z', finishedAt: '2026-10-07T11:00:00Z' }),
+                campaign: step({ total: 900, checked: 50, startedAt: '2026-10-07T11:05:00Z' }),
+            },
+        });
+        expect(buttons(done.card)).toEqual([['Run again', false], ['Resume', false]]);
+        expect(done.card.textContent).toContain('Done 2026-10-07');
+        expect(done.card.textContent).toContain('Paused · 50 of 900 ghosts checked');
+    });
+
+    it('starts a compaction step and shows the refusal for a step out of order', async () => {
+        const { window } = analyticsDom();
+        const state = { running: null, writePacked: false, steps: { expired: {}, campaign: {} } };
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce({ status: 200, ok: true, json: async () => ({ ...state, running: 'expired' }) })
+            .mockResolvedValueOnce({ status: 409, ok: false, json: async () => ({}) });
+        const controller = createGhostCompactionController(window.document, fetchImpl);
+
+        await controller.act('start', 'expired');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/ghost-compaction', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ action: 'start', step: 'expired' }),
+        }));
+        const card = window.document.getElementById('analytics-ghost-compaction');
+        expect([...card.querySelectorAll('button')][0].textContent).toBe('Pause');
+
+        await controller.act('start', 'campaign');
+        expect(card.textContent).toContain('Finish the step before this one first.');
+    });
+
     it('saves a choice and reads the move again only while the Storage tab is open', async () => {
         vi.useFakeTimers();
         try {
@@ -391,6 +456,8 @@ describe('moderator analytics page', () => {
                 ? { storage: { totalBytes: 2048, groups: [] }, racedListFill: null }
                 : url.startsWith('/api/analytics/ghost-archive')
                     ? { choice: 'off', days: {}, eligibleDays: 0, blob: {} }
+                    : url.startsWith('/api/analytics/ghost-compaction')
+                    ? { running: null, writePacked: false, steps: { expired: {}, campaign: {} } }
                     : url.startsWith('/api/analytics/challenges')
                     ? { date: '2026-08-15', items: [], nextOffset: null }
                     : summaryFixture()),
@@ -409,9 +476,10 @@ describe('moderator analytics page', () => {
         expect(panel('storage').hidden).toBe(false);
         expect(panel('players').hidden).toBe(true);
         tab('challenges').click();
-        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(4));
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(5));
         expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
             '/api/analytics/summary',
+            '/api/analytics/ghost-compaction',
             '/api/analytics/ghost-archive',
             '/api/analytics/storage',
             '/api/analytics/challenges?offset=0&period=today',

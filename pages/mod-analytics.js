@@ -3,6 +3,7 @@ const SUMMARY_URL = '/api/analytics/summary';
 const CHALLENGES_URL = '/api/analytics/challenges';
 const STORAGE_URL = '/api/analytics/storage';
 const GHOST_MOVE_URL = '/api/analytics/ghost-archive';
+const GHOST_COMPACTION_URL = '/api/analytics/ghost-compaction';
 const GHOST_MOVE_POLL_MS = 5_000;
 const TABS = ['players', 'challenges', 'storage'];
 const TAB_MEMORY_KEY = 'MiniRacerAnalyticsTab';
@@ -489,6 +490,144 @@ function racedListFillText(fill) {
     return null;
 }
 
+const COMPACTION_STEPS = [
+    ['expired', 'Expired Daily days'],
+    ['campaign', 'Campaign stages, least played first'],
+];
+
+function progressBar(doc, label, done, total) {
+    const bar = element(doc, 'div', 'analytics-progress');
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', label);
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', String(total));
+    bar.setAttribute('aria-valuenow', String(Math.min(done, total)));
+    const fill = element(doc, 'div', 'analytics-progress__fill');
+    fill.style.width = `${total > 0 ? percent(done, total) : 0}%`;
+    bar.append(fill);
+    return bar;
+}
+
+function compactionButton(state, name) {
+    const step = state?.steps?.[name] ?? {};
+    if (state?.running === name) return { label: 'Pause', action: 'pause', disabled: false };
+    const label = step.finishedAt ? 'Run again' : step.startedAt ? 'Resume' : 'Start';
+    const order = COMPACTION_STEPS.map(([key]) => key);
+    const earlierOpen = order.slice(0, order.indexOf(name)).some((key) => !state?.steps?.[key]?.finishedAt);
+    return { label, action: 'start', disabled: Boolean(state?.running) || earlierOpen };
+}
+
+// Rewrites stored ghosts in the compact form, a step at a time. Progress
+// counts ghosts checked out of the ghosts in the step when it started.
+export function renderGhostCompaction(root, { state = null, busy = false, error = null, onAction } = {}) {
+    const section = root.getElementById('analytics-ghost-compaction');
+    if (!section) return;
+    const nodes = [cardHeading(root, 'Compact ghosts')];
+    if (state) {
+        nodes.push(element(root, 'p', 'analytics-note', state.writePacked
+            ? 'New best times are saved compact.'
+            : 'New best times are saved compact from the first Start.'));
+        for (const [name, title] of COMPACTION_STEPS) {
+            const step = state.steps?.[name] ?? {};
+            const row = element(root, 'div', 'analytics-step');
+            const head = element(root, 'div', 'analytics-step__head');
+            head.append(element(root, 'p', 'analytics-step__title', title));
+            const control = compactionButton(state, name);
+            const button = element(root, 'button', 'analytics-button', control.label);
+            button.type = 'button';
+            button.disabled = busy || control.disabled;
+            button.addEventListener('click', () => { void onAction?.(control.action, name); });
+            head.append(button);
+            const total = toCount(step.total);
+            const checked = toCount(step.checked);
+            const stage = state.running === name ? 'Running'
+                : step.finishedAt ? `Done ${String(step.finishedAt).slice(0, 10)}`
+                    : step.startedAt ? 'Paused' : 'Not started';
+            row.append(
+                head,
+                progressBar(root, `${title}: ghosts checked`, checked, total),
+                element(root, 'p', 'analytics-note',
+                    `${stage} · ${formatCount(checked)} of ${formatCount(total)} ghosts checked`
+                    + ` · ${formatCount(step.packed)} compacted · ${formatBytes(step.savedBytes)} saved`),
+            );
+            nodes.push(row);
+        }
+        if (state.lastError) {
+            const failed = element(root, 'p', 'analytics-status', `Last error: ${String(state.lastError).slice(0, 200)}`);
+            failed.dataset.state = 'error';
+            nodes.push(failed);
+        }
+    }
+    if (error) {
+        const failed = element(root, 'p', 'analytics-status', error);
+        failed.dataset.state = 'error';
+        nodes.push(failed);
+    }
+    section.replaceChildren(...nodes);
+    section.hidden = false;
+    section.setAttribute('aria-busy', String(busy));
+}
+
+async function readCompactionResponse(response) {
+    if (response.status === 403) return { error: 'Moderator access required.' };
+    if (response.status === 409) return { error: 'Finish the step before this one first.' };
+    if (!response.ok) return { error: 'Could not load ghost compaction.' };
+    return { state: await response.json() };
+}
+
+export function createGhostCompactionController(root, fetchImpl = fetch, { pollMs = GHOST_MOVE_POLL_MS } = {}) {
+    let state = null;
+    let busy = false;
+    let error = null;
+    let timer = null;
+    const render = () => renderGhostCompaction(root, { state, busy, error, onAction: act });
+    async function refresh() {
+        try {
+            const result = await readCompactionResponse(await fetchImpl(GHOST_COMPACTION_URL));
+            if (result.error) error = result.error;
+            else {
+                state = result.state;
+                error = null;
+            }
+        } catch (_error) {
+            error = 'Could not load ghost compaction.';
+        }
+        render();
+    }
+    async function act(action, step) {
+        if (busy) return;
+        busy = true;
+        render();
+        try {
+            const result = await readCompactionResponse(await fetchImpl(GHOST_COMPACTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, step }),
+            }));
+            if (result.error) error = result.error;
+            else {
+                state = result.state;
+                error = null;
+            }
+        } catch (_error) {
+            error = 'Could not change the step.';
+        } finally {
+            busy = false;
+            render();
+        }
+    }
+    function setActive(active) {
+        if (active && timer === null) {
+            void refresh();
+            timer = setInterval(() => { void refresh(); }, pollMs);
+        } else if (!active && timer !== null) {
+            clearInterval(timer);
+            timer = null;
+        }
+    }
+    return { refresh, act, setActive };
+}
+
 const DAILY_GHOST_CHOICES = [
     ['off', 'Off'],
     ['trial', 'Move one day'],
@@ -518,16 +657,7 @@ export function renderGhostMove(root, { status = null, busy = false, error = nul
     if (status) {
         const eligible = toCount(status.eligibleDays);
         const done = toCount(status.days?.done);
-        const share = eligible > 0 ? percent(done, eligible) : 0;
-        const bar = element(root, 'div', 'analytics-progress');
-        bar.setAttribute('role', 'progressbar');
-        bar.setAttribute('aria-label', 'Finished Daily days moved');
-        bar.setAttribute('aria-valuemin', '0');
-        bar.setAttribute('aria-valuemax', String(eligible));
-        bar.setAttribute('aria-valuenow', String(done));
-        const fill = element(root, 'div', 'analytics-progress__fill');
-        fill.style.width = `${share}%`;
-        bar.append(fill);
+        const bar = progressBar(root, 'Finished Daily days moved', done, eligible);
         const blob = status.blob ?? {};
         const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
         const lines = [
@@ -978,7 +1108,13 @@ export function renderAnalyticsSummary(root, summary) {
 
 // The Players sections, and the other tabs' cards, which an access error
 // must clear too.
-const LOCKED_SECTION_IDS = [...SECTION_IDS, 'analytics-challenges', 'analytics-storage', 'analytics-ghost-move'];
+const LOCKED_SECTION_IDS = [
+    ...SECTION_IDS,
+    'analytics-challenges',
+    'analytics-storage',
+    'analytics-ghost-compaction',
+    'analytics-ghost-move',
+];
 
 export function renderAnalyticsMessage(root, message, state = 'error') {
     const status = root.getElementById('analytics-status');
@@ -1091,9 +1227,11 @@ export async function bootAnalytics(root = document, fetchImpl = fetch) {
     const challenges = createChallengeAnalyticsController(root, fetchImpl);
     const storage = createStorageTabController(root, fetchImpl);
     const ghostMove = createGhostMoveController(root, fetchImpl);
+    const compaction = createGhostCompactionController(root, fetchImpl);
     const opened = new Set();
     const tabs = setupAnalyticsTabs(root, {
         onOpen: (name) => {
+            compaction.setActive(name === 'storage');
             ghostMove.setActive(name === 'storage');
             if (opened.has(name)) return;
             opened.add(name);
