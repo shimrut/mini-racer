@@ -487,11 +487,18 @@ function racedListFillText(fill) {
 
 // The move of old Daily ghosts to blob storage. Blob figures come from the
 // last sweep of each day; Redis figures count payload, not Redis memory.
+const DAILY_GHOST_CHOICE_LABELS = {
+    off: 'Off',
+    trial: 'Move one day (trial)',
+    all: 'Move all old days',
+    restore: 'Restore all to Redis',
+};
+
 function dailyGhostArchiveText(status) {
     if (!status || typeof status !== 'object') return null;
     const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
-    if (status.mode === 'off' && touched === 0) return null;
-    const mode = status.mode === 'move' ? '' : ` (${status.mode})`;
+    if (status.choice === 'off' && touched === 0) return null;
+    const mode = ` (${DAILY_GHOST_CHOICE_LABELS[status.choice] ?? 'Off'})`;
     const parts = [
         `moved ${formatCount(status.moved)} (Redis payload removed ${formatBytes(status.freed)})`,
     ];

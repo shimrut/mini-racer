@@ -43,11 +43,32 @@ import {
 
 export type DailyGhostArchiveMode = 'off' | 'move' | 'restore';
 
-// Changed by deploy. 'off' does nothing, and pauses a sweep. 'restore' writes
-// every moved ghost back to Redis from its blob copy and deletes nothing.
-export const DAILY_GHOST_ARCHIVE_MODE: DailyGhostArchiveMode = 'off';
-// How many days the job may start. 1 for the first live day, then null.
-export const DAILY_GHOST_ARCHIVE_DAY_LIMIT: number | null = 1;
+// What a moderator picks in the subreddit menu. Each install keeps its own
+// choice, because each install has its own Redis and its own blob storage.
+// 'off' does nothing, and pauses a sweep. 'trial' moves one day only.
+// 'restore' writes every moved ghost back to Redis and deletes nothing.
+export type DailyGhostArchiveChoice = 'off' | 'trial' | 'all' | 'restore';
+
+export const DAILY_GHOST_ARCHIVE_CHOICES: readonly { value: DailyGhostArchiveChoice; label: string }[] = [
+    { value: 'off', label: 'Off' },
+    { value: 'trial', label: 'Move one day (trial)' },
+    { value: 'all', label: 'Move all old days' },
+    { value: 'restore', label: 'Restore all to Redis' },
+];
+
+export function isDailyGhostArchiveChoice(value: unknown): value is DailyGhostArchiveChoice {
+    return DAILY_GHOST_ARCHIVE_CHOICES.some((choice) => choice.value === value);
+}
+
+export function dailyGhostArchiveRunFor(choice: DailyGhostArchiveChoice): {
+    mode: DailyGhostArchiveMode;
+    dayLimit: number | null;
+} {
+    if (choice === 'trial') return { mode: 'move', dayLimit: 1 };
+    if (choice === 'all') return { mode: 'move', dayLimit: null };
+    return { mode: choice, dayLimit: null };
+}
+
 // Raise after a rollback to an older app version: every done day is checked
 // again, because an older version may change a day without raising its
 // revision.
@@ -57,6 +78,32 @@ const KEY_PREFIX = 'dailygp:ghost-archive:v1';
 export const DAILY_GHOST_ARCHIVE_LOCK_KEY = `${KEY_PREFIX}:lock`;
 export const DAILY_GHOST_ARCHIVE_DAYS_KEY = `${KEY_PREFIX}:days`;
 export const DAILY_GHOST_ARCHIVE_TOTALS_KEY = `${KEY_PREFIX}:totals`;
+export const DAILY_GHOST_ARCHIVE_SETTING_KEY = `${KEY_PREFIX}:setting`;
+
+export type DailyGhostArchiveSetting = {
+    choice: DailyGhostArchiveChoice;
+    changedAt: string | null;
+    changedBy: string | null;
+};
+
+export async function readDailyGhostArchiveSetting(): Promise<DailyGhostArchiveSetting> {
+    const value = parseJsonObject(await redis.get(DAILY_GHOST_ARCHIVE_SETTING_KEY));
+    return {
+        choice: isDailyGhostArchiveChoice(value?.choice) ? value.choice : 'off',
+        changedAt: typeof value?.changedAt === 'string' ? value.changedAt : null,
+        changedBy: typeof value?.changedBy === 'string' ? value.changedBy : null,
+    };
+}
+
+export async function saveDailyGhostArchiveSetting(
+    choice: DailyGhostArchiveChoice,
+    changedBy: string,
+    now = new Date(),
+): Promise<DailyGhostArchiveSetting> {
+    const setting = { choice, changedAt: now.toISOString(), changedBy };
+    await redis.set(DAILY_GHOST_ARCHIVE_SETTING_KEY, JSON.stringify(setting));
+    return setting;
+}
 
 export function dailyGhostArchivePageKey(challengeId: string): string {
     return `${KEY_PREFIX}:page:${challengeId}`;
@@ -1108,9 +1155,10 @@ async function runUpkeep(ctx: RunContext): Promise<void> {
     }
 }
 
+// With no mode given, a run follows the moderator's choice saved in Redis.
 export async function runDailyGhostArchive({
-    mode = DAILY_GHOST_ARCHIVE_MODE,
-    dayLimit = DAILY_GHOST_ARCHIVE_DAY_LIMIT,
+    mode: givenMode,
+    dayLimit: givenDayLimit,
     epoch = DAILY_GHOST_ARCHIVE_EPOCH,
     store,
     clock = SYSTEM_BLOB_CLOCK,
@@ -1126,6 +1174,11 @@ export async function runDailyGhostArchive({
     const report: DailyGhostArchiveReport = {
         status: 'off', moved: 0, restored: 0, held: 0, failed: 0, passesEnded: 0,
     };
+    const chosen = givenMode === undefined
+        ? dailyGhostArchiveRunFor((await readDailyGhostArchiveSetting()).choice)
+        : null;
+    const mode = givenMode ?? chosen!.mode;
+    const dayLimit = givenDayLimit !== undefined ? givenDayLimit : (chosen?.dayLimit ?? null);
     if (mode === 'off') return report;
     const lock = await acquireRedisLock(DAILY_GHOST_ARCHIVE_LOCK_KEY, LOCK_TTL_MS, redis);
     if (!lock) return { ...report, status: 'busy' };
@@ -1212,6 +1265,7 @@ export async function runDailyGhostArchive({
 // ---- Status for the moderator page and the storage view. ----
 
 export type DailyGhostArchiveStatus = {
+    choice: DailyGhostArchiveChoice;
     mode: DailyGhostArchiveMode;
     days: Record<DayState, number>;
     // Days past their 8th-day start that are not yet done.
@@ -1229,15 +1283,14 @@ export type DailyGhostArchiveStatus = {
 
 const HELD_COUNT_LIMIT = 1000;
 
-export async function readDailyGhostArchiveStatus(
-    mode: DailyGhostArchiveMode = DAILY_GHOST_ARCHIVE_MODE,
-    nowMs = Date.now(),
-): Promise<DailyGhostArchiveStatus> {
-    const [rawTotals, rawDays, storedDays] = await Promise.all([
+export async function readDailyGhostArchiveStatus(nowMs = Date.now()): Promise<DailyGhostArchiveStatus> {
+    const [rawTotals, rawDays, storedDays, setting] = await Promise.all([
         redis.get(DAILY_GHOST_ARCHIVE_TOTALS_KEY),
         redis.hGetAll(DAILY_GHOST_ARCHIVE_DAYS_KEY),
         readStoredDays(),
+        readDailyGhostArchiveSetting(),
     ]);
+    const { mode } = dailyGhostArchiveRunFor(setting.choice);
     const totals = parseTotals(rawTotals);
     const days = new Map<string, DailyGhostArchiveDay>();
     for (const [id, raw] of Object.entries(rawDays ?? {})) {
@@ -1263,6 +1316,7 @@ export async function readDailyGhostArchiveStatus(
         availableUntilMs + PODIUM_WINDOW_MS <= nowMs && days.get(id)?.state !== 'done'
     )).length;
     return {
+        choice: setting.choice,
         mode,
         days: counts,
         waitingDays,

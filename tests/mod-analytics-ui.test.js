@@ -187,6 +187,7 @@ describe('moderator analytics page', () => {
 
     it('shows how far the move of old Daily ghosts has come, and nothing while it never ran', () => {
         const status = {
+            choice: 'all',
             mode: 'move',
             days: { moving: 1, waiting: 0, done: 4, restoring: 0, restored: 0 },
             waitingDays: 2,
@@ -198,9 +199,9 @@ describe('moderator analytics page', () => {
             blob: { bytes: 2.5 * 1024 * 1024, objects: 12000, measuredDays: 4 },
         };
         for (const [dailyGhostArchive, text] of [
-            [status, 'Old Daily ghosts: moved 12,345 (Redis payload removed 3.0 MB) · held 3 · waiting 2 days'
-                + ' · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)'],
-            [{ ...status, mode: 'restore', restored: 40 }, 'Old Daily ghosts (restore): moved 12,345'],
+            [status, 'Old Daily ghosts (Move all old days): moved 12,345 (Redis payload removed 3.0 MB) · held 3'
+                + ' · waiting 2 days · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)'],
+            [{ ...status, choice: 'restore', mode: 'restore', restored: 40 }, 'Old Daily ghosts (Restore all to Redis): moved 12,345'],
         ]) {
             const { window } = analyticsDom();
             renderAnalyticsSummary(window.document, summaryFixture({
@@ -213,7 +214,9 @@ describe('moderator analytics page', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture({
             storage: { totalBytes: 1536, groups: [] },
-            dailyGhostArchive: { ...status, mode: 'off', days: { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 } },
+            dailyGhostArchive: {
+                ...status, choice: 'off', mode: 'off', days: { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 },
+            },
         }));
         expect(window.document.getElementById('analytics-storage').textContent).not.toContain('Old Daily ghosts');
     });

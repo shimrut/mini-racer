@@ -1,6 +1,10 @@
 import express from 'express';
 import { runRacedListFill } from './player/raced-list-fill.js';
-import { runDailyGhostArchive } from './daily/daily-ghost-archive.js';
+import {
+    readDailyGhostArchiveStatus,
+    runDailyGhostArchive,
+    saveDailyGhostArchiveSetting,
+} from './daily/daily-ghost-archive.js';
 import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
 import { isDailyGpChallengePlayable } from './daily/daily-gp-model.js';
 import {
@@ -329,6 +333,8 @@ function registerProductionRoutes(app: express.Application): void {
             return result;
         },
         runDailyGhostArchive: () => runDailyGhostArchive(),
+        readDailyGhostArchiveStatus: () => readDailyGhostArchiveStatus(),
+        saveDailyGhostArchiveSetting: (choice, changedBy) => saveDailyGhostArchiveSetting(choice, changedBy),
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

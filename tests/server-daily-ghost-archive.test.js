@@ -434,11 +434,13 @@ describe("moving old Daily ghosts to blob storage", () => {
     await seedRun("guest:b", fullRunText(31000, 1));
     await redis.set(guestProgressSelectionPendingKey("guest:b"), "1");
     clock.advance(DAY_MS);
-    await runArchive(clock, blobs, { dayLimit: 1 });
+    await archive.saveDailyGhostArchiveSetting("trial", "mod-name");
+    await runArchive(clock, blobs, { mode: undefined, dayLimit: undefined });
 
-    const status = await archive.readDailyGhostArchiveStatus("move", clock.now());
+    const status = await archive.readDailyGhostArchiveStatus(clock.now());
 
     expect(status).toMatchObject({
+      choice: "trial",
       mode: "move",
       days: { done: 1, moving: 0, waiting: 0, restoring: 0, restored: 0 },
       // The second day is past its 8th-day start but was not started.
@@ -457,6 +459,39 @@ describe("moving old Daily ghosts to blob storage", () => {
     expect(await runArchive(clock, blobs, { mode: "off" })).toMatchObject({ status: "off" });
     expect(await runText("guest:a")).toBe(text);
     expect(await dayRecord()).toBeNull();
+  });
+
+  it("follows the choice a moderator saved, and is off until one is saved", async () => {
+    const second = await storeDay("2026-09-21");
+    const text = fullRunText(30000);
+    await seedRun("guest:a", text);
+    await seedRun("guest:a", text, second);
+    clock.advance(DAY_MS);
+    const followChoice = () => runArchive(clock, blobs, { mode: undefined, dayLimit: undefined });
+
+    expect(await archive.readDailyGhostArchiveSetting()).toMatchObject({ choice: "off" });
+    expect(await followChoice()).toMatchObject({ status: "off" });
+    expect(await runText("guest:a")).toBe(text);
+
+    await archive.saveDailyGhostArchiveSetting("trial", "mod-name");
+    clock.advance(60_000);
+    await followChoice();
+    clock.advance(60_000);
+    await followChoice();
+    expect((await runValue("guest:a")).ghost).toBeNull();
+    expect((await runValue("guest:a", second)).ghost).not.toBeNull();
+
+    await archive.saveDailyGhostArchiveSetting("all", "mod-name");
+    clock.advance(60_000);
+    await followChoice();
+    expect((await runValue("guest:a", second)).ghost).toBeNull();
+
+    await archive.saveDailyGhostArchiveSetting("restore", "mod-name");
+    clock.advance(60_000);
+    await followChoice();
+    expect(await runText("guest:a")).toBe(text);
+    expect(await runText("guest:a", second)).toBe(text);
+    expect(await archive.readDailyGhostArchiveSetting()).toMatchObject({ choice: "restore", changedBy: "mod-name" });
   });
 
   it("never runs past 27 s when every blob call stalls, and keeps unstarted names", async () => {
