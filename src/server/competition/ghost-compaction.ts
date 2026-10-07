@@ -3,7 +3,7 @@ import { CAMPAIGN_LIVE_STAGES } from '../../../game/campaign/manifest.js';
 import { toCampaignCompetition } from './competition.js';
 import { challengeCollectionKey } from './pb-ghost-store.js';
 import { packPbGhostTrace } from './pb-ghost-pack.js';
-import { turnOnPackedGhostWrites } from './pb-ghost-write.js';
+import { notePackedGhostWritesOn, WRITE_PACKED_GHOSTS_KEY } from './pb-ghost-write.js';
 import { isValidPbGhostTrace } from './pb-ghost-trace.js';
 import { DAILY_GP_CHALLENGE_HISTORY_HASH_KEY } from '../daily/daily-gp-model.js';
 import {
@@ -150,9 +150,12 @@ export async function readGhostCompactionState(): Promise<GhostCompactionState> 
 // Changes the state in a transaction that watches it, so a change saved in
 // the meantime is never written over: `decide` gets the state as it is now and
 // returns the next one, or the same object to change nothing. It may refuse by
-// throwing; the watch is then dropped.
+// throwing; the watch is then dropped. With `turnOnPackedWrites`, the same
+// transaction also turns on packed best-time writes, so both are saved or
+// neither is.
 async function updateState(
     decide: (current: GhostCompactionState) => Promise<GhostCompactionState>,
+    { turnOnPackedWrites = false }: { turnOnPackedWrites?: boolean } = {},
 ): Promise<GhostCompactionState> {
     for (let attempt = 0; attempt < MAX_STATE_UPDATES; attempt += 1) {
         const transaction = await redis.watch(GHOST_COMPACTION_STATE_KEY);
@@ -166,13 +169,14 @@ async function updateState(
             await safelyUnwatch(transaction);
             throw error;
         }
-        if (next === current) {
+        if (next === current && !turnOnPackedWrites) {
             await safelyUnwatch(transaction);
             return current;
         }
         try {
             await transaction.multi();
-            await transaction.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify(next));
+            if (next !== current) await transaction.set(GHOST_COMPACTION_STATE_KEY, JSON.stringify(next));
+            if (turnOnPackedWrites) await transaction.set(WRITE_PACKED_GHOSTS_KEY, '1');
             const results = await transaction.exec();
             if (Array.isArray(results) && results.length > 0) return next;
         } catch (error) {
@@ -241,7 +245,9 @@ export type GhostCompactionAction = 'start' | 'pause';
 // Starts a step (or runs it again over boards it has not finished), or pauses
 // the running step. A step starts only after the steps before it finished
 // once, and never while another step runs. Every choice is made on the state
-// as it is when it is saved.
+// as it is when it is saved. Every Start that is not refused also turns on
+// packed best-time writes in the same transaction, a Start of a step already
+// running too, so a switch that a failed write left off is set again.
 export async function setGhostCompactionStep(
     action: GhostCompactionAction,
     step: GhostCompactionStepName,
@@ -252,9 +258,7 @@ export async function setGhostCompactionStep(
             ? { ...current, running: null, updatedAt: now.toISOString() }
             : current));
     }
-    let started = false;
     const next = await updateState(async (current) => {
-        started = false;
         if (current.running === step) return current;
         if (current.running) throw new GhostCompactionRefusal('Another step is running.');
         const before = GHOST_COMPACTION_STEPS.slice(0, GHOST_COMPACTION_STEPS.indexOf(step));
@@ -288,7 +292,6 @@ export async function setGhostCompactionStep(
             };
         // A run with nothing left to do is finished at once.
         if (!resume && boards.length === 0) nextStep.finishedAt = now.toISOString();
-        started = true;
         return {
             ...current,
             running: nextStep.finishedAt ? null : step,
@@ -297,9 +300,10 @@ export async function setGhostCompactionStep(
             lastError: null,
             updatedAt: now.toISOString(),
         };
-    });
-    // Every server reads packed ghosts by now; new best times are saved packed too.
-    if (started) await turnOnPackedGhostWrites(now.getTime());
+    }, { turnOnPackedWrites: true });
+    // Every server reads packed ghosts by now; new best times are saved packed
+    // too. This server knows it only once the switch is saved.
+    notePackedGhostWritesOn(now.getTime());
     return next;
 }
 

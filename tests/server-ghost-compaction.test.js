@@ -458,6 +458,77 @@ describe("ghost compaction", () => {
     expect((await compaction.setGhostCompactionStep("start", "expired", NOW)).steps.expired.runId).toBe(2);
   });
 
+  // The first Redis request that carries the packed-write switch fails before
+  // anything in it is saved: a plain write, or a transaction that holds it.
+  function failFirstSwitchWrite() {
+    let failed = false;
+    const fail = () => {
+      failed = true;
+      throw new Error("Redis write failed");
+    };
+    const set = redis.set.bind(redis);
+    vi.spyOn(redis, "set").mockImplementation(async (key, ...rest) => {
+      if (key === write.WRITE_PACKED_GHOSTS_KEY && !failed) fail();
+      return set(key, ...rest);
+    });
+    const watch = redis.watch.bind(redis);
+    vi.spyOn(redis, "watch").mockImplementation(async (...keys) => {
+      const transaction = await watch(...keys);
+      let carriesSwitch = false;
+      return {
+        ...transaction,
+        set: async (key, ...rest) => {
+          if (key === write.WRITE_PACKED_GHOSTS_KEY) carriesSwitch = true;
+          return transaction.set(key, ...rest);
+        },
+        exec: async () => {
+          if (carriesSwitch && !failed) fail();
+          return transaction.exec();
+        },
+      };
+    });
+  }
+
+  it("saves a Start and the packed-write switch together, and a second Start repairs a failed one", async () => {
+    const day = await storeDay("2026-09-20");
+    await seed(day, "guest:a", runText(1));
+    failFirstSwitchWrite();
+
+    await expect(compaction.setGhostCompactionStep("start", "expired", NOW)).rejects.toThrow("Redis write failed");
+
+    // Neither is saved, and this server does not think the switch is on.
+    expect(await redis.get(compaction.GHOST_COMPACTION_STATE_KEY)).toBeFalsy();
+    expect(await redis.get(write.WRITE_PACKED_GHOSTS_KEY)).toBeFalsy();
+    expect(await write.shouldWritePackedGhosts(NOW.getTime())).toBe(false);
+
+    const state = await compaction.setGhostCompactionStep("start", "expired", NOW);
+
+    expect(state.running).toBe("expired");
+    expect(await redis.get(write.WRITE_PACKED_GHOSTS_KEY)).toBe("1");
+    expect(await write.shouldWritePackedGhosts(NOW.getTime() + 61_000)).toBe(true);
+  });
+
+  it("sets the switch again on a Start of a running step whose switch is off, and keeps its progress", async () => {
+    const saved = JSON.stringify({
+      running: "expired",
+      writePacked: true,
+      steps: {
+        expired: {
+          runId: 3, skipTracked: true, boards: [{ key: "dailygp:challenge-pbs:daily-gp-2026-09-20", total: 9 }],
+          index: 0, cursor: 5, total: 9, checked: 5, packed: 4, savedBytes: 400, skipped: 1, boardSkipped: 1,
+          doneKeys: [], startedAt: NOW.toISOString(), finishedAt: null,
+        },
+      },
+    });
+    await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, saved);
+
+    const state = await compaction.setGhostCompactionStep("start", "expired", NOW);
+
+    expect(await redis.get(write.WRITE_PACKED_GHOSTS_KEY)).toBe("1");
+    expect(await redis.get(compaction.GHOST_COMPACTION_STATE_KEY)).toBe(saved);
+    expect(state.steps.expired).toMatchObject({ runId: 3, cursor: 5, checked: 5, packed: 4 });
+  });
+
   it("runs again over the days that expired since, and only those", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const first = await storeDay("2026-09-20");

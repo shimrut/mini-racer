@@ -25,6 +25,12 @@ export async function shouldWritePackedGhosts(nowMs = Date.now()): Promise<boole
 
 export async function turnOnPackedGhostWrites(nowMs = Date.now()): Promise<void> {
     await redis.set(WRITE_PACKED_GHOSTS_KEY, '1');
+    notePackedGhostWritesOn(nowMs);
+}
+
+// For a caller that saved the switch in its own transaction: this server
+// writes packed from now on, without waiting for its next read.
+export function notePackedGhostWritesOn(nowMs = Date.now()): void {
     cache = { value: true, readAtMs: nowMs };
 }
 
