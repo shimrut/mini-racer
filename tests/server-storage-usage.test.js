@@ -280,6 +280,33 @@ describe('server storage usage', () => {
         expect(measuredBoards).toHaveLength(60);
     });
 
+    // After the ghost move, a done day holds small stubs and an untouched day
+    // full ghosts. One sample across both would give every day the same size.
+    it('samples moved, partly moved and unmoved Daily days apart', async () => {
+        const days = Array.from({ length: 90 }, (_unused, index) => (
+            `daily-gp-${new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10)}`
+        ));
+        const rowSize = (index) => (index < 30 ? 100 : index < 60 ? 500 : 2000);
+        const stateOf = (index) => (index < 30 ? 'done' : index < 60 ? 'moving' : null);
+        putHash('dailygp:challenges', Object.fromEntries(days.map((day) => [day, '{}'])));
+        for (const [index, day] of days.entries()) {
+            putHash(`dailygp:challenge-pbs:${day}`, { ghost: 'x'.repeat(rowSize(index)) });
+        }
+        putHash('dailygp:ghost-archive:v1:days', Object.fromEntries(days
+            .map((day, index) => [day, stateOf(index)])
+            .filter(([, state]) => state)
+            .map(([day, state]) => [day, JSON.stringify({ state })])));
+
+        const usage = await measure();
+        const ghosts = groupById(usage, 'ghosts');
+
+        const exact = days.reduce((bytes, day, index) => (
+            bytes + `dailygp:challenge-pbs:${day}`.length + 'ghost'.length + rowSize(index)
+        ), 0);
+        expect(ghosts.rows).toBe(90);
+        expect(ghosts.bytes).toBe(exact);
+    });
+
     it('scales the player records it sampled up to every player it knows about', async () => {
         const players = Array.from({ length: 120 }, (_unused, index) => `reddit:racer-${index}`);
         seedOneDayOfRacing({ players });

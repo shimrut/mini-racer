@@ -312,6 +312,22 @@ describe("moving old Daily ghosts to blob storage", () => {
     expect(await heldNames()).toEqual({});
   });
 
+  it("holds a run whose sign-in starts after the upload, before the commit", async () => {
+    const text = fullRunText(30000);
+    await seedRun("guest:a", text);
+    redis.setBeforeExec((keys) => {
+      if (!keys.includes(pbKey())) return;
+      redis.setBeforeExec(null);
+      void redis.set(guestProgressSelectionPendingKey("guest:a"), "1");
+    });
+
+    await runArchive(clock, blobs);
+
+    expect(await runText("guest:a")).toBe(text);
+    expect(await heldNames()).toEqual({ [field("guest:a")]: "signin" });
+    expect(blobs.count("put")).toBe(1);
+  });
+
   it("holds a run whose account has a sign-in in progress", async () => {
     const text = fullRunText(30000);
     await seedRun("reddit:b", text);
@@ -410,6 +426,29 @@ describe("moving old Daily ghosts to blob storage", () => {
     expect(await runText("guest:tiny")).toBe(tiny);
     expect((await runValue("guest:a")).ghost).toBeNull();
     expect(await dayRecord()).toMatchObject({ state: "done", moved: 1 });
+  });
+
+  it("reports its progress for the moderator page", async () => {
+    await storeDay("2026-09-21");
+    await seedRun("guest:a", fullRunText(30000));
+    await seedRun("guest:b", fullRunText(31000, 1));
+    await redis.set(guestProgressSelectionPendingKey("guest:b"), "1");
+    clock.advance(DAY_MS);
+    await runArchive(clock, blobs, { dayLimit: 1 });
+
+    const status = await archive.readDailyGhostArchiveStatus("move", clock.now());
+
+    expect(status).toMatchObject({
+      mode: "move",
+      days: { done: 1, moving: 0, waiting: 0, restoring: 0, restored: 0 },
+      // The second day is past its 8th-day start but was not started.
+      waitingDays: 1,
+      moved: 1,
+      held: 1,
+      blob: { objects: 1, measuredDays: 1 },
+    });
+    expect(status.freed).toBeGreaterThan(0);
+    expect(status.blob.bytes).toBe(blobs.objects.get(blobs.keys()[0]).bytes.byteLength);
   });
 
   it("does nothing while off", async () => {

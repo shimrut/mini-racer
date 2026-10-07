@@ -185,6 +185,39 @@ describe('moderator analytics page', () => {
         }
     });
 
+    it('shows how far the move of old Daily ghosts has come, and nothing while it never ran', () => {
+        const status = {
+            mode: 'move',
+            days: { moving: 1, waiting: 0, done: 4, restoring: 0, restored: 0 },
+            waitingDays: 2,
+            moved: 12345,
+            restored: 0,
+            freed: 3 * 1024 * 1024,
+            deleted: 7,
+            held: 3,
+            blob: { bytes: 2.5 * 1024 * 1024, objects: 12000, measuredDays: 4 },
+        };
+        for (const [dailyGhostArchive, text] of [
+            [status, 'Old Daily ghosts: moved 12,345 (Redis payload removed 3.0 MB) · held 3 · waiting 2 days'
+                + ' · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)'],
+            [{ ...status, mode: 'restore', restored: 40 }, 'Old Daily ghosts (restore): moved 12,345'],
+        ]) {
+            const { window } = analyticsDom();
+            renderAnalyticsSummary(window.document, summaryFixture({
+                storage: { totalBytes: 1536, groups: [] },
+                dailyGhostArchive,
+            }));
+            expect(window.document.getElementById('analytics-storage').textContent).toContain(text);
+        }
+
+        const { window } = analyticsDom();
+        renderAnalyticsSummary(window.document, summaryFixture({
+            storage: { totalBytes: 1536, groups: [] },
+            dailyGhostArchive: { ...status, mode: 'off', days: { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 } },
+        }));
+        expect(window.document.getElementById('analytics-storage').textContent).not.toContain('Old Daily ghosts');
+    });
+
     it('shows Redis occupancy by family when the summary includes it', () => {
         const { window } = analyticsDom();
         renderAnalyticsSummary(window.document, summaryFixture({

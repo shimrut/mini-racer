@@ -485,9 +485,30 @@ function racedListFillText(fill) {
     return null;
 }
 
-function renderStorage(doc, storage, racedListFill = null) {
+// The move of old Daily ghosts to blob storage. Blob figures come from the
+// last sweep of each day; Redis figures count payload, not Redis memory.
+function dailyGhostArchiveText(status) {
+    if (!status || typeof status !== 'object') return null;
+    const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
+    if (status.mode === 'off' && touched === 0) return null;
+    const mode = status.mode === 'move' ? '' : ` (${status.mode})`;
+    const parts = [
+        `moved ${formatCount(status.moved)} (Redis payload removed ${formatBytes(status.freed)})`,
+    ];
+    if (toCount(status.restored) > 0) parts.push(`restored ${formatCount(status.restored)}`);
+    parts.push(`held ${formatCount(status.held)}`, `waiting ${formatCount(status.waitingDays)} days`);
+    const blob = status.blob ?? {};
+    parts.push(`blob ${formatBytes(blob.bytes)} in ${formatCount(blob.objects)} objects`
+        + ` (measured on ${formatCount(blob.measuredDays)} of ${formatCount(touched)} days)`);
+    return `Old Daily ghosts${mode}: ${parts.join(' · ')}`;
+}
+
+function renderStorage(doc, storage, racedListFill = null, dailyGhostArchive = null) {
     const fillText = racedListFillText(racedListFill);
-    const fillNode = fillText ? [element(doc, 'p', 'analytics-note', fillText)] : [];
+    const archiveText = dailyGhostArchiveText(dailyGhostArchive);
+    const fillNode = [fillText, archiveText]
+        .filter(Boolean)
+        .map((text) => element(doc, 'p', 'analytics-note', text));
     if (!storage || typeof storage !== 'object') {
         return [
             cardHeading(doc, 'Redis'),
@@ -828,7 +849,12 @@ export function renderAnalyticsSummary(root, summary) {
     modesNode.replaceChildren(...renderModes(root, days));
     cohortsNode?.replaceChildren(...renderCohorts(root, cohorts));
     monthsNode.replaceChildren(...renderMonths(root, months));
-    storageNode?.replaceChildren(...renderStorage(root, summary?.storage, summary?.racedListFill));
+    storageNode?.replaceChildren(...renderStorage(
+        root,
+        summary?.storage,
+        summary?.racedListFill,
+        summary?.dailyGhostArchive,
+    ));
 
     const dayHead = cardHeading(root, 'Daily breakdown');
     if (stored.length === 0) {

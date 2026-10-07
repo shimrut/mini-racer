@@ -7,12 +7,14 @@ describe('moderator analytics summary payload', () => {
         const storage = { totalBytes: 2048, groups: [] };
 
         const racedListFill = { state: 'working', boardsDone: 3, boards: 40 };
+        const dailyGhostArchive = { mode: 'move', moved: 12 };
 
         await expect(getModeratorAnalyticsSummary({
             getSummary: async () => summary,
             getStorage: async () => storage,
             getRacedListFill: async () => racedListFill,
-        })).resolves.toEqual({ ...summary, storage, racedListFill });
+            getDailyGhostArchive: async () => dailyGhostArchive,
+        })).resolves.toEqual({ ...summary, storage, racedListFill, dailyGhostArchive });
     });
 
     it('keeps player counts when Redis occupancy fails', async () => {
@@ -27,6 +29,9 @@ describe('moderator analytics summary payload', () => {
             getRacedListFill: async () => {
                 throw new Error('Redis read failed');
             },
-        })).resolves.toEqual({ ...summary, storage: null, racedListFill: null });
+            getDailyGhostArchive: async () => {
+                throw new Error('Redis read failed');
+            },
+        })).resolves.toEqual({ ...summary, storage: null, racedListFill: null, dailyGhostArchive: null });
     });
 });

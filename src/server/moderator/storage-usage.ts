@@ -37,6 +37,7 @@ import {
 import { LAUNCHER_POSTS_KEY } from '../posts/launcher-post-store.js';
 import { MOD_ANALYTICS_POSTS_KEY } from './moderator-analytics-post.js';
 import { challengeCollectionKey } from '../competition/pb-ghost-store.js';
+import { readDailyGhostArchiveDayStates } from '../daily/daily-ghost-archive.js';
 import { readContextSubredditName } from '../request/request-context.js';
 import {
     STORED_TRACKS_INDEX_KEY,
@@ -440,11 +441,14 @@ function buildKeyGroups({
     subredditName,
     now,
     storedDailyChallengeIds,
+    archiveDayStates,
 }: {
     subredditName: string;
     now: Date;
     // Every stored Daily day; the analytics window when not given.
     storedDailyChallengeIds?: readonly string[];
+    // The ghost move's state of each day it touched.
+    archiveDayStates?: ReadonlyMap<string, string>;
 }): KeyGroup[] {
     const scope = analyticsScope(subredditName);
     const { dates, months } = analyticsRetentionWindow(now);
@@ -469,14 +473,31 @@ function buildKeyGroups({
         detail: 'Standings order, the row behind each place, and the change counter',
     };
 
+    // A day whose ghosts moved holds small stubs, a day still moving holds
+    // both, and other days hold full ghosts. Each kind is sampled apart, so
+    // one kind cannot set the row size of another.
+    const ghostDayGroups = archiveDayStates
+        ? [
+            storedDays.filter((day) => archiveDayStates.get(day) === 'done'),
+            storedDays.filter((day) => ['moving', 'waiting', 'restoring'].includes(archiveDayStates.get(day) ?? '')),
+            storedDays.filter((day) => !archiveDayStates.has(day) || archiveDayStates.get(day) === 'restored'),
+        ]
+        : [storedDays];
+    const ghostDayParts = ghostDayGroups
+        .filter((group) => group.length > 0)
+        .map((group) => {
+            const sampled = pickSpread(group, SAMPLED_DAILY_DAYS);
+            return {
+                ...ghosts,
+                strings: [],
+                hashes: sampled.map((challengeId) => challengeCollectionKey(challengeId)),
+                sortedSets: [],
+                scale: group.length / sampled.length,
+            };
+        });
+
     return [
-        {
-            ...ghosts,
-            strings: [],
-            hashes: sampledDays.map((challengeId) => challengeCollectionKey(challengeId)),
-            sortedSets: [],
-            scale: dailyScale,
-        },
+        ...ghostDayParts,
         {
             ...ghosts,
             strings: [],
@@ -572,12 +593,14 @@ function readSubredditName(subredditName?: unknown): string {
 // - Locks, rate limits and share links. They are short-lived, and no list names them.
 // - Signed-out guest records. A guest is listed only after Campaign progress.
 // - The Creator's Campaign series, its Daily list, and the Copy tab reports.
+// - The ghost move's own small records: its day states, lists and totals.
 // Redis also adds its own overhead for each key and each row.
 async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> {
     const windowChallengeIds = analyticsRetentionWindow(now).dates.map((date) => createDailyChallengeId(date));
     const storedDailyChallengeIds = await readStoredDailyChallengeIds(windowChallengeIds);
+    const archiveDayStates = await readDailyGhostArchiveDayStates().catch(() => undefined);
     const groups = mergeGroupParts(await Promise.all([
-        ...buildKeyGroups({ subredditName: subreddit, now, storedDailyChallengeIds })
+        ...buildKeyGroups({ subredditName: subreddit, now, storedDailyChallengeIds, archiveDayStates })
             .map((group) => measureKeyGroup(group)),
         measurePlayerRecords(analyticsScope(subreddit)),
         measureTracks(),

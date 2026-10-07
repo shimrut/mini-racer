@@ -465,6 +465,8 @@ type SliceOutcome = {
     // Rows that need nothing: gone, already in the wanted form, or not a run.
     drop: string[];
     failed: { name: string; code: string }[];
+    // Rows whose player had a sign-in in progress before any blob call.
+    marked?: string[];
 };
 
 function failureCode(error: unknown, step: 'upload' | 'confirm_read'): string | null {
@@ -625,9 +627,10 @@ async function commitSlice(
         const remove = [...outcome.drop, ...converted, ...changed];
         const heldReasons: Record<string, string> = {};
         for (const { name, code } of outcome.failed) heldReasons[name] = `failed:${code}`;
+        const held = [...signin, ...(outcome.marked ?? [])];
         if (source === 'page') {
-            remove.push(...outcome.failed.map((item) => item.name), ...signin);
-            for (const name of signin) heldReasons[name] = 'signin';
+            remove.push(...outcome.failed.map((item) => item.name), ...held);
+            for (const name of held) heldReasons[name] = 'signin';
         }
         if (converted.length) await transaction.hSet(pbKey, writes);
         if (remove.length) await transaction.hDel(sourceKey, remove);
@@ -640,7 +643,7 @@ async function commitSlice(
             ...counts,
             freed: day.freed + freed,
             hasHeld: day.hasHeld || Object.keys(heldReasons).length > 0,
-            heldThisPass: day.heldThisPass + (source === 'page' ? signin.length : 0),
+            heldThisPass: day.heldThisPass + (source === 'page' ? held.length : 0),
             failedThisPass: day.failedThisPass + outcome.failed.length,
             lastError: outcome.failed[0] ? `${outcome.failed[0].code}` : day.lastError,
             updatedAt: ctx.clock.now(),
@@ -686,7 +689,7 @@ async function commitSlice(
         const converted = Object.keys(writes).length;
         if (ctx.mode === 'move') ctx.report.moved += converted;
         else ctx.report.restored += converted;
-        ctx.report.held += signin.length;
+        ctx.report.held += signin.length + (outcome.marked?.length ?? 0);
         ctx.report.failed += outcome.failed.length;
         if (outcome.failed.length) {
             console.error(
@@ -705,9 +708,16 @@ async function prepareSlice(
     names: readonly string[],
 ): Promise<SliceOutcome> {
     const raws = await redis.hMGet(challengeCollectionKey(challengeId), [...names]);
-    return ctx.mode === 'move'
-        ? prepareMoves(ctx, challengeId, names, raws)
-        : prepareRestores(ctx, names, raws);
+    // A player with a sign-in in progress is held before any blob call, so no
+    // copy is made for nothing. The commit checks the marks again.
+    const marks = await redis.mGet(names.flatMap(markerKeys));
+    const marked = names.filter((_name, index) => marks[index * 2] || marks[index * 2 + 1]);
+    const free = names.filter((name) => !marked.includes(name));
+    const freeRaws = free.map((name) => raws[names.indexOf(name)]);
+    const outcome = ctx.mode === 'move'
+        ? await prepareMoves(ctx, challengeId, free, freeRaws)
+        : await prepareRestores(ctx, free, freeRaws);
+    return { ...outcome, marked };
 }
 
 // A move pass is done when the revision did not move. A restore pass ends the
@@ -1197,4 +1207,84 @@ export async function runDailyGhostArchive({
             console.error('Daily ghost archive lock cleanup failed:', error);
         });
     }
+}
+
+// ---- Status for the moderator page and the storage view. ----
+
+export type DailyGhostArchiveStatus = {
+    mode: DailyGhostArchiveMode;
+    days: Record<DayState, number>;
+    // Days past their 8th-day start that are not yet done.
+    waitingDays: number;
+    moved: number;
+    restored: number;
+    // Payload bytes taken out of Redis by committed changes, less those put back.
+    freed: number;
+    deleted: number;
+    // Runs on held lists (a sign-in in progress, or a copy that failed).
+    held: number;
+    // Measured by the last finished sweep of each day.
+    blob: { bytes: number; objects: number; measuredDays: number };
+};
+
+const HELD_COUNT_LIMIT = 1000;
+
+export async function readDailyGhostArchiveStatus(
+    mode: DailyGhostArchiveMode = DAILY_GHOST_ARCHIVE_MODE,
+    nowMs = Date.now(),
+): Promise<DailyGhostArchiveStatus> {
+    const [rawTotals, rawDays, storedDays] = await Promise.all([
+        redis.get(DAILY_GHOST_ARCHIVE_TOTALS_KEY),
+        redis.hGetAll(DAILY_GHOST_ARCHIVE_DAYS_KEY),
+        readStoredDays(),
+    ]);
+    const totals = parseTotals(rawTotals);
+    const days = new Map<string, DailyGhostArchiveDay>();
+    for (const [id, raw] of Object.entries(rawDays ?? {})) {
+        const day = parseDay(raw);
+        if (day) days.set(id, day);
+    }
+    const counts: Record<DayState, number> = { moving: 0, waiting: 0, done: 0, restoring: 0, restored: 0 };
+    const blob = { bytes: 0, objects: 0, measuredDays: 0 };
+    for (const day of days.values()) {
+        counts[day.state] += 1;
+        if (day.blob) {
+            blob.bytes += day.blob.bytes;
+            blob.objects += day.blob.objects;
+            blob.measuredDays += 1;
+        }
+    }
+    const heldCounts = await Promise.all([...days.entries()]
+        .filter(([, day]) => day.hasHeld)
+        .map(async ([id]) => (
+            await redis.hScan(dailyGhostArchiveHeldKey(id), 0, undefined, HELD_COUNT_LIMIT)
+        ).fieldValues.length));
+    const waitingDays = storedDays.filter(({ id, availableUntilMs }) => (
+        availableUntilMs + PODIUM_WINDOW_MS <= nowMs && days.get(id)?.state !== 'done'
+    )).length;
+    return {
+        mode,
+        days: counts,
+        waitingDays,
+        moved: totals.moved,
+        restored: totals.restored,
+        freed: totals.freed,
+        deleted: totals.deleted,
+        held: heldCounts.reduce((sum, count) => sum + count, 0),
+        blob,
+    };
+}
+
+// The state of each day the job touched, so the storage view can sample moved
+// and unmoved days apart.
+export async function readDailyGhostArchiveDayStates(): Promise<Map<string, DayState>> {
+    const ids = await redis.hKeys(DAILY_GHOST_ARCHIVE_DAYS_KEY);
+    const states = new Map<string, DayState>();
+    if (!ids.length) return states;
+    const values = await redis.hMGet(DAILY_GHOST_ARCHIVE_DAYS_KEY, ids);
+    ids.forEach((id, index) => {
+        const day = parseDay(values[index]);
+        if (day) states.set(id, day.state);
+    });
+    return states;
 }
