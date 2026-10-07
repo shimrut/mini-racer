@@ -65,12 +65,95 @@ function errorName(error: unknown): string {
     return typeof name === 'string' ? name : '';
 }
 
+export type BlobClock = {
+    now(): number;
+    sleep(ms: number): Promise<void>;
+};
+
+export const SYSTEM_BLOB_CLOCK: BlobClock = {
+    now: () => Date.now(),
+    sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+};
+
+// Devvit allows 100 blob requests a second; the job keeps to 40.
+const MAX_REQUESTS_PER_SECOND = 40;
+const REQUEST_WINDOW_MS = 1000;
+// Covers a step of the millisecond clock between the check and the send.
+const REQUEST_MARGIN_MS = 2;
+
+// The SDK's retry strategy for one attempt: a failed call is not sent again.
+// The job tries a failed call again on its own, in a later request.
+const ONE_ATTEMPT = {
+    async acquireInitialRetryToken() {
+        return { getRetryCount: () => 0, getRetryDelay: () => 0 };
+    },
+    async refreshRetryTokenForRetry(): Promise<never> {
+        throw new Error('Blob calls are sent once.');
+    },
+    recordSuccess() {},
+};
+
+function abortedError(): Error {
+    const error = new Error('The blob request was aborted before it was sent.');
+    error.name = 'AbortError';
+    return error;
+}
+
+// Sends a request only when fewer than `limit` went out in the last second,
+// counting both ends of the second. The check and the send are one step, and
+// a small margin covers a clock step between the two, so the limit also holds
+// where the requests are seen. The clock is read again after each wait, so a
+// timer that ends early cannot let a request through too soon.
+function gateRequests<Result>(
+    limit: number,
+    clock: BlobClock,
+    send: (request: unknown, options?: { abortSignal?: AbortSignal }) => Promise<Result>,
+): (request: unknown, options?: { abortSignal?: AbortSignal }) => Promise<Result> {
+    const span = REQUEST_WINDOW_MS + REQUEST_MARGIN_MS;
+    const sent: number[] = [];
+    return async (request, options) => {
+        while (true) {
+            if (options?.abortSignal?.aborted) throw abortedError();
+            const now = clock.now();
+            while (sent.length && now - sent[0] > span) sent.shift();
+            if (sent.length < limit) {
+                sent.push(now);
+                return send(request, options);
+            }
+            await clock.sleep(sent[0] + span + 1 - now);
+        }
+    };
+}
+
+// Makes each call one HTTP request, and sends no request past the limit. The
+// SDK's retry step stays in place, because its signing step is placed next to
+// it; it reads its strategy from the config on each call.
+function limitClient(client: S3Client, limit: number, clock: BlobClock): S3Client {
+    const config = client.config as unknown as {
+        retryStrategy: () => Promise<unknown>;
+        maxAttempts: () => Promise<number>;
+        requestHandler: { handle: (request: unknown, options?: { abortSignal?: AbortSignal }) => Promise<unknown> };
+    };
+    config.retryStrategy = async () => ONE_ATTEMPT;
+    config.maxAttempts = async () => 1;
+    const handler = config.requestHandler;
+    handler.handle = gateRequests(limit, clock, handler.handle.bind(handler));
+    return client;
+}
+
 // The store for one server request. The Devvit client must not be kept from
-// one request to the next, so the client is made on first use.
-export function createDevvitBlobStore(makeClient: () => Promise<S3Client> = newS3Client): BlobStore {
+// one request to the next, so the client is made on first use. Every call is
+// one request, and at most `maxRequestsPerSecond` requests go out in any second.
+export function createDevvitBlobStore(
+    makeClient: () => Promise<S3Client> = newS3Client,
+    { maxRequestsPerSecond = MAX_REQUESTS_PER_SECOND, clock = SYSTEM_BLOB_CLOCK }: {
+        maxRequestsPerSecond?: number;
+        clock?: BlobClock;
+    } = {},
+): BlobStore {
     let client: Promise<S3Client> | null = null;
     const s3 = () => {
-        client ??= makeClient();
+        client ??= makeClient().then((made) => limitClient(made, maxRequestsPerSecond, clock));
         return client;
     };
     return {
@@ -130,16 +213,6 @@ export function createDevvitBlobStore(makeClient: () => Promise<S3Client> = newS
         },
     };
 }
-
-export type BlobClock = {
-    now(): number;
-    sleep(ms: number): Promise<void>;
-};
-
-export const SYSTEM_BLOB_CLOCK: BlobClock = {
-    now: () => Date.now(),
-    sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
-};
 
 // Every call of one request goes through a session. A session keeps calls
 // under a rate, aborts a call that runs too long, and starts no call that

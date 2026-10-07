@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
+  S3Client,
 } from "@aws-sdk/client-s3";
+import { HttpResponse } from "@smithy/protocol-http";
 import {
   BlobCallTimeoutError,
   BlobDeadlineError,
@@ -19,12 +22,46 @@ function fakeS3(respond) {
   return {
     sent,
     client: {
+      // The parts of the SDK's config the store sets.
+      config: { requestHandler: { handle: async () => ({}) } },
       async send(command, options) {
         sent.push({ command, options });
         return respond(command);
       },
     },
   };
+}
+
+// An S3 client made as Devvit makes it: the SDK's own client with its retry
+// and signing steps, a step that fills in the bucket, and a request handler
+// that answers each request with `status` and keeps the request.
+function devvitLikeClient(status, requests, clock = null) {
+  const client = new S3Client({
+    region: "us-east-1",
+    credentials: { accessKeyId: "id", secretAccessKey: "secret", sessionToken: "token" },
+    requestHandler: {
+      async handle(request) {
+        requests.push({ request, at: clock?.now() ?? Date.now() });
+        return {
+          response: new HttpResponse({
+            statusCode: status,
+            headers: { "content-type": "application/xml" },
+            body: Readable.from([status === 200 ? "" : "<Error><Code>InternalError</Code><Message>x</Message></Error>"]),
+          }),
+        };
+      },
+    },
+  });
+  client.middlewareStack.add((next) => async (args) => {
+    args.input.Bucket = "bucket";
+    return next(args);
+  }, { step: "initialize", name: "BucketFill" });
+  return client;
+}
+
+function header(request, name) {
+  const found = Object.entries(request.headers).find(([key]) => key.toLowerCase() === name);
+  return found?.[1];
 }
 
 describe("Devvit blob store", () => {
@@ -95,6 +132,88 @@ describe("Devvit blob store", () => {
     const store = createDevvitBlobStore(async () => s3.client);
     await expect(store.list("p/", "old", 200, new AbortController().signal))
       .rejects.toBeInstanceOf(BlobListTokenRejectedError);
+  });
+});
+
+describe("Devvit S3 client in the store", () => {
+  it("sends a failed call once", async () => {
+    const requests = [];
+    const store = createDevvitBlobStore(async () => devvitLikeClient(500, requests));
+
+    for (const key of ["a.gz", "b.gz", "c.gz"]) {
+      await expect(store.put(key, new Uint8Array([1]), new AbortController().signal)).rejects.toThrow();
+    }
+
+    expect(requests).toHaveLength(3);
+  });
+
+  it("still signs each request, and says it is the only attempt", async () => {
+    const requests = [];
+    const store = createDevvitBlobStore(async () => devvitLikeClient(200, requests));
+
+    await store.put("a.gz", new Uint8Array([1]), new AbortController().signal);
+
+    expect(requests).toHaveLength(1);
+    expect(header(requests[0].request, "authorization")).toMatch(/^AWS4-HMAC-SHA256 Credential=id\//);
+    expect(header(requests[0].request, "amz-sdk-request")).toBe("attempt=1; max=1");
+  });
+
+  it("sends at most 40 requests in any second, on a clock whose waits end early or late", async () => {
+    // A virtual clock: time moves only when nothing else can run, to the
+    // earliest wait. Waits end up to 2 ms early or 5 ms late.
+    const jitter = [-2, 5, 0, -1, 3, -2, 1, 4];
+    let nowMs = 0;
+    let turn = 0;
+    const timers = [];
+    const clock = {
+      now: () => nowMs,
+      sleep: (ms) => new Promise((resolve) => {
+        timers.push({ at: nowMs + Math.max(0, ms + jitter[turn++ % jitter.length]), resolve });
+      }),
+    };
+    const requests = [];
+    const store = createDevvitBlobStore(async () => devvitLikeClient(200, requests, clock), { clock });
+
+    let finished = false;
+    const all = Promise.all(Array.from({ length: 120 }, (_value, index) => (
+      store.put(`k${index}.gz`, new Uint8Array([1]), new AbortController().signal)
+    ))).then(() => { finished = true; });
+    for (let step = 0; step < 10_000 && !finished; step += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+      if (!timers.length) continue;
+      timers.sort((a, b) => a.at - b.at);
+      const next = timers.shift();
+      nowMs = Math.max(nowMs, next.at);
+      next.resolve();
+    }
+    await all;
+
+    const times = requests.map(({ at }) => at).sort((a, b) => a - b);
+    expect(times).toHaveLength(120);
+    expect(times.at(-1)).toBeGreaterThan(2000);
+    for (const start of times) {
+      expect(times.filter((at) => at >= start && at <= start + 1000).length).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it("sends nothing for a call aborted while it waits at the limit", async () => {
+    const waits = [];
+    const clock = { now: () => 0, sleep: () => new Promise((resolve) => waits.push(resolve)) };
+    const requests = [];
+    const store = createDevvitBlobStore(async () => devvitLikeClient(200, requests, clock), {
+      clock,
+      maxRequestsPerSecond: 1,
+    });
+    await store.put("a.gz", new Uint8Array([1]), new AbortController().signal);
+    const controller = new AbortController();
+    const waiting = store.put("b.gz", new Uint8Array([1]), controller.signal);
+    await vi.waitFor(() => expect(waits).toHaveLength(1));
+
+    controller.abort();
+    waits[0]();
+
+    await expect(waiting).rejects.toThrow();
+    expect(requests).toHaveLength(1);
   });
 });
 
