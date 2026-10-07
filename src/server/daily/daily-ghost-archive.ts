@@ -13,7 +13,7 @@ import {
     type BlobStore,
 } from '../blob/blob-store.js';
 import { challengeCollectionKey, isPbGhostArchiveRef, type PbGhostArchiveRef } from '../competition/pb-ghost-store.js';
-import { isValidPbGhostTrace } from '../competition/pb-ghost-trace.js';
+import { storedRunGhost } from '../competition/pb-ghost-pack.js';
 import {
     guestProgressSelectionAccountPendingKeyForHash,
     guestProgressSelectionPendingKeyForHash,
@@ -291,20 +291,23 @@ function readRun(raw: unknown): { text: string; value: Record<string, unknown> }
     }
 }
 
+// A full ghost is stored plain or packed.
 function holdsFullGhost(run: { value: Record<string, unknown> } | null): boolean {
-    return Boolean(run && isValidPbGhostTrace(run.value.ghost));
+    return Boolean(run && storedRunGhost(run.value));
 }
 
 function isStub(run: { value: Record<string, unknown> } | null): boolean {
     return Boolean(run && (run.value.ghost === null || run.value.ghost === undefined)
+        && run.value.ghostPacked === undefined
         && isPbGhostArchiveRef(run.value.ghostArchive));
 }
 
 // The text left in Redis after the ghost moved: every field as it was, the
-// ghost replaced by the reference.
+// ghost, plain or packed, replaced by the reference.
 export function buildDailyGhostStub(fullText: string, ref: PbGhostArchiveRef): string {
     const value = JSON.parse(fullText) as Record<string, unknown>;
     value.ghost = null;
+    delete value.ghostPacked;
     value.ghostArchive = ref;
     return JSON.stringify(value);
 }
@@ -658,7 +661,7 @@ async function prepareRestores(
             || !full
             || full.bestTimeMs !== stub.bestTimeMs
             || full.updatedAt !== stub.updatedAt
-            || !isValidPbGhostTrace(full.ghost)
+            || !storedRunGhost(full)
         ) {
             outcome.failed.push({ name, code: 'restore_mismatch' });
             return;

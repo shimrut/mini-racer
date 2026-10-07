@@ -20,6 +20,7 @@ const {
   guestProgressSelectionAccountPendingKey,
   guestProgressSelectionPendingKey,
 } = await import("../src/server/player/guest-retirement.ts");
+const { packPbGhostTrace } = await import("../src/server/competition/pb-ghost-pack.ts");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -513,6 +514,23 @@ describe("moving old Daily ghosts to blob storage", () => {
     await runArchive(clock, blobs);
 
     expect(errors).toHaveBeenCalledWith("Daily ghost archive failed:", DAY_ID, "upload", "blob put failed");
+  });
+
+  it("moves a packed ghost like a plain one, and restores the same text", async () => {
+    const plain = JSON.parse(fullRunText(30000, 4));
+    const packedText = JSON.stringify({ ...plain, ghost: null, ghostPacked: packPbGhostTrace(plain.ghost) });
+    await seedRun("guest:packed", packedText);
+
+    await runArchive(clock, blobs);
+
+    const stub = await runValue("guest:packed");
+    expect(stub.ghost).toBeNull();
+    expect(stub.ghostPacked).toBeUndefined();
+    expect(blobText(blobs, stub.ghostArchive.key)).toBe(packedText);
+
+    clock.advance(60_000);
+    await runArchive(clock, blobs, { mode: "restore" });
+    expect(await runText("guest:packed")).toBe(packedText);
   });
 
   it("does nothing while off", async () => {

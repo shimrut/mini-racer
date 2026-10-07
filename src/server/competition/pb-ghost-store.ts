@@ -2,7 +2,6 @@ import { redisCompressed as redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import {
     createTrackFingerprint,
-    isValidPbGhostTrace,
     PB_GHOST_SCHEMA_VERSION,
     PB_GHOST_SIMULATION_REVISION,
     type PbGhostTrace,
@@ -13,6 +12,7 @@ import {
     type RedisLock,
 } from '../redis/redis-lock.js';
 import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
+import { storedRunGhost } from './pb-ghost-pack.js';
 import { normalizeLapCompletionTimesSec } from '../../../game/shared/lap-completion-times.js';
 import type {
     ObsoleteReason,
@@ -101,9 +101,8 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
         ) {
             return null;
         }
-        const ghost = isValidPbGhostTrace(value.ghost)
-            ? value.ghost
-            : null;
+        // A ghost may be stored plain or packed; the record always holds it plain.
+        const ghost = storedRunGhost(value as Record<string, unknown>);
         const rulesRevision = value.rulesRevision === 1 ? 1 : 0;
         const lapCount = rulesRevision === 1 && (value.lapCount === 2 || value.lapCount === 3)
             ? value.lapCount
