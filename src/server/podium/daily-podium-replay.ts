@@ -2,6 +2,7 @@ import { reddit } from '@devvit/web/server';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { isValidPbGhostTrace, type PbGhostTrace } from '../competition/pb-ghost-trace.js';
 import { isRecord, sha256Hex } from '../shared/value-guards.js';
+import { postFallbackTexts } from '../posts/post-fallback-texts.js';
 
 export const DAILY_PODIUM_REPLAY_MARKER = 'Podium replay data:';
 export const DAILY_PODIUM_REPLAY_FORMAT = 'MINIRACER-PODIUM-REPLAY-V1';
@@ -169,55 +170,6 @@ export function decodeDailyPodiumReplay(
     }
 }
 
-const FALLBACK_TEXT_KEYS = [
-    'text',
-    'markdown',
-    'raw',
-    'value',
-    'body',
-    'selftext',
-    'textFallback',
-    'richtextFallback',
-] as const;
-
-function collectFallbackTexts(value: unknown, texts: string[], depth = 0): void {
-    if (depth > 4) return;
-    if (typeof value === 'string') {
-        if (value && !texts.includes(value)) texts.push(value);
-        const first = value.trimStart()[0];
-        if (first === '{' || first === '[' || first === '"') {
-            try {
-                collectFallbackTexts(JSON.parse(value), texts, depth + 1);
-            } catch {
-            }
-        }
-        return;
-    }
-    if (Array.isArray(value)) {
-        for (const item of value) collectFallbackTexts(item, texts, depth + 1);
-        return;
-    }
-    if (!isRecord(value)) return;
-    for (const key of FALLBACK_TEXT_KEYS) {
-        if (key in value) collectFallbackTexts(value[key], texts, depth + 1);
-    }
-}
-
-export function podiumPostFallbackTexts(post: unknown): string[] {
-    if (!isRecord(post)) return [];
-    const texts: string[] = [];
-    for (const key of ['body', 'selftext', 'textFallback', 'richtextFallback'] as const) {
-        collectFallbackTexts(post[key], texts);
-    }
-    if (typeof post.toJSON === 'function') {
-        try {
-            collectFallbackTexts((post as { toJSON: () => unknown }).toJSON(), texts);
-        } catch {
-        }
-    }
-    return texts;
-}
-
 export function resolveDailyPodiumReplayFromPost(
     post: unknown,
     postData: {
@@ -234,7 +186,7 @@ export function resolveDailyPodiumReplayFromPost(
         ? postData.replayDataHash
         : undefined;
     const expected = { challengeId, lapCount, replayDataHash };
-    for (const text of podiumPostFallbackTexts(post)) {
+    for (const text of postFallbackTexts(post)) {
         const { decoded } = decodeDailyPodiumReplay(text, expected);
         if (decoded) return decoded.envelope;
     }
