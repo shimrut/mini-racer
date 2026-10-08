@@ -53,6 +53,19 @@ Street cars, added with grounds on 2026-09-25):
 
 A player who kept an old picture car sees no visual change.
 
+Car size and shape, in world units (1u = 40 px):
+
+| | Length | Width |
+| --- | --- | --- |
+| Hit-box (capsule, unchanged since 2026-07-15) | 1.23 | 0.55 |
+| Stock picture car (`mr_mr_red`) | 1.19 | 0.74 |
+| Picture cars, median of 23 | 1.17 | 0.71 |
+| Formula drawn car | 1.18 | 0.69 |
+
+Both kinds are drawn in the same 52 px square with the same shadow. Formula is about 7% narrower
+than the stock car, which leaves a little more visible road, but not enough to matter. Its
+only ground mark is a red brake glow when the car loses speed quickly.
+
 ## Reports by platform
 
 One Android, one iOS and one Windows (no touch screen) player. The phone fix explains Android
