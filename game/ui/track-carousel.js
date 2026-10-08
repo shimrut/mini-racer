@@ -105,11 +105,6 @@ function createStandingsIcon() {
     return icon;
 }
 
-const PLACEHOLDER_TRACK_PATH =
-    'M90 255L205 255C250 255 268 228 262 196C257 170 228 166 204 160C180 154 176 128 198 116'
-    + 'C226 101 252 92 248 64C244 38 214 30 186 36L140 48C118 54 110 78 92 86C70 96 46 84 42 108'
-    + 'C38 140 40 190 48 222C54 246 66 255 90 255Z';
-const PLACEHOLDER_TURN_LABELS = [[278, 226, 'T1'], [166, 140, 'T2'], [266, 34, 'T3'], [106, 112, 'T4'], [30, 92, 'T5']];
 let placeholderArtCount = 0;
 
 function createSvgElement(tagName, attributes = {}, children = []) {
@@ -119,21 +114,20 @@ function createSvgElement(tagName, attributes = {}, children = []) {
     return element;
 }
 
-function createPlaceholderLabel(x, y, text, className = 'track-carousel__placeholder-label') {
-    const label = createSvgElement('text', { x, y, 'text-anchor': 'middle', class: className });
-    label.textContent = text;
-    return label;
-}
-
-// The stage that is not made yet, as a circuit plan on grid paper.
+// The stage that is not made yet: grid paper with only the start line and one car length of road.
 function createPlaceholderTrackSvg() {
     placeholderArtCount += 1;
     const fadeId = `track-carousel-plan-fade-${placeholderArtCount}`;
     const gridMaskId = `track-carousel-plan-grid-${placeholderArtCount}`;
-    const hollowId = `track-carousel-plan-hollow-${placeholderArtCount}`;
+    const roadFadeId = `track-carousel-plan-road-fade-${placeholderArtCount}`;
+    const roadMaskId = `track-carousel-plan-road-${placeholderArtCount}`;
     const gridLines = Array.from({ length: 16 }, (_, index) => createSvgElement('path', {
         d: `M${index * 20} 0V300M0 ${index * 20}H300`,
     }));
+    const startLabel = createSvgElement('text', {
+        x: 146, y: 180, 'text-anchor': 'middle', class: 'track-carousel__placeholder-label',
+    });
+    startLabel.textContent = 'S/F';
     return createSvgElement('svg', {
         class: 'track-carousel__placeholder-art',
         viewBox: '20 12 268 274',
@@ -149,22 +143,25 @@ function createPlaceholderTrackSvg() {
             createSvgElement('mask', { id: gridMaskId }, [
                 createSvgElement('rect', { width: 300, height: 300, fill: `url(#${fadeId})` }),
             ]),
-            // Black road centre: the outline stroke keeps only its two edges.
-            createSvgElement('mask', { id: hollowId }, [
-                createSvgElement('rect', { width: 300, height: 300, fill: '#fff' }),
-                createSvgElement('path', {
-                    d: PLACEHOLDER_TRACK_PATH, fill: 'none', stroke: '#000', 'stroke-width': 21, 'stroke-linejoin': 'round',
-                }),
+            // A preview car is about 0.6 of the road width long: the road is solid for 16 units, then fades.
+            createSvgElement('linearGradient', {
+                id: roadFadeId, gradientUnits: 'userSpaceOnUse', x1: 146, y1: 0, x2: 172, y2: 0,
+            }, [
+                createSvgElement('stop', { offset: '0.6', 'stop-color': '#fff' }),
+                createSvgElement('stop', { offset: '1', 'stop-color': '#000' }),
+            ]),
+            createSvgElement('mask', { id: roadMaskId }, [
+                createSvgElement('rect', { width: 300, height: 300, fill: `url(#${roadFadeId})` }),
             ]),
         ]),
         createSvgElement('g', { class: 'track-carousel__placeholder-grid', mask: `url(#${gridMaskId})` }, gridLines),
-        createSvgElement('path', {
-            class: 'track-carousel__placeholder-outline', d: PLACEHOLDER_TRACK_PATH, mask: `url(#${hollowId})`,
-        }),
-        createSvgElement('path', { class: 'track-carousel__placeholder-centre', d: PLACEHOLDER_TRACK_PATH }),
-        createSvgElement('path', { class: 'track-carousel__placeholder-start', d: 'M90 241V269' }),
-        createPlaceholderLabel(90, 282, 'S/F', 'track-carousel__placeholder-label track-carousel__placeholder-label--start'),
-        ...PLACEHOLDER_TURN_LABELS.map(([x, y, text]) => createPlaceholderLabel(x, y, text)),
+        createSvgElement('g', { mask: `url(#${roadMaskId})` }, [
+            createSvgElement('rect', { class: 'track-carousel__placeholder-road', x: 146, y: 138, width: 26, height: 24 }),
+            createSvgElement('path', { class: 'track-carousel__placeholder-outline', d: 'M146 138H172M146 162H172' }),
+            createSvgElement('path', { class: 'track-carousel__placeholder-centre', d: 'M146 150H172' }),
+        ]),
+        createSvgElement('path', { class: 'track-carousel__placeholder-start', d: 'M146 136V164' }),
+        startLabel,
     ]);
 }
 

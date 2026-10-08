@@ -448,8 +448,7 @@ describe('campaign placeholder after the last stage', () => {
             expect(card.querySelector('canvas')).toBeNull();
             const art = card.querySelector('svg.track-carousel__placeholder-art');
             expect(art).not.toBeNull();
-            expect([...art.querySelectorAll('text')].map((label) => label.textContent))
-                .toEqual(['S/F', 'T1', 'T2', 'T3', 'T4', 'T5']);
+            expect([...art.querySelectorAll('text')].map((label) => label.textContent)).toEqual(['S/F']);
             expect(card.querySelector('.track-carousel__gate').hidden).toBe(true);
 
             const parts = carousel._footParts;

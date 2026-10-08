@@ -514,7 +514,7 @@ body[data-lobby-mode="campaign"] #start-overlay {
     z-index: 1;
 }
 
-/* The stage after the last one, drawn as a circuit plan on grid paper. */
+/* The stage after the last one: grid paper with only its start line and the first car length of road. */
 .track-carousel__placeholder-art {
     display: block;
     width: 100%;
@@ -523,15 +523,19 @@ body[data-lobby-mode="campaign"] #start-overlay {
 
 .track-carousel__placeholder-grid {
     stroke: #6f83a5;
-    stroke-opacity: 0.16;
+    stroke-opacity: 0.24;
     stroke-width: 0.8;
+}
+
+.track-carousel__placeholder-road {
+    fill: #8fb4ff;
+    fill-opacity: 0.12;
 }
 
 .track-carousel__placeholder-outline {
     fill: none;
     stroke: #8fb4ff;
-    stroke-linejoin: round;
-    stroke-width: 24;
+    stroke-width: 1.5;
 }
 
 .track-carousel__placeholder-centre {
@@ -548,15 +552,10 @@ body[data-lobby-mode="campaign"] #start-overlay {
 }
 
 .track-carousel__placeholder-label {
-    fill: #8fb4ff;
+    fill: #f8fafc;
     font-family: var(--mono-font);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.06em;
-}
-
-.track-carousel__placeholder-label--start {
-    fill: #f8fafc;
     letter-spacing: 0.08em;
 }
 
