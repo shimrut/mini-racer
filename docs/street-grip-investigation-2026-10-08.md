@@ -110,6 +110,40 @@ steps past the skid-mark point (side speed over 28% of speed).
 Result: the same taps give the same race, to the last digit, in all three versions. The Street
 car's grip, slide and lap time did not change.
 
+## Phone fix: races before and after
+
+The real touch code from before the fix (`216176a^`) and after it (latest) gets the same finger
+touches. Its left and right presses drive the latest physics, one lap on each of the 156 Street
+tracks.
+
+- The driver is the test autopilot. It puts a finger down or lifts it when its wish changes.
+- Like a person, it notices when the car ignores its steering for 0.4 s, then lifts and taps
+  both sides again.
+- Faults, played the same way for both versions: a lost lift (the browser never reports that a
+  finger lifted), and a thumb roll (a second finger lands on the same side, then the first lifts).
+
+Medians over the tracks finished in both versions:
+
+| Scenario | Wrong steering per lap, before → after | Lap time lost before the fix | Re-taps needed, before → after |
+| --- | --- | --- | --- |
+| Clean taps | 0 s → 0 s | 0 s (identical races) | 0 → 0 |
+| One lost lift per lap | 0.38 s → 0.05 s | 0.13 s | 1 → 0 |
+| Lost lift about every 5 s | 1.15 s → 0.17 s | 0.32 s | 2 → 0 |
+| Thumb roll on 1 hold in 5 | 0.88 s → 0 s | 0.18 s | 1 → 0 |
+
+- Wrong steering: time the car steers differently from the fingers. Before the fix, a lost lift
+  keeps the turn on until the player taps that side again; pressing the other side meanwhile
+  cancels out and the car goes straight. A thumb roll drops the turn when the first finger
+  lifts. After the fix, a lost lift ends at the next touch anywhere on the screen, and a thumb
+  roll keeps turning.
+- Slide and grip do not change: average slide stays about 10.3° and time sliding about 21% in
+  every scenario. The car's grip is the same. Before the fix, the car sometimes did not do what
+  the finger said, either turning on its own or running wide. That reads as a loose car.
+- With clean taps the two versions race identically, so the fix only matters on phones that
+  lose a lift, or for players who use two fingers on one side.
+- How often real phones lose a lift is not known. The 0.4 s reaction time is a guess; a slower
+  reaction makes the old code worse.
+
 ## Not checked
 
 Track shapes stored only in Redis (Creator edits, the live Daily list). They cannot be read from
