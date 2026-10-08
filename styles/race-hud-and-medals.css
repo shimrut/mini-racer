@@ -120,12 +120,6 @@
     margin-top: -0.25rem;
 }
 
-.hud-medal {
-    display: flex;
-    align-items: center;
-    line-height: 0;
-}
-
 .medal-svg {
     display: block;
     flex-shrink: 0;

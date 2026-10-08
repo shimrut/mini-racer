@@ -149,15 +149,6 @@
         height: 3.6rem;
     }
 
-    #garage-modal .garage-trail-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.55rem;
-    }
-
-    #garage-modal .garage-trail-option {
-        min-height: 5.85rem;
-    }
-
     #campaign-playlist-list.daily-playlist-list,
     #daily-playlist-list.daily-playlist-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
