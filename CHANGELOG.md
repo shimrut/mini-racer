@@ -1,3 +1,5 @@
+- New app icon: the red Formula car turns through a kerbed corner, brake light on, with **MINI RACER** in the bottom right. It replaces the plain text on black.
+
 - **Gun Slinger** returns with its v2.4.0 layout and medal times, between Winding Road and Lightning Hook in Daily. **Water Pistol** stays available at the end of Daily.
 
 - **Ridge Runner** has a new layout. **Broken Road** and **Dirt Valley** have adjusted corners. Ridge Runner and Dirt Valley have new medal times.
