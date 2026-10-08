@@ -371,5 +371,3 @@ export const challengeRunEngineMethods = {
         return personalBest;
     },
 };
-
-export { applyTrackPersonalBest };

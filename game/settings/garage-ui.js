@@ -98,7 +98,6 @@ export class GarageUi {
     get garageToggleButtons() { return document.querySelectorAll('[aria-controls="garage-modal"]'); }
     get customPanel() { return document.getElementById('garage-panel-custom'); }
     get panelSkin() { return document.getElementById('garage-panel-skin'); }
-    get panelTrails() { return document.getElementById('garage-panel-trails'); }
     get skinGrid() { return document.getElementById('garage-skin-grid'); }
     get trailGrid() { return document.getElementById('garage-trail-grid'); }
 

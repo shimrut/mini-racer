@@ -49,7 +49,6 @@ export function createRacePreparation({
 } = {}) {
     const slots = new Map();
     const listeners = new Set();
-    let nextToken = 0;
 
     function notify() {
         for (const listener of listeners) {
@@ -147,7 +146,6 @@ export function createRacePreparation({
             return current.promise;
         }
         const state = {
-            token: ++nextToken,
             trackKey,
             challenge,
             record: findRecord(trackKey, challenge),
