@@ -1,5 +1,4 @@
-/* The Garage workshop: a car stage, decals, paint and a trail-color row. */
-/* The shared modal owns width, heading, scrolling and Back clearance. */
+/* The Garage workshop (stage, decals, paint, trail row); the shared modal owns width, heading, scroll and Back. */
 #garage-modal .garage-tabs {
     position: sticky;
     top: 0;

@@ -491,8 +491,7 @@
     background: var(--speedometer-lit);
 }
 
-/* Dirt and Snow: the rally speed bar. Fewer, wider, slanted lights in the
-   yellow of the Rally car's lamps. */
+/* Dirt and Snow: the rally speed bar, with fewer wide slanted lights in rally lamp yellow. */
 .speedometer--rally {
     --speedometer-lit: #ffd84a;
 }

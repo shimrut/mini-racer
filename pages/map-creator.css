@@ -1,5 +1,4 @@
-/* The Creator: the Mapmaker with game tracks, the Daily list, the Campaign
-   Planner and the copy of unplayed tracks. It works on desktop and on phones. */
+/* The Creator: Mapmaker, Daily list, Campaign Planner and copies, on desktop and phones. */
 
 .creator-mode #restore-drafts-dialog {
     display: none !important;
@@ -355,8 +354,7 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
     background: rgba(3, 6, 12, 0.7);
 }
 
-/* The Test Drive page has the only bar: the title on the left, the
-   controls and Close on the right. */
+/* Test Drive's only bar: title left, controls and Close right. */
 .creator-drive .drive-divider {
     display: inline-block;
     width: 1px;
@@ -403,8 +401,7 @@ body.creator-mode:not([data-creator-tab="tracks"]) .creator-editor-only {
         min-width: 0;
     }
 
-    /* The Save button shows Save or Saved, so the phone keeps only the
-       states that need words. */
+    /* The phone keeps only Save states that need words. */
     .creator-save-status:not([data-state="error"]):not([data-state="locked"]) {
         display: none;
     }

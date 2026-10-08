@@ -1,7 +1,4 @@
-/* Mini Racer — miniracer.club
-   Landing Page Stylesheet.
-   100% In-Engine Project Assets. Zero External Dependencies.
-   Pure Static HTML5 & CSS3. */
+/* Mini Racer landing page (miniracer.club): static HTML and CSS, in-engine assets only. */
 
 @font-face {
     font-family: "Outfit";
@@ -411,8 +408,7 @@ a:focus-visible {
         padding-block: 0.6rem;
     }
 
-    /* Track on Mobile: large, top-anchored, clearly visible.
-       Fixed so its scaled overflow never stretches the page. */
+    /* Mobile track: large, top-anchored, and fixed so its overflow never widens the page. */
     .track {
         position: fixed;
         top: 0;
@@ -538,8 +534,7 @@ a:focus-visible {
         align-items: center;
     }
 
-    /* Neutralize every roster order so areas place deterministically,
-       and every min-width so nothing can force the page wider. */
+    /* Reset roster order and min-width, so areas place predictably and nothing widens the page. */
     .hero-stage .stacked-title,
     .hero-stage .callout-stack,
     .hero-stage .facts,
