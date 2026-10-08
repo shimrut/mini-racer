@@ -23,7 +23,7 @@ function buildLockMeter(stage) {
 // A series without a published final stage gets more stages later, so its rail ends on this card.
 function buildMoreStagesCard(seriesId) {
     const id = `${seriesId}-more`;
-    const trackName = 'More stages';
+    const trackName = 'In design';
     return {
         challengeId: id,
         challenge: { id, placeholder: true, unlocked: false, trackName },

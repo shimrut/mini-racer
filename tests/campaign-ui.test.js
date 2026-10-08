@@ -2651,7 +2651,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
-    it('cannot race or open standings on the More stages placeholder', () => {
+    it('cannot race or open standings on the In design placeholder', () => {
         const originalDocument = global.document;
         const label = createElement('span');
         label.className = 'main-menu__label';
@@ -2683,9 +2683,9 @@ describe('Campaign lobby and shared modal adapters', () => {
             stages: [{ id: 'growing-v1-00', unlocked: true, medal: null }],
         });
 
-        lobby.setCampaignSelectedStage({ id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'More stages' });
+        lobby.setCampaignSelectedStage({ id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' });
         expect(label.textContent).toBe('Soon');
-        expect(track.textContent).toBe('More stages');
+        expect(track.textContent).toBe('In design');
         expect(laps.hidden).toBe(true);
         expect(primary.disabled).toBe(true);
         expect(standings.disabled).toBe(true);

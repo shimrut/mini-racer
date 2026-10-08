@@ -367,15 +367,15 @@ describe('campaign placeholder after the last stage', () => {
         return campaignState([], { seriesId: 'growing-v1', ...stateOverrides });
     }
 
-    it('ends a series without a final stage on a More stages card', () => {
+    it('ends a series without a final stage on an In design card', () => {
         registerStoredSeries([{ id: 'growing-v1', name: 'Growing', stages: growingStages }]);
         const cards = buildCampaignCarouselCards(growingState());
 
         expect(cards).toHaveLength(5);
         expect(cards.at(-1)).toEqual({
             challengeId: 'growing-v1-more',
-            challenge: { id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'More stages' },
-            trackName: 'More stages',
+            challenge: { id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' },
+            trackName: 'In design',
             placeholder: true,
             locked: false,
         });
@@ -439,14 +439,17 @@ describe('campaign placeholder after the last stage', () => {
         try {
             carousel.render([
                 { challengeId: 'growing-v1-00', challenge: { id: 'growing-v1-00' }, trackName: 'Stage', bestLabel: '0:40.000', medalTiers: [] },
-                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'More stages', placeholder: true },
+                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'In design', placeholder: true },
             ], { selectedChallengeId: 'growing-v1-more' });
 
             const card = document.querySelector('[data-challenge-id="growing-v1-more"]');
             expect(card.classList.contains('is-placeholder')).toBe(true);
-            expect(card.getAttribute('aria-label')).toBe('More stages');
+            expect(card.getAttribute('aria-label')).toBe('In design');
             expect(card.querySelector('canvas')).toBeNull();
-            expect(card.querySelector('svg.track-carousel__placeholder-art')).not.toBeNull();
+            const art = card.querySelector('svg.track-carousel__placeholder-art');
+            expect(art).not.toBeNull();
+            expect([...art.querySelectorAll('text')].map((label) => label.textContent))
+                .toEqual(['S/F', 'T1', 'T2', 'T3', 'T4', 'T5']);
             expect(card.querySelector('.track-carousel__gate').hidden).toBe(true);
 
             const parts = carousel._footParts;
@@ -466,7 +469,7 @@ describe('campaign placeholder after the last stage', () => {
             carousel.render([
                 { challengeId: 'growing-v1-00', challenge: { id: 'growing-v1-00' }, trackName: 'A', medalTiers: [] },
                 { challengeId: 'growing-v1-01', challenge: { id: 'growing-v1-01' }, trackName: 'B', medalTiers: [] },
-                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'More stages', placeholder: true },
+                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'In design', placeholder: true },
             ], { selectedChallengeId: 'growing-v1-01' });
             const count = document.getElementById('campaign-carousel-count');
             expect(count.textContent).toBe('2 / 2');
