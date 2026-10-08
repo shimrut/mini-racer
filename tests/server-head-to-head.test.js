@@ -633,6 +633,45 @@ describe('head-to-head service', () => {
         expect((await service.submit({ challengeId: 'missing' }, { username: 'RaceFan' })).status).toBe(401);
     });
 
+    it('refuses preview, create and next without a signed name and subreddit', async () => {
+        const service = makeService();
+        const unsigned = [
+            { subredditName: 'MiniRacer' },
+            { username: 'RaceFan' },
+            { username: '   ', subredditName: 'MiniRacer' },
+            { username: 'RaceFan', subredditName: '  ' },
+            { username: 42, subredditName: 'MiniRacer' },
+            { username: 'RaceFan', subredditName: ['MiniRacer'] },
+        ];
+        for (const requestContext of unsigned) {
+            for (const result of [
+                await service.preview({ sourceKind: 'campaign' }, requestContext),
+                await service.create({ challengeToken: 'token' }, requestContext),
+                await service.next({}, requestContext),
+            ]) {
+                expect(result.status).toBe(401);
+                expect(result.body.status).toBe('signed_in_required');
+            }
+        }
+        expect(redis.set).not.toHaveBeenCalled();
+    });
+
+    it('trims the signed name and subreddit before it stores a preview', async () => {
+        const service = makeService();
+        const preview = await service.preview(
+            { sourceKind: 'campaign' },
+            { ...context, username: '  RaceFan ', subredditName: ' MiniRacer  ' },
+        );
+
+        expect(preview.status).toBe(200);
+        expect(preview.body.username).toBe('RaceFan');
+        const stored = JSON.parse(redis.set.mock.calls.find(([key]) => (
+            key === `miniracer:head-to-head:preview:${preview.body.challengeToken}`
+        ))[1]);
+        expect(stored.username).toBe('RaceFan');
+        expect(stored.subredditName).toBe('MiniRacer');
+    });
+
     it('reuses the same live post for the same user, race, and exact time', async () => {
         const service = makeService();
         const first = await createChallenge(service);

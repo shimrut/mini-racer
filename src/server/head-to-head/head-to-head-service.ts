@@ -30,6 +30,7 @@ import {
     writeHeadToHeadPostIdentityByChallengeId,
 } from './head-to-head-store.js';
 import { resolveHeadToHeadRecord, resolveHeadToHeadRecordResult } from './head-to-head-post.js';
+import { getSignedHeadToHeadContext } from './head-to-head-share.js';
 import {
     catalogCardFromRecord,
     pickNextHeadToHeadChallenge,
@@ -256,17 +257,6 @@ async function recordChallengePostUnlock(playerId: string, trackKey: string) {
 function requestUserId(context: HeadToHeadRequestContext): string | undefined {
     const id = typeof context.userId === 'string' ? context.userId.trim() : '';
     return id.startsWith('t2_') ? id : undefined;
-}
-
-function signedContext(context: HeadToHeadRequestContext): {
-    username: string;
-    subredditName: string;
-} | null {
-    const username = typeof context.username === 'string' ? context.username.trim() : '';
-    const subredditName = typeof context.subredditName === 'string'
-        ? context.subredditName.trim()
-        : '';
-    return username && subredditName ? { username, subredditName } : null;
 }
 
 function challengeContext(context: HeadToHeadRequestContext): {
@@ -592,7 +582,7 @@ export function createHeadToHeadService(
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult> {
-        const request = signedContext(context);
+        const request = getSignedHeadToHeadContext(context);
         if (!request) {
             return { status: 401, body: { status: 'signed_in_required', error: 'Sign in to Reddit to challenge other players.' } };
         }
@@ -651,7 +641,7 @@ export function createHeadToHeadService(
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult> {
-        const request = signedContext(context);
+        const request = getSignedHeadToHeadContext(context);
         if (!request) {
             return {
                 status: 401,
@@ -1113,7 +1103,7 @@ export function createHeadToHeadService(
         input: Record<string, unknown>,
         context: HeadToHeadRequestContext,
     ): Promise<HeadToHeadServiceResult> {
-        const request = signedContext(context);
+        const request = getSignedHeadToHeadContext(context);
         if (!request) {
             return {
                 status: 401,
