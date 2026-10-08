@@ -2,7 +2,7 @@ import { CONFIG } from '../game/config.js';
 import { getDefaultDrawnCarAssetForGround } from '../game/car/car-skin-grounds.js';
 import { DRAWN_CAR_DRAW_PIXELS } from '../game/car/drawn-car/formula.js';
 import { getDrawnCar } from '../game/car/sprite.js';
-import { TRACK_GROUNDS, TRACK_GROUND_KEYS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
+import { TRACK_GROUNDS, getStoredTrackGroundKey, getTrackGround } from '../game/track/grounds.js';
 import { TRACK_SCHEDULE_KEYS } from '../game/track/catalog.js';
 import { buildTrackGeometry } from '../game/track/runtime.js';
 import { TRACKS } from '../game/track/tracks.js';

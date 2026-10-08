@@ -1897,7 +1897,6 @@ function drawKineticHeadline(ctx, opts) {
         x,
         y,
         color,
-        theme,
         beats,
         alignment = 'left',
         maxWidth
@@ -2334,7 +2333,6 @@ function renderArcadeCRT(ctx, width, height, timeMs, scene, options) {
     ctx.restore();
 
     const plateY = 40;
-    const plateH = 110;
     ctx.save();
     const plateAlpha = Math.min(1, intro * 1.3);
     ctx.globalAlpha = plateAlpha;
@@ -2821,10 +2819,8 @@ function renderStickerCollage(ctx, width, height, timeMs, scene, options) {
 }
 
 function renderTelemetry(ctx, width, height, timeMs, scene, options) {
-    const intro = easeOutCubic(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
     const outro = easeOutCubic(scene.outroProgress);
-    const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
     const red = '#c01d1d';
     const ink = '#111';
@@ -2974,8 +2970,6 @@ function renderTelemetry(ctx, width, height, timeMs, scene, options) {
 function renderTradingCard(ctx, width, height, timeMs, scene, options) {
     const intro = easeOutBack(scene.introProgress);
     const action = easeOutCubic(scene.actionProgress);
-    const outro = easeOutCubic(scene.outroProgress);
-    const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
 
     const bg = ctx.createLinearGradient(0, 0, width, height);
@@ -3161,8 +3155,6 @@ function drawStar(ctx, cx, cy, outerR, points) {
 }
 
 function renderCockpitPOV(ctx, width, height, timeMs, scene, options) {
-    const intro = easeOutCubic(scene.introProgress);
-    const action = easeOutCubic(scene.actionProgress);
     const outro = easeOutCubic(scene.outroProgress);
     const preset = getActivePreset();
     const track = TRACKS[state.trackKey];
@@ -4484,7 +4476,6 @@ async function exportThumbnailPack() {
     state.isPlaying = false;
     const savedStyle = state.templateStyle;
     updateStatusUi('Rendering thumbnail pack…');
-    const theme = THEMES.find((candidate) => candidate.id === state.themeId) ?? THEMES[0];
     const templateStyleIds = ['arcade-crt', 'magazine', 'sticker', 'telemetry', 'trading-card', 'cockpit'];
     try {
         let count = 0;
