@@ -65,11 +65,7 @@ export const modeRouterEngineMethods = {
 
     handleActiveRaceLapCompleted(lapTime, details) {
         if (this.activeRaceMode === 'community') return;
-        if (typeof this.handleChallengeLapCompleted === 'function') {
-            this.handleChallengeLapCompleted(lapTime, details);
-            return;
-        }
-        this.handleDailyChallengeLapCompleted?.(lapTime, details);
+        this.handleChallengeLapCompleted?.(lapTime, details);
     },
 
     handleActiveRaceWin(winData) {

@@ -88,7 +88,7 @@ describe('race engine — collision auto-restart', () => {
             restartCurrentRunAfterCollision: vi.fn(),
             handleCheckpointPassed: vi.fn(),
             handleDailyChallengeWin: vi.fn(),
-            handleDailyChallengeLapCompleted: vi.fn(),
+            handleChallengeLapCompleted: vi.fn(),
         });
     }
 

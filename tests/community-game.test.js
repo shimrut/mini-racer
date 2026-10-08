@@ -121,7 +121,6 @@ describe('Community race isolation', () => {
             handleCommunityWin: communityEngineMethods.handleCommunityWin,
             handleDailyChallengeWin: vi.fn(),
             handleChallengeLapCompleted: vi.fn(),
-            handleDailyChallengeLapCompleted: vi.fn(),
         };
         modeRouterEngineMethods.handleActiveRaceLapCompleted.call(engine, 12.345, {});
         modeRouterEngineMethods.handleActiveRaceWin.call(engine, {
@@ -129,7 +128,6 @@ describe('Community race isolation', () => {
             lapTime: 12.345,
         });
         expect(engine.handleChallengeLapCompleted).not.toHaveBeenCalled();
-        expect(engine.handleDailyChallengeLapCompleted).not.toHaveBeenCalled();
         expect(engine.handleDailyChallengeWin).not.toHaveBeenCalled();
         expect(modal.showModal).toHaveBeenCalledWith(
             'FINISHED',

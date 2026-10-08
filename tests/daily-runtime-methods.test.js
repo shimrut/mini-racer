@@ -26,4 +26,12 @@ describe('Daily runtime methods', () => {
             expect(methods[name], name).toBe(method);
         }
     });
+
+    it('gives every race mode the shared lap handler', async () => {
+        for (const mode of ['home', 'daily', 'campaign', 'challenge']) {
+            const { methods } = await loadModeRuntime(mode);
+            expect(methods.handleChallengeLapCompleted, mode)
+                .toBe(challengeRunEngineMethods.handleChallengeLapCompleted);
+        }
+    });
 });

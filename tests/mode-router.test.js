@@ -21,7 +21,6 @@ function createEngine(overrides = {}) {
         handleHeadToHeadWin: vi.fn(),
         handleDailyChallengeWin: vi.fn(),
         handleChallengeLapCompleted: vi.fn(),
-        handleDailyChallengeLapCompleted: vi.fn(),
         showCampaignLobby: vi.fn(() => 'campaign-lobby'),
         showChallengeLobby: vi.fn(() => 'challenge-lobby'),
         loadChallengeLobby: vi.fn(() => 'challenge-lobby'),
@@ -70,7 +69,6 @@ describe('mode router', () => {
                 4.5,
                 { completedLaps: 1 },
             );
-            expect(engine.handleDailyChallengeLapCompleted).not.toHaveBeenCalled();
         }
     });
 

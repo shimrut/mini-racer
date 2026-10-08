@@ -7,12 +7,10 @@ import {
 import { normalizeCheckpointTimesSec } from "../shared/checkpoint-times.js";
 import { isVerificationQueueSubmissionBlocked } from "../scoreboard/verification-queue.js";
 import { normalizePbGhostRecord } from "../ghost/pb-ghost.js";
-import { createPersonalBestPaceBaseline, getLapPaceDeltaSec } from "../ghost/pb-pace.js";
+import { createPersonalBestPaceBaseline } from "../ghost/pb-pace.js";
 import {
-  buildLapRecord,
   createModalActions,
   isNewBestResult,
-  pushRecentLap,
 } from "../race/result-flow.js";
 import {
   formatDailyChallengeResultLabel,
@@ -1055,72 +1053,6 @@ export const dailyChallengeEngineMethods = {
   selectDailyCarouselChallenge(challengeId) {
     if (!challengeId) return false;
     return Boolean(this.dailyCarousel?.selectChallenge?.(challengeId));
-  },
-
-  handleDailyChallengeLapCompleted(lapTime, {
-    elapsedTimeSec = null,
-    completedLaps = null,
-    requiredLaps = null,
-    isFinalLap = false,
-  } = {}) {
-    if (!this.currentChallengeRun || !Number.isFinite(lapTime)) {
-      this.updateDailyChallengeHud();
-      this.requestRender();
-      return;
-    }
-
-    const lapNumber = Number.isInteger(completedLaps)
-      ? completedLaps
-      : this.currentChallengeRun.completedLaps || 0;
-    const raceElapsedTime = Number.isFinite(elapsedTimeSec)
-      ? elapsedTimeSec
-      : this.currentTime;
-    const requiredLapCount = Number.isInteger(requiredLaps)
-      ? requiredLaps
-      : this.currentChallengeRun.requiredLaps;
-    const paceBaseline = this.getActiveRacePaceBaseline?.()
-      ?? this.raceComparisonTarget
-      ?? this.activePersonalBestPaceBaseline
-      ?? null;
-    const lapRecord = buildLapRecord(lapNumber, lapTime, null);
-    lapRecord.deltaVsBest = getLapPaceDeltaSec({
-      elapsedTimeSec: raceElapsedTime,
-      lapNumber,
-      requiredLaps: requiredLapCount,
-      isFinalLap,
-      paceBaseline,
-    });
-
-    pushRecentLap(this.currentChallengeRun.recentLaps, lapRecord);
-
-    this.currentChallengeRun.bestLapSecBeforeLastLap =
-      this.currentChallengeRun.bestLap?.time ?? null;
-
-    if (
-      !this.currentChallengeRun.bestLap ||
-      lapTime < this.currentChallengeRun.bestLap.time
-    ) {
-      this.currentChallengeRun.bestLap = {
-        lapNumber,
-        time: lapTime,
-      };
-    }
-
-    if (!isFinalLap) {
-      this.hud.showLapFlash({
-        lapNumber,
-        lapTime,
-        deltaVsBest: lapRecord.deltaVsBest,
-        isBest: false,
-        isNewBest: false,
-        completedLaps: lapNumber,
-        requiredLaps: requiredLapCount,
-        elapsedTimeSec: raceElapsedTime,
-      });
-      this._resetLapTrailAfterIntermediateLap();
-    }
-    this.updateDailyChallengeHud();
-    this.requestRender();
   },
 
   getInvalidWinDataReason(winData) {
