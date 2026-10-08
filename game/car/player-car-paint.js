@@ -19,8 +19,7 @@ export function readPlayerCarPaint(assetName) {
     return readPlayerCarPaints()[assetName] ?? {};
 }
 
-// Replaces the cache when applying the authoritative owner's profile. Older
-// profiles without paints clear another owner's locally cached colors.
+// Replaces the cache with the owner's profile, so no other owner's colors remain.
 export function applyPlayerCarPaints(value) {
     const paints = normalizeCarPaints(value);
     if (typeof window === 'undefined' || !window.localStorage) return paints;
@@ -42,8 +41,7 @@ export function writePlayerCarPaint(assetName, channel, color) {
     if (!CAR_PAINT_CHANNELS.some(({ id }) => id === channel)) {
         return paints[assetName] ?? {};
     }
-    // A preset choice removes just this override, retaining its original
-    // hand-authored tones and the other customized channels.
+    // A preset choice removes only this override.
     if (color === null) {
         const remaining = { ...paints[assetName] };
         delete remaining[channel];

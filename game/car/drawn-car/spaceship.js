@@ -12,14 +12,7 @@ import { noseStripe } from "./parts/nose-stripe.js";
 import { shipWing } from "./parts/ship-wing.js";
 import { sideIntake } from "./parts/side-intake.js";
 
-// The Spaceship: a racer for space tracks, seen from above, nose to the
-// right. It is as long and as wide as the Formula car, and it is drawn with
-// the parts of the car: the body with its side pods and raised center, the
-// glass cockpit, the front wing, the side intakes and vents, and the tail
-// light. Swept wings with end plates, two engine pods with flames, and a red
-// and a green light at the wing tips make it a spaceship. The flames grow
-// with the speed and turn against the steering, as the nozzle of the jet ski
-// does. formula.js tells how a car file works.
+// The Spaceship: Formula body parts plus swept wings, engine pods with flames and wing-tip lights.
 
 const POD_Y = -17.5;
 const NOZZLE_X = -46;
@@ -34,8 +27,7 @@ export const SPACESHIP = {
     tertiary: "#ff7a1a",
   },
 
-  // Each area takes "main", "accent", "tertiary", a color, or null. The
-  // areas of the car body, cockpit and front wing work as on the car.
+  // Areas take main, accent, tertiary, a color or null; body, cockpit and front wing work as on the car.
   decals: {
     body: "main",
     centerStripe: "accent",

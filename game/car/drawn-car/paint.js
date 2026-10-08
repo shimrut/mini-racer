@@ -1,6 +1,4 @@
-// Drawing helpers that the car parts share. A "trace" function adds a shape
-// to the current path. It does not start a new path, so that one shape can be
-// used to fill, to outline and to clip.
+// Shared drawing helpers; a trace adds to the current path, so one shape can fill, outline and clip.
 
 // Adds a closed, smooth line through the points.
 export function traceSmooth(ctx, points) {
@@ -23,9 +21,7 @@ export function traceSmooth(ctx, points) {
   ctx.closePath();
 }
 
-// The full outline of a shape that has the same left and right side. The
-// points give the left half (negative y), from the rear to the front. The
-// first and the last point must be on the center line (y = 0).
+// Traces a symmetric shape from its left half, rear to front; the end points are on y = 0.
 export function mirrorHalf(halfPoints) {
   const mirror = halfPoints.slice(1, -1).reverse().map(([x, y]) => [x, -y]);
   return [...halfPoints, ...mirror];
@@ -96,9 +92,7 @@ export function edgeBand(ctx, trace, color, width) {
   });
 }
 
-// Paints a band along the edges that face one direction, inside the shape.
-// A positive depth paints the edges that face +y (the lower edges), a
-// negative depth paints the edges that face -y.
+// Paints a band inside the edges that face +y (positive depth) or -y (negative depth).
 export function facingBand(ctx, trace, color, depth) {
   insideShape(ctx, trace, () => {
     ctx.beginPath();
@@ -142,9 +136,7 @@ export function isHexColor(value) {
   return typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
 }
 
-// The four tones of one paint color: the color itself, its shadow, its deep
-// shadow and its highlight. A color can also come as an object that gives
-// some tones by hand; the missing tones are made from the base.
+// Base, shadow, deep shadow and highlight of a color; an object may set some tones by hand.
 export function paintTones(color) {
   const tones = typeof color === "string" ? { base: color } : { ...color };
   if (!isHexColor(tones.base)) return null;

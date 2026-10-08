@@ -1,12 +1,6 @@
 import { facingBand, fillWithOutline, mirrorHalf, traceSmooth } from "../paint.js";
 
-// The long seat of a jet ski, along the middle behind the handlebars. It
-// has a light top where the light falls, and a seam near its edge.
-//
-// Decal area:
-//   seat  the cover of the seat; with no paint, it is dark
-//
-// The shape gives its left half (negative y), from the rear to the front.
+// The jet ski seat; the shape gives the left half, rear to front. Decal area: seat (dark when unpainted).
 export const jetSkiSeat = {
   defaults: {
     shape: [[-39, 0], [-39, -6], [-35, -7.6], [-18, -8.2], [-6, -8.6], [0, -7.8], [3.6, -4.6], [4.2, 0]],

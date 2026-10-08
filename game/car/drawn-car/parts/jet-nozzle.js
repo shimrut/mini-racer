@@ -1,9 +1,6 @@
 import { fillWithOutline, traceRoundRect } from "../paint.js";
 
-// The jet nozzle at the stern of a jet ski. The part origin is its mount on
-// the stern, and the nozzle sticks out to the rear. It turns with the
-// steering, against the car's front wheels: to turn right, its rear end
-// swings right. Place it with steerScale -1.
+// The jet ski nozzle; it steers against the front wheels, so place it with steerScale -1.
 export const jetNozzle = {
   defaults: {
     length: 5,

@@ -1,16 +1,7 @@
 import { fillWithOutline, insideShape, traceRoundRect } from "../paint.js";
 
-// The rear wing: a flat plate across the back of the car. A dark band runs
-// along its front edge, and a thin line shows the flap near its rear edge.
-//
-// Decal areas:
-//   rearWing      the paint of the whole plate
-//   rearWingFlap  the strip from the rear edge to the flap line
-//   rearWingEnds  the two end plates, at the outer ends of the wing
-//
-// With "endFront" or "endBack", the end plates are tall plates of their own:
-// they stand past the edges of the wing, and they have the wing paint when
-// "rearWingEnds" has no paint.
+// The rear wing; endFront/endBack make the end plates tall plates with the wing paint as fallback.
+// Decal areas: rearWing, rearWingFlap, rearWingEnds.
 export const rearWing = {
   defaults: {
     from: -49.6,
@@ -23,8 +14,7 @@ export const rearWing = {
     flapWidth: 20,
     // The length of each end plate, across the car.
     endLength: 4.2,
-    // The end plates stand this far in front of the wing and behind it.
-    // Both 0: the end plates are only paint on the wing.
+    // End plate reach in front of and behind the wing; both 0 means paint only.
     endFront: 0,
     endBack: 0,
   },

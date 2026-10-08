@@ -1,13 +1,9 @@
 import { RALLY_CAR } from "./rally.js";
 import { mud } from "./parts/mud.js";
 
-// The Snow car: the Rally car made for ice and snow. Its knobby tires have
-// metal studs and packed snow between the blocks, the light pod has four
-// lamps, and snow clumps and frost cover the body instead of mud.
-// formula.js tells how a car file works.
+// The Snow car: the Rally car with studded tires, a four-lamp pod, and snow and frost in place of mud.
 
-// The snow clumps sit on the top of the side pods, the engine cover, the
-// wings and the nose.
+// Snow clumps on the side pods, engine cover, wings and nose.
 const SNOW = {
   seed: 3,
   zones: [
@@ -57,8 +53,7 @@ export const SNOW_CAR = {
     mudLight: "#ffffff",
   },
 
-  // The Rally parts, with studded tires, a wider light pod, and snow in the
-  // place of the mud.
+  // Rally parts with studded tires, a wider light pod and snow.
   parts: RALLY_CAR.parts.map((part) => {
     if (part.id === "rearTire" || part.id === "frontTire") {
       return { ...part, settings: { ...part.settings, studs: true } };

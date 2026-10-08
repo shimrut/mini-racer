@@ -6,8 +6,7 @@ export { PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET_NAME } from "./car-unlock
 
 const drawnCars = new Map();
 
-// Rendering callers supply their own paint and decal style. Generic assets remain the preset;
-// saved picks and unlock rules keep the original asset names.
+// Callers pass their own paint and decals; saved picks and unlock rules keep the original asset names.
 export function getCarSpriteCacheKey(assetName, options) {
   const car = getDrawnCar(assetName, options);
   if (!car) return assetName;
@@ -22,9 +21,7 @@ export function getCarPaintColors(assetName, options) {
   ]));
 }
 
-// The car for a skin that is drawn in code, or null for an image skin. There
-// is one preset and one latest customized variant per asset, so another caller's
-// preset preview does not evict the player's current car. Its sprite is at rest.
+// The drawn car at rest, or null for an image skin; one preset and one custom variant are cached per asset.
 export function getDrawnCar(assetName, { paint = null, decalStyle = null } = {}) {
   if (!isDrawnCarAsset(assetName)) return null;
   const skin = DRAWN_CAR_SKINS[assetName];

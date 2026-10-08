@@ -1,10 +1,6 @@
 import { facingBand, fillWithOutline, traceRoundRect } from "../paint.js";
 
-// The air scoop on the engine cover, behind the cockpit. It is a painted box
-// with a dark mouth at its front end.
-//
-// Decal area:
-//   scoop  the box
+// The air scoop behind the cockpit. Decal area: scoop.
 export const airScoop = {
   defaults: {
     from: -27,

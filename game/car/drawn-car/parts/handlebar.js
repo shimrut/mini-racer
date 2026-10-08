@@ -1,14 +1,9 @@
 import { fillWithOutline, traceRoundRect } from "../paint.js";
 
-// The handlebars of a jet ski. The part origin is the steering column. The
-// bars turn with the steering. The rider holds the grips at their ends.
-//
-// Decal area:
-//   barPad  the pad on the steering column
+// Jet ski handlebars; the origin is the steering column. Decal area: barPad.
 export const handlebar = {
   defaults: {
-    // The distance from the column to each grip, and how far the ends
-    // sweep back.
+    // Column-to-grip distance and grip sweep.
     halfWidth: 11.5,
     sweep: 1.6,
     grip: 3.4,

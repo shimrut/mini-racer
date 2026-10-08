@@ -7,16 +7,12 @@ import { louvers } from "./parts/louvers.js";
 import { mud } from "./parts/mud.js";
 import { mudFlap } from "./parts/mud-flap.js";
 
-// The Rally car: the Formula car made for dirt roads. It has wider knobby
-// tires, mud flaps, a light pod on the nose, an air scoop behind the cockpit,
-// vent slots on the side pods and mud on the body. formula.js tells how a
-// car file works.
+// The Rally car: the Formula car with knobby tires, mud flaps, light pod, air scoop, vents and mud.
 
 const REAR_TIRE = { length: 18.4, width: 12.6 };
 const FRONT_TIRE = { length: 17.6, width: 11.2 };
 
-// The wider tires keep their inner edges where the Formula tires have them,
-// so the arms still meet them.
+// Wider tires keep the Formula inner edge, so the arms still meet them.
 const REAR_TIRE_Y = -18.2 - REAR_TIRE.width / 2;
 const FRONT_TIRE_Y = -17.05 - FRONT_TIRE.width / 2;
 

@@ -9,17 +9,7 @@ import { navLight } from "./parts/nav-light.js";
 import { rider } from "./parts/rider.js";
 import { wake } from "./parts/wake.js";
 
-// The Jet Ski: the vehicle for water tracks, seen from above, bow to the
-// right. It is as long and as wide as the Formula car, and it is drawn like
-// the car: the hull has darker side decks and a raised center with a light
-// rim, and the windscreen is glass like the car cockpit. It has black rubber
-// rails and sponsons on its sides, a footwell with a non-slip mat on each
-// side of a long seat, a grab handle, mirrors, two headlights and two tail
-// lights that come on when it slows down. The handlebars turn with the
-// steering, and the jet nozzle on the stern turns against them. A rider in
-// a life vest and a helmet holds the grips. The jet leaves a wash of foam,
-// and bow waves run along the hull. Both grow with the speed. formula.js
-// tells how a car file works.
+// The Jet Ski for water tracks, Formula-sized; its nozzle steers against the bars and its wake grows with speed.
 
 export const JET_SKI = {
   boxSize: FORMULA_CAR.boxSize,

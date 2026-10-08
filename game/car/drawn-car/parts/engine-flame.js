@@ -1,7 +1,4 @@
-// The flame of one spaceship engine, behind its nozzle, on the left side.
-// Place it with mirror: true for the right engine. The flame is a flat
-// point of light with a white core. It grows with the speed and flickers
-// a little. It is drawn under the pod.
+// A spaceship engine flame, left side (mirror for the right); grows with speed and is drawn under the pod.
 export const engineFlame = {
   moves: true,
   defaults: {
@@ -10,8 +7,7 @@ export const engineFlame = {
     x: -45,
     y: -12.5,
     halfWidth: 3.4,
-    // The flame length at rest and at full speed. The box of the car ends
-    // at x = -55.
+    // Flame length at rest and at full speed; the car box ends at x = -55.
     length: [2.5, 8],
     flicker: 0.9,
   },

@@ -1,8 +1,4 @@
-// The hub: the light oval on the side wall of a tire, where the axle ends and
-// the suspension arms meet the wheel. It is its own part, so that a skin can
-// give it its own color.
-//
-// Give it the same length, width, side wall and steering as its tire.
+// The tire hub, its own part so a skin can color it; give it the same size and steering as its tire.
 export const hub = {
   defaults: {
     length: 17.8,

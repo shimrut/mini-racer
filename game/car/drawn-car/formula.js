@@ -10,30 +10,11 @@ import { sideIntake } from "./parts/side-intake.js";
 import { suspensionArm } from "./parts/suspension-arm.js";
 import { tire } from "./parts/tire.js";
 
-// The Formula car: the red open-wheel car, seen from above, nose to the right.
-//
-// All sizes are in car units. The car is 100 units long: the rear wing is at
-// x = -50 and the nose tip is at x = 50. Negative y is the left side of the
-// car and positive y is the right side.
-//
-// "parts" is the list of parts, in drawing order: a part covers the parts
-// before it. Each item has:
-//   id        the name that a skin uses to change this part
-//   part      the part file that draws it
-//   settings  changes to the part's own settings (sizes and shapes)
-//   mirror    true: the part is also drawn as a mirror copy on the right side
-//   steers    true: the part turns with the steering, around "pivot"
-//   steerScale  optional: a multiplier on the steering angle; -1 turns the
-//             part the other way
-//   pivot     the turn point, from the center of the part (default: the
-//             center)
-//
-// A tire and its hub use the same sizes.
+// The Formula car from above, nose on +x: 100 units long (x = -50 to 50), -y is the left side.
+// Each part: id (for skins), part, settings, mirror, steers/steerScale, pivot; later parts cover earlier ones.
 const FRONT_TIRE = { length: 17, width: 9.5 };
 
-// "livery" gives the three paint colors, and "decals" gives the paint of
-// each decal area. game/car/drawn-car.js tells how they work. "colors" are
-// the materials that are not paint: glass, frame, tires, lights.
+// livery: three paint colors; decals: paint per area; colors: glass, frame, tires and lights.
 export const FORMULA_CAR = {
   // The square that holds the car. The car is 100 units of it.
   boxSize: 110,
@@ -90,11 +71,9 @@ export const FORMULA_CAR = {
     { id: "frontArmBack", part: suspensionArm, mirror: true, settings: { from: [26.3, -17.8], to: [19.1, -8] } },
     { id: "frontArmFront", part: suspensionArm, mirror: true, settings: { from: [27.3, -17.8], to: [31.8, -5.5] } },
 
-    // Each tire is a mirror pair, so the side wall and the hub face the body
-    // on both sides of the car.
+    // Mirror pairs, so the side wall and hub face the body on both sides.
     { id: "rearTire", part: tire, at: [-29.8, -23.6], mirror: true },
-    // A front tire and its hub turn in place, on the center of the tire. The
-    // arms stay still.
+    // Front tires and hubs turn on the tire center; the arms stay still.
     { id: "frontTire", part: tire, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
     { id: "rearHub", part: hub, at: [-29.8, -23.6], mirror: true },
     { id: "frontHub", part: hub, at: [26.8, -21.8], settings: FRONT_TIRE, mirror: true, steers: true },
@@ -116,8 +95,7 @@ export const FORMULA_CAR = {
     responseSec: 0.06,
   },
   wheelSpin: {
-    // The tires roll by this distance in one frame, or less. A larger step
-    // makes a fast wheel look like it turns backward.
+    // Max roll per frame; a larger step makes a fast wheel look reversed.
     maxStepPerFrame: 1.3,
     // At this distance in one frame, the grooves are fully blurred.
     blurStep: 3.5,
@@ -135,8 +113,7 @@ export const FORMULA_CAR = {
 // The race and Mapmaker draw this car in a square of this many pixels.
 export const DRAWN_CAR_DRAW_PIXELS = 52;
 
-// Width of this picture in world units. The rear tires are the widest part.
-// pixelsPerWorldUnit is the race grid size: that many pixels are one unit.
+// Picture width in world units (the rear tires are widest); pixelsPerWorldUnit is the race grid size.
 export function normalCarPictureWidth(pixelsPerWorldUnit) {
   const rear = FORMULA_CAR.parts.find((part) => part.id === "rearTire");
   const tireWidth = rear.settings?.width ?? tire.defaults.width;

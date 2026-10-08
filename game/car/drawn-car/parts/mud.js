@@ -1,21 +1,7 @@
 import { rgba } from "../paint.js";
 
-// Dirt on the car: splashes with small drops around them. The "mud" and
-// "mudLight" colors give the look: brown for mud, white for snow. The dirt
-// goes only where the car already has paint, so it never shows on the
-// ground. It must come after the parts it covers, in the same group of parts
-// that do not move.
-//
-// Each zone gives an area of the left side of the car, the number of
-// splashes and their size. The right side gets its own splashes, so the two
-// sides do not look the same. The seed makes the same splashes every time.
-//
-// "lumps" is the number of blobs in one splash: more lumps give a soft clump,
-// as for snow. "drops" is the smallest and largest number of small drops
-// around a splash, and "opacity" the range of its strength.
-//
-// A thin film of dust, or frost, also covers the rear of the car. "dust" is
-// its strength at the rear edge, and "dustTo" is where it ends.
+// Mud or snow splashes, clipped to painted areas; place after the parts it covers, in the same still group.
+// Zones set area, count and size per side; seed fixes the pattern; lumps, drops, opacity, dust and dustTo set the look.
 export const mud = {
   defaults: {
     seed: 7,

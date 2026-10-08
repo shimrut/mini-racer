@@ -1,19 +1,9 @@
 import { facingBand, fillShape, fillWithOutline, insideShape, mix, traceRoundedPolygon } from "../paint.js";
 
-// One swept wing of the spaceship, on the left side, drawn like the wings of
-// the car: a painted blade on a dark under blade that shows along the rear
-// edge. Place it with mirror: true for the right wing. A light band runs
-// along the front edge and a dark band along the rear edge. Thin panel
-// lines run along the wing, and an end plate closes the tip.
-//
-// Decal areas:
-//   wings        the paint of the wing
-//   wingTips     the outer end of the wing and its end plate
-//   wingStripes  a stripe along the front edge
+// A spaceship wing, left side (mirror for the right). Decal areas: wings, wingTips, wingStripes.
 export const shipWing = {
   defaults: {
-    // The corners: the front and rear of the root, then the front and rear
-    // of the tip.
+    // Corners: root front and rear, then tip front and rear.
     corners: [[-2, -14], [-26, -28.6], [-34.5, -28.6], [-37, -12.5]],
     radius: 1.6,
     // The under blade shows behind the rear edge by this length.

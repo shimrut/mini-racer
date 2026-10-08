@@ -1,7 +1,6 @@
 import { fillWithOutline, traceRoundRect } from "../paint.js";
 
-// The rally light pod on the nose: a dark bar across the nose with round
-// lamps in a row.
+// The rally light pod across the nose.
 export const lightPod = {
   defaults: {
     x: 43.4,

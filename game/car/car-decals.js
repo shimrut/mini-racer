@@ -1,7 +1,6 @@
 import { DRAWN_CAR_ASSET_NAMES, DRAWN_CAR_SKINS, isDrawnCarAsset } from './drawn-car-skins.js';
 
-// Existing skins supply paired body and wing maps for the same model. A
-// style changes those maps without changing the skin's colors or identity.
+// A decal style swaps a skin's body and wing maps; colors and skin identity stay.
 export function getCarDecalStyleOptions(assetName) {
     if (!isDrawnCarAsset(assetName)) return [];
     const { car } = DRAWN_CAR_SKINS[assetName];
@@ -16,8 +15,7 @@ export function normalizeCarDecalStyle(assetName, id) {
     return style;
 }
 
-// Bound profile keys to drawn skins and choices to their compatible model.
-// An explicit original style remains a choice, including during guest Merge.
+// Keys must be drawn skins and choices must fit the model; an explicit original style is a choice.
 export function normalizeCarDecals(value) {
     const decals = {};
     if (!value || typeof value !== 'object' || Array.isArray(value)) return decals;

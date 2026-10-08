@@ -1,14 +1,6 @@
 import { facingBand, fillShape, fillWithOutline, insideShape, mix, traceRoundRect } from "../paint.js";
 
-// One engine pod of the spaceship, on the left side, drawn like the side pods
-// of the car: a light upper edge and a dark lower edge. It has a dark intake
-// at its front end, a ring of paint, panel lines, a row of vent slots, and
-// the nozzle at its rear end. The inside of the nozzle glows. Place it with
-// mirror: true for the right pod.
-//
-// Decal areas:
-//   pods     the paint of the pod; with no paint, it is bare metal
-//   podRing  a ring of paint around the front part of the pod
+// A spaceship engine pod, left side (mirror for the right). Decal areas: pods (bare metal unpainted), podRing.
 export const enginePod = {
   defaults: {
     from: -46,

@@ -1,8 +1,6 @@
 import { fillWithOutline } from "../paint.js";
 
-// A small round light, such as a red or green light at a wing tip of the
-// spaceship or a lamp on the nose of the jet ski. It has a white shine on
-// its upper side.
+// A small round light, such as a wing-tip or nose lamp.
 export const navLight = {
   defaults: {
     x: 0,

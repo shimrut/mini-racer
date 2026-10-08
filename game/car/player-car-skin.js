@@ -107,8 +107,7 @@ export const PLAYER_CAR_SKINS = Object.freeze(
     )
 );
 
-// These cars have their own Garage tab, so the Legacy tab leaves them out.
-// Their cars stay valid.
+// These cars have their own Garage tab, so Legacy leaves them out; they stay valid.
 const OWN_TAB_SKIN_SECTION_IDS = Object.freeze(['formula', 'grip', 'dirt', 'snow', 'water', 'space']);
 
 // The Legacy tab shows only the cars of live grounds that have no tab of their own.
@@ -199,8 +198,7 @@ export function readPlayerGroundCarSkinChoice(ground) {
     return isUsableGroundSkin(name, key) ? name : null;
 }
 
-// The skin the player drives on a ground: their pick, else the ground's
-// default skin, else their tarmac skin when the ground has no skins yet.
+// The player's pick, else the ground default, else their tarmac skin.
 export function readPlayerCarSkinAssetName(ground = 'tarmac') {
     const key = normalizeCarSkinGround(ground);
     const picked = readPlayerGroundCarSkinChoice(key);
@@ -212,9 +210,7 @@ export function readPlayerCarSkinAssetName(ground = 'tarmac') {
         : readPlayerCarSkinAssetName('tarmac');
 }
 
-// Stores a skin for its own ground. An invalid skin resets tarmac to the stock
-// car and clears the pick of any other ground. Returns the skin the player now drives
-// on that ground.
+// Saves a skin for its ground (invalid: stock car on tarmac, no pick elsewhere) and returns the skin now driven there.
 export function writePlayerCarSkinAssetName(assetName, ground = getCarAssetGround(assetName)) {
     const key = normalizeCarSkinGround(ground);
     const fallback = key === 'tarmac' ? STOCK_CAR_ASSET_NAME : null;

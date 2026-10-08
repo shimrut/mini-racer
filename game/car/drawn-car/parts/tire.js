@@ -1,13 +1,6 @@
 import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 
-// A tire seen from above. The tire is a drum: it is light at the center and
-// dark at the front and rear ends. The grooves go around the drum, so they
-// move fast at the center and slow at the ends when the wheel rolls. The top
-// of a rolling tire moves forward, so the grooves move toward the nose.
-//
-// The side wall is on the +y edge. Place the left tire and mirror it, so the
-// side wall faces the body on both sides. The light oval on the side wall
-// is the hub, which is its own part.
+// A road tire; its grooves roll toward the nose, side wall on +y, mirror for the right.
 export const tire = {
   moves: true,
   defaults: {

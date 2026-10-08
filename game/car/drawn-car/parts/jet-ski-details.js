@@ -1,10 +1,8 @@
 import { facingBand, fillWithOutline, insideShape, traceRoundRect, traceRoundedPolygon } from "../paint.js";
 
-// Small parts of the jet ski: the side sponsons, the windscreen, the
-// mirrors and the grab handle.
+// Small jet ski parts: sponsons, windscreen, mirrors and grab handle.
 
-// A sponson: a short fin of black plastic on the side of the hull, near the
-// stern, on the left side. Place it with mirror: true.
+// A side sponson near the stern, left side (mirror for the right).
 export const sponson = {
   defaults: {
     corners: [[-42.5, -23], [-25, -25.2], [-28.5, -28.6], [-40.5, -28.2]],
@@ -18,9 +16,7 @@ export const sponson = {
   },
 };
 
-// The windscreen in front of the handlebars: a low curved glass, drawn like
-// the glass of the car cockpit, dark at its rear edge with a shine on its
-// upper side.
+// The low windscreen, drawn like the cockpit glass.
 export const windscreen = {
   defaults: {
     x: 19,
@@ -60,11 +56,7 @@ export const windscreen = {
   },
 };
 
-// A rear-view mirror on the left side of the hood: a short stalk and a
-// painted housing with glass on its rear side. Place it with mirror: true.
-//
-// Decal area:
-//   mirrors  the housing; with no paint, it takes the hull paint
+// A left rear-view mirror (mirror for the right). Decal area: mirrors (hull paint when unpainted).
 export const rearMirror = {
   defaults: {
     base: [12.5, -15.4],
@@ -97,8 +89,7 @@ export const rearMirror = {
   },
 };
 
-// The grab handle behind the seat: a bar across the deck with a light line
-// along its top.
+// The grab handle behind the seat.
 export const grabHandle = {
   defaults: {
     x: -41.5,

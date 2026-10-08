@@ -1,43 +1,6 @@
-// Garage skins that game/car/drawn-car.js draws in code. They have no image
-// file. The key is the skin name that the garage, the unlock rules and the
-// server keep for the player. A name whose last part starts with mr_grip_,
-// mr_dirt_, mr_snow_, mr_water_ or mr_space_ is a skin for that ground, as
-// for the image skins.
-//
-// To make a skin, add an entry:
-//   label   the name in the garage
-//   series  the garage section, such as "formula"
-//   car     the car file in game/car/drawn-car/: "formula", "circuit",
-//           "rally", "snow", "jetski" or "spaceship"
-//   livery  the main, accent and tertiary colors
-//   decals  the paint of each area: "main", "accent", "tertiary", a color
-//           such as "#ffffff", or null for no paint
-//   colors  optional: new material colors, such as the rally lamps
-//   parts   optional: changes to one part, such as a new mud pattern
-// An area that the skin does not name keeps the paint of the car file.
-//
-// The decal areas of the Formula car:
-//   body, centerStripe, sidePodStripes, noseTip, noseStripe, cockpitRim,
-//   intakes, rearWing, rearWingFlap, rearWingEnds, frontWing,
-//   frontWingTips, frontWingEdge
-// The Circuit car has the same areas.
-// The Rally and Snow cars have the same areas, and also:
-//   scoop
-// The Jet Ski has other areas:
-//   hull, hullStripes, hoodStripe, noseTip, seat, mirrors, barPad, helmet,
-//   vest
-// The Spaceship has the areas of the Formula car body, cockpit and front
-// wing, and also:
-//   wings, wingTips, wingStripes, pods, podRing
-//
-// For example, a blue car with orange wing ends and green side stripes:
-//   'drawn/formula-blue': {
-//       label: 'Blue', series: 'formula', car: 'formula',
-//       livery: { main: '#1f4fe0', accent: '#ff6a00', tertiary: '#b6ff3a' },
-//       decals: { rearWingEnds: 'accent', frontWingTips: 'accent', sidePodStripes: 'tertiary' },
-//   },
-//
-// This file holds only data, because the server reads the skin names.
+// Garage skins drawn in code (drawn-car.js); the key is the saved skin name and its mr_<ground>_ part sets the ground.
+// Entry: label, series, car (formula|circuit|rally|snow|jetski|spaceship), livery, decals, optional colors and parts.
+// Each part file lists its decal areas. Data only, because the server reads the names.
 
 export const DRAWN_CAR_SKINS = Object.freeze({
     'drawn/formula-red': Object.freeze({
@@ -82,8 +45,7 @@ export const DRAWN_CAR_SKINS = Object.freeze({
             frontWingTips: 'tertiary',
         }),
     }),
-    // Circuit skins: players drive them on circuit tracks. The end plates of
-    // the rear wing take paint, so each skin shows its wing from far away.
+    // Circuit skins paint the rear wing end plates, so each shows from far away.
     'drawn/mr_grip_circuit': Object.freeze({
         label: 'Red',
         series: 'grip',
@@ -117,8 +79,7 @@ export const DRAWN_CAR_SKINS = Object.freeze({
         livery: Object.freeze({ main: '#1c1e22', accent: '#d9a520', tertiary: '#ffffff' }),
         decals: Object.freeze({ sidePodStripes: 'accent', noseStripe: 'accent', rearWingEnds: 'accent' }),
     }),
-    // Dirt skins: players drive them on dirt tracks. Each rally skin has its
-    // own mud pattern, so no two look the same.
+    // Dirt skins: each rally skin has its own mud pattern.
     'drawn/mr_dirt_rally': Object.freeze({
         label: 'Red',
         series: 'dirt',
@@ -185,8 +146,7 @@ export const DRAWN_CAR_SKINS = Object.freeze({
         colors: Object.freeze({ lamp: '#f4f7ff', lampShine: '#ffffff' }),
         parts: Object.freeze({ mud: Object.freeze({ settings: Object.freeze({ seed: 41 }) }) }),
     }),
-    // Snow skins: players drive them on snow tracks. Each has its own snow
-    // pattern.
+    // Snow skins: each has its own snow pattern.
     'drawn/mr_snow_ice': Object.freeze({
         label: 'White',
         series: 'snow',

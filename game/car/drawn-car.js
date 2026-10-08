@@ -7,44 +7,8 @@ import { SPACESHIP } from "./drawn-car/spaceship.js";
 import { isHexColor, paintTones } from "./drawn-car/paint.js";
 import { DRAWN_CAR_SKINS, isDrawnCarAsset } from "./drawn-car-skins.js";
 
-// Draws a car in code from its parts. Each part is its own file in
-// game/car/drawn-car/parts/, and a car file such as
-// game/car/drawn-car/formula.js puts the parts in place and gives the colors.
-//
-// A part is an object with:
-//   defaults    its own settings: sizes and shapes
-//   moves       true when its look changes while the car drives
-//   draw()      draws the part in car units
-//   drawGround() optional: draws on the ground below the car
-//
-// The paint of a car has three colors, the livery:
-//   main      the body color
-//   accent    the second color
-//   tertiary  the third color
-// Each color is one value, such as "#1e6fe8". The shadow, deep shadow and
-// highlight tones come from it. To set a tone by hand, give an object:
-//   { base: "#f90815", shade: "#b40106", deep: "#960000", light: "#ff3c40" }
-//
-// The decals are the areas of the car that take paint. Each area takes
-// "main", "accent", "tertiary", a color such as "#ffffff", or null for no
-// paint. The car file lists the areas and their default paint.
-//
-// A skin changes a car without a copy of it:
-//   livery            new main, accent or tertiary colors
-//   decals            new paint for some areas
-//   colors            new colors for the materials: glass, tires, frame
-//   parts[id].colors  new material colors for one part
-//   parts[id].settings  size or shape changes for one part
-//   parts[id].part    a different part file in that place
-//   parts[id].hidden  true: the part is not drawn
-//
-// Three things move: the front wheels turn with the steering, the tires roll
-// with the speed, and the brake light comes on when the car loses speed
-// quickly. The parts that do not move are drawn one time and kept.
-//
-// The jet ski and the spaceship are drawn in the same way. They have no
-// wheels: the handlebars and the jet nozzle turn with the steering, and the
-// wake and the engine flames grow with the speed.
+// Draws a car from part files placed by a car file (drawn-car/formula.js); skins override paint or parts.
+// Only steering, tire roll, brake light, wake and flames move; still parts are drawn once and cached.
 
 export const DRAWN_CAR_MODELS = Object.freeze({
   formula: FORMULA_CAR,
@@ -55,19 +19,12 @@ export const DRAWN_CAR_MODELS = Object.freeze({
   spaceship: SPACESHIP,
 });
 
-// The motion that a part reads:
-//   steerAngle  the turn angle of the steering, in radians
-//   roll        how far the tires rolled, in car units
-//   rollBlur    0 to 1: how blurred the tire grooves are
-//   brake       0 to 1: how bright the brake light is
-//   pace        the speed of the car, in car units each second
+// Motion parts read: steerAngle (rad), roll and pace (car units), rollBlur and brake (0 to 1).
 const STILL = Object.freeze({ steerAngle: 0, roll: 0, rollBlur: 0, brake: 0, pace: 0 });
 
-// The race picture of the car is this many times larger than the car on the
-// screen. A high quality shrink of it keeps the thin lines from breaking up.
+// Oversample the race picture so thin lines survive the shrink.
 const FRAME_OVERSAMPLE = 2;
-// While the car moves, the race picture is painted again at most once in
-// this time: every second frame at 60 frames each second.
+// A moving car repaints at most every second frame at 60 fps.
 const REPAINT_INTERVAL_SEC = 1 / 40;
 // On a slow device, the race picture is painted 15 times each second.
 const SLOW_REPAINT_INTERVAL_SEC = 1 / 15;
@@ -80,9 +37,7 @@ export class DrawnCar {
     const styleSkin = isDrawnCarAsset(decalStyle) ? DRAWN_CAR_SKINS[decalStyle] : null;
     const selectedStyle = styleSkin && DRAWN_CAR_MODELS[styleSkin.car] === car ? styleSkin : null;
     this.decals = { ...car.decals, ...((selectedStyle || skin).decals || {}) };
-    // Keep the preset untouched. A custom livery needs a visible third area
-    // when its original decal layout does not use that channel. Explicitly
-    // selected decals keep their layout even when it uses fewer channels.
+    // A custom livery shows the third color even if the decals skip it; picked decals keep their layout.
     if (selectedStyle === null && paint !== null && !Object.values(this.decals).includes("tertiary")) {
       this.decals.rearWingEnds = "tertiary";
     }
@@ -112,13 +67,7 @@ export class DrawnCar {
     this.sincePaintSec = Infinity;
   }
 
-  // dt: seconds since the last frame. 0 stops all motion.
-  // speedKph: the car speed, for the brake light.
-  // speedPx: the car speed in world pixels per second, for the tires.
-  // steer: -1 is full left, 1 is full right.
-  // holding: true keeps the brake light on, as on the start grid.
-  // size: the drawn size of the car box in world pixels.
-  // lowQuality: true paints the race picture less often, for a slow device.
+  // dt 0 stops motion; steer -1..1; speedPx in world px/s; holding keeps the brake light on.
   update(dt, {
     speedKph = 0, speedPx = 0, steer = 0, holding = false, size = 52, lowQuality = false,
   } = {}) {
@@ -159,16 +108,13 @@ export class DrawnCar {
     }
   }
 
-  // The car at rest, with straight wheels and the brake light off. Other
-  // screens use it as a plain car picture: the garage, the ghost car and the
-  // track cards.
+  // The car at rest, for the garage, the ghost and track cards.
   get sprite() {
     if (!this.staticSprite) this.staticSprite = this.paint(null, STILL);
     return this.staticSprite;
   }
 
-  // A clean detail of named parts, without the tires/frame around them.
-  // The Garage fits the painted bounds into its thumbnail without stretching.
+  // Named parts only, without tires or frame, for Garage thumbnails.
   partSprite(partIds, { paint = null, single = false } = {}) {
     const pixels = Math.ceil(this.car.boxSize * this.pixelsPerUnit);
     const canvas = createCanvas(pixels, pixels);
@@ -183,21 +129,18 @@ export class DrawnCar {
     return canvas;
   }
 
-  // Draws the car at the origin, with the nose on the +x axis. The box of the
-  // car is size x size pixels.
+  // Draws the car at the origin, nose on +x, in a size x size box.
   draw(ctx, size) {
     const frame = this.renderFrame(this.getFramePixelsPerUnit(ctx, size));
     if (!frame) return;
-    // The frame is larger than the car on screen. A high quality shrink keeps
-    // the thin lines from breaking up.
+    // Oversample so thin lines survive the shrink.
     const quality = ctx.imageSmoothingQuality;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(frame, -size / 2, -size / 2, size, size);
     ctx.imageSmoothingQuality = quality;
   }
 
-  // Draws what the parts put on the ground, such as the red glow of the
-  // brake light. Call it before draw().
+  // Ground effects, such as the brake glow; call before draw().
   drawGround(ctx, size) {
     const scale = size / this.car.boxSize;
     for (const placement of this.placements) {
@@ -211,8 +154,7 @@ export class DrawnCar {
     }
   }
 
-  // The size of the race picture: FRAME_OVERSAMPLE times the car on the
-  // screen, and never larger than the sprite.
+  // FRAME_OVERSAMPLE times the on-screen car, capped at the sprite size.
   getFramePixelsPerUnit(ctx, size) {
     const transform = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
     const screenScale = transform ? Math.hypot(transform.a, transform.b) : 0;
@@ -222,10 +164,7 @@ export class DrawnCar {
     return Math.min(this.pixelsPerUnit, Math.max(0.5, Math.ceil(wanted * 4) / 4));
   }
 
-  // The car in its current pose. The frame is painted again only when the
-  // pose changes. While the car moves, it is painted at most once in each
-  // repaint interval, and the tires roll by at most one step between two
-  // pictures, so a fast wheel does not look like it turns backward.
+  // Repaints only on a pose change, and limits the roll step so a fast wheel never looks reversed.
   renderFrame(pixelsPerUnit = this.pixelsPerUnit) {
     if (pixelsPerUnit !== this.framePixelsPerUnit) {
       this.frame = null;
@@ -273,8 +212,7 @@ export class DrawnCar {
     return canvas;
   }
 
-  // Each group of parts that do not move is drawn one time for each picture
-  // size, on its own layer.
+  // Each still group is drawn once per picture size, on its own layer.
   getLayers(pixelsPerUnit = this.pixelsPerUnit) {
     const cached = this.layerSets.get(pixelsPerUnit);
     if (cached) return cached;
@@ -300,8 +238,7 @@ export class DrawnCar {
   }
 }
 
-// The parts of the car with the skin changes, in drawing order. A mirrored
-// part gets a second placement for the right side.
+// Parts with skin changes, in drawing order; a mirrored part gets a right-side copy.
 function placeParts(car, skin, paint) {
   const carColors = { ...car.colors, ...(skin.colors || {}) };
   const placements = [];
@@ -328,9 +265,7 @@ function placeParts(car, skin, paint) {
   return placements;
 }
 
-// Gives the paint of a decal area: the four tones of its color, or null when
-// the area has no paint. "fallback" is the paint when the area has no paint
-// or an unknown one, for the areas that always need paint.
+// The four tones of a decal area, or null; fallback is for areas that always need paint.
 function makePaint(livery, decals) {
   const tones = new Map();
   const tonesOf = (value) => {
@@ -349,8 +284,7 @@ function makePaint(livery, decals) {
   return paint;
 }
 
-// Splits the parts into groups: parts that do not move and are next to each
-// other share a group, and each moving part is its own group.
+// Adjacent still parts share a group; each moving part is its own group.
 function groupRuns(placements) {
   const runs = [];
   for (const placement of placements) {

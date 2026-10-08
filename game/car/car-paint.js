@@ -24,8 +24,7 @@ function normalizePaintColor(value) {
     return color.length === 4 ? `#${color.slice(1).replace(/./g, '$&$&')}` : color;
 }
 
-// Keep seven choices, including the actual preset and any saved color. Use
-// the nearest palette slot so each row keeps its familiar range of hues.
+// Seven choices with the preset and saved color, each in its nearest palette slot.
 export function getCarPaintOptions(preset, current = preset) {
     const options = CAR_PAINT_COLORS.map((color) => ({ ...color }));
     const rgb = (color) => [1, 3, 5].map((start) => parseInt(color.slice(start, start + 2), 16));
@@ -44,8 +43,7 @@ export function getCarPaintOptions(preset, current = preset) {
         ? { ...color, id: 'preset', label: 'Preset' } : color);
 }
 
-// The catalog bounds both the number of entries and the keys stored in a
-// profile. Paint never creates a new asset identifier or changes car choice.
+// The catalog limits stored entries and keys; paint never adds assets or changes the car.
 export function normalizeCarPaints(value) {
     const paints = {};
     if (!value || typeof value !== 'object' || Array.isArray(value)) return paints;

@@ -1,14 +1,7 @@
 import { fillWithOutline, insideShape, traceRoundedPolygon } from "../paint.js";
 
-// One half of the front wing: a blade that is narrow at its outer end and
-// wide where it goes under the nose, with a dark plate below it that shows
-// behind its rear edge. The corners go: rear inner, rear outer, front outer,
-// front inner.
-//
-// Decal areas:
-//   frontWing      the paint of the whole blade
-//   frontWingTips  the outer end of the blade
-//   frontWingEdge  a band along the rear edge of the blade
+// Half the front wing; corners: rear inner, rear outer, front outer, front inner.
+// Decal areas: frontWing, frontWingTips, frontWingEdge.
 export const frontWing = {
   defaults: {
     wing: [[41.3, -3.2], [36.9, -18.9], [42, -18.9], [47.9, -3.2]],

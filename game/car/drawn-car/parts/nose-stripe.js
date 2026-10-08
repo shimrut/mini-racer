@@ -1,8 +1,4 @@
-// The short stripe on the nose. It is wider at the rear and narrow at the
-// front, with round ends.
-//
-// Decal area:
-//   noseStripe  the stripe; with no paint, the stripe is not drawn
+// The nose stripe. Decal area: noseStripe (not drawn when unpainted).
 export const noseStripe = {
   defaults: {
     from: 32.8,

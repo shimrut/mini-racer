@@ -1,7 +1,6 @@
 import { fillWithOutline, traceRoundRect } from "../paint.js";
 
-// Vent slots on a side pod: short dark slots in a row, tilted toward the
-// rear.
+// Vent slots on a side pod, tilted to the rear.
 export const louvers = {
   defaults: {
     // The center of each slot.

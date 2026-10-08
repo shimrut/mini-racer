@@ -1,15 +1,6 @@
 import { fillShape, insideShape, traceRoundRect } from "../paint.js";
 
-// A knobby tire for dirt roads. Square tread blocks stand out from the rubber
-// in two rows, and the blocks stick out past the long edges of the tire. The
-// blocks go around the drum, so they roll with the speed like the grooves of
-// the road tire: fast at the center and slow at the ends.
-//
-// A winter tire has studs: a small metal dot on each block.
-//
-// The side wall is on the +y edge. Place the left tire and mirror it, so the
-// side wall faces the body on both sides. The light oval on it is the hub,
-// which is its own part.
+// A knobby dirt tire (studs for winter) whose blocks roll like road grooves; side wall on +y, mirror for the right.
 export const knobbyTire = {
   moves: true,
   defaults: {
@@ -39,8 +30,7 @@ export const knobbyTire = {
     const turn = ((motion.roll / halfLength) % step + step) % step;
     const contrast = 1 - motion.rollBlur * 0.6;
 
-    // The blocks that face up, as [x, length, depth] for each row. The second
-    // row is half a block behind the first.
+    // Top blocks as [x, length, depth] per row; row two is offset by half a block.
     const rowBlocks = (offset) => {
       const list = [];
       for (let angle = -Math.PI / 2 + ((turn + offset) % step); angle < Math.PI / 2; angle += step) {

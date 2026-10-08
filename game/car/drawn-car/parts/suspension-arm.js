@@ -1,5 +1,4 @@
-// One suspension arm: a round bar from one point to another, with a light
-// line along its top side.
+// One suspension arm between two points.
 export const suspensionArm = {
   defaults: {
     from: [0, 0],

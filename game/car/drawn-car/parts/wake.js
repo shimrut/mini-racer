@@ -1,25 +1,19 @@
 import { rgba } from "../paint.js";
 
-// The white water that a jet ski pushes up, drawn on the water under the
-// hull: a bow wave along each side of the bow, and a wash of foam behind
-// the stern with bubbles that stream back. Both grow with the speed. The
-// part draws nothing on the jet ski itself.
+// Jet ski bow waves and stern foam, drawn on the water; both grow with speed.
 export const wake = {
   defaults: {
     // At this pace (car units each second), the wake is at its full size.
     fullPace: 1180,
     sternX: -45,
-    // The wash behind the stern: its half width at the stern and its
-    // length at rest and at full speed.
+    // Stern wash half width, and its length at rest and at full speed.
     washHalfWidth: 9,
     washLength: [6, 34],
     washSpread: 7,
     bubbles: 7,
-    // How far the bow wave stands out from the hull, at rest and at full
-    // speed.
+    // Bow wave reach from the hull, at rest and at full speed.
     bowWave: [0.6, 5],
-    // The edge of the hull on the left side, from the bow to the rear end
-    // of the bow wave.
+    // The left hull edge, bow to the end of the bow wave.
     bowEdge: [[48, 0], [46.5, -2.6], [40, -6.5], [30, -11], [18, -15], [4, -17.6], [-10, -18.6]],
     alpha: 0.85,
   },

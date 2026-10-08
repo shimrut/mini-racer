@@ -9,20 +9,8 @@ import {
   traceSmooth,
 } from "../paint.js";
 
-// The body: the side pods and the nose, with the raised center tub on top.
-// The side pods are a little darker than the tub. The tub has a light rim,
-// a dark chevron behind the cockpit and a dark chevron in front of it. The
-// lower edges are dark and the upper edges are light, as if the light comes
-// from the -y side.
-//
-// Decal areas:
-//   body            the paint of the whole body
-//   centerStripe    a stripe along the center of the tub, from the rear to
-//                   the nose tip
-//   sidePodStripes  a thin stripe along each side pod and the nose
-//   noseTip         the front end of the nose
-//
-// All shapes give their left half (negative y), from the rear to the front.
+// Side pods, nose and raised center tub, lit from -y; shapes give the left half, rear to front.
+// Decal areas: body, centerStripe, sidePodStripes, noseTip.
 export const body = {
   defaults: {
     shape: [

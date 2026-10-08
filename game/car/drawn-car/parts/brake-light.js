@@ -1,8 +1,6 @@
 import { fillWithOutline, mix, rgba, traceRoundRect } from "../paint.js";
 
-// The one red light at the rear center of the car, below the rear wing. From
-// above, only its rear end shows behind the wing. When the car brakes, the
-// light comes on and a red glow shows on the ground behind the car.
+// The rear brake light; braking lights it and adds a red glow on the ground.
 export const brakeLight = {
   moves: true,
   defaults: {

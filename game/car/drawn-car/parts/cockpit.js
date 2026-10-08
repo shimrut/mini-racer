@@ -1,11 +1,6 @@
 import { fillWithOutline, insideShape } from "../paint.js";
 
-// The cockpit: a dark glass dome with a painted rim around it. The glass is
-// darker at its lower rear side and has a curved shine on its upper side.
-//
-// Decal area:
-//   cockpitRim  the rim around the glass
-// Adds an oval as its own closed shape.
+// The glass cockpit dome. Decal area: cockpitRim.
 function oval(ctx, cx, cy, rx, ry) {
   ctx.moveTo(cx + rx, cy);
   ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);

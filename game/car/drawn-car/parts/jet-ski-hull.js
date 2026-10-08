@@ -10,21 +10,8 @@ import {
   traceSmooth,
 } from "../paint.js";
 
-// The hull of a jet ski, seen from above, drawn like the body of the car:
-// the side decks are a little darker than the raised center, which has a
-// light rim and a dark valley round it. The hull has a round, blunt nose,
-// the widest part behind the handlebars, and a flat stern. A black rubber
-// rail runs along each side. The raised center is the hood at the front and
-// the base of the seat at the rear. A footwell with a non-slip mat is on each
-// side of the seat. The light comes from the -y side, as on the car body.
-//
-// Decal areas:
-//   hull         the paint of the hull and the hood
-//   hullStripes  a stripe along each side deck, from the bow to the stern
-//   hoodStripe   a stripe along the middle of the hood
-//   noseTip      the front end of the bow
-//
-// The shapes give their left half (negative y), from the rear to the front.
+// The jet ski hull, drawn like the car body; shapes give the left half, rear to front.
+// Decal areas: hull, hullStripes, hoodStripe, noseTip.
 export const jetSkiHull = {
   defaults: {
     shape: [
@@ -105,8 +92,7 @@ export const jetSkiHull = {
   },
 };
 
-// A black rubber rail along the edge of each side, from the stern corner to
-// the bow.
+// A rubber rail along each side, stern to bow.
 function drawRails(ctx, shape, rail, colors) {
   const points = shape.slice(rail.from, rail.to + 1);
   ctx.lineWidth = rail.width * 2;
@@ -134,8 +120,7 @@ function drawRails(ctx, shape, rail, colors) {
   }
 }
 
-// A footwell on each side: a dark non-slip mat with lines across it, sunk
-// into the deck, with a shade along its upper edge.
+// A sunken footwell mat on each side of the seat.
 function drawFootwells(ctx, footwell, colors, outline) {
   for (const side of [1, -1]) {
     const corners = footwell.corners.map(([x, y]) => [x, y * side]);

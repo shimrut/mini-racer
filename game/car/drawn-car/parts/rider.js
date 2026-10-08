@@ -1,18 +1,10 @@
 import { facingBand, fillWithOutline, insideShape } from "../paint.js";
 
-// The rider of a jet ski, seen from above: legs down to the footwells, a
-// life vest, arms to the grips of the handlebars, and a helmet with a visor
-// to the front. The hands hold the grips, so they follow the handlebars
-// when they turn. Place it after the handlebars.
-//
-// Decal areas:
-//   helmet  the paint of the helmet
-//   vest    the paint of the life vest
+// The jet ski rider; hands follow the bars, so place it after them. Decal areas: helmet, vest.
 export const rider = {
   moves: true,
   defaults: {
-    // The steering column, the distance from it to each grip, and how far
-    // the grips sweep back: as for the handlebars.
+    // Column, grip distance and sweep, as for the handlebars.
     barPivot: [9, 0],
     grip: 10.2,
     gripSweep: 1.6,
