@@ -182,6 +182,43 @@ describe('stored Campaign series', () => {
         mockContext.subredditId = 't5_one';
     });
 
+    it('reads only the series cache of the install that makes the request', () => {
+        series.clearStoredSeriesCacheForTests();
+        const byId = { revision: '5', published: Object.freeze([{ id: 'by-id' }]) };
+        const byName = { revision: '5', published: Object.freeze([{ id: 'by-name' }]) };
+        series.publishStoredSeriesSnapshot('t5_one', byId);
+        series.publishStoredSeriesSnapshot('miniracer', byName);
+        try {
+            mockContext.subredditName = 'MiniRacer';
+            expect(series.resolveStoredSeriesForRequest()).toBe(byId.published);
+
+            delete mockContext.subredditId;
+            expect(series.resolveStoredSeriesForRequest()).toBe(byName.published);
+            mockContext.subredditId = '';
+            expect(series.resolveStoredSeriesForRequest()).toBe(byName.published);
+
+            delete mockContext.subredditName;
+            expect(series.resolveStoredSeriesForRequest()).toEqual([]);
+            mockContext.subredditId = 't5_two';
+            expect(series.resolveStoredSeriesForRequest()).toEqual([]);
+
+            Object.defineProperty(mockContext, 'subredditId', {
+                configurable: true,
+                enumerable: true,
+                get() { throw new Error('No request context.'); },
+            });
+            expect(series.resolveStoredSeriesForRequest()).toEqual([]);
+        } finally {
+            Object.defineProperty(mockContext, 'subredditId', {
+                configurable: true,
+                enumerable: true,
+                writable: true,
+                value: 't5_one',
+            });
+            delete mockContext.subredditName;
+        }
+    });
+
     it('fixes the published stages, and lets new stages go after them', async () => {
         await series.saveStoredSeries('night-v1', draft, { username: 'ModOne' });
         await series.publishStoredSeries('night-v1', { username: 'ModOne' });

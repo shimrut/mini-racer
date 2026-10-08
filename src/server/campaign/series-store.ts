@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { redis, type TxClientLike } from '@devvit/redis';
-import { context } from '@devvit/web/server';
 import seriesData from '../../../game/campaign/series.json' with { type: 'json' };
 import { CAMPAIGN_NUMBERS_SERIES_ID } from '../../../game/campaign/manifest.js';
 import {
@@ -18,7 +17,7 @@ import { TrackInputError } from '../tracks/track-shape.js';
 import {
     TrackConflictError, queueStoredTrackRecord, freezeStoredTrack, matchesStoredTrack, readStoredTrack,
     queueStoredTrackRemoval, isStoredTrackRemoved,
-    readStoredTrackKeys, readStoredTracksRevision, type StoredTrackRecord,
+    readStoredTrackKeys, readStoredTracksRevision, readStoredTrackInstallScope, type StoredTrackRecord,
 } from '../tracks/track-store.js';
 import { buildLockedTrackCopy } from '../tracks/track-copy.js';
 
@@ -147,19 +146,8 @@ type InstallCache = { revision: string; published: readonly StoredSeriesDefiniti
 const cacheByInstall = new Map<string, InstallCache>();
 const EMPTY: readonly StoredSeriesDefinition[] = Object.freeze([]);
 
-function readInstallScope(): string | null {
-    try {
-        const id = (context as { subredditId?: unknown }).subredditId;
-        if (typeof id === 'string' && id) return id;
-        const name = (context as { subredditName?: unknown }).subredditName;
-        return typeof name === 'string' && name ? name.toLowerCase() : null;
-    } catch {
-        return null;
-    }
-}
-
 function cachedPublishedSeries(): readonly StoredSeriesDefinition[] {
-    const scope = readInstallScope();
+    const scope = readStoredTrackInstallScope();
     return scope ? cacheByInstall.get(scope)?.published ?? EMPTY : EMPTY;
 }
 
