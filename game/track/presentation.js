@@ -31,9 +31,7 @@ const DEFAULT_TRACK_PRESENTATION = Object.freeze({
 
 // The look of each non-tarmac ground. An event look still wins over it.
 const GROUND_TRACK_PRESENTATIONS = Object.freeze({
-    // A dirt road with banks of piled earth in place of kerbs, and bushes
-    // and trees in place of tyre stacks. The kerb colours stay for the
-    // series mark.
+    // Dirt: earth banks in place of kerbs, bushes and trees in place of tyres; kerb colours mark the series.
     dirt: Object.freeze({
         trackColor: '#634833',
         patchColors: Object.freeze(['rgba(146, 112, 78, 0.1)', 'rgba(60, 42, 28, 0.14)']),
@@ -44,8 +42,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         bankColor: '#9c7b56',
         bankShadeColor: '#4a3422',
         bankLightColor: '#c2a077',
-        // One sharp line of dark earth at the wall, and a thin, even lip of
-        // earth, so the edge of the road is easy to see.
+        // A sharp dark wall line and an even earth lip, so the road edge is clear.
         bankFootLineColor: 'rgba(38, 22, 10, 0.62)',
         bankFootLineWidth: 6,
         bankLipMaxRadius: 3,
@@ -67,9 +64,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         // A slide scrapes a wide smear of dark earth.
         skidColor: 'rgba(36, 20, 8, 0.4)',
         skidWidthScale: 1.5,
-        // Ruts pressed into the earth, with a shade side. The ruts and the
-        // skid marks are under the rear tires, and a rut is as wide as a
-        // rear tire of the Rally car.
+        // Shaded ruts under the rear tires, as wide as a Rally car tire.
         tyreTrackColor: 'rgba(40, 24, 12, 0.34)',
         tyreTrackShadeColor: 'rgba(24, 12, 4, 0.34)',
         markHalfWidth: 0.29,
@@ -85,9 +80,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         schematicRoadColor: '#7a5c42',
         schematicEdgeColor: '#f1e4cc'
     }),
-    // Packed snow: a smooth road with some ice patches, banks of fresh snow
-    // in place of kerbs, and pine trees, snowmen and igloos in place of tyre
-    // stacks. The kerb colours stay for the series mark.
+    // Snow: smooth road with ice, snow banks, and pines, snowmen and igloos; kerb colours mark the series.
     snow: Object.freeze({
         trackColor: '#b8c8d7',
         icePatchColor: 'rgba(190, 222, 246, 0.5)',
@@ -101,8 +94,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         bankWidth: 20,
         showTireWalls: false,
         tracksideItems: Object.freeze([['pine', 3], ['snowman', 1], ['igloo', 1]]),
-        // A finish line of squares dyed blue in the snow, with a block of ice
-        // and a flag at each end.
+        // A blue-dyed finish line with an ice block and flag at each end.
         finishLineStyle: 'painted',
         finishLineColor: '#2d5b8c',
         finishLineAltColor: '#eef4f9',
@@ -117,9 +109,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         // A slide scrapes a wide, soft smear.
         skidColor: 'rgba(92, 122, 156, 0.26)',
         skidWidthScale: 1.8,
-        // Grooves pressed into the snow, with a shade side. The grooves and
-        // the skid marks are under the rear tires, and a groove is as wide
-        // as a rear tire of the Snow car.
+        // Shaded grooves under the rear tires, as wide as a Snow car tire.
         tyreTrackColor: 'rgba(98, 126, 160, 0.34)',
         tyreTrackShadeColor: 'rgba(70, 98, 132, 0.3)',
         tyreTrackSeconds: 5,
@@ -141,10 +131,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         trackColor: '#2d3644',
         schematicRoadColor: '#3b4554'
     }),
-    // Open water: a blue channel with light shallows at each edge and small
-    // wave marks. Sand banks with a line of white foam on the water take
-    // the place of kerbs, and palm trees, rocks and beach umbrellas take the
-    // place of tyre stacks. The kerb colours stay for the series mark.
+    // Water: blue channel, sand banks with foam, and palms, rocks and umbrellas; kerb colours mark the series.
     water: Object.freeze({
         trackColor: '#1f6fae',
         edgeBandColor: 'rgba(88, 196, 214, 0.3)',
@@ -184,9 +171,7 @@ const GROUND_TRACK_PRESENTATIONS = Object.freeze({
         schematicRoadColor: '#2a78b5',
         schematicEdgeColor: '#f7eed3'
     }),
-    // A lane in space: a dark violet road with a grid, magenta and cyan
-    // light strips in place of kerbs, and stars behind it. Asteroids,
-    // planets and satellites take the place of tyre stacks.
+    // Space: violet lane with a grid, light strips for kerbs, stars, and asteroids, planets and satellites.
     space: Object.freeze({
         trackColor: '#241d4f',
         infieldColor: 'transparent',

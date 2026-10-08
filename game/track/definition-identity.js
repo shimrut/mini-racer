@@ -1,5 +1,4 @@
-// Client asset/attempt identity. This is separate from the server PB fingerprint:
-// names and medal metadata do not change a race, but corner smoothing does.
+// Client asset identity, apart from the PB fingerprint: names and medals do not change a race, smoothing does.
 export function getTrackDefinitionIdentity(track) {
     if (!track) return null;
     const point = (value) => value ? [value.x, value.y] : null;

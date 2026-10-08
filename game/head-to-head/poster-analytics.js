@@ -12,8 +12,7 @@ function isChallengePoster(root) {
         && /^t3_[a-z0-9]+$/i.test(context.postId);
 }
 
-// Reporting must never hold up the poster or its expansion gesture. Identity
-// and the target post are derived by the server, not supplied by the browser.
+// Reporting never delays the poster; the server derives identity and target post.
 export function reportChallengePosterEvent(action, root = globalThis) {
     if (!['view', 'click', 'own_open'].includes(action)
         || !isChallengePoster(root)

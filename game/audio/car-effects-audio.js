@@ -55,10 +55,7 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipFreqPerSpeed: 1200,
         shiftCrackVol: 0,
     }),
-    // Rally: a lower, barkier four-cylinder, gravel that stays quiet on a
-    // straight and louder in a slide, a wide gravel spray instead of a tyre
-    // squeal, a hard bang and a big rev drop at each gear change, and exhaust
-    // pops when the car slows down.
+    // Rally: barkier four-cylinder, quiet gravel that grows in a slide, gravel spray, gear bangs and overrun pops.
     dirt: Object.freeze({
         shaperAmount: 34,
         barkBoostDb: 5.5,
@@ -89,14 +86,7 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         shiftCrackVol: 0.32,
         overrunPopVol: 0.1,
     }),
-    // Ice rally: snow soaks the highs, so the engine stays muffled and a bit
-    // lower, with a soft gear bang and quiet pops. Packed snow crunches under
-    // the tyres on a straight and louder in a slide. The slide is a low whoosh,
-    // not a thin hiss.
-    // Starting values. Listen on a snow track: the engine should stay quieter
-    // in the highs than tarmac, the crunch should be obvious at speed, and a
-    // slide should sound thick. If the slide is thin, lower slipFreqBase. If
-    // the car is buried, raise level.
+    // Ice rally: muffled engine, snow crunch, low slide whoosh; a thin slide needs a lower slipFreqBase.
     snow: Object.freeze({
         shaperAmount: 12,
         barkBoostDb: 1,
@@ -127,9 +117,7 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         shiftCrackVol: 0.14,
         overrunPopVol: 0.04,
     }),
-    // A race circuit: an engine that turns faster. The note is a little
-    // higher, brighter and cleaner, with more high whine. The tyres squeal
-    // as on tarmac.
+    // Circuit: a faster, brighter engine with more whine; tarmac tyre squeal.
     grip: Object.freeze({
         shaperAmount: 8,
         barkBoostDb: 1,
@@ -148,10 +136,7 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipFreqPerSpeed: 1200,
         shiftCrackVol: 0,
     }),
-    // A racing jet ski: a buzzy two-stroke with one long gear, so the note
-    // climbs all the way to top speed with no gear change. Water rushes
-    // past the hull, the hull slaps the waves with a low thump, and a slide
-    // is a wide splash, not a squeal.
+    // Jet ski: buzzy two-stroke with one long gear, water rush, hull slaps, and a splash for a slide.
     water: Object.freeze({
         gearCount: 1,
         shaperAmount: 24,
@@ -182,9 +167,7 @@ const GROUND_SOUND_PROFILES = Object.freeze({
         slipHighpass: 400,
         shiftCrackVol: 0,
     }),
-    // A jet engine: a clean, smooth note with one long gear and a strong high
-    // whine, over a low rocket rumble. Nothing touches the ground, so there
-    // are no tyre sounds. A slide is a low whoosh.
+    // Jet engine: smooth note, one long gear, high whine over a rocket rumble; no tyres, a whoosh for a slide.
     space: Object.freeze({
         gearCount: 1,
         shaperAmount: 3,
@@ -486,8 +469,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         graphBuilt = true;
     }
 
-    // The gravel and rumble sounds run only on a ground that uses them, so
-    // a tarmac race does not play two silent sounds.
+    // Gravel and rumble run only on grounds that use them.
     function startGroundNoise() {
         if (gravelSource || !ctx || !masterGain || !compressor || !noiseBuffer) return;
         if (!gravelNoiseBuffer) gravelNoiseBuffer = createGravelNoiseBuffer(ctx, 2);
@@ -521,8 +503,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         rumbleSource.start();
     }
 
-    // Call only while the two sounds are silent, as at the start of a
-    // tarmac race: the ground noise goes to 0 when a race stops.
+    // Call only while both sounds are silent, as at a tarmac race start.
     function stopGroundNoise() {
         if (!gravelSource) return;
         for (const source of [gravelSource, rumbleSource]) {
@@ -566,8 +547,7 @@ export function createCarEffectsAudio(externalCtx, externalOutput) {
         }
     }
 
-    // A short noise burst. The gear bang uses a longer mid hit. An overrun pop
-    // is shorter and higher.
+    // A short noise burst: a longer mid hit for gear bangs, shorter and higher for pops.
     function scheduleNoiseHit({ volume, freq, q, attack, release, delay = 0 }) {
         if (!ctx || !masterGain || !noiseBuffer || !(volume > 0)) return;
         const t = ctx.currentTime + delay;

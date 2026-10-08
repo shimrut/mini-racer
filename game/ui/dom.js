@@ -8,9 +8,7 @@ export function scheduleAfterModalPaint(callback) {
     });
 }
 
-// Copies the text to the clipboard. Inside the Reddit frame, the browser can
-// refuse the Clipboard API. Then the copy uses a hidden text field. Call this
-// directly from the click, before any await, so that the click still counts.
+// Falls back to a hidden field when the Reddit frame blocks the Clipboard API; call before any await.
 export async function copyTextToClipboard(text) {
     try {
         await navigator.clipboard.writeText(text);
@@ -35,9 +33,7 @@ export async function copyTextToClipboard(text) {
     }
 }
 
-// Several screens set the state of one Start button. Each one blocks or frees
-// it with its own reason, and the button is enabled only when no reason is
-// left. So no screen can enable a Start that another screen still blocks.
+// Each screen blocks Start with its own reason; Start is enabled only when none remain.
 const buttonBlocks = new WeakMap();
 
 export function setButtonBlock(button, reason, blocked) {

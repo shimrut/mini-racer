@@ -696,8 +696,7 @@ export class TrackCarousel {
     }
 
     renderPreview(canvas, card, { force = false } = {}) {
-        // The car on the card depends on the track's ground, so load the
-        // track first and pick the car after.
+        // The card's car depends on the ground, so load the track first.
         if (card?.trackKey && !getLoadedClientTrack(card.trackKey) && !legacyPreviewTracks?.[card.trackKey]) {
             void loadClientTrack(card.trackKey).then(() => {
                 if (canvas.isConnected !== false) this.renderPreview(canvas, card, { force: true });

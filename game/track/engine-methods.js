@@ -43,8 +43,7 @@ export const trackEngineMethods = {
     return this._racePreparation;
   },
 
-  // Prepares a race target in a slot. The promise gives the record, or null
-  // when a newer target replaced it.
+  // Prepares a race target; resolves to the record, or null when a newer target replaced it.
   prepareRaceTrack(slot, target) {
     return this.getRacePreparation().prepare(slot, target);
   },
@@ -59,15 +58,13 @@ export const trackEngineMethods = {
     return this._racePreparation?.findRecord(trackKey, challenge) ?? null;
   },
 
-  // Definitions are required before the menu becomes interactive. Other
-  // tracks' walls and pictures can still build from the local asset caches.
+  // Definitions load before the menu is usable; walls and pictures can build from local caches.
   isRaceTrackReady(trackKey, challenge = null) {
     return Boolean(getLoadedClientTrack(trackKey))
       && (!this.raceTrackNeedsConfirmation(trackKey, challenge) || isTrackLayoutConfirmed(trackKey));
   },
 
-  // All interactive tracks have a loaded authoritative definition. A picture
-  // that is not cached yet builds locally while the lobby stays visible.
+  // Every usable track has its definition; an uncached picture builds while the lobby shows.
   canStartRaceTrack(trackKey, challenge = null) {
     return this.isRaceTrackReady(trackKey, challenge);
   },
@@ -78,8 +75,7 @@ export const trackEngineMethods = {
       && this.currentTrackPresentation?.key === resolveRacePresentation(trackKey, this.currentTrack, challenge).key;
   },
 
-  // Start has no definition-loading fallback. Priority records retain their
-  // assets; other tracks use the same local caches as before Redis.
+  // Start never loads a definition; priority records keep their assets.
   readyRaceTrack(slot, trackKey, challenge = null) {
     if (!this.isRaceTrackReady(trackKey, challenge)) {
       throw new Error('The race definitions are not loaded. Try the lobby again.');
@@ -87,8 +83,7 @@ export const trackEngineMethods = {
     return this.getRacePreparation().prepareLoaded(slot, { trackKey, challenge });
   },
 
-  // Prepares the card that a lobby carousel stopped on, so that Start runs
-  // with no drawing. A swipe to another card stops the build.
+  // Prepares the carousel's current card so Start draws nothing; a swipe stops the build.
   prepareSelectedRaceTrack(mode, { trackKey, challenge = null, isStillSelected = () => true } = {}) {
     if (typeof trackKey !== 'string' || !trackKey) return;
     if (!this.canStartRaceTrack(trackKey, challenge)) return;

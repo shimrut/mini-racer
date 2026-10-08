@@ -925,8 +925,7 @@ export const dailyChallengeEngineMethods = {
       || null;
 
     let challenges = this.dailyCarouselChallenges();
-    // An already hydrated list can stay interactive while a refreshed list
-    // arrives. New definitions are resolved before the replacement paints.
+    // A loaded list stays usable while a refresh arrives; new definitions resolve before it repaints.
     const paintedCached = typeof this.loadRaceDefinitions !== 'function'
       || challenges.every((entry) => this.canStartRaceTrack?.(entry.trackKey, entry) === true);
     if (paintedCached) this.paintDailyCarousel(challenges, { selectedChallengeId: preferredId, loading: challenges.length < DAILY_PLAYLIST_DAYS });

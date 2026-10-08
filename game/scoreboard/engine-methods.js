@@ -25,9 +25,7 @@ import {
 import { shouldAutoRetryVerificationQueue } from "../track/environment.js";
 import { isStoredSeriesListLoaded } from "../campaign/stored-series.js";
 
-// Until the series list loads, a due Campaign time wakes the queue only to
-// load the list again, once in each retry wait. It never sets a timer of 0
-// that repeats.
+// Until the series list loads, a due Campaign time only reloads it once per retry wait, never a 0 timer.
 function nextVerificationQueueWakeAt(engine) {
   if (isStoredSeriesListLoaded()) return getNextVerificationAttemptAt();
   const dailyAt = getNextVerificationAttemptAt({ buckets: ["daily"] });
@@ -184,8 +182,7 @@ export const scoreboardEngineMethods = {
     }
   },
 
-  // Campaign times wait until the game knows every published series. The
-  // Campaign answer brings that list; it also loads the Campaign code.
+  // Campaign times wait for the Campaign answer, which brings the series list and the Campaign code.
   requestCampaignSeriesList() {
     this.campaignSeriesListRetryAt = Date.now() + getVerificationRetryDelayMs();
     const loading = this.invokeModeMethod?.("campaign", "ensureCampaignBootstrap");

@@ -138,8 +138,7 @@ export async function getCampaignBootstrap({ seriesId = CAMPAIGN_ID } = {}) {
         if ((response.body.campaignId ?? CAMPAIGN_ID) !== requestedSeriesId) {
             throw new Error('The requested Campaign is unavailable.');
         }
-        // The answer leaves out an empty list, so any good answer brings the
-        // whole list. The stage tracks can still fail to load after this.
+        // A good answer always carries the whole list; stage tracks can still fail to load.
         markStoredSeriesLoaded();
         const trackKeys = (Array.isArray(response.body.stages)
             ? response.body.stages

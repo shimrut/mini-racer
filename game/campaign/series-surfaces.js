@@ -1,8 +1,6 @@
 import { TRACK_GROUNDS, isTrackGroundKey } from '../track/grounds.js';
 
-// Series surfaces are presentation metadata: they never decide whether a series
-// is live. The track definition remains the authority for driving. Stored
-// summaries describe published stages.
+// Surfaces are display data only; the track definition decides driving.
 export function getCampaignSeriesGrounds(series, readTrackGround = null) {
     const stages = Array.isArray(series?.stages) ? series.stages : [];
     let grounds;

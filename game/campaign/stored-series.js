@@ -1,26 +1,18 @@
-// Campaign series made in the Creator live in the game's database, not in the
-// app. The game and the server give the manifest the published ones before
-// they read the Campaign. A stored series with the name of an app series
-// replaces it. Each entry has the form of an entry in series.json:
-// { id, name, ground, grounds, finalStageId, stages: [{ trackKey, laps, requiredMedals }] }.
-// finalStageId is null until the Creator publishes a designated endpoint.
-// grounds lists the actual published surfaces; ground is the legacy theme.
-// This file has no imports, so the manifest can use it.
+// Published Creator series, given to the manifest before it reads the Campaign; same name replaces an app series.
+// Entry: { id, name, ground, grounds, finalStageId, stages: [{ trackKey, laps, requiredMedals }] }. No imports.
 
 const EMPTY = Object.freeze([]);
 let localStoredSeries = EMPTY;
 let storedSeriesResolver = () => localStoredSeries;
 let storedSeriesListLoaded = false;
 
-// The same list object comes back until the list changes, so the manifest
-// builds the series again only after a change.
+// The same object returns until the list changes, so the manifest rebuilds only then.
 export function getStoredSeriesDefinitions() {
     const definitions = storedSeriesResolver();
     return Array.isArray(definitions) ? definitions : EMPTY;
 }
 
-// The server gives each subreddit its own series, so it replaces the lookup
-// for the current request. The game keeps the local list.
+// The server replaces this lookup per request, so each subreddit has its own series.
 export function setStoredSeriesResolver(resolver) {
     storedSeriesResolver = typeof resolver === 'function' ? resolver : () => localStoredSeries;
 }
@@ -32,8 +24,7 @@ export function registerStoredSeries(definitions) {
     return localStoredSeries;
 }
 
-// The game knows every published series only after a Campaign answer arrived.
-// Before that, a stage of a Creator series is unknown, but it is not gone.
+// Before the first Campaign answer, a Creator stage is unknown, not gone.
 export function markStoredSeriesLoaded() {
     storedSeriesListLoaded = true;
 }

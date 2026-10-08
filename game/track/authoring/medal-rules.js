@@ -1,5 +1,4 @@
-// Medal time rules for authored tracks. The Mapmaker and the server use the
-// same rules, so the server can refuse a medal row that the editor refuses.
+// Medal rules shared by the Mapmaker and the server, so both refuse the same rows.
 
 export const MEDAL_TIERS = Object.freeze(['author', 'gold', 'silver', 'bronze']);
 

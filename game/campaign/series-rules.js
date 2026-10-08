@@ -1,9 +1,6 @@
-// Rules for the Campaign series list. This file has no imports, so the
-// Mapmaker server can use it without watching the series data file.
+// Campaign series rules, with no imports so the Mapmaker server can use them.
 
-// The Creator makes a series live only when it has this many stages. After
-// that, its stages are fixed, and new stages go after the last one.
-// Formula Mini needs 2 stages.
+// Stages a series needs to go live (Formula Mini: 2); then stages are fixed and new ones go last.
 export const CAMPAIGN_SERIES_MIN_STAGES = 1;
 const FORMULA_MINI_SERIES_ID = 'grip-v1';
 const FORMULA_MINI_MIN_STAGES = 2;
@@ -14,8 +11,7 @@ export function getCampaignSeriesMinStages(series) {
 
 export const CAMPAIGN_STAGE_MAX_LAPS = 3;
 
-// The medals that the stage at this position can need at most: 3 for each
-// stage before it, so Gold on every stage always opens the next one.
+// Max medals a stage can need: 3 per earlier stage, so all Gold always opens the next.
 export function getMaxRequiredMedals(stageIndex) {
     return Math.max(0, stageIndex) * 3;
 }
@@ -23,9 +19,7 @@ export function getMaxRequiredMedals(stageIndex) {
 // Numbers keeps this name for ever: every saved Numbers record and key uses it.
 export const CAMPAIGN_NUMBERS_SERIES_ID = 'numbered-v1';
 
-// A series is live when the Creator makes it live, and only then. Its grounds
-// and stage count do not decide it. In the app data, only Numbers is live;
-// every other app series waits for the Creator.
+// A series is live only when the Creator makes it live; in app data only Numbers is.
 export function isAppCampaignSeriesLive(series) {
     return series?.id === CAMPAIGN_NUMBERS_SERIES_ID;
 }

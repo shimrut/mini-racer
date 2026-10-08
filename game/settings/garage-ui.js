@@ -60,8 +60,7 @@ export function getSpriteBounds(sprite, comparison = null) {
             }
         }
     }
-    // Mirrored stripes/wing ends are one element repeated on each side.
-    // Show one side when the empty middle would shrink both in the detail.
+    // Mirrored stripes and wing ends repeat per side; show one side when the gap would shrink both.
     if (other && halfCount && bottom >= sprite.height / 2 && !touchesCenter) {
         return { left: halfLeft, top: halfTop, width: halfRight - halfLeft + 1,
             height: halfBottom - halfTop + 1, count: halfCount };
@@ -332,8 +331,7 @@ export class GarageUi {
         this.buildDecalOptions(skin.assetName);
         let artwork = this.previewArtwork.get(car);
         if (!artwork) {
-            // Render the large still at three times the race sprite's density.
-            // Keep it separate from the cached car used during racing.
+            // The large still at three times race density, separate from the race's cached car.
             const showcase = new DrawnCar(car.car, DRAWN_CAR_SKINS[skin.assetName], {
                 ...options, pixelsPerUnit: 9,
             });
@@ -364,8 +362,7 @@ export class GarageUi {
                 const image = button.querySelector('img');
                 if (selected) image.src = artwork.image;
                 else {
-                    // Transient previews use the same constructor without
-                    // replacing the cached animated car for this skin.
+                    // Previews never replace the cached animated car for this skin.
                     const preview = new DrawnCar(car.car, DRAWN_CAR_SKINS[skin.assetName], {
                         paint: options.paint, decalStyle: id,
                     });
@@ -399,8 +396,7 @@ export class GarageUi {
                 button.setAttribute('aria-pressed', String(active));
             });
         }
-        // Paint and decal refreshes reuse the prepared artwork. Only a different
-        // resolved car requires another PNG or painted detail.
+        // Paint and decal changes reuse the artwork; only a different car needs a new PNG or detail.
         if (this.previewCar === car) return;
         this.previewCar = car;
         this.carPreview.src = artwork.image;
@@ -416,9 +412,7 @@ export class GarageUi {
         const details = new Map();
         const white = paintTones('#ffffff');
         const black = paintTones('#000000');
-        // The part renderer identifies its own used paint areas. Comparing two
-        // colors locates the painted region without copying decal assignments
-        // or maintaining model-specific crop coordinates.
+        // The part renderer finds its painted areas by comparing two colors, with no crop tables.
         for (const id of new Set(car.placements.map((placement) => placement.id))) {
             const channels = new Set();
             car.partSprite([id], { single: true, paint: (area, fallback) => {
@@ -438,8 +432,7 @@ export class GarageUi {
                     const top = Math.max(0, bounds.top - padding);
                     const width = Math.min(car.sprite.width, bounds.left + bounds.width + padding) - left;
                     const height = Math.min(car.sprite.height, bounds.top + bounds.height + padding) - top;
-                    // Body is a close-up around its center, rather than a
-                    // second miniature of the complete pointed silhouette.
+                    // Body is a close-up around its center, not a second small car.
                     const detailWidth = channel === 'main' ? Math.min(width, height * 1.2) : width;
                     details.set(channel, { left: left + (width - detailWidth) / 2, top,
                         width: detailWidth, height, count: bounds.count, partId: id });
@@ -453,8 +446,7 @@ export class GarageUi {
     makePartDetail(car, bounds) {
         const part = car.partSprite([bounds.partId, bounds.bodyPartId]);
         const ctx = part.getContext('2d');
-        // Keep overlays such as the cockpit inside the chosen part's shape,
-        // while excluding neighboring tires/frame from the close-up.
+        // Keep overlays inside the chosen part and leave out nearby tires and frame.
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = 'source-in';
         ctx.drawImage(car.sprite, 0, 0);

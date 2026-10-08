@@ -1,7 +1,6 @@
 import { getCampaignFinalStage, getCampaignSeriesStages, isCampaignSeriesFinished } from './manifest.js';
 
-// Saved stage PBs already include every required lap. A partial or unconfirmed
-// series has no aggregate: missing stages must never count as zero.
+// Stage PBs include all laps; a partial or unconfirmed series has no aggregate, never zeros.
 export function getCampaignAggregateTotalTimeMs(seriesId, resultsByRaceId = {}) {
     const finalStage = getCampaignFinalStage(seriesId);
     const stages = getCampaignSeriesStages(seriesId);

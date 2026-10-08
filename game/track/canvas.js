@@ -23,8 +23,7 @@ function drawDesertBackdrop(ctx, width, height, presentation = {}) {
     ctx.fillRect(0, 0, width, height);
 }
 
-// The grid of a finish line: two rows of squares across the road, from p1 to
-// p2. Null when the line is too short to draw.
+// A two-row finish grid from p1 to p2, or null when too short.
 function finishLineGrid(p1, p2, width) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -146,9 +145,7 @@ export function drawPresentationBackground(ctx, width, height, presentation = {}
     ctx.fillRect(0, 0, width, height);
 }
 
-// Stars behind a space track, in two layers. Each layer moves slower than
-// the track, so the stars look far away. The stars of each square of sky
-// come from its position, so they stay in place from frame to frame.
+// Two slow parallax star layers; each sky square seeds its stars, so they stay put.
 const STAR_LAYERS = Object.freeze([
     Object.freeze({ parallax: 0.25, cell: 90, count: 3, minSize: 1, maxSize: 1.6 }),
     Object.freeze({ parallax: 0.55, cell: 150, count: 2, minSize: 1.4, maxSize: 2.4 })
@@ -399,8 +396,7 @@ function getPointsAlongLoop(points, step) {
     return result;
 }
 
-// Flat patches of ice on the road. Each patch has straight edges and lies
-// along the road. Two short glints catch the light from the top left.
+// Flat ice patches along the road, with two glints from the top left.
 const ICE_GLINT_ANGLE = -Math.PI / 4;
 
 function addIcePatch(path, x, y, halfLength, halfWidth, angle, random) {
@@ -472,8 +468,7 @@ function drawIcePatches(ctx, outer, inner, presentation) {
     }
 }
 
-// Small wave marks on water: one or two short arcs side by side, all
-// upright, as in a drawn map.
+// Small upright wave arcs on water, as on a drawn map.
 function drawWaveMarks(ctx, width, height, presentation) {
     const color = presentation.waveColor;
     const areaPerMark = Number(presentation.waveAreaPerMark);
@@ -501,8 +496,7 @@ function drawWaveMarks(ctx, width, height, presentation) {
     ctx.stroke(path);
 }
 
-// A grid of thin lines on a space lane. The car moves over it, so the
-// grid shows the speed.
+// A thin grid on a space lane, so the car's speed shows.
 function drawSurfaceGrid(ctx, width, height, presentation) {
     const color = presentation.gridColor;
     const spacing = Number(presentation.gridSpacing);
@@ -522,8 +516,7 @@ function drawSurfaceGrid(ctx, width, height, presentation) {
     ctx.stroke(path);
 }
 
-// The texture of a ground: a grid, patches, ice, edge bands, waves and
-// specks, only on the road.
+// A ground's road texture: grid, patches, ice, edge bands, waves and specks.
 function drawSurfaceTexture(ctx, surfacePath, outer, inner, outerPath, innerPath, width, height, presentation) {
     ctx.save();
     ctx.clip(surfacePath, 'evenodd');
@@ -536,8 +529,7 @@ function drawSurfaceTexture(ctx, surfacePath, outer, inner, outerPath, innerPath
     ctx.restore();
 }
 
-// The size of each lump of a bank along a closed line. The bank swells and
-// narrows slowly along its length, and each lump is a little different.
+// Lump sizes along a bank that swells and narrows slowly, each lump a little different.
 function getBankLumps(points, step, minRadius, maxRadius, random) {
     const phaseA = random() * Math.PI * 2;
     const phaseB = random() * Math.PI * 2;
@@ -562,17 +554,14 @@ function addBankLumps(path, lumps, radiusScale = 1, offsetX = 0, offsetY = 0) {
 const BANK_LUMP_STEP = 7;
 const BANK_LIP_MIN_RADIUS = 2;
 const BANK_LIP_MAX_RADIUS = 5;
-// The light comes from the top left. Each lump has a shade to the lower right
-// and a bright top to the upper left.
+// Lit from the top left: shade to the lower right, bright top to the upper left.
 const BANK_SHADE_OFFSET_X = 1.5;
 const BANK_SHADE_OFFSET_Y = 2;
 const BANK_LIGHT_OFFSET_X = -1.2;
 const BANK_LIGHT_OFFSET_Y = -1.5;
 const BANK_LIGHT_SCALE = 0.6;
 
-// One band of lumps along both edges of the road, only inside the clip.
-// colors gives the base, shade and light colours of the lumps. extraLumps
-// are more lumps in the same band, such as a mound under a bush.
+// One lump band along both road edges inside the clip; colors sets base, shade and light; extraLumps add mounds.
 function drawBankLumpBand(ctx, clipPath, outer, inner, minRadius, maxRadius, seed, colors, extraLumps = []) {
     const shadePath = new Path2D();
     const bankPath = new Path2D();
@@ -604,12 +593,8 @@ function hasEdgeBanks(presentation) {
     return Boolean(presentation.bankColor) && Number(presentation.bankWidth) > 0;
 }
 
-// A bank of piled snow, earth or sand along each edge of the road, in place
-// of kerbs. Large lumps sit off the road. Small lumps make a soft lip on the
-// road: a lip colour makes it a line of foam on water. A soft shadow on the
-// road at the foot of the bank makes the bank stand up. A sharp foot line
-// in its place marks the wall, so the edge of the road is easy to see.
-// mounds are more lumps of the bank, under the things that stand on it.
+// Snow, earth or sand banks in place of kerbs, with a soft lip, a shadow and a sharp wall line.
+// mounds are bank lumps under trackside items.
 function drawEdgeBanks(ctx, surfacePath, outerPath, innerPath, outer, inner, width, height, presentation, mounds = []) {
     const bankWidth = Number(presentation.bankWidth);
     if (!hasEdgeBanks(presentation)) return;
@@ -698,9 +683,7 @@ export function drawTrackBoundaries(ctx, outerPath, innerPath, presentation = {}
 // How far each corner of a painted square can move, as a part of the square.
 const FINISH_PAINT_JITTER = 0.14;
 
-// A finish line painted on a loose ground, as chalk on soil or dye in snow.
-// The corners of the squares move a little, so the paint looks uneven. With
-// no second colour, the road shows between the painted squares.
+// A chalk or dye finish line on loose ground, with uneven corners; with one colour the road shows through.
 function drawPaintedFinishLine(ctx, p1, p2, width, presentation) {
     const grid = finishLineGrid(p1, p2, width);
     if (!grid) return;
@@ -920,11 +903,9 @@ function isCircleOffRoad(ctx, surfacePath, x, y, radius) {
 
 // The gap between the road and the nearest part of a trackside item.
 const TRACKSIDE_MIN_GAP = 3;
-// On a bank, the middle of an item stands on the middle of the bank, as a
-// part of the bank width. A large item can hang over the road edge.
+// An item's middle stands on the bank middle; a large one can hang over the road.
 const TRACKSIDE_BANK_MIDDLE = 0.5;
-// On a bank, the bank swells into a mound under each item, this much wider
-// than the item. The mound is lumps round a middle lump, as the bank is.
+// The bank swells into a mound this much wider than each item.
 const TRACKSIDE_MOUND_RIM = 3;
 const TRACKSIDE_MOUND_LUMPS = 6;
 // The chance of a second and a third item in a group.
@@ -932,8 +913,7 @@ const TRACKSIDE_SECOND_CHANCE = 0.75;
 const TRACKSIDE_THIRD_CHANCE = 0.35;
 // Items in a group touch a little.
 const TRACKSIDE_GROUP_SPACING = 0.85;
-// The edge direction at a point is the direction over this distance to each
-// side, so that it does not jump at the corners of the edge line.
+// Edge direction is measured over this distance each side, so it never jumps at corners.
 const TRACKSIDE_DIRECTION_SPAN = 10;
 // Steps, in pixels, to move an item along or away from the edge.
 const TRACKSIDE_MOVE_STEP = 2;
@@ -991,8 +971,7 @@ function createEdgeWalk(points) {
     return { length, pointAt, locate };
 }
 
-// The direction at a point on the road edge out to the side away from the
-// road, for an edge that runs at `angle`.
+// The outward direction at a road edge that runs at `angle`.
 function getEdgeFrame(ctx, surfacePath, point, angle) {
     let normalX = -Math.sin(angle);
     let normalY = Math.cos(angle);
@@ -1003,9 +982,7 @@ function getEdgeFrame(ctx, surfacePath, point, angle) {
     return { normalX, normalY, facing: Math.atan2(-normalY, -normalX) };
 }
 
-// Where an item of this size stands beside the road, `distance` along the
-// edge of `side`: on the middle of the bank when there is a bank, and off
-// the road otherwise. Returns null when it does not fit there.
+// An item's spot `distance` along `side`: the bank middle, else off the road; null when it does not fit.
 function findTracksideSpot(ctx, surfacePath, side, distance, item, size, presentation) {
     const point = side.walk.pointAt(distance);
     const behind = side.walk.pointAt(distance - TRACKSIDE_DIRECTION_SPAN);
@@ -1027,8 +1004,7 @@ function findTracksideSpot(ctx, surfacePath, side, distance, item, size, present
     return { ...at(), distance, reach, facing: frame.facing };
 }
 
-// Where the next item of a group stands: along the edge from its neighbour,
-// in `direction`, so that the two only just touch.
+// The next item's spot along the edge, just touching its neighbour.
 function findTracksideNeighbourSpot(ctx, surfacePath, side, neighbour, direction, item, size, presentation) {
     const wanted = (neighbour.reach + size * item.reach) * TRACKSIDE_GROUP_SPACING;
     let distance = neighbour.distance + direction * wanted * 0.5;
@@ -1040,9 +1016,7 @@ function findTracksideNeighbourSpot(ctx, surfacePath, side, neighbour, direction
     return null;
 }
 
-// A small group of items beside the road at a distance along an edge. The
-// largest item stands in the middle, and the others to each side of it,
-// along the edge. Adds each item to `planned`.
+// A small group along an edge, largest in the middle; adds each item to `planned`.
 function planTracksideGroup(ctx, surfacePath, side, distance, presentation, random, planned) {
     let count = 1;
     if (random() < TRACKSIDE_SECOND_CHANCE) count += 1;
@@ -1071,9 +1045,7 @@ function planTracksideGroup(ctx, surfacePath, side, distance, presentation, rand
     });
 }
 
-// Where every trackside item stands: the groups at the checkpoints, and the
-// item at each end of the finish line, such as a hay bale with a flag. Each
-// planned item keeps the random source to draw it with.
+// Every trackside item: groups at checkpoints and one at each finish line end, each with its own random source.
 function planTracksideItems(ctx, surfacePath, sides, track, mapTrackPoint, presentation) {
     const planned = [];
     const key = presentation.key || 'track';
@@ -1102,8 +1074,7 @@ function planTracksideItems(ctx, surfacePath, sides, track, mapTrackPoint, prese
     return planned;
 }
 
-// The mound of bank under a planned item: lumps round a middle lump. The
-// lumps join the bank, so the item looks planted in it.
+// The bank mound under a planned item, joined to the bank.
 function getTracksideMoundLumps(planned) {
     const lumps = [];
     for (const { size, spot } of planned) {
@@ -1235,8 +1206,7 @@ export function buildTrackCanvas(track, geometry, presentation = {}) {
         outer: { points: outer, walk: createEdgeWalk(mappedOuter) },
         inner: { points: inner, walk: createEdgeWalk(mappedInner) }
     };
-    // The items are placed before the bank is drawn, so that the bank can
-    // swell into a mound under each of them.
+    // Place items before drawing the bank, so it can swell under them.
     const tracksideItems = planTracksideItems(ctx, surfacePath, sides, track, mapTrackPoint, presentation);
     drawEdgeBanks(ctx, surfacePath, outerPath, innerPath, mappedOuter, mappedInner, canvas.width, canvas.height,
         presentation, getTracksideMoundLumps(tracksideItems));

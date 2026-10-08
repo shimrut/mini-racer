@@ -189,9 +189,7 @@ function pointAtPerimeterProgress(polygon, progress) {
     return { ...polygon[0] };
 }
 
-// Measures the lap along the outer wall from the finish, in the driving
-// direction. An alignment under 0.25 means the start heading points across the
-// road, so the direction is unknown.
+// Lap length along the outer wall from the finish; an alignment under 0.25 means an unknown direction.
 function measureLap(outer, finishHit, startAngle) {
     const outerLength = outer.reduce((sum, point, index) => sum + distance(point, outer[(index + 1) % outer.length]), 0);
     const a = outer[finishHit.segmentIndex];
@@ -213,13 +211,7 @@ function measureLap(outer, finishHit, startAngle) {
 // Tried in turn until a gate crosses the road cleanly: the middle of the stretch first.
 const NEW_CHECKPOINT_SPOTS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8];
 
-/**
- * Places a new checkpoint in the longest stretch of the lap without a gate:
- * finish to the first checkpoint, one checkpoint to the next, or the last
- * checkpoint to the finish. Returns its list position and the gate. Null when a
- * gate misses the road, the start heading points across the road, the
- * checkpoints are out of order, or no clean gate fits in that stretch.
- */
+/** Adds a gate in the lap's longest gateless stretch; null when no clean gate can be placed. */
 export function placeCheckpointInLongestGap(track) {
     if (!Number.isFinite(track?.startAngle)) return null;
     const geometry = buildTrackGeometry(track);
@@ -256,10 +248,7 @@ export function placeCheckpointInLongestGap(track) {
     return null;
 }
 
-/**
- * Validate a Mapmaker draft against the race collision walls and lap gates.
- * Errors make a track unplayable; warnings flag risky but potentially intentional layouts.
- */
+/** Checks a Mapmaker draft against the walls and gates: errors make it unplayable, warnings flag risky layouts. */
 export function validateTrackQuality(track) {
     const issues = [];
     const rawOuter = track?.outer;

@@ -2,8 +2,7 @@ import { createBooleanPreference } from './parse-stored-boolean-toggle.js';
 
 export const QUICK_RESTART_STORAGE_KEY = 'VectorGpQuickRestartEnabled';
 
-// Quick Restart is held back for now: Settings hides its row, and the game
-// treats it as off. The saved choice stays. Set this to true to show it again.
+// Quick Restart is held back: Settings hides it and the game treats it as off; true shows it again.
 export const QUICK_RESTART_SETTING_VISIBLE = false;
 
 const quickRestartPreference = createBooleanPreference(QUICK_RESTART_STORAGE_KEY, {

@@ -52,8 +52,7 @@ const LOBBY_CHORDS = [
     }
 ];
 
-// The dirt song: a D minor rally-rock riff over D, C, B flat and A.
-// Each chord lists its bass root and a pentatonic riff scale.
+// Dirt song: D minor rally-rock over D, C, B flat, A; each chord has a bass root and riff scale.
 const DIRT_CHORDS = [
     { name: 'D minor', root: 38, notes: [62, 65, 67, 69, 72, 74] },
     { name: 'C Major', root: 36, notes: [60, 62, 64, 67, 69, 72] },
@@ -61,9 +60,7 @@ const DIRT_CHORDS = [
     { name: 'A minor', root: 33, notes: [57, 60, 62, 64, 67, 69] }
 ];
 
-// The snow song: a cold B minor synth track over B minor 9, G major 7,
-// E minor 9 and F sharp sus 4. Each chord lists its bass root and the
-// notes for the glassy plucks and the pad.
+// Snow song: cold B minor synth (Bm9, Gmaj7, Em9, F#sus4); each chord has a bass root and pluck/pad notes.
 const SNOW_CHORDS = [
     { name: 'B minor 9', root: 35, notes: [59, 62, 66, 69, 73, 74] },
     { name: 'G Major 7', root: 31, notes: [55, 59, 62, 66, 69, 71] },
@@ -71,9 +68,7 @@ const SNOW_CHORDS = [
     { name: 'F sharp sus 4', root: 30, notes: [54, 59, 61, 66, 71, 73] }
 ];
 
-// The space song: a low synth drive over F sharp minor, D, A and E. The
-// space ground plays it. Each chord lists its bass root and the notes for
-// the arp.
+// Space song: low synth drive over F# minor, D, A, E; each chord has a bass root and arp notes.
 const SPACE_CHORDS = [
     { name: 'F sharp minor', root: 30, notes: [54, 57, 61, 66, 69] },
     { name: 'D Major', root: 26, notes: [54, 57, 62, 66, 69] },
@@ -81,8 +76,7 @@ const SPACE_CHORDS = [
     { name: 'E Major', root: 28, notes: [52, 56, 59, 64, 68] }
 ];
 
-// The water song: a bright D major synth track over D, B minor, G and A.
-// Each chord lists its bass root and the notes for the plucks.
+// Water song: bright D major synth over D, B minor, G, A; each chord has a bass root and pluck notes.
 const WATER_CHORDS = [
     { name: 'D Major', root: 38, notes: [62, 66, 69, 71, 74, 78] },
     { name: 'B minor', root: 35, notes: [59, 62, 66, 69, 71, 74] },
@@ -90,8 +84,7 @@ const WATER_CHORDS = [
     { name: 'A Major', root: 33, notes: [57, 61, 64, 66, 69, 73] }
 ];
 
-// Grip keeps the tarmac song's driving synth sound and sixteenth-note
-// momentum, with its own E minor, G, D and A progression and melody.
+// Grip: the tarmac synth drive with its own E minor, G, D, A progression and melody.
 const GRIP_CHORDS = [
     { name: 'E minor', root: 28, notes: [52, 55, 59, 62, 64, 67, 71, 74] },
     { name: 'G Major', root: 31, notes: [55, 59, 62, 64, 67, 71, 74, 79] },
@@ -115,17 +108,14 @@ function getRaceSong(ground) {
 // Scale steps of the dirt riff, one per sixteenth; null is a rest.
 const DIRT_RIFF_PATTERN = [0, null, 1, 2, null, 2, 1, null, 0, null, 3, null, 2, 1, null, 0];
 
-// Glassy pluck notes of the snow song, one per sixteenth; null is a rest.
-// The notes fall every three steps, across the beat, to feel restless.
+// Snow plucks per sixteenth (null rests), every three steps across the beat.
 const SNOW_PLUCK_PATTERN = [0, null, null, 3, null, null, 5, null, 4, null, null, 2, null, null, 1, null];
 
-// Two alternating grip melodies rise and answer across every sixteenth.
-// Their contour differs from the tarmac arp even though they share its drive.
+// Two alternating grip melodies across every sixteenth, unlike the tarmac arp.
 const GRIP_ARP_A = [0, 2, 4, 6, 4, 2, 5, 3, 1, 3, 5, 7, 5, 3, 2, 4];
 const GRIP_ARP_B = [2, 4, 6, 4, 3, 5, 7, 5, 2, 4, 6, 5, 4, 3, 1, 0];
 
-// Pluck notes of the water song, one per sixteenth; null is a rest. They
-// skip up and down like drops of water.
+// Water plucks per sixteenth (null rests), skipping like drops.
 const WATER_PLUCK_PATTERN = [0, null, 2, null, 4, null, 3, 2, null, 1, null, 3, 5, null, 4, null];
 
 // Arp notes of the space song, one per sixteenth, as for the tarmac arp.
@@ -593,8 +583,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
             playSub(time, midiToFreq(chord.root), (isPlaying ? 0.3 : 0.2) * accent, 0.2);
         }
 
-        // Half-time drums: the snare lands once a bar, so the song feels
-        // wide and cold even at speed.
+        // Half-time drums: one snare per bar keeps the song wide and cold.
         if (isPlaying) {
             if ((step === 0 || step === 10) && speedNorm > 0.02) {
                 playKick(time, 0.4 + speedNorm * 0.06);
@@ -630,8 +619,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         }
     }
 
-    // A warm arp note: a saw with a triangle an octave below, through a
-    // low, round filter with little resonance.
+    // Warm arp note: saw plus a triangle an octave below, through a low round filter.
     function playWarmArp(time, pitch, velocity = 0.12, duration = 0.1, openFilterAmount = 0.5) {
         if (!ctx) return;
 
@@ -707,8 +695,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
         const chord = WATER_CHORDS[chordIndex];
 
-        // The bass bounces: the root on the beat, and the octave on the half
-        // beat after it, as a jet ski rides the waves.
+        // Bouncing bass: root on the beat, octave on the half beat.
         if (step % 4 === 0) {
             playBass(time, midiToFreq(chord.root), isPlaying ? 0.3 : 0.2, isPlaying ? 0.14 : 0.25);
         } else if (step % 4 === 2) {
@@ -743,8 +730,7 @@ export function createProceduralMusic(externalCtx, externalOutput) {
         const speedNorm = clamp(gameState.speed / (gameState.maxSpeedKph / 20), 0, 1);
         const chord = GRIP_CHORDS[chordIndex];
 
-        // The tarmac eighth-note bass and four-on-the-floor beat supply the
-        // momentum the earlier sparse grip arrangement was missing.
+        // Tarmac eighth-note bass and four-on-the-floor beat give grip its drive.
         if (step % 2 === 0) {
             const octave = step % 4 === 2;
             const velocity = (isPlaying ? 0.32 : 0.22) * (octave ? 0.85 : 1);

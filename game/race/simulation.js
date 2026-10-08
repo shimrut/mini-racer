@@ -551,8 +551,7 @@ export function getCarRearAxleWorldPoint(pos, angle, config) {
     };
 }
 
-// groundOverride: only tests give it, to try other ground numbers. The game
-// and the server always drive the ground of the track.
+// groundOverride is for tests only; the game and server drive the track's ground.
 export function updateSimulation(
     state, dt, config, currentTrack, collisionSegments, groundOverride = null
 ) {
@@ -596,8 +595,7 @@ export function updateSimulation(
                 : 14 * ground.angularResponse;
 
             state.angularVelocity = Number.isFinite(state.angularVelocity) ? state.angularVelocity : 0;
-            // A ground with yaw carry lets the car keep turning after the
-            // player lets go. Tarmac has none and keeps the original steps.
+            // Yaw carry keeps a turn going after release; tarmac has none.
             const yawCarry = steerInput === 0 ? ground.yawCarry : 0;
             if (yawCarry > 0) {
                 state.angularVelocity += (desiredAngularVelocity - state.angularVelocity)
@@ -654,8 +652,7 @@ export function updateSimulation(
                 : 0.45 * ground.steerGripScale;
             const activeGrip = Math.max(0, effectiveGrip) * (steerInput === 0 ? 1 : steerGripScale);
             lateralSpeed *= Math.exp(-activeGrip * dt);
-            // A ground with slide scrub takes forward speed while the car
-            // slides. Tarmac has none.
+            // Slide scrub takes forward speed in a slide; tarmac has none.
             if (ground.slideScrub > 0 && currentSpeed > 0.001) {
                 const slideShare = Math.min(1, Math.abs(lateralSpeed) / currentSpeed);
                 forwardSpeed *= Math.exp(-ground.slideScrub * slideShare * dt);

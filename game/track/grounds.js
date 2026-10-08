@@ -1,21 +1,7 @@
-// A ground scales the car's driving settings for a whole track. The game and
-// the server replay check both read it, so a ground's numbers are part of the
-// race rules: once a track with that ground is live, do not change them.
-// Tarmac multiplies by exactly 1, which keeps tarmac times bit-identical.
-//
-// The driving settings:
-//   accel            acceleration
-//   maxSpeed         top speed
-//   grip             side grip: less grip makes the car slide wider
-//   steerGripScale   side grip while the player steers
-//   turnRate         how fast the car turns at full steering
-//   angularResponse  how quickly the car starts and stops turning
-//   highSpeedSteerTrim  how much less the car turns at top speed: more
-//                    makes the front push wide
-// These two are values, not multipliers. Tarmac has 0, which turns them off:
-//   yawCarry         0 to 1: how much the car keeps turning after the
-//                    player lets go
-//   slideScrub       the forward speed that a slide takes, each second
+// A ground scales the car's driving settings for a track; the game and the replay check both read it.
+// The numbers are race rules: never change them once a track on that ground is live. Tarmac is exactly 1.
+// steerGripScale: grip while steering; highSpeedSteerTrim: less turn at top speed (more pushes wide).
+// yawCarry (0 to 1, turn kept after release) and slideScrub (speed lost per second sliding) are values; 0 is off.
 
 export const DEFAULT_TRACK_GROUND_KEY = 'tarmac';
 
@@ -64,12 +50,7 @@ export const TRACK_GROUNDS = Object.freeze({
         slideScrub: 0,
         skidMarkMinSlipRatio: 0.5
     }),
-    // A race-circuit road: the car holds its line and almost never slides.
-    // On tarmac, the slide makes the car's line change smoothly. With no
-    // slide, the car starts and stops turning more slowly, so its line and
-    // the camera stay as calm as on tarmac. A turn takes some speed, as the
-    // slide does on tarmac, so a long turn does not go much wider.
-    // It has its own car sound and its own cars.
+    // Grip: almost no slide, so turning starts and stops slower to keep the line and camera calm; turns cost speed.
     grip: Object.freeze({
         key: 'grip',
         label: 'Track',
@@ -84,10 +65,7 @@ export const TRACK_GROUNDS = Object.freeze({
         slideScrub: 3,
         skidMarkMinSlipRatio: 0.28
     }),
-    // Open water: the jet ski is driven, not a car. The hull slides wide in
-    // a turn, like on snow. The nose starts to turn slowly, and the jet ski
-    // keeps turning a little after the player lets go. The water takes some speed
-    // in a slide. A water lap is about 23% slower than tarmac, as on dirt.
+    // Water (jet ski): wide slides, slow turn-in with carry, speed lost sliding; about 23% slower than tarmac.
     water: Object.freeze({
         key: 'water',
         label: 'Water',
@@ -102,10 +80,7 @@ export const TRACK_GROUNDS = Object.freeze({
         slideScrub: 0.4,
         skidMarkMinSlipRatio: 0.45
     }),
-    // A space lane: the spaceship is driven, not a car. It speeds up
-    // fastest and has the highest top speed. The nose turns quickly, but
-    // the ship keeps its line and slides very wide, with no loss of speed.
-    // A space lap takes about the same time as tarmac.
+    // Space (spaceship): fastest, quick nose, very wide slides without speed loss; laps about tarmac time.
     space: Object.freeze({
         key: 'space',
         label: 'Space',

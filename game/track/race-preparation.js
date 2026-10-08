@@ -1,12 +1,5 @@
-// Priority targets build inside the loader. Selected/Next targets can prewarm
-// locally before Start; other pictures use the existing caches. Start consumes
-// only loaded definitions and never imports a chunk or asks the server.
-//
-// Each slot holds the record of one target: the Daily, the Campaign stage, the
-// selected card, the Campaign Next stage or the Head to Head track. A record
-// keeps its own references to the walls and the picture, so other tracks that
-// push them out of the asset caches do not undo it. A new target for a slot
-// replaces its record, and a late answer for an older target is dropped.
+// One record per slot (Daily, stage, selected card, Next, Head to Head), holding its walls and picture.
+// Start uses only loaded definitions; a newer target replaces a record and a late older answer is dropped.
 
 import { getTrackCanvasAsset, getTrackRuntimeAsset } from './assets.js';
 import { getLoadedClientTrack, loadRaceDefinitions } from './client-registry.js';
@@ -29,8 +22,7 @@ export function raceAssetOptionsKey(options = {}) {
     return `${options.qualityLevel ?? 0}:${options.frameSkip ?? 0}`;
 }
 
-// The race challenge of a Campaign stage or a Head to Head: its presentation
-// is the plain one of its track.
+// Campaign and Head to Head races use the track's plain presentation.
 export function plainRaceChallenge(trackKey) {
     return { trackKey, skin: 'default' };
 }
@@ -60,8 +52,7 @@ export function createRacePreparation({
         }
     }
 
-    // A record is ready only while it is the current layout of its key, with
-    // the current asset options and the presentation of this challenge.
+    // Ready only for the current layout, asset options and this challenge's presentation.
     function matches(record, trackKey, challenge) {
         if (!record || record.trackKey !== trackKey) return false;
         const latest = getLoadedClientTrack(trackKey);
@@ -92,8 +83,7 @@ export function createRacePreparation({
         });
     }
 
-    // Start uses only an already loaded definition. Cache misses rebuild local
-    // assets, without importing a definition or asking the server.
+    // Uses only a loaded definition; misses rebuild assets locally, never asking the server.
     function prepareLoaded(slot, { trackKey, challenge = null } = {}) {
         const track = getLoadedClientTrack(trackKey);
         if (!track) throw new Error('The race definitions are not loaded. Try the lobby again.');
@@ -109,8 +99,7 @@ export function createRacePreparation({
         if (slots.get(slot) !== state) return null;
         let track = getLoadedClientTrack(trackKey);
         if (!track) throw new Error('The track layout could not be confirmed. Retry before racing.');
-        // The walls and the picture block the screen while they build. The
-        // caller can wait for a quiet moment, or stop the build.
+        // The build blocks the screen, so the caller may wait for a quiet moment or stop it.
         if (state.beforeBuild && await state.beforeBuild() === false) {
             if (slots.get(slot) === state) {
                 slots.delete(slot);
@@ -127,9 +116,7 @@ export function createRacePreparation({
         return state.record;
     }
 
-    // Prepares the target of a slot. A target that another slot already holds
-    // is shared, not built again. `beforeBuild` runs after the server check
-    // and the load, just before the build; false stops the build.
+    // Prepares a slot's target, sharing one another slot holds; `beforeBuild` false stops the build.
     function prepare(slot, { trackKey, challenge = null, beforeBuild = null } = {}) {
         if (typeof trackKey !== 'string' || !trackKey) {
             return Promise.reject(new Error('A race needs a track.'));

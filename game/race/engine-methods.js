@@ -51,15 +51,11 @@ const COMPARISON_TIE_EPSILON_SEC = 0.005;
 export const MAX_SIMULATED_FRAME_DT = 0.1;
 export const RANKED_RUN_STALL_FRAME_MS = 250;
 export const RANKED_RUN_STALL_MESSAGE = "Rank disabled due to frame stalls";
-// With Quick Restart on, a second touch in this time restarts the run. It is
-// the fade-in of the pause menu that Quick Restart opens (--dur-quick-pause in
-// styles/foundation.css).
+// Quick Restart window for a second touch: the pause menu fade-in (--dur-quick-pause in foundation.css).
 export const QUICK_RESTART_TAP_WINDOW_MS = 180;
-// The second touch must land this close to the first tap, so that a steering
-// thumb does not restart the run.
+// The second touch must land this close to the first, so a steering thumb never restarts.
 export const QUICK_RESTART_TAP_RADIUS_PX = 64;
-// The touch that restarts the run still ends in a click. The first click in
-// this time is dropped.
+// Drop the first click in this time, from the touch that restarted the run.
 export const QUICK_RESTART_CLICK_DROP_MS = 500;
 
 // The point of a pointer tap, or null for a click from the keyboard.
@@ -73,8 +69,7 @@ function finitePositive(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
-// A rival gets a random skin of the track's ground that differs from the
-// player's. When the ground has no other skin, the rival uses the player's.
+// A rival gets a random other skin of the ground, or the player's when there is none.
 export function chooseOpponentCarAsset({
   playerAssetName = STOCK_CAR_ASSET_NAME,
   ground = "tarmac",
@@ -610,8 +605,7 @@ export const raceEngineMethods = {
         decalStyle,
         onLoaded: (image) => {
           this.carSprite = image;
-          // A skin drawn in code moves in the race. The sprite is only the car
-          // at rest, for the ghost car and the track cards.
+          // A drawn skin moves in the race; the sprite is only the car at rest.
           this.drawnCar = getDrawnCar(assetName, { paint, decalStyle });
           this.drawnCar?.resetMotion();
           this.carSpriteDrawWidth = DRAWN_CAR_DRAW_PIXELS;
@@ -711,11 +705,7 @@ export const raceEngineMethods = {
     }
   },
 
-  // A tap on the pause control. With Quick Restart on, the first tap pauses
-  // the run at once, and the pause menu fades in slowly at first, then fast.
-  // A second touch near the first tap, while the menu fades in, restarts the
-  // run at once, as a collision does, with the same delay. The menu is cut,
-  // so the restart is the only thing the player sees.
+  // Quick Restart: the first tap pauses at once; a second nearby touch during the fade-in restarts like a collision.
   handlePauseTap(event) {
     if (this.pauseTapTimer) return;
     if (!this.quickRestartEnabled) {
@@ -735,9 +725,7 @@ export const raceEngineMethods = {
     return this.status === "paused" && this.modal?.isPauseModalActive?.() === true;
   },
 
-  // The second tap counts when the finger touches, not when it lifts. The
-  // pause menu covers the pause control, so the touch is caught before it
-  // reaches the menu.
+  // Count the second tap on touch, before the menu that covers the control can catch it.
   openQuickRestartTapWindow(tapPoint) {
     const onPointerDown = (event) => {
       if (!this.isQuickRestartPauseOpen()) {
@@ -780,8 +768,7 @@ export const raceEngineMethods = {
     this.restartCurrentRunAfterCollision();
   },
 
-  // With the menu gone, the click of the restarting touch would reach what is
-  // under the finger, such as the pause control, and pause the new run.
+  // With the menu gone, the restarting touch's click would hit the pause control and pause the new run.
   dropQuickRestartClick() {
     if (typeof globalThis.addEventListener !== "function") return;
     let timer = null;
@@ -931,8 +918,7 @@ export const raceEngineMethods = {
       preserveDailyChallenge = false,
       preserveRaceComparisonTarget = preserveDailyChallenge,
       showStartOverlay = !autoStart,
-      // A race start keeps the lobby or the finish screen until the new track
-      // is drawn, so the previous track never shows.
+      // Keep the lobby or finish screen until the new track is drawn.
       keepScreen = false,
     } = {},
   ) {
@@ -1050,8 +1036,7 @@ export const raceEngineMethods = {
     );
   },
 
-  // Moves the wheels and the brake lights of a drawn car. The car is still
-  // when the race is not running, but it holds its brakes in the countdown.
+  // Moves a drawn car's wheels and brake lights; still when not racing, braking in the countdown.
   updateDrawnCar(dt, size) {
     const running = this.status === "playing";
     const holding = this.status === "starting";

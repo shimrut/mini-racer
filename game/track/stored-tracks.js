@@ -1,11 +1,5 @@
-// Tracks made in the Creator live in the game's database, not in the app.
-// The game and the server put them in this list before they look up a track.
-// A stored track wins over a built-in track with the same key, so a copy of a
-// built-in track in the database replaces the app copy.
-//
-// A stored entry: { key, name, ground, medalRow, track }. `track` is the shape
-// with its name. `medalRow` is { gold, silver, bronze, author } or null.
-// Its identity helper is independent of the catalog and the medal times.
+// Creator tracks, looked up before built-ins with the same key, so a stored copy replaces the app track.
+// Entry: { key, name, ground, medalRow ({ gold, silver, bronze, author } or null), track }.
 
 import { getTrackDefinitionIdentity } from './definition-identity.js';
 
@@ -23,9 +17,7 @@ export function isStoredTrack(trackKey) {
     return storedTrackExists ? storedTrackExists(trackKey) : getStoredTrack(trackKey) !== null;
 }
 
-// The server gives each subreddit its own stored tracks, so it replaces the
-// lookup for the current request. The game keeps the local list. `exists`
-// answers whether a key is stored without loading the track.
+// The server replaces this lookup per subreddit request; `exists` checks a key without loading it.
 export function setStoredTrackResolver(resolver, { exists = null } = {}) {
     storedTrackResolver = typeof resolver === 'function'
         ? resolver

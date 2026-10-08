@@ -23,9 +23,7 @@ export function getStaleRunTrackReason(engine) {
         : null;
 }
 
-// Shows a race whose track is installed. The new track is drawn first. Then
-// the finish screen closes and the lobby fades out, so the previous track
-// never shows.
+// Draws the new track first, then closes the finish screen and fades the lobby.
 export async function revealInstalledRace(engine) {
     engine.resize?.({ render: true });
     engine.modal?.closeModal?.();
@@ -34,14 +32,12 @@ export async function revealInstalledRace(engine) {
     await transition;
 }
 
-// Explicit Retry/Restart adopts a new definition. Collision resets continue to
-// use the fixed definition and runtime of the current attempt.
+// Retry and Restart adopt a new definition; collision resets keep the attempt's own.
 export async function reloadChangedRaceTrack(engine, { isStillCurrent = () => true, ...options } = {}) {
     if (hasCurrentTrackDefinition(engine)) return;
     const trackKey = engine.currentTrackKey;
     const challenge = engine.activeDailyChallenge;
-    // A removed override may reveal a built-in whose chunk was never needed
-    // on entry. This explicit reload is the definition-loading exception.
+    // The one definition load allowed here: a removed override can reveal an unloaded built-in.
     await engine.loadRaceDefinitions?.([trackKey], { challenge });
     if (!isStillCurrent()) return;
     const prepared = engine.readyRaceTrack?.('selected', trackKey, challenge);

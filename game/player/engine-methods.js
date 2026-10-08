@@ -14,8 +14,7 @@ export const playerProfileEngineMethods = {
         carUnlocks,
         authoritative = true,
     } = {}, { loadCar = true } = {}) {
-        // A transfer can replace progress while keeping the same account owner.
-        // Fence pending requests and drop retained mode state before applying it.
+        // A transfer can replace progress for the same owner; fence pending requests and drop retained mode state.
         this._raceModeProfileRevision = (this._raceModeProfileRevision || 0) + 1;
         this._raceModeWarmups?.clear();
         this._campaignBootstrapRequestId = (this._campaignBootstrapRequestId || 0) + 1;

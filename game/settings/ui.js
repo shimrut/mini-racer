@@ -394,8 +394,7 @@ export class SettingsUi {
         this.syncQuickRestartRowVisibility();
     }
 
-    // While Quick Restart is held back, its row is hidden and its switch is
-    // disabled, so keyboard navigation skips it.
+    // While Quick Restart is held back, its row is hidden and its switch disabled for keyboard navigation.
     syncQuickRestartRowVisibility() {
         const switchEl = this.quickRestartSwitch;
         if (!switchEl) return;

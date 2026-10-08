@@ -358,9 +358,7 @@ export const BUILT_IN_TRACKS = Object.fromEntries(
     ]),
 );
 
-// Compatibility registry for existing gameplay and server consumers. A
-// stored track with the same key wins over the built-in one. A list of the
-// registry gives the built-in tracks only.
+// Registry where a stored track wins over a built-in one; listing it gives built-ins only.
 export const TRACKS = new Proxy(BUILT_IN_TRACKS, {
     get(target, trackKey, receiver) {
         const stored = typeof trackKey === 'string' ? getStoredTrack(trackKey) : null;

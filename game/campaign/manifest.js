@@ -92,11 +92,7 @@ if (!APP_SERIES.some((series) => series.id === CAMPAIGN_NUMBERS_SERIES_ID && ser
     throw new Error('The Numbers Campaign series must stay live.');
 }
 
-// The app series with the published stored series. A stored series replaces
-// the app series with the same name, but never Numbers. New stored series
-// come after the app series. Each stored list is built once: on the server,
-// requests that run at the same time can read different lists, and each one
-// keeps the same stages until it ends.
+// App series plus published stored series (same name replaces, never Numbers); each list is built once per request.
 const viewsByDefinitions = new WeakMap();
 
 function buildStoredSeries(definitions) {
@@ -135,8 +131,7 @@ function currentViews() {
     return views;
 }
 
-// An array that always shows the current list, so the code that reads the
-// Campaign lists sees the published stored series too.
+// A live array, so readers always see the published stored series too.
 function liveList(read) {
     return new Proxy([], {
         get(_target, property) {
@@ -169,9 +164,7 @@ export const CAMPAIGN_SERIES = liveList(() => currentViews().live);
 
 export const CAMPAIGN_LIVE_STAGES = liveList(() => currentViews().liveStages);
 
-// Players choose a series only when more than one is live. With one, the
-// Campaign opens its stages, with no series screen and no series choice.
-// The count includes the published series from the Creator.
+// A series choice shows only with more than one live series, Creator series included.
 export function campaignHasSeriesChoice() {
     return currentViews().live.length > 1;
 }

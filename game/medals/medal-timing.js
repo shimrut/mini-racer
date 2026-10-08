@@ -38,8 +38,7 @@ function normalizeMedalTimes(raw) {
 
 const MEDAL_TIMES = normalizeMedalTimes(_medalTimesRaw);
 
-// A stored track keeps its own medal row, also when a built-in track has
-// the same key.
+// A stored track keeps its own medals, even when a built-in track has its key.
 function getMedalRow(trackKey) {
     const stored = getStoredTrack(trackKey);
     if (stored) return stored.medalRow ?? null;

@@ -98,9 +98,7 @@ export class InteractionsUi {
             this.bindSteeringSide(this.rightTouchBtn, onRightDown, onRightUp),
         ].filter(Boolean);
 
-        // Each touch event lists the fingers that are still down. A finger
-        // whose lift the browser lost is not in the list at the next touch.
-        // This listener runs after the handlers of each side.
+        // Runs after each side's handlers; a finger whose lift was lost is missing from the next touch list.
         const dropLostFingers = (e) => {
             if (!e.touches) return;
             const down = new Set(Array.from(e.touches, (touch) => touch.identifier));
@@ -114,8 +112,7 @@ export class InteractionsUi {
     bindSteeringSide(button, onDown, onUp) {
         if (!button) return null;
 
-        // Fingers steer from touch events. Pointer events steer only for a
-        // mouse or a pen, so that one finger does not count two times.
+        // Fingers steer from touch events and pointers only for mouse or pen, so a finger never counts twice.
         const fingersUseTouchEvents = "ontouchstart" in window;
         const fingers = new Set();
         const pointers = new Set();
@@ -136,8 +133,7 @@ export class InteractionsUi {
             update();
         };
 
-        // A lift also ends the older fingers on this side. Thus a tap stops a
-        // turn when the browser lost a lift but still lists the finger.
+        // A lift also ends older fingers on this side, so a tap stops a turn after a lost lift.
         const touchUp = (e) => {
             if (e.cancelable) e.preventDefault();
             Array.from(e.changedTouches || [], (touch) => {

@@ -4,8 +4,7 @@ import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../camp
 import { renderTrackPreviewCanvas, trackPreviewPixelScale } from '../ui/track-carousel.js';
 import { formatSeriesMedals } from './campaign-series-picker.js';
 
-// The Campaign series screen: one row for each series, with a picture of its
-// first track, its name in the Home menu type, and one line of detail.
+// One row per series: first-track picture, name and one detail line.
 
 // A series with no stages yet shows a track of its ground, so the ground is visible.
 const GROUND_PREVIEW_TRACK_KEYS = Object.freeze({
@@ -25,8 +24,7 @@ function previewTrackKeyFor(series) {
     return groundTrackKey && hasTrack(groundTrackKey) ? groundTrackKey : DEFAULT_TRACK_KEY;
 }
 
-// The live series, in data file order. Medals come from the bootstrap summary
-// of the live series.
+// Live series in data file order; medals from the bootstrap summary.
 export function buildCampaignSeriesRows(state = {}) {
     const summaries = new Map(
         (Array.isArray(state?.series) ? state.series : []).map((summary) => [summary.id, summary]),
@@ -92,8 +90,7 @@ function buildRow(row, onChoose) {
     return button;
 }
 
-// Draws the rows. It does nothing when the rows have not changed, so a repaint
-// of the Campaign screen keeps the pictures and the keyboard cue.
+// Draws rows only when they changed, so a repaint keeps pictures and focus.
 export function renderCampaignSeriesList(container, rows, { onChoose = null } = {}) {
     if (!container) return;
     const key = JSON.stringify(rows);

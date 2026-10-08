@@ -1,5 +1,4 @@
-// The race camera: its zoom, and how far it looks ahead of the car. The race
-// and the Mapmaker Test Drive use this module, so both show the same view.
+// Race camera zoom and look-ahead, shared by the race and the Mapmaker Test Drive.
 
 export const CAMERA_DT_MIN_S = 1 / 120;
 export const CAMERA_DT_MAX_S = 1 / 45;

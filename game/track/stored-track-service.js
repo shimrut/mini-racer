@@ -1,8 +1,4 @@
-// Loads the stored tracks that the server names, before the game reads them.
-// The server gives a track only after it is placed in a Daily or a published
-// series. The Daily answers carry their stored tracks. For another key that
-// the app does not have, the game asks the server once, and again after a few
-// minutes, when a new Daily can start.
+// Loads server-named stored tracks first; unknown keys are asked once, then again after a few minutes.
 
 import { isBuiltInTrack } from './catalog.js';
 import { getStoredTrack, registerStoredTrack, unregisterStoredTrack } from './stored-tracks.js';
@@ -64,8 +60,7 @@ export function registerStoredTracksFromPayload(tracks, { confirmedTrackKeys = [
     for (const entry of entries) {
         if (entry) {
             registerStoredTrack(entry);
-            // Authoritative Campaign answers also carry the tracks of the
-            // other published series. Reuse those confirmations too.
+            // Campaign answers also carry other published series' tracks; reuse them.
             if (requested.length) confirmedKeys.add(entry.key);
         }
     }
@@ -100,8 +95,7 @@ async function requestStoredTracks(trackKeys) {
             throw new Error('The track layout could not be confirmed. Retry before racing.');
         }
         const requestedTracks = body.tracks.filter((raw) => trackKeys.includes(raw?.key));
-        // A binding API answer can confirm a newer layout while this cosmetic
-        // request is in flight. It takes precedence over the older request.
+        // A binding answer that arrives meanwhile wins over this cosmetic request.
         registerStoredTracksFromPayload(requestedTracks.filter((raw) => !confirmedKeys.has(raw.key)));
         trackKeys.forEach((key) => {
             if (!confirmedKeys.has(key) && isBuiltInTrack(key)
@@ -113,9 +107,7 @@ async function requestStoredTracks(trackKeys) {
     }
 }
 
-// Cosmetic prefetch remains best effort. Race preparation uses
-// requireConfirmation, including built-in keys, and must expose Retry on a
-// failed/invalid answer. A successful empty answer confirms the app definition.
+// Prefetch is best effort; race preparation needs confirmation and Retry, and an empty answer confirms the app track.
 export async function ensureStoredTracks(trackKeys = [], { includeBuiltIn = false, requireConfirmation = false } = {}) {
     const wanted = [...new Set(Array.isArray(trackKeys) ? trackKeys : [trackKeys])];
     if (requireConfirmation && wanted.every((key) => !key || confirmedKeys.has(key))) return;

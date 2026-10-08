@@ -13,8 +13,7 @@ function summaryMetrics(summary) {
     const metrics = [];
     const dailySavedResults = nonNegativeInteger(summary?.dailySavedResults);
     const dailyPlaylistSize = nonNegativeInteger(summary?.dailyPlaylistSize);
-    // "Daily 43" counts every Daily day raced; "Daily 2/7" counts the
-    // playable days only, until the server can list older days.
+    // "Daily 43" counts all raced days; "Daily 2/7" only playable days, until the server lists older ones.
     if (dailySavedResults !== null) {
         metrics.push({
             label: 'Daily',
@@ -69,9 +68,7 @@ function summaryBlock(summary) {
     return block;
 }
 
-// Keep guest is not offered: it deletes the account's results wherever the
-// guest has none. The server still finishes a Keep guest transfer that
-// started before.
+// Keep guest is not offered, because it deletes account results; the server finishes old ones.
 const CHOICE_BUTTON_LABELS = {
     merge: 'MERGE BEST TIMES',
     account: 'CONTINUE WITH ACCOUNT',
@@ -124,12 +121,10 @@ async function postProgressSelection(body, controller = null) {
 }
 
 const PROGRESS_SELECTION_CONTINUE_REASON = 'progress_selection_continue';
-// A transfer with many Daily days answers "continue" after each share of the
-// work. Each request gets its own wait; this bounds the number of requests.
+// Caps the requests of a long Daily transfer, which answers continue after each share.
 const PROGRESS_SELECTION_MAX_REQUESTS = 200;
 
-// Sends the choice (or a resume), then follows every "continue" answer by
-// resuming the same transfer at once, until the transfer answers for good.
+// Sends the choice, then resumes on every continue until the transfer finishes.
 async function postProgressSelectionUntilDone(body, { onContinue = null } = {}) {
     let next = body;
     for (let request = 0; request < PROGRESS_SELECTION_MAX_REQUESTS; request += 1) {

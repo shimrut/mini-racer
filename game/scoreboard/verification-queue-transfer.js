@@ -14,9 +14,7 @@ import {
   writeQueueState,
 } from "./verification-queue.js";
 
-// Keep account drops the guest's queued runs; Merge keeps the account's and
-// moves the guest's, keeping the faster run where both queued one. Keep guest
-// is retired and runs as Merge, on the phone as on the server.
+// Keep account drops guest runs; Merge keeps the faster of each pair; retired Keep guest runs as Merge.
 function runnableTransferChoice(choice) {
   if (choice === "account") return "account";
   return choice === "guest" || choice === "merge" ? "merge" : null;

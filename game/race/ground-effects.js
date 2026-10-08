@@ -4,12 +4,7 @@ import { getCarRearAxleWorldPoint } from "./simulation.js";
 import { KPH_PER_WORLD_UNIT } from "../car/handling.js";
 import { getTrackGround } from "../track/grounds.js";
 
-// Look-only effects that keep the car on the ground on a loose surface:
-// tyre tracks behind the rear wheels, lumps of earth or snow thrown from the
-// wheels, and the look of the skid marks. On water, the tracks are the wake of
-// the jet ski and the spray is splashes. In space, the tracks are the engine
-// trails.
-// They never change the drive, so they live outside the shared simulation.
+// Look-only ground effects (tracks, spray, skid look, wake, engine trails), outside the shared simulation.
 
 const TYRE_TRACK_DEFAULT_SECONDS = 3;
 const TYRE_TRACK_MAX_SECONDS = 5;
@@ -25,40 +20,24 @@ const TYRE_TRACK_SHADE_OFFSET = 0.35;
 const TYRE_TRACK_SHADE_WIDTH = 0.45;
 
 const SPRAY_MIN_SPEED = 3;
-// The spray starts just behind the rear edge of the car, in line with the
-// rear tires, so it comes out from behind the car and not from under its
-// middle.
+// Spray starts just behind the rear tires, not from under the car.
 const SPRAY_BEHIND_CENTER = 0.6;
 const SPRAY_HALF_WIDTH = 0.28;
-// Dust from the front wheels starts just behind the front tires, in line
-// with them. A front puff is about as wide as the tire (4-6 px), is at its
-// full size at once, and stays in the line of its tire.
+// Front dust starts behind the front tires, tire-wide (4-6 px) and full size at once.
 const SPRAY_FRONT_AHEAD_OF_CENTER = 0.2;
 const SPRAY_FRONT_HALF_WIDTH = 0.26;
 const SPRAY_FRONT_POP = 0.12;
 const SPRAY_FRONT_SPREAD_SCALE = 0.3;
 const SPRAY_FRONT_MIN_SIZE = 2.3;
 const SPRAY_FRONT_MAX_SIZE = 3;
-// Dust and snow follow the speed. Just above SPRAY_MIN_SPEED, the wheels
-// throw a few small lumps, also in a slide. At the top speed of the ground,
-// they throw more lumps at full size. A front lump never grows past the tire
-// width.
+// Spray follows speed: a few small lumps just above SPRAY_MIN_SPEED, more full-size ones at top speed.
 const SPRAY_SLOW_SIZE = 0.3;
 const SPRAY_FAST_SIZE = 1;
-// At the top speed, this part of the amount of the style, so that the lumps
-// stay apart and do not join into one long plume.
+// Top-speed share of the style amount, so lumps stay apart instead of one plume.
 const SPRAY_FAST_AMOUNT = 0.5;
 
-// Spray: flat shapes, with a shade to the lower right and a light top to the
-// upper left when the ground gives those colours. Each lump keeps some of the
-// car's speed, is thrown back and out from the wheel, and slows down. It
-// grows to its full size, then shrinks away. A ground picks a spray style:
-// - lumps: splashes of water from the hull, that pop up.
-// - snow: lumps of snow from all four wheels, that pop up.
-// - dust: puffs of dust from all four wheels that stay close behind them,
-//   overlap into one flat cloud, and grow more slowly.
-// frontShare: the part of the rear wheel spray that each front wheel throws.
-// followsSpeed: the amount and the size of the lumps follow the speed.
+// Spray lumps keep some car speed, fly back and out, grow, then shrink; shaded when the ground gives colours.
+// Styles: lumps (water splashes), snow (all wheels), dust (low merging cloud); frontShare and followsSpeed tune them.
 const SPRAY_LUMPS = Object.freeze({
   baseChance: 0.45,
   slipChance: 0.9,
@@ -100,9 +79,7 @@ const SPRAY_LIGHT_OFFSET_X = -1;
 const SPRAY_LIGHT_OFFSET_Y = -1.2;
 const SPRAY_LIGHT_SCALE = 0.55;
 
-// A wall hit on a bank of earth or snow throws lumps of the bank in place of
-// sparks. They fly out from the wall into the road, keep a little of the
-// car's speed, and are drawn like the spray. A harder hit throws more.
+// A bank hit throws bank lumps instead of sparks, drawn like spray; harder hits throw more.
 const SCRAPE_MIN_LUMPS = 10;
 const SCRAPE_MAX_LUMPS = 18;
 const SCRAPE_THROW = 5;
@@ -269,8 +246,7 @@ function slowSpray(particles, dt) {
   }
 }
 
-// Call once per physics step, after the simulation moved the car, with the
-// events of that step.
+// Call once per physics step, after the car moved, with that step's events.
 export function recordGroundEffects(engine, presentation, config, events = null) {
   const tracks = engine.tyreTracks;
   const trackColor = presentation?.tyreTrackColor;
@@ -311,8 +287,7 @@ function getSprayRadius(particle) {
   return particle.size * Math.min(1, age / pop) * Math.sqrt(1 - age);
 }
 
-// One flat layer of the spray lumps, or of the wall hit lumps, as one fill,
-// so lumps that touch merge.
+// One fill per layer, so touching lumps merge.
 function fillSprayLayer(ctx, particles, gs, debris, color, scale, offsetX, offsetY) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -330,8 +305,7 @@ function fillSprayLayer(ctx, particles, gs, debris, color, scale, offsetX, offse
   if (lumps > 0) ctx.fill();
 }
 
-// Spray and wall hit lumps, under the car and the sparks. The race and
-// the Mapmaker test drive draw the other particles as flat dots.
+// Spray and bank lumps, under the car and sparks; other particles are flat dots.
 export function drawSpray(ctx, particles, presentation, gs) {
   if (!presentation || !Array.isArray(particles) || particles.length === 0) return;
   const debris = presentation.scrapeDebris;
@@ -354,19 +328,12 @@ export function drawSpray(ctx, particles, presentation, gs) {
   ctx.restore();
 }
 
-// The distance of each line of tyre tracks and skid marks from the middle of
-// the car, in world units. A ground can put them under the rear tires.
+// Track and skid line offset from the car middle, in world units; a ground can set it.
 export function getMarkHalfWidth(presentation) {
   return Number(presentation?.markHalfWidth) || MARK_HALF_WIDTH;
 }
 
-// One side of a line of marks behind the rear wheels, for tyre tracks and
-// skid marks. A gap in the marks starts a new line.
-// offset moves the line that many pixels to the lower right, or to the upper
-// left when it is less than 0.
-// halfWidthAt: optional, gives the distance of the line from the middle at
-// each mark: for a ground that puts the marks under the rear tires, or for a
-// wake that opens out. Without it, the distance is MARK_HALF_WIDTH.
+// One side of a mark line behind the rear wheels; a gap starts a new line, offset shifts it, halfWidthAt varies it.
 export function addMarkSide(path, marks, start, end, gs, side, offset = 0, halfWidthAt = null) {
   const first = marks.get(start);
   const firstHalf = halfWidthAt ? halfWidthAt(start) : MARK_HALF_WIDTH;
@@ -387,8 +354,7 @@ export function addMarkSide(path, marks, start, end, gs, side, offset = 0, halfW
   }
 }
 
-// The oldest part of the tracks is the faintest, so they fade out behind the car.
-// lowQuality: true draws fewer fade steps, for a slow device.
+// Tracks fade with age; lowQuality draws fewer fade steps.
 export function drawTyreTracks(ctx, tracks, presentation, gs, zoom, lowQuality = false) {
   const color = presentation?.tyreTrackColor;
   if (!color || !tracks || tracks.length < 2) return;
@@ -407,14 +373,11 @@ export function drawTyreTracks(ctx, tracks, presentation, gs, zoom, lowQuality =
   ctx.strokeStyle = color;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  // Tracks as wide as the tire keep their width in the world, as the tire
-  // does. Other tracks keep most of their width on the screen when the
-  // camera zooms out.
+  // Tire-wide tracks keep their world width; others keep most of their screen width when zoomed out.
   const lineWidth = presentation.tyreTrackIsTireWidth === true
     ? width
     : Math.max(width * 0.8, width / zoom);
-  // A groove pressed into earth or snow: the light from the top left puts
-  // its upper left side in shade.
+  // A groove in earth or snow, shaded on its upper left side.
   const shadeColor = presentation.tyreTrackShadeColor;
   const shadeOffset = lineWidth * TYRE_TRACK_SHADE_OFFSET;
   const shadeWidth = lineWidth * TYRE_TRACK_SHADE_WIDTH;
@@ -446,8 +409,7 @@ export function drawTyreTracks(ctx, tracks, presentation, gs, zoom, lowQuality =
   ctx.restore();
 }
 
-// Skid marks show where the car slid. strokePaths strokes the mark paths
-// with the current style.
+// Skid marks where the car slid, stroked with the current style.
 export function strokeSkidMarks(ctx, presentation, zoom, strokePaths) {
   const lineWidth = Math.max(3.4, 4.2 / zoom) * (Number(presentation?.skidWidthScale) || 1);
   ctx.save();

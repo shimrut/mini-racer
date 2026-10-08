@@ -9,9 +9,7 @@ import {
 const STAGE_MEDAL_TIERS = new Set(['author', 'gold', 'silver', 'bronze']);
 const MEDAL_TIER_ORDER = ['author', 'gold', 'silver', 'bronze'];
 
-// One screen for every campaign. The series that was just finished fills the
-// title, the medal of each stage and the medal total. A series the game does
-// not currently publish, or one that is not finished, has no screen.
+// One finished screen for every published, finished series: title, stage medals and total.
 export function buildCampaignFinishedScreen(seriesId, resultsByRaceId = {}) {
     const series = getCampaignSeries(seriesId);
     if (!series || !isCampaignSeriesFinished(seriesId, resultsByRaceId)) return null;

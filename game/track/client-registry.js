@@ -69,8 +69,7 @@ export function getLoadedClientTrack(trackKey) {
     return getStoredTrack(trackKey)?.track || loadedTracks.get(trackKey) || null;
 }
 
-// Menus await this boundary before exposing their tracks. Redis confirmation
-// chooses the definition source; built-in definitions still need their chunks.
+// Menus wait for this before showing tracks; Redis picks the source, built-ins still need their chunks.
 export async function loadRaceDefinitions(trackKeys = [], { requireConfirmation = true } = {}) {
     const keys = [...new Set((Array.isArray(trackKeys) ? trackKeys : [trackKeys])
         .filter((key) => typeof key === 'string' && key))];

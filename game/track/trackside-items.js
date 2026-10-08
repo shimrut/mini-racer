@@ -1,14 +1,5 @@
-// Things beside the road at each checkpoint, in place of the tyre stacks:
-// bushes and trees on dirt; pine trees, snowmen and igloos on snow; palm
-// trees, rocks and beach umbrellas on water; asteroids, planets and
-// satellites in space. They are flat shapes, drawn like the banks: the light
-// comes from the top left, so each shape has a shade to the lower right, a
-// light top to the upper left, and a shadow on the ground. The space items
-// float, so they have no shadow.
-//
-// Each item draws at (x, y) in track-canvas pixels. size is its radius.
-// random gives the item its own shape. facing is the angle from the item to
-// the road, so a snowman and an igloo face the road.
+// Checkpoint items in place of tyre stacks per ground, lit from the top left; space items float without shadow.
+// Draws at (x, y) in track pixels; size is the radius, random shapes it, facing points it at the road.
 
 const LIGHT_OFFSET_X = -1.2;
 const LIGHT_OFFSET_Y = -1.5;
@@ -173,8 +164,7 @@ function fillCircle(ctx, x, y, radius, color) {
     ctx.fill();
 }
 
-// A pine tree seen from above: rings of short branch tips, with lumps of
-// snow on the upper left of the branches, where the light falls.
+// A pine from above, snow on the lit branches.
 function drawPine(ctx, x, y, size, { random }) {
     const points = 12 + Math.floor(random() * 3);
     const turn = random() * Math.PI;
@@ -202,8 +192,7 @@ function drawSnowBall(ctx, x, y, radius) {
     fillCircle(ctx, x + LIGHT_OFFSET_X * 1.3, y + LIGHT_OFFSET_Y * 1.3, radius * 0.55, SNOW.light);
 }
 
-// A snowman seen from a little above the front: a body, a head with a black
-// hat, stick arms, and a carrot nose that points at the road.
+// A snowman whose carrot nose points at the road.
 function drawSnowman(ctx, x, y, size, { facing }) {
     const cos = Math.cos(facing);
     const sin = Math.sin(facing);
@@ -318,8 +307,7 @@ function scaleCorners(corners, scale, offsetX = 0, offsetY = 0) {
     return corners.map(([x, y]) => [x * scale + offsetX, y * scale + offsetY]);
 }
 
-// A palm tree seen from above: long pointed fronds from a small crown, with
-// a light line along the upper left side of each frond.
+// A palm from above, fronds lit on their upper left.
 function drawPalm(ctx, x, y, size, { random }) {
     const count = 6 + Math.floor(random() * 2);
     const turn = random() * Math.PI * 2;
@@ -397,8 +385,7 @@ function drawUmbrella(ctx, x, y, size, { random }) {
     fillCircle(ctx, x, y, size * 0.12, UMBRELLA.pole);
 }
 
-// A rock in space: a rough stone with round craters. Each crater is a dark
-// round with the stone colour pushed to its lower right, as a dip.
+// A space rock with shaded craters.
 function drawAsteroid(ctx, x, y, size, { random }) {
     const corners = makeStoneCorners(random, size, 9 + Math.floor(random() * 3));
     fillRing(ctx, x + SHADE_OFFSET_X, y + SHADE_OFFSET_Y, corners, ASTEROID.shade);
@@ -449,8 +436,7 @@ function drawPlanet(ctx, x, y, size, { random }) {
     ctx.stroke();
 }
 
-// A satellite seen from above: a body between two solar panels, and a
-// small dish.
+// A satellite: body, two panels and a dish.
 function drawSatellite(ctx, x, y, size, { random }) {
     const angle = random() * Math.PI;
     const cos = Math.cos(angle);
@@ -484,8 +470,7 @@ function drawSatellite(ctx, x, y, size, { random }) {
     fillCircle(ctx, x + LIGHT_OFFSET_X, y + LIGHT_OFFSET_Y, bodyHalf * 0.55, SATELLITE.dish);
 }
 
-// A checkered flag on a pole at (x, y). The flag blows away from the road, so
-// it never hangs over it. Its shadow falls on the ground to the lower right.
+// A checkered flag that blows away from the road, shadow to the lower right.
 function drawFlag(ctx, x, y, facing, poleColor) {
     const away = facing + Math.PI;
     const cos = Math.cos(away);
@@ -560,8 +545,7 @@ function drawHayBale(ctx, x, y, size, { facing }) {
     drawFlag(ctx, x, y, facing, HAY.pole);
 }
 
-// A block of ice seen from above, with a flag on its top. Ice stands out
-// from the white snow bank.
+// An ice block with a flag, to stand out from the snow bank.
 function drawIceBlock(ctx, x, y, size, { facing }) {
     const angle = facing + Math.PI / 2;
     const fillBlock = (offsetX, offsetY, scale, color) => {
@@ -589,9 +573,7 @@ function drawIceBlock(ctx, x, y, size, { facing }) {
     drawFlag(ctx, x, y, facing, ICE.pole);
 }
 
-// Each item: how to draw it, the radius range it draws at, and how far it
-// reaches from its middle as a part of its radius (arms, a door tunnel). An
-// item with a flag reaches farther on the side away from the road.
+// Per item: draw function, radius range and reach per radius; flagged items reach farther away from the road.
 export const TRACKSIDE_ITEMS = Object.freeze({
     bush: Object.freeze({ draw: drawBush, minSize: 11, maxSize: 13, reach: 1 }),
     tree: Object.freeze({ draw: drawTree, minSize: 18, maxSize: 21, reach: 1 }),
@@ -614,8 +596,7 @@ function getFarReach(item) {
     return Math.max(item.maxSize * item.reach, flagReach);
 }
 
-// How far a group of these items can reach from the point it stands at: an
-// item stands its own reach away, reaches as far again, and has a shadow.
+// A group's reach: its own reach twice, plus a shadow.
 export function getTracksideItemsExtent(names) {
     const items = names.map((name) => TRACKSIDE_ITEMS[name]).filter(Boolean);
     if (items.length === 0) return 0;

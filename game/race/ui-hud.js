@@ -12,10 +12,7 @@ import {
 const HUD_TIME_MIN_MS = 1000 / 30;
 const HUD_SPEED_MIN_MS = 1000 / 15;
 
-// Tarmac, Grip, Water and Space show the race-circuit speed bar: many thin
-// red lights.
-// Dirt and Snow show the rally speed bar: fewer wide slanted lights, in the
-// yellow of the Rally car's lamps.
+// Tarmac, Grip, Water and Space use the circuit speed bar; Dirt and Snow the yellow rally bar.
 const RALLY_SPEEDOMETER_GROUNDS = new Set(['dirt', 'snow']);
 const CIRCUIT_SPEED_TICKS = 20;
 const RALLY_SPEED_TICKS = 10;
