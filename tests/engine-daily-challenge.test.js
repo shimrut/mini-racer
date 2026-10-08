@@ -38,13 +38,13 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       requestRender: vi.fn(),
     };
 
-    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 10, {
+    RealTimeRacer.prototype.handleChallengeLapCompleted.call(engine, 10, {
       elapsedTimeSec: 10,
       completedLaps: 1,
       requiredLaps: 3,
       isFinalLap: false,
     });
-    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 12.5, {
+    RealTimeRacer.prototype.handleChallengeLapCompleted.call(engine, 12.5, {
       elapsedTimeSec: 22.5,
       completedLaps: 2,
       requiredLaps: 3,
@@ -91,7 +91,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       requestRender: vi.fn(),
     };
 
-    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 10, {
+    RealTimeRacer.prototype.handleChallengeLapCompleted.call(engine, 10, {
       elapsedTimeSec: 10,
       completedLaps: 1,
       requiredLaps: 2,
@@ -757,7 +757,7 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       scoreboardReplay: { getPayload: vi.fn(() => ({ inputs: [] })) },
     };
 
-    RealTimeRacer.prototype.handleDailyChallengeLapCompleted.call(engine, 5.1, {
+    RealTimeRacer.prototype.handleChallengeLapCompleted.call(engine, 5.1, {
       elapsedTimeSec: 5.1,
       completedLaps: 1,
       requiredLaps: 1,

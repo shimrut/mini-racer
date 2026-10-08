@@ -120,6 +120,7 @@ describe('Community race isolation', () => {
             showCommunityLobby: vi.fn(),
             handleCommunityWin: communityEngineMethods.handleCommunityWin,
             handleDailyChallengeWin: vi.fn(),
+            handleChallengeLapCompleted: vi.fn(),
             handleDailyChallengeLapCompleted: vi.fn(),
         };
         modeRouterEngineMethods.handleActiveRaceLapCompleted.call(engine, 12.345, {});
@@ -127,6 +128,7 @@ describe('Community race isolation', () => {
             trackKey: `community:${mapId}`,
             lapTime: 12.345,
         });
+        expect(engine.handleChallengeLapCompleted).not.toHaveBeenCalled();
         expect(engine.handleDailyChallengeLapCompleted).not.toHaveBeenCalled();
         expect(engine.handleDailyChallengeWin).not.toHaveBeenCalled();
         expect(modal.showModal).toHaveBeenCalledWith(

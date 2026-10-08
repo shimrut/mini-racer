@@ -20,6 +20,7 @@ function createEngine(overrides = {}) {
         handleCampaignWin: vi.fn(),
         handleHeadToHeadWin: vi.fn(),
         handleDailyChallengeWin: vi.fn(),
+        handleChallengeLapCompleted: vi.fn(),
         handleDailyChallengeLapCompleted: vi.fn(),
         showCampaignLobby: vi.fn(() => 'campaign-lobby'),
         showChallengeLobby: vi.fn(() => 'challenge-lobby'),
@@ -61,13 +62,16 @@ describe('mode router', () => {
         expect(home.handleDailyChallengeWin).toHaveBeenCalledWith(winData);
     });
 
-    it('routes lap completions through the shared Daily handler for every mode', () => {
-        const engine = createEngine({ activeRaceMode: 'campaign' });
-        engine.handleActiveRaceLapCompleted(4.5, { completedLaps: 1 });
-        expect(engine.handleDailyChallengeLapCompleted).toHaveBeenCalledWith(
-            4.5,
-            { completedLaps: 1 },
-        );
+    it('routes lap completions through the shared lap handler for every mode', () => {
+        for (const activeRaceMode of ['daily', 'campaign', 'challenge']) {
+            const engine = createEngine({ activeRaceMode });
+            engine.handleActiveRaceLapCompleted(4.5, { completedLaps: 1 });
+            expect(engine.handleChallengeLapCompleted).toHaveBeenCalledWith(
+                4.5,
+                { completedLaps: 1 },
+            );
+            expect(engine.handleDailyChallengeLapCompleted).not.toHaveBeenCalled();
+        }
     });
 
     it('restarts Daily through its own retry path and other modes in place', () => {
