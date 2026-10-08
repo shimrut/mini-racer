@@ -9,7 +9,7 @@ export {
 
 // Median gaps between the author time and the other medals on the current tracks.
 export const MEDAL_GAP_RATIOS = Object.freeze({ gold: 1.025, silver: 1.055, bronze: 1.088 });
-// Bronze laps stay under this, because the server refuses replays over 41.7 s per lap.
+// Bronze laps stay under this; the server refuses replays over 41.7 s per lap (docs/track-authoring.md).
 export const BRONZE_WARNING_SEC = 25;
 export const DRAFT_LAP_LIMIT = 10;
 const DRAFT_LAPS_PREFIX = 'mapmaker:draft-laps:v1:';
