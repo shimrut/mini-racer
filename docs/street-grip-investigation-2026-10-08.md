@@ -2,7 +2,8 @@
 
 Players say the Street car feels grippier since grounds (surfaces) came out.
 
-Compared: `22bfe02^` (2026-09-25, the last commit before grounds) to `90c3d89` (today).
+Compared: `22bfe02^` (2026-09-25, the last commit before grounds) to `90c3d89` (today), and the
+v2.3 and v2.4 release branches (same-taps races, below).
 
 ## Answer
 
@@ -35,9 +36,10 @@ the contrast with the new grounds and a phone steering fix.
    player points it, which reads as more grip. Phones only.
 3. **New drawn Street cars (Formula).** The front wheels turn with the steering. Looks more
    planted. Looks only.
-4. **Two Street tracks have new walls.** Monkey Wrench and Double Trouble are about 6–7%
-   narrower, which makes them harder, not easier. New Street tracks are about 3% wider at the
-   median. Budapest Run is the widest (4.77u) with round corners (5).
+4. **Street track shapes.** Against the released v2.4, no Street track that was in v2.4 changed
+   shape (see the same-taps races below). Monkey Wrench and Double Trouble differ only from the
+   development line of 2026-09-25, not from what players had. New Street tracks are about 3%
+   wider at the median. Budapest Run is the widest (4.77u) with round corners (5).
 
 ## Visual changes on Street
 
@@ -71,6 +73,42 @@ only ground mark is a red brake glow when the car loses speed quickly.
 One Android, one iOS and one Windows (no touch screen) player. The phone fix explains Android
 and iOS. Windows steers by keyboard, which did not change, so that report is the drawn cars or
 the contrast with the looser grounds.
+
+## Same-taps races: v2.3, v2.4 and latest
+
+No release tags exist, so the release branches stand in: v2.3 = `racer-231` (2026-09-08),
+v2.4 = `racer-v2-4` (2026-09-22, the last release before grounds), latest = this branch. Each
+race runs that version's own physics, driving settings and track files, one lap, 60 steps a
+second.
+
+- Taps: the test autopilot drives each track once on the latest code. Its key presses are the
+  tape played on every version. A second tape of random human-style taps (holds of 0.1 to 0.5 s,
+  20 s per track) is played too.
+- 126 Street tracks are in all three versions.
+
+| Check | Result |
+| --- | --- |
+| Same track shape, autopilot taps | Identical every step in all 3 versions: 126 of 126 |
+| Each version's own track files, autopilot taps | Identical: 126 of 126 |
+| Random human-style taps | Identical: 126 of 126 |
+| Grip setting | 4.3 in all 3 |
+
+Six tracks, measured (each value is the same in v2.3, v2.4 and latest):
+
+| Track | Lap (s) | Average slide | Time sliding | Corner speed (km/h) | Wall hits | Skid marks |
+| --- | --- | --- | --- | --- | --- | --- |
+| Circuit | 6.468 | 14.4° | 42.9% | 221.5 | 1 | 167 |
+| Mountain Peak | 13.417 | 13.3° | 31.7% | 193.3 | 11 | 255 |
+| Shark Fin | 19.106 | 7.6° | 12.7% | 218.1 | 8 | 146 |
+| Hook Loop | 11.631 | 13.9° | 27.2% | 160.1 | 9 | 190 |
+| Winding Road | 12.093 | 10.7° | 24.4% | 211.3 | 9 | 177 |
+| Lightning Hook | 16.808 | 8.7° | 15.1% | 187.6 | 12 | 152 |
+
+Slide is the angle between where the car points and where it moves. Time sliding counts the
+steps past the skid-mark point (side speed over 28% of speed).
+
+Result: the same taps give the same race, to the last digit, in all three versions. The Street
+car's grip, slide and lap time did not change.
 
 ## Not checked
 
