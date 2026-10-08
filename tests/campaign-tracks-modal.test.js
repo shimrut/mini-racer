@@ -24,6 +24,7 @@ import { DailyChallengeUi } from '../game/daily-challenge/ui.js';
 import * as dailyChallengeService from '../game/daily-challenge/service.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
 import { normalizeCampaignLobbyState } from '../game/lobby/service.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
 
 function createClassList() {
     const values = new Set();
@@ -284,6 +285,41 @@ describe('Campaign Tracks list rows', () => {
             unlocked: false,
         }));
     });
+
+    it('ends on the In design tile, which picks the placeholder card', () => {
+        const onChoose = vi.fn();
+        const placeholder = { id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' };
+        const ui = new DailyChallengeUi();
+        ui.closePlaylistModal = vi.fn();
+        ui.renderCampaignPlaylist([...campaignStages(), placeholder], { onChoose }, {
+            selectedStageId: 'growing-v1-more',
+        });
+
+        expect(list.children).toHaveLength(3);
+        const tile = list.children[2];
+        expect(tile.className).toContain('current');
+        expect(tile.className).not.toContain('is-locked');
+        expect(findByClass(tile, 'daily-playlist-hero-title').textContent).toBe('In design');
+        expect(findByClass(tile, 'daily-playlist-hero-day').textContent).toBe('Soon');
+        const art = tile.children[0].children;
+        expect(art.map((child) => child.tagName)).toEqual(['svg']);
+        expect(art[0].attributes.class).toBe('daily-playlist-hero-placeholder');
+        expect(findByClass(tile, 'daily-playlist-hero-medal')).toBeNull();
+        expect(findByClass(tile, 'daily-playlist-hero-rank')).toBeNull();
+        expect(tile.attributes['aria-label']).toBe('In design. Soon');
+
+        tile.listeners.get('click')();
+        expect(ui.closePlaylistModal).toHaveBeenCalledTimes(1);
+        expect(onChoose).toHaveBeenCalledWith(placeholder);
+    });
+
+    it('shows no placeholder tile when no stage can be raced', () => {
+        const ui = new DailyChallengeUi();
+        ui.renderCampaignPlaylist([{ id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' }]);
+
+        expect(list.children).toHaveLength(1);
+        expect(list.children[0].textContent).toBe('No tracks available');
+    });
 });
 
 describe('Daily Tracks list rows', () => {
@@ -351,6 +387,34 @@ describe('Campaign Tracks list engine', () => {
             expect.objectContaining({ onChoose: expect.any(Function) }),
             { selectedStageId: 'numbered-v1-00' },
         );
+    });
+
+    it('adds the placeholder to the list of a series that gets more stages', () => {
+        registerStoredSeries([{ id: 'growing-v1', name: 'Growing', stages: [{ trackKey: 'circuit', laps: 1, requiredMedals: 0 }] }]);
+        try {
+            const openCampaignTracksModal = vi.fn();
+            const stages = campaignStages();
+            campaignEngineMethods.openCampaignTracks.call({
+                campaignLobbyState: { seriesId: 'growing-v1', stages },
+                _campaignBootstrapReady: true,
+                dailyChallengeUi: { openCampaignTracksModal },
+            });
+
+            expect(openCampaignTracksModal.mock.calls[0][0]).toEqual([
+                ...stages,
+                { id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' },
+            ]);
+
+            openCampaignTracksModal.mockClear();
+            campaignEngineMethods.openCampaignTracks.call({
+                campaignLobbyState: { seriesId: 'numbered-v1', stages },
+                _campaignBootstrapReady: true,
+                dailyChallengeUi: { openCampaignTracksModal },
+            });
+            expect(openCampaignTracksModal.mock.calls[0][0]).toBe(stages);
+        } finally {
+            clearStoredSeriesForTests();
+        }
     });
 
     it('shows loading when bootstrap has not produced stages yet', () => {

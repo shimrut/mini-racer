@@ -20,6 +20,7 @@ import { resolveTrackPresentation, TRACK_PRESENTATION_SURFACES } from '../track/
 import { closeModalElement, openModalElement } from '../ui/modal-handoff.js';
 import { bindReusableModal, configureReusableModal } from '../ui/reusable-modal.js';
 import { formatCampaignStageLabel } from '../campaign/carousel-model.js';
+import { createPlaceholderTrackSvg } from '../ui/placeholder-track-art.js';
 import { formatLapsLabel } from '../shared/laps-label.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 import { getMedalForRaceTime } from '../medals/medal-timing.js';
@@ -49,6 +50,7 @@ function buildTracksTile({
     titleText,
     medalTier = null,
     rankLabel = null,
+    placeholder = false,
     onClick,
 }) {
     const row = document.createElement('button');
@@ -63,10 +65,15 @@ function buildTracksTile({
 
     const preview = document.createElement('div');
     preview.className = 'daily-playlist-hero-preview';
-    const canvas = document.createElement('canvas');
-    canvas.width = 300;
-    canvas.height = 160;
-    preview.appendChild(canvas);
+    // The stage after the last one has no track to draw yet.
+    const canvas = placeholder ? null : document.createElement('canvas');
+    if (canvas) {
+        canvas.width = 300;
+        canvas.height = 160;
+        preview.appendChild(canvas);
+    } else {
+        preview.appendChild(createPlaceholderTrackSvg('daily-playlist-hero-placeholder'));
+    }
 
     if (medalTier) {
         const medal = document.createElement('div');
@@ -362,6 +369,7 @@ export class DailyChallengeUi {
         const playableStages = Array.isArray(stages)
             ? stages.filter((stage) => stage?.trackKey && hasTrack(stage.trackKey))
             : [];
+        const moreStages = Array.isArray(stages) ? stages.find((stage) => stage?.placeholder) : null;
         if (!playableStages.length) {
             renderPlaylistMessage(list, 'No tracks available');
             return;
@@ -403,6 +411,21 @@ export class DailyChallengeUi {
                 },
             });
             this.renderPlaylistPreview(canvas, stage);
+            list.appendChild(row);
+        }
+
+        if (moreStages) {
+            const { row } = buildTracksTile({
+                isCurrent: moreStages.id === this._campaignTracksSelectedId,
+                placeholder: true,
+                ariaLabel: `${moreStages.trackName}. Soon`,
+                statusText: 'Soon',
+                titleText: moreStages.trackName,
+                onClick: () => {
+                    this.closePlaylistModal();
+                    onChoose?.(moreStages);
+                },
+            });
             list.appendChild(row);
         }
     }

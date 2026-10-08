@@ -20,14 +20,22 @@ function buildLockMeter(stage) {
     };
 }
 
-// A series without a published final stage gets more stages later, so its rail ends on this card.
+// A live series without a published final stage gets more stages later.
+export function campaignSeriesGetsMoreStages(seriesId) {
+    return Boolean(getCampaignSeries(seriesId)) && !getCampaignFinalStage(seriesId);
+}
+
+// The stage after the last one of such a series, for the stage rail and the Tracks list.
+export function buildCampaignMoreStagesStage(seriesId) {
+    return { id: `${seriesId}-more`, placeholder: true, unlocked: false, trackName: 'In design' };
+}
+
 function buildMoreStagesCard(seriesId) {
-    const id = `${seriesId}-more`;
-    const trackName = 'In design';
+    const stage = buildCampaignMoreStagesStage(seriesId);
     return {
-        challengeId: id,
-        challenge: { id, placeholder: true, unlocked: false, trackName },
-        trackName,
+        challengeId: stage.id,
+        challenge: stage,
+        trackName: stage.trackName,
         placeholder: true,
         locked: false,
     };
@@ -66,7 +74,7 @@ export function buildCampaignCarouselCards(campaignState = {}) {
     }
 
     const seriesId = campaignState?.seriesId;
-    if (cards.length && getCampaignSeries(seriesId) && !getCampaignFinalStage(seriesId)) {
+    if (cards.length && campaignSeriesGetsMoreStages(seriesId)) {
         cards.push(buildMoreStagesCard(seriesId));
     }
     return cards;

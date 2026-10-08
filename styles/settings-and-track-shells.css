@@ -463,6 +463,17 @@
     object-fit: contain;
 }
 
+#daily-playlist-modal .daily-playlist-hero-placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* At tile size the S/F label is too small to read. */
+#daily-playlist-modal .daily-playlist-hero-placeholder text {
+    display: none;
+}
+
 #daily-playlist-modal .daily-playlist-hero-title {
     display: block;
     min-width: 0;

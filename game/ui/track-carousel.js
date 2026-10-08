@@ -5,6 +5,7 @@ import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import { createLockIconSvg } from './lock-icon.js';
+import { createPlaceholderTrackSvg } from './placeholder-track-art.js';
 import {
     resolveTrackPresentation,
     TRACK_PRESENTATION_SURFACES,
@@ -103,66 +104,6 @@ function createStandingsIcon() {
     path.setAttribute('fill', 'currentColor');
     icon.append(path);
     return icon;
-}
-
-let placeholderArtCount = 0;
-
-function createSvgElement(tagName, attributes = {}, children = []) {
-    const element = document.createElementNS(SVG_NS, tagName);
-    for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
-    element.append(...children);
-    return element;
-}
-
-// The stage that is not made yet: grid paper with only the start line and one car length of road.
-function createPlaceholderTrackSvg() {
-    placeholderArtCount += 1;
-    const fadeId = `track-carousel-plan-fade-${placeholderArtCount}`;
-    const gridMaskId = `track-carousel-plan-grid-${placeholderArtCount}`;
-    const roadFadeId = `track-carousel-plan-road-fade-${placeholderArtCount}`;
-    const roadMaskId = `track-carousel-plan-road-${placeholderArtCount}`;
-    const gridLines = Array.from({ length: 16 }, (_, index) => createSvgElement('path', {
-        d: `M${index * 20} 0V300M0 ${index * 20}H300`,
-    }));
-    const startLabel = createSvgElement('text', {
-        x: 132, y: 180, 'text-anchor': 'middle', class: 'track-carousel__placeholder-label',
-    });
-    startLabel.textContent = 'S/F';
-    return createSvgElement('svg', {
-        class: 'track-carousel__placeholder-art',
-        viewBox: '20 12 268 274',
-        preserveAspectRatio: 'xMidYMid meet',
-        'aria-hidden': 'true',
-        focusable: 'false',
-    }, [
-        createSvgElement('defs', {}, [
-            createSvgElement('radialGradient', { id: fadeId }, [
-                createSvgElement('stop', { offset: '0.55', 'stop-color': '#fff' }),
-                createSvgElement('stop', { offset: '1', 'stop-color': '#000' }),
-            ]),
-            createSvgElement('mask', { id: gridMaskId }, [
-                createSvgElement('rect', { width: 300, height: 300, fill: `url(#${fadeId})` }),
-            ]),
-            // A preview car is about 0.6 of the road width long: the road is solid for two car lengths, then fades.
-            createSvgElement('linearGradient', {
-                id: roadFadeId, gradientUnits: 'userSpaceOnUse', x1: 132, y1: 0, x2: 178, y2: 0,
-            }, [
-                createSvgElement('stop', { offset: '0.7', 'stop-color': '#fff' }),
-                createSvgElement('stop', { offset: '1', 'stop-color': '#000' }),
-            ]),
-            createSvgElement('mask', { id: roadMaskId }, [
-                createSvgElement('rect', { width: 300, height: 300, fill: `url(#${roadFadeId})` }),
-            ]),
-        ]),
-        createSvgElement('g', { class: 'track-carousel__placeholder-grid', mask: `url(#${gridMaskId})` }, gridLines),
-        createSvgElement('g', { mask: `url(#${roadMaskId})` }, [
-            createSvgElement('rect', { class: 'track-carousel__placeholder-road', x: 132, y: 138, width: 46, height: 24 }),
-            createSvgElement('path', { class: 'track-carousel__placeholder-outline', d: 'M132 138H178M132 162H178' }),
-            createSvgElement('path', { class: 'track-carousel__placeholder-centre', d: 'M132 150H178' }),
-        ]),
-        createSvgElement('path', { class: 'track-carousel__placeholder-start', d: 'M132 136V164' }),
-        startLabel,
-    ]);
 }
 
 function createSpecCell(label, element = 'span') {
@@ -507,7 +448,7 @@ export class TrackCarousel {
             createLockIconSvg('track-carousel__preview-lock-icon'),
         );
         gate.append(previewLock);
-        previewArt.append(canvas ?? createPlaceholderTrackSvg());
+        previewArt.append(canvas ?? createPlaceholderTrackSvg('track-carousel__placeholder-art'));
         preview.append(previewArt, gate);
 
         element.append(preview);

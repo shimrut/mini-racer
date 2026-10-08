@@ -38,7 +38,11 @@ import {
     isCampaignSeriesFinished,
     isCampaignSeriesId,
 } from './manifest.js';
-import { buildCampaignCarouselCards } from './carousel-model.js';
+import {
+    buildCampaignCarouselCards,
+    buildCampaignMoreStagesStage,
+    campaignSeriesGetsMoreStages,
+} from './carousel-model.js';
 import { buildCampaignFinishedScreen } from './finished-screen.js';
 import { isVerificationQueueSubmissionBlocked } from '../scoreboard/verification-queue.js';
 import {
@@ -66,8 +70,10 @@ const CAMPAIGN_UNLOCK_CONFIRMATION_POLL_MS = 50;
 function campaignTracksListPayload(engine) {
     const stages = engine.campaignLobbyState?.stages;
     const hasStages = Array.isArray(stages) && stages.length > 0;
-    if (hasStages) return stages;
-    return engine._campaignBootstrapReady ? [] : null;
+    if (!hasStages) return engine._campaignBootstrapReady ? [] : null;
+    // A series that gets more stages later ends on its placeholder, as on the stage rail.
+    const seriesId = engine.campaignLobbyState.seriesId;
+    return campaignSeriesGetsMoreStages(seriesId) ? [...stages, buildCampaignMoreStagesStage(seriesId)] : stages;
 }
 
 function toRaceChallenge(stage) {
