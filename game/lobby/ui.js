@@ -551,7 +551,10 @@ export class LobbyUi {
     syncModeToolbarState() {
         const standings = document.getElementById('lobby-mode-standings-btn');
         if (!standings) return;
-        standings.disabled = this.mode === 'community';
+        // The placeholder after the last Campaign stage has no standings.
+        standings.disabled = this.mode === 'community'
+            || (this.mode === 'campaign' && !this.isCampaignSeriesView()
+                && this._campaignSelectedStage?.placeholder === true);
     }
 
     getPaneAriaLabel(mode = this.mode) {
@@ -863,6 +866,7 @@ export class LobbyUi {
     getCampaignPrimaryLabel() {
         if (this._campaignStartError) return 'Retry Start';
         const stage = this._campaignSelectedStage;
+        if (stage?.placeholder) return 'Soon';
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
         return this.campaignState.primaryLabel
             || (this._campaignPrimaryLoading ? 'Loading' : '');

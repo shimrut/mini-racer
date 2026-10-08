@@ -181,6 +181,12 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     transform: scale(0.92);
 }
 
+.lobby-header-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .lobby-subhead {
     display: flex;
     align-items: center;
@@ -394,6 +400,8 @@ button:active:not(.main-menu__item):not(.combined-action-btn):not(.hud-pause-btn
     text-transform: uppercase;
     white-space: nowrap;
     max-width: 100%;
+    /* The separator's height, so a brief without laps keeps the button height. */
+    min-height: 0.78rem;
     overflow: hidden;
 }
 

@@ -2651,6 +2651,54 @@ describe('Campaign lobby and shared modal adapters', () => {
         global.document = originalDocument;
     });
 
+    it('cannot race or open standings on the More stages placeholder', () => {
+        const originalDocument = global.document;
+        const label = createElement('span');
+        label.className = 'main-menu__label';
+        const brief = createElement('span');
+        brief.className = 'main-menu__race-brief';
+        const track = createElement('span');
+        track.className = 'main-menu__race-brief-track';
+        const separator = createElement('span');
+        separator.className = 'main-menu__race-brief-separator';
+        const laps = createElement('span');
+        laps.className = 'main-menu__race-brief-laps';
+        brief.children.push(track, separator, laps);
+        const primary = createElement('button');
+        primary.children.push(label, brief);
+        const standings = createElement('button');
+        const elements = { 'campaign-primary-btn': primary, 'lobby-mode-standings-btn': standings };
+        global.document = {
+            getElementById: (id) => elements[id] ?? null,
+            querySelector: () => null,
+            addEventListener: vi.fn(),
+            createElement,
+        };
+        const originalRequestAnimationFrame = global.requestAnimationFrame;
+        global.requestAnimationFrame = vi.fn();
+        const lobby = new LobbyUi({});
+
+        lobby.bind();
+        lobby.showCampaign({
+            stages: [{ id: 'growing-v1-00', unlocked: true, medal: null }],
+        });
+
+        lobby.setCampaignSelectedStage({ id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'More stages' });
+        expect(label.textContent).toBe('Soon');
+        expect(track.textContent).toBe('More stages');
+        expect(laps.hidden).toBe(true);
+        expect(primary.disabled).toBe(true);
+        expect(standings.disabled).toBe(true);
+
+        lobby.setCampaignSelectedStage({ id: 'growing-v1-00', unlocked: true, trackName: 'Number Zero', laps: 1 });
+        expect(label.textContent).toBe('Start Race');
+        expect(primary.disabled).toBe(false);
+        expect(standings.disabled).toBe(false);
+
+        global.requestAnimationFrame = originalRequestAnimationFrame;
+        global.document = originalDocument;
+    });
+
     it('replays the primary label fade only when the word actually changes', () => {
         const originalDocument = global.document;
         const label = createElement('span');

@@ -105,6 +105,26 @@ function createStandingsIcon() {
     return icon;
 }
 
+// An empty dashed track: the stage that is not made yet.
+function createPlaceholderTrackSvg() {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.classList.add('track-carousel__placeholder-art');
+    svg.setAttribute('viewBox', `0 0 ${PREVIEW_WIDTH} ${PREVIEW_HEIGHT}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const road = document.createElementNS(SVG_NS, 'path');
+    road.setAttribute('class', 'track-carousel__placeholder-road');
+    road.setAttribute('fill-rule', 'evenodd');
+    road.setAttribute('d', 'M84 28H236A60 60 0 0 1 236 148H84A60 60 0 0 1 84 28Z'
+        + 'M84 48H236A40 40 0 0 1 236 128H84A40 40 0 0 1 84 48Z');
+    const startLine = document.createElementNS(SVG_NS, 'path');
+    startLine.setAttribute('class', 'track-carousel__placeholder-start');
+    startLine.setAttribute('d', 'M160 28V48');
+    svg.append(road, startLine);
+    return svg;
+}
+
 function createSpecCell(label, element = 'span') {
     const cell = document.createElement(element);
     cell.className = 'track-carousel__spec';
@@ -420,10 +440,15 @@ export class TrackCarousel {
         preview.className = 'daily-playlist-hero-preview';
         const previewArt = document.createElement('div');
         previewArt.className = 'track-carousel__preview-art';
-        const canvas = document.createElement('canvas');
-        canvas.width = PREVIEW_WIDTH;
-        canvas.height = PREVIEW_HEIGHT;
-        canvas.setAttribute('aria-hidden', 'true');
+        const canvas = card.placeholder ? null : document.createElement('canvas');
+        if (canvas) {
+            canvas.width = PREVIEW_WIDTH;
+            canvas.height = PREVIEW_HEIGHT;
+            canvas.setAttribute('aria-hidden', 'true');
+        } else {
+            element.classList.add('is-placeholder');
+            element.setAttribute('aria-label', card.trackName || '');
+        }
         const gate = document.createElement('div');
         gate.className = 'track-carousel__gate';
         gate.hidden = true;
@@ -442,7 +467,7 @@ export class TrackCarousel {
             createLockIconSvg('track-carousel__preview-lock-icon'),
         );
         gate.append(previewLock);
-        previewArt.append(canvas);
+        previewArt.append(canvas ?? createPlaceholderTrackSvg());
         preview.append(previewArt, gate);
 
         element.append(preview);
@@ -515,7 +540,7 @@ export class TrackCarousel {
         element.classList.toggle('is-locked', Boolean(card.locked));
         parts.gate.hidden = !Boolean(card.locked);
 
-        if (renderPreview) this.renderPreview(parts.canvas, card);
+        if (renderPreview && parts.canvas) this.renderPreview(parts.canvas, card);
     }
 
     paintExpiry(card) {
@@ -543,6 +568,16 @@ export class TrackCarousel {
 
         if (this.root) {
             this.root.classList.toggle('is-locked', Boolean(card.locked));
+        }
+
+        // The placeholder has no time, rank or medals; Start says why it cannot race.
+        if (card.placeholder) {
+            parts.requirement.hidden = true;
+            parts.meta.hidden = true;
+            parts.verificationError.hidden = true;
+            parts.medal.hidden = true;
+            parts.medal.disabled = true;
+            return;
         }
 
         const locked = Boolean(card.locked);
@@ -794,6 +829,7 @@ export class TrackCarousel {
 
     syncNavButtons() {
         const count = this._cards.length;
+        const trackCount = this._cards.filter((card) => !card.placeholder).length;
         const prev = this.prevBtn;
         const next = this.nextBtn;
         const navigation = this.navigation;
@@ -802,10 +838,12 @@ export class TrackCarousel {
             ? Math.min(Math.max(this._selectedIndex, 0), count - 1)
             : -1;
         if (navigation) navigation.hidden = count === 0;
+        // The placeholder is not a track, so it has no number.
+        const counted = count > 0 && !this._cards[selectedIndex]?.placeholder;
         if (countLabel) {
-            countLabel.textContent = count > 0 ? `${selectedIndex + 1} / ${count}` : '';
-            if (count > 0) {
-                countLabel.setAttribute('aria-label', `Track ${selectedIndex + 1} of ${count}`);
+            countLabel.textContent = counted ? `${selectedIndex + 1} / ${trackCount}` : '';
+            if (counted) {
+                countLabel.setAttribute('aria-label', `Track ${selectedIndex + 1} of ${trackCount}`);
             } else {
                 countLabel.removeAttribute('aria-label');
             }

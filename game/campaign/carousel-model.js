@@ -1,5 +1,6 @@
 import { getCombinedMedalStackTiers } from '../medals/medal-timing.js';
 import { hasTrack } from '../track/catalog.js';
+import { getCampaignFinalStage, getCampaignSeries } from './manifest.js';
 
 export function formatCampaignStageLabel(stage) {
     const number = typeof stage?.numberLabel === 'string' && stage.numberLabel.trim()
@@ -16,6 +17,19 @@ function buildLockMeter(stage) {
         label: 'Medals',
         remainingMedals: Math.max(0, requiredMedals - medalTotal),
         ratio: Math.max(0, Math.min(1, medalTotal / requiredMedals)),
+    };
+}
+
+// A series without a published final stage gets more stages later, so its rail ends on this card.
+function buildMoreStagesCard(seriesId) {
+    const id = `${seriesId}-more`;
+    const trackName = 'More stages';
+    return {
+        challengeId: id,
+        challenge: { id, placeholder: true, unlocked: false, trackName },
+        trackName,
+        placeholder: true,
+        locked: false,
     };
 }
 
@@ -51,5 +65,9 @@ export function buildCampaignCarouselCards(campaignState = {}) {
         });
     }
 
+    const seriesId = campaignState?.seriesId;
+    if (cards.length && getCampaignSeries(seriesId) && !getCampaignFinalStage(seriesId)) {
+        cards.push(buildMoreStagesCard(seriesId));
+    }
     return cards;
 }

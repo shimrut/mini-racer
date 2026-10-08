@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { JSDOM } from 'jsdom';
 import {
     buildCampaignCarouselCards,
     formatCampaignStageLabel,
 } from '../game/campaign/carousel-model.js';
 import { normalizeCampaignLobbyState } from '../game/lobby/service.js';
 import { campaignEngineMethods } from '../game/campaign/engine-methods.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
+import { TrackCarousel } from '../game/ui/track-carousel.js';
 
 function campaignState(stageOverrides = [], stateOverrides = {}) {
     const trackKeys = ['circuit', 'sunlitTemple', 'royalPlateau', 'mistwoodSerpent'];
@@ -349,5 +352,134 @@ describe('campaign card medal targets', () => {
         expect(cards[0].medalTiers.map(({ tier, filled }) => [tier, filled])).toEqual([
             ['bronze', true], ['silver', false], ['gold', false], ['author', false],
         ]);
+    });
+});
+
+describe('campaign placeholder after the last stage', () => {
+    afterEach(() => clearStoredSeriesForTests());
+
+    const growingStages = [
+        { trackKey: 'circuit', laps: 1, requiredMedals: 0 },
+        { trackKey: 'sunlitTemple', laps: 1, requiredMedals: 1 },
+    ];
+
+    function growingState(stateOverrides = {}) {
+        return campaignState([], { seriesId: 'growing-v1', ...stateOverrides });
+    }
+
+    it('ends a series without a final stage on a More stages card', () => {
+        registerStoredSeries([{ id: 'growing-v1', name: 'Growing', stages: growingStages }]);
+        const cards = buildCampaignCarouselCards(growingState());
+
+        expect(cards).toHaveLength(5);
+        expect(cards.at(-1)).toEqual({
+            challengeId: 'growing-v1-more',
+            challenge: { id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'More stages' },
+            trackName: 'More stages',
+            placeholder: true,
+            locked: false,
+        });
+        expect(cards.slice(0, -1).some((card) => card.placeholder)).toBe(false);
+    });
+
+    it('adds no placeholder once the Creator publishes the final stage', () => {
+        registerStoredSeries([{
+            id: 'growing-v1', name: 'Growing', finalStageId: 'growing-v1-01', stages: growingStages,
+        }]);
+
+        expect(buildCampaignCarouselCards(growingState()).some((card) => card.placeholder)).toBe(false);
+    });
+
+    it('adds no placeholder to Numbers, to an unknown series, or to an empty rail', () => {
+        registerStoredSeries([{ id: 'growing-v1', name: 'Growing', stages: growingStages }]);
+
+        expect(buildCampaignCarouselCards(campaignState([], { seriesId: 'numbered-v1' }))
+            .some((card) => card.placeholder)).toBe(false);
+        expect(buildCampaignCarouselCards(campaignState([], { seriesId: 'missing-v1' }))
+            .some((card) => card.placeholder)).toBe(false);
+        expect(buildCampaignCarouselCards(growingState({
+            stages: [{ id: 'growing-v1-00', trackKey: 'not-a-real-track' }],
+        }))).toEqual([]);
+    });
+
+    it('never prepares the placeholder as a race track', () => {
+        const prepareSelectedRaceTrack = vi.fn();
+        campaignEngineMethods.handleCampaignCarouselSettled.call({
+            status: 'ready',
+            startOverlay: { isStartOverlayVisible: () => true },
+            prepareSelectedRaceTrack,
+        }, { placeholder: true, locked: false, challenge: { id: 'growing-v1-more', placeholder: true } });
+
+        expect(prepareSelectedRaceTrack).not.toHaveBeenCalled();
+    });
+
+    function mountCarousel() {
+        const dom = new JSDOM(`<div id="campaign-carousel">
+            <div id="campaign-carousel-viewport"><div id="campaign-carousel-rail"></div></div>
+            <button id="campaign-carousel-prev"></button><button id="campaign-carousel-next"></button>
+            <div id="campaign-carousel-navigation"><span id="campaign-carousel-count"></span></div>
+        </div>`);
+        const originals = { document: global.document, window: global.window };
+        global.document = dom.window.document;
+        global.window = dom.window;
+        const carousel = new TrackCarousel({ idPrefix: 'campaign-carousel' });
+        carousel.bind();
+        return {
+            carousel,
+            document: dom.window.document,
+            restore() {
+                global.document = originals.document;
+                global.window = originals.window;
+            },
+        };
+    }
+
+    it('draws the placeholder as an empty track with no time, rank or medals', () => {
+        const { carousel, document, restore } = mountCarousel();
+        try {
+            carousel.render([
+                { challengeId: 'growing-v1-00', challenge: { id: 'growing-v1-00' }, trackName: 'Stage', bestLabel: '0:40.000', medalTiers: [] },
+                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'More stages', placeholder: true },
+            ], { selectedChallengeId: 'growing-v1-more' });
+
+            const card = document.querySelector('[data-challenge-id="growing-v1-more"]');
+            expect(card.classList.contains('is-placeholder')).toBe(true);
+            expect(card.getAttribute('aria-label')).toBe('More stages');
+            expect(card.querySelector('canvas')).toBeNull();
+            expect(card.querySelector('svg.track-carousel__placeholder-art')).not.toBeNull();
+            expect(card.querySelector('.track-carousel__gate').hidden).toBe(true);
+
+            const parts = carousel._footParts;
+            expect(parts.meta.hidden).toBe(true);
+            expect(parts.medal.hidden).toBe(true);
+            expect(parts.medal.disabled).toBe(true);
+            expect(parts.requirement.hidden).toBe(true);
+            expect(parts.verificationError.hidden).toBe(true);
+        } finally {
+            restore();
+        }
+    });
+
+    it('counts only the stages, and shows no number on the placeholder', () => {
+        const { carousel, document, restore } = mountCarousel();
+        try {
+            carousel.render([
+                { challengeId: 'growing-v1-00', challenge: { id: 'growing-v1-00' }, trackName: 'A', medalTiers: [] },
+                { challengeId: 'growing-v1-01', challenge: { id: 'growing-v1-01' }, trackName: 'B', medalTiers: [] },
+                { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'More stages', placeholder: true },
+            ], { selectedChallengeId: 'growing-v1-01' });
+            const count = document.getElementById('campaign-carousel-count');
+            expect(count.textContent).toBe('2 / 2');
+            expect(count.getAttribute('aria-label')).toBe('Track 2 of 2');
+            expect(document.getElementById('campaign-carousel-next').disabled).toBe(false);
+
+            carousel.step(1);
+            expect(carousel.getSelectedChallenge().placeholder).toBe(true);
+            expect(count.textContent).toBe('');
+            expect(count.hasAttribute('aria-label')).toBe(false);
+            expect(document.getElementById('campaign-carousel-next').disabled).toBe(true);
+        } finally {
+            restore();
+        }
     });
 });

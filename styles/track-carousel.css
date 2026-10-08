@@ -514,6 +514,25 @@ body[data-lobby-mode="campaign"] #start-overlay {
     z-index: 1;
 }
 
+/* The stage after the last one, drawn in the dashed lock colours. */
+.track-carousel__placeholder-art {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.track-carousel__placeholder-road {
+    fill: #1e3050;
+    stroke: #6f83a5;
+    stroke-dasharray: 8 6;
+    stroke-width: 2;
+}
+
+.track-carousel__placeholder-start {
+    stroke: #6f83a5;
+    stroke-width: 2;
+}
+
 .track-carousel__requirement {
     display: flex;
     flex-direction: column;
