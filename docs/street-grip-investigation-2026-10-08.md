@@ -144,6 +144,26 @@ Medians over the tracks finished in both versions:
 - How often real phones lose a lift is not known. The 0.4 s reaction time is a guess; a slower
   reaction makes the old code worse.
 
+### Who feels it: tap-tap or long presses
+
+Same setup, but each finger lift has the same 1 in 40 chance to be lost, and the driver either
+holds its presses or taps in pulses. Means per lap over the 156 Street tracks:
+
+| Style | Finger lifts | Lost lifts | Wrong steering, before → after | Lap time lost before the fix | Extra wall hits before the fix |
+| --- | --- | --- | --- | --- | --- |
+| Long presses | 58 | 0.9 | 0.35 s → 0.08 s | 0.06 s | 0.2 |
+| Tap-tap (0.1 s on, 0.1 s off) | 97 | 3.2 | 1.66 s → 0.23 s | 2.8 s | 2.9 |
+| Fast tap-tap (0.07 s on, 0.05 s off) | 146 | 5.4 | 2.05 s → 0.26 s | 3.5 s | 3.2 |
+
+- Tap-tap players lift a finger far more often, so a lost lift happens 3 to 6 times as often.
+  Each one costs about the same (0.4 to 0.5 s of wrong steering), so they lost the most to the
+  old code. While a turn is stuck, their taps on that side do nothing and the car turns at full
+  lock, not the half turn their taps ask for, so it hits the inside wall.
+- Long presses lose fewer lifts. They are the only ones hit by a thumb roll, because a tap is
+  too short to change fingers.
+- The 1 in 40 rate is a guess. The real rate changes the size of every number, not which style
+  feels it more.
+
 ## Not checked
 
 Track shapes stored only in Redis (Creator edits, the live Daily list). They cannot be read from
