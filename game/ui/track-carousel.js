@@ -125,7 +125,7 @@ function createPlaceholderTrackSvg() {
         d: `M${index * 20} 0V300M0 ${index * 20}H300`,
     }));
     const startLabel = createSvgElement('text', {
-        x: 146, y: 180, 'text-anchor': 'middle', class: 'track-carousel__placeholder-label',
+        x: 132, y: 180, 'text-anchor': 'middle', class: 'track-carousel__placeholder-label',
     });
     startLabel.textContent = 'S/F';
     return createSvgElement('svg', {
@@ -143,11 +143,11 @@ function createPlaceholderTrackSvg() {
             createSvgElement('mask', { id: gridMaskId }, [
                 createSvgElement('rect', { width: 300, height: 300, fill: `url(#${fadeId})` }),
             ]),
-            // A preview car is about 0.6 of the road width long: the road is solid for 16 units, then fades.
+            // A preview car is about 0.6 of the road width long: the road is solid for two car lengths, then fades.
             createSvgElement('linearGradient', {
-                id: roadFadeId, gradientUnits: 'userSpaceOnUse', x1: 146, y1: 0, x2: 172, y2: 0,
+                id: roadFadeId, gradientUnits: 'userSpaceOnUse', x1: 132, y1: 0, x2: 178, y2: 0,
             }, [
-                createSvgElement('stop', { offset: '0.6', 'stop-color': '#fff' }),
+                createSvgElement('stop', { offset: '0.7', 'stop-color': '#fff' }),
                 createSvgElement('stop', { offset: '1', 'stop-color': '#000' }),
             ]),
             createSvgElement('mask', { id: roadMaskId }, [
@@ -156,11 +156,11 @@ function createPlaceholderTrackSvg() {
         ]),
         createSvgElement('g', { class: 'track-carousel__placeholder-grid', mask: `url(#${gridMaskId})` }, gridLines),
         createSvgElement('g', { mask: `url(#${roadMaskId})` }, [
-            createSvgElement('rect', { class: 'track-carousel__placeholder-road', x: 146, y: 138, width: 26, height: 24 }),
-            createSvgElement('path', { class: 'track-carousel__placeholder-outline', d: 'M146 138H172M146 162H172' }),
-            createSvgElement('path', { class: 'track-carousel__placeholder-centre', d: 'M146 150H172' }),
+            createSvgElement('rect', { class: 'track-carousel__placeholder-road', x: 132, y: 138, width: 46, height: 24 }),
+            createSvgElement('path', { class: 'track-carousel__placeholder-outline', d: 'M132 138H178M132 162H178' }),
+            createSvgElement('path', { class: 'track-carousel__placeholder-centre', d: 'M132 150H178' }),
         ]),
-        createSvgElement('path', { class: 'track-carousel__placeholder-start', d: 'M146 136V164' }),
+        createSvgElement('path', { class: 'track-carousel__placeholder-start', d: 'M132 136V164' }),
         startLabel,
     ]);
 }
