@@ -56,9 +56,7 @@ const ui = {
 };
 // Online, the Mapmaker is the index page of /mapmaker/.
 if (MAPMAKER_ONLINE && !CREATOR_PLAYTEST) document.querySelector('.drive-back').href = './';
-// In the Creator, Test Drive runs in a frame of the Creator page. Close
-// closes the frame, so the Creator page never reloads. Opened as a page,
-// Close goes back to the Creator.
+// In the Creator, Close closes Test Drive's frame without a reload; as a page, it goes back.
 if (CREATOR_PLAYTEST) {
     document.getElementById('drive-close')?.addEventListener('click', () => {
         if (window.parent !== window) {
@@ -78,9 +76,7 @@ let trackPresentation = null;
 let state = null;
 let paused = false;
 let raceFrame = 'desktop';
-// Same cutoff as the game: a phone or a narrow window is already the phone view.
-// The Creator runs Test Drive in a frame, so the frame size says nothing about
-// the device there: only a touch screen forces the phone view.
+// The game's phone cutoff; in the Creator frame, only a touch screen forces the phone view.
 const deviceMobileQuery = window.matchMedia(CREATOR_PLAYTEST
     ? '(hover: none) and (pointer: coarse)'
     : '(max-width: 768px), (hover: none) and (pointer: coarse), (max-height: 600px) and (orientation: landscape)');
@@ -103,8 +99,7 @@ let draftLapsKey = null;
 const car = { assetName: null, drawn: null, drawSize: DRAWN_CAR_DRAW_PIXELS };
 const lookAhead = { x: 0, y: 0 };
 const desiredLookAhead = { x: 0, y: 0 };
-// The car moves in fixed steps. As in the race, it is drawn between its last
-// two steps, so it moves smoothly at any screen refresh rate.
+// Fixed physics steps, drawn between the last two, as in the race.
 const previousPose = { x: 0, y: 0, angle: 0 };
 const displayPose = { x: 0, y: 0, angle: 0 };
 const heldKeys = new Set();

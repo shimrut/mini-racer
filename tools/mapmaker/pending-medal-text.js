@@ -1,6 +1,4 @@
-// Text typed in a medal field that is not in the medal row yet. The editor
-// keeps it for each track and each medal, so a repaint, a refresh or a switch
-// to another track does not take it away. A commit puts the text in the row.
+// Typed medal text per track and medal that survives repaints, refreshes and track switches until committed.
 
 export function setPendingMedalText(pendingByKey, trackKey, tier, text) {
     const pending = pendingByKey.get(trackKey) ?? new Map();

@@ -1,5 +1,4 @@
-// The Creator's requests to the game's server. Every Creator route checks on
-// the server that the viewer is a moderator of the subreddit.
+// Creator requests; the server checks the moderator on every route.
 
 export class CreatorRequestError extends Error {
     constructor(message, status) {

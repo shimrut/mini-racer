@@ -6,22 +6,18 @@ const MIN_ARC_STEPS = 2;
 const MAX_ARC_STEPS = 12;
 const ARC_STEP_ANGLE = Math.PI / 8;
 const INFLATE_ITERS = 10;
-// smoothPoly in game/track/runtime.js never trims a corner by more than this
-// share of either neighbouring segment.
+// smoothPoly never trims a corner by more than this share of a neighbouring segment.
 const RACE_TRIM_SHARE = 1 / 2.5;
-// A curve's end points sit nearer its own corner than the next one, so each
-// wall edge splits at its middle.
+// Curve ends sit nearer their own corner, so each wall edge splits at its middle.
 const CURVE_ZONE_SHARE = 0.5;
 const CURVE_GAP_SLACK = 1.25;
 const CURVE_FIT_PASSES = 10;
 const CURVE_CHECK_SAMPLES = 32;
 const CURVE_MATCH_TOLERANCE = 0.05;
 const EPSILON = 1e-6;
-// Where the line goes on almost straight and the width changes, the change
-// takes this many half widths of the wider road on each side of the point.
+// On a near-straight, a width change spans this many wider half widths each side.
 const WIDTH_BLEND_HALF_WIDTHS = 1.5;
-// Over a turn sharper than this (cos 150°), the two inside wall lines do not
-// meet near the corner.
+// Past this turn (cos 150°), the two inside walls do not meet near the corner.
 const HAIRPIN_DOT = -0.866;
 
 function signedArea(points) {
@@ -301,12 +297,7 @@ function lineCrossing(pointA, dirA, pointB, dirB) {
     return add(pointA, scale(dirA, cross(subtract(pointB, pointA), dirB) / denominator));
 }
 
-// A road whose sections have other widths: each section runs from one
-// centerline point to the next. A corner keeps one sharp wall point on its
-// inside, where the two inside wall lines meet, so the race rounds it like
-// any other corner. The outside curve takes the change of width. Where the
-// line goes on almost straight, the width changes over a short stretch.
-// `pivots` names the inside point of each corner.
+// Per-section widths: each corner keeps one sharp inside point for the race to round, and the outside takes the change.
 function buildVaryingRibbonWalls(centerline, sectionHalves) {
     const count = centerline.length;
     const cornerHalves = sectionHalves.map((half, index) => Math.max(half, sectionHalves[(index - 1 + count) % count]));
@@ -404,8 +395,7 @@ function buildVaryingRibbonWalls(centerline, sectionHalves) {
     };
 }
 
-// halfWidth is one half width for the whole road, or a half width for each
-// section of the centerline: from each centerline point to the next.
+// halfWidth is one value, or one per centerline section.
 export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadii = null) {
     if (Array.isArray(halfWidth)) {
         if (!centerline || centerline.length < 3 || halfWidth.length !== centerline.length
@@ -481,8 +471,7 @@ export function buildRibbonWallsFromCenterline(centerline, halfWidth, filletRadi
         return null;
     }
 
-    // Keep the road's actual guide points for start and checkpoint placement.
-    // The input centerline may have moved when tight bends were inflated.
+    // Keep the road's own guide points; tight bends may have moved the centerline.
     return { outer, inner, centerline: samples.map((sample) => clonePoint(sample.point)) };
 }
 
@@ -505,8 +494,7 @@ function roundedCornerPoint(corner, frame, trim, t) {
     };
 }
 
-// Wall points one road width from the race-rounded corner, from its incoming
-// side to its outgoing side. roadSide is 1 when the road is left of the wall.
+// Wall points one road width from the rounded corner; roadSide is 1 when the road is left of the wall.
 function curveAroundCorner(prev, corner, next, frame, cornerRadius, roadWidth, roadSide) {
     const { incoming, outgoing, turnAngle } = frame;
     const trim = Math.min(
@@ -533,9 +521,7 @@ function curveAroundCorner(prev, corner, next, frame, cornerRadius, roadWidth, r
     return points;
 }
 
-// The run of wall points that curves around one corner of the other wall: on
-// the road side, nearer that corner than the far end of either of its edges,
-// and at most maxWidth away.
+// The run of wall points curving round a corner of the other wall, within maxWidth.
 function facingRun(wall, claimed, prev, corner, next, frame, roadSide, maxWidth) {
     const belongs = wall.map((point, index) => {
         if (claimed[index]) {
@@ -580,9 +566,7 @@ function facingRun(wall, claimed, prev, corner, next, frame, roadSide, maxWidth)
     return size >= 2 && size < count ? { first, size } : null;
 }
 
-// True when the run, ordered from the corner's incoming side, already keeps
-// one road width from the race-rounded corner, as Draw and this file build it.
-// Hand-shaped curves are left alone.
+// True when the run already keeps one road width from the rounded corner; hand-shaped curves stay.
 function followsRoundedCorner(runPoints, prev, corner, next, frame, roadWidth) {
     const trimIn = dot(subtract(corner, runPoints[0]), frame.incoming);
     const trimOut = dot(subtract(runPoints[runPoints.length - 1], corner), frame.outgoing);
@@ -656,10 +640,7 @@ function findCornerCurves(walls, roadSides, maxWidth) {
     return corners.filter((entry) => !claimed[entry.wallName][entry.index]);
 }
 
-// Race smoothing rounds a single wall corner point by the track's corner
-// radius, but hardly changes a curve made of many short segments. Rebuild each
-// such curve that faces a single corner point, so it stays one road width from
-// the rounded corner at every Wall Corners setting.
+// Rebuilds many-segment curves facing a corner point, which smoothing barely changes, to keep one road width.
 export function findCornerWallGroups(outer, inner, roadWidth) {
     const walls = { outer, inner };
     const roadSides = {
@@ -703,8 +684,7 @@ export function fitCurvesToCorners(outer, inner, cornerRadius, roadWidth) {
         const { curve } = end.entry;
         return end.atStart ? curve[0] : curve[curve.length - 1];
     };
-    // A rebuilt curve moves the end points next to the other wall's corners,
-    // which changes how far the race rounds those corners.
+    // A rebuilt curve moves points next to the other wall's corners, changing their rounding.
     for (let pass = 0; pass < CURVE_FIT_PASSES; pass += 1) {
         corners.forEach((entry) => {
             const prev = pointAt(entry.wallName, entry.index - 1);

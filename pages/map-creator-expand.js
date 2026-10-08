@@ -1,5 +1,4 @@
-// Full screen stays on this page. Switching to another page is what the
-// Open Creator button asked for, and Reddit never showed it.
+// Full screen stays on this page; Open Creator asked for this page, and Reddit never showed it.
 
 import { getWebViewMode, requestExpandedMode } from '@devvit/web/client';
 

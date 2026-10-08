@@ -3,10 +3,7 @@ import { KPH_PER_WORLD_UNIT } from '../../game/car/handling.js';
 import { buildTrackGeometry } from '../../game/track/runtime.js';
 import { distance } from '../geometry.js';
 
-// Five flow rules, measured on the fast line with the car's real steering limits.
-// Of the 124 Daily tracks on 2026-09-24, they pass exactly the six that play as
-// flowy: Double Crest, Anvil Circuit, Shark Bite, Oven Mitt, Whistle Ridge and
-// Safari Circuit. They are warnings: six examples are too few to block a track.
+// Five flow rules on the fast line; on 2026-09-24 they passed exactly the six flowy Daily tracks, so they only warn.
 export const FLOW_LIMITS = Object.freeze({
     maxSteerFreeSec: 1,
     minCornerSpeedShare: 0.4,
@@ -15,8 +12,7 @@ export const FLOW_LIMITS = Object.freeze({
     maxWidthVariation: 0.08,
 });
 
-// Drawing guide for Line Build: a straight longer than 14 units takes about a second
-// at top speed. A bend wider than a 15-unit radius needs no steering on the fast line.
+// Line Build guide: a 14-unit straight is about a second at top speed; bends over a 15-unit radius need no steering.
 export const FLOW_DRAW_GUIDE = Object.freeze({
     maxStraight: 14,
     minBendRadius: 15,
@@ -151,8 +147,7 @@ function buildCenterline(outer, inner) {
     return resampleLoop(line, count);
 }
 
-// Fast line: the smoothest path that stays inside the lane (least squared bend).
-// Projected over-relaxed Gauss-Seidel, solved coarse to fine until it settles.
+// Fast line: least squared bend inside the lane, by over-relaxed Gauss-Seidel, coarse to fine.
 function solveFastLine(center, normals, low, high) {
     const count = center.length;
     const offset = new Float64Array(count);
@@ -323,13 +318,7 @@ function turnAt(previous, point, next) {
     return Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
 }
 
-/**
- * Find the stretches of a Line Build sketch that need no steering.
- * A point is a bend when the fast line must turn there tighter than the guide
- * radius. The fast line can round a corner only as far as the lane allows, and
- * a run of short sketch segments only as wide as the curve they draw.
- * Each run reports its length after the rounded bends at both ends.
- */
+/** Finds Line Build stretches the fast line drives without steering, measured between rounded bends. */
 export function measureStraights(points, { closed = false, halfWidth = 0 } = {}) {
     const count = points?.length ?? 0;
     if (count < 2) return [];
@@ -371,13 +360,7 @@ export function measureStraights(points, { closed = false, halfWidth = 0 } = {})
 const DRIVE_LAUNCH_SHARE = 0.5;
 const DRIVE_TAP_MERGE_SEC = 0.25;
 
-/**
- * Summarize how a real Test Drive lap flowed, from per-step samples of
- * { time, speed, steer } where steer is -1 (left), 0 or 1 (right).
- * The standing start is skipped: the lap is read from the moment the car
- * first reaches half its top speed. Taps on one side less than a quarter
- * second apart count as one steering input.
- */
+/** Summarizes a Test Drive lap from { time, speed, steer } samples, from half top speed, merging taps < 0.25 s. */
 export function summarizeDriveFlow(samples) {
     const launch = samples?.findIndex((sample) => sample.speed >= TOP_SPEED * DRIVE_LAUNCH_SHARE) ?? -1;
     if (launch < 0) return null;
@@ -418,10 +401,7 @@ export function summarizeDriveFlow(samples) {
     };
 }
 
-/**
- * Measure a closed track against the five flow rules.
- * Returns null when the walls do not form a road that can be measured.
- */
+/** Measures a closed track against the five flow rules; null when the walls form no road. */
 export function analyzeTrackFlow(track) {
     if (!Array.isArray(track?.outer) || !Array.isArray(track?.inner)
         || track.outer.length < 3 || track.inner.length < 3) return null;

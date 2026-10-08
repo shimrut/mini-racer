@@ -178,8 +178,7 @@ export function bindCampaignRaceButton(
     return button;
 }
 
-// Older Creator posts predate final-track and published-surface metadata.
-// This read loads only public artwork; it never bootstraps the viewer's progress.
+// Old Creator posts lack final-track and surface data; this loads public artwork only, never viewer progress.
 export async function prepareCampaignPoster(value, {
     requestMetadata = (seriesId) => requestJsonWithTimeout(
         `/api/campaign/poster?seriesId=${encodeURIComponent(seriesId)}`,

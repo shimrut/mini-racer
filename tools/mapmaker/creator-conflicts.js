@@ -1,6 +1,4 @@
-// Compares Creator work with the version on the server, in the form the
-// server stores. A save whose answer was lost, or a version that another
-// device saved, is then known by its content.
+// Compares Creator work with the server version in stored form, to recognise lost or other-device saves.
 
 import { MEDAL_TIERS } from './medal-times.js';
 import { isValidTrackKey, trackKeyFromName } from './track-source.js';
@@ -23,8 +21,7 @@ function centiseconds(value) {
     return Number.isFinite(number) ? Math.round(number * 100) / 100 : null;
 }
 
-// Each medal rounded to 0.01 s, as the server stores it. A row with a blank or
-// a zero time stays as it is: it is not the same as no row.
+// Medals rounded to 0.01 s as stored; blank or zero rows stay, unlike no row.
 function medalRowContent(row) {
     if (!row || typeof row !== 'object') return null;
     return Object.fromEntries(MEDAL_TIERS.map((tier) => [tier, centiseconds(row[tier])]));
@@ -40,8 +37,7 @@ function roadLineContent(roadLine) {
     };
 }
 
-// The track, its unfinished road, its medal row and its road line as the
-// server keeps them.
+// Track, unfinished road, medal row and road line as the server keeps them.
 export function trackContent({ track, draftLoop, medalRow, roadLine }) {
     const shape = {
         name: String(track?.name ?? '').trim(),
@@ -66,8 +62,7 @@ export function sameTrackContent(first, second) {
     return trackContent(first) === trackContent(second);
 }
 
-// A series as the server keeps it: the name trimmed, the stages as numbers.
-// The typed text of a medal target is only for its field.
+// A series as stored: trimmed name, numeric stages; typed medal text is only for the field.
 export function seriesContent(series) {
     return JSON.stringify({
         name: String(series?.name ?? '').trim(),
@@ -92,8 +87,7 @@ export function sameDailyKeys(first, second) {
         && first.length === second.length && first.every((key, index) => key === second[index]);
 }
 
-// A live series keeps its ground and its live stages. A draft that changes
-// them cannot be saved over it.
+// A live series keeps its ground and live stages; a draft that changes them cannot save.
 export function fitsLiveSeries(draft, server) {
     const fixed = server?.publishedStageCount ?? 0;
     if (!fixed) return true;
@@ -109,8 +103,7 @@ export function fitsLiveSeries(draft, server) {
     return true;
 }
 
-// Saves that ended with no clear answer: the server may have them. Each key
-// keeps its own list, and a retry never replaces an earlier entry.
+// Saves with no clear answer, per key; a retry never replaces an earlier entry.
 export function rememberUncertain(uncertainByKey, key, content) {
     const entries = uncertainByKey.get(key) ?? [];
     if (!entries.includes(content)) entries.push(content);
@@ -121,15 +114,13 @@ export function isUncertain(uncertainByKey, key, content) {
     return Boolean(uncertainByKey.get(key)?.includes(content));
 }
 
-// A request with no clear answer: no HTTP answer, a server failure, or an
-// answer that cannot be read. A 4xx answer is clear: nothing was written.
+// No clear answer: no reply, a server failure, or an unreadable reply; a 4xx wrote nothing.
 export function isUncertainFailure(error) {
     const status = Number(error?.status);
     return !Number.isFinite(status) || status === 0 || status >= 500;
 }
 
-// The name and key of a copy: "‹name› copy", then "‹name› copy 2" and on.
-// The suffix always fits in the name limit, and the key is free.
+// "‹name› copy", then "copy 2" and on, always within the name limit and with a free key.
 export function copyTrackName(name, isTaken) {
     const base = String(name ?? '').trim() || 'Track';
     for (let number = 1; number <= 50; number += 1) {

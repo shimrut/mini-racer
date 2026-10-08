@@ -1,5 +1,4 @@
-// The post is a small card, like a race preview. Open Creator uses the same
-// full-screen open as Race Now, onto the Creator page.
+// A small post card; Open Creator uses the same full-screen open as Race Now.
 
 import { requestExpandedMode } from '@devvit/web/client';
 

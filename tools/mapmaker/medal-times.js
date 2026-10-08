@@ -9,8 +9,7 @@ export {
 
 // Median gaps between the author time and the other medals on the current tracks.
 export const MEDAL_GAP_RATIOS = Object.freeze({ gold: 1.025, silver: 1.055, bronze: 1.088 });
-// Keep a bronze lap under this time, because the server refuses a replay longer
-// than 41.7 s for each lap (docs/track-authoring.md).
+// Bronze laps stay under this, because the server refuses replays over 41.7 s per lap.
 export const BRONZE_WARNING_SEC = 25;
 export const DRAFT_LAP_LIMIT = 10;
 const DRAFT_LAPS_PREFIX = 'mapmaker:draft-laps:v1:';
@@ -38,8 +37,7 @@ export function suggestMedalTimes(authorSec) {
     };
 }
 
-// A short hash of the track layout. A change to a wall, gate, start point,
-// corner or ground gives a new hash, so old Test Drive laps do not count.
+// A layout hash; any wall, gate, start, corner or ground change voids old Test Drive laps.
 export function trackLayoutHash(track) {
     const { name: _name, ...layout } = track && typeof track === 'object' ? track : {};
     const text = JSON.stringify(layout);

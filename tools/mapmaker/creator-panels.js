@@ -1,5 +1,4 @@
-// The Creator screens next to the track editor: the Daily list, the Campaign
-// Planner and the copy of unplayed tracks. The server checks every change.
+// Creator panels beside the editor: Daily list, Campaign Planner and copies; the server checks every change.
 
 import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../../game/campaign/series-surfaces.js';
 import {
@@ -87,8 +86,7 @@ function seriesPayload(draft) {
     };
 }
 
-// The series as the moderator typed it. A newer edit that gives the same
-// number ("05" after "5") is still a newer edit.
+// The series as typed; "05" after "5" is still a newer edit.
 function seriesTypedContent(draft) {
     return JSON.stringify({ ...seriesPayload(draft), id: draft.id,
         typed: draft.stages.map((stage) => stage.requiredMedalsText ?? null) });
@@ -99,8 +97,7 @@ function hasUndoWork(preview) {
     return Boolean(preview?.removed?.length || preview?.removedSeries?.length || preview?.dailyList === 'would-restore');
 }
 
-// The server has this version of the draft: the draft takes its record, and
-// keeps its identity and its stage objects, so the fields stay.
+// The server has this draft: take its record but keep identity and stage objects, so fields stay.
 function adoptSavedSeries(draft, series) {
     const { stages, ...fields } = structuredClone(series);
     Object.assign(draft, fields);
@@ -119,8 +116,7 @@ function adoptSavedSeries(draft, series) {
 }
 
 export class CreatorPanels {
-    // `confirm` opens the page's own dialog. Reddit ignores window.confirm.
-    // `choose` asks a question with more than two answers.
+    // `confirm` uses the page dialog (Reddit ignores window.confirm); `choose` offers more answers.
     constructor({ onOpenTrack, onTracksChanged, setStatus, confirm, choose = async () => 'cancel' }) {
         this.onOpenTrack = onOpenTrack;
         this.onTracksChanged = onTracksChanged;
@@ -150,14 +146,11 @@ export class CreatorPanels {
         this.copyError = null;
         this.copyView = null;
         this.copyLoading = false;
-        // Showing a tab never asks the server. The Creator loads every tab
-        // when it opens, and a change reloads the tabs it affects at once,
-        // in the background. A reload that must wait for a write waits here.
+        // Showing a tab never asks the server; tabs load on open and reload in the background after a change.
         this.pendingRefresh = new Set();
     }
 
-    // The editor reads every tab when it opens the Creator. Those answers
-    // fill the tabs, unless a tab has changed since the read started.
+    // Open-time reads fill the tabs, unless a tab changed since the read started.
     receiveViews({ daily, seriesView, copyView, generation }) {
         if (generation !== this.writeGeneration || this.busy) return;
         if (daily && !this.dailyLoading && !this.dailyDirty) {
@@ -362,8 +355,7 @@ export class CreatorPanels {
                 this.dailyKeys = [...this.daily.schedule.keys];
             }
             this.dailyDirty = JSON.stringify(this.dailyKeys) !== JSON.stringify(this.daily.schedule.keys);
-            // The Campaign shows which tracks are in the Daily list, and the
-            // copy shows whether the list is in Redis.
+            // Campaign marks Daily list tracks; the copy shows whether the list is in Redis.
             this.refresh('campaign', 'copy');
             this.setStatus(this.dailyDirty
                 ? 'Saved the earlier Daily list. Newer changes are still unsaved.' : 'Saved the Daily list.');
@@ -381,8 +373,7 @@ export class CreatorPanels {
         if (conflict) await this.recoverDailyConflict(baseRevision, attempt);
     }
 
-    // Another revision of the Daily list is on the server. A save of this
-    // page whose answer was lost goes again once; anything else is a question.
+    // Another Daily list revision exists: resend a lost save once, else ask.
     async recoverDailyConflict(baseRevision, attempt) {
         let server;
         try {
@@ -534,9 +525,7 @@ export class CreatorPanels {
         if (draft && refs?.draft === draft && refs.structure === structure && refs.root.isConnected
             && refs.stages.length === draft.stages.length
             && refs.stages.every((entry, index) => entry.stage === draft.stages[index])) {
-            // The editor's layout is the same: update it in place, so the field
-            // being typed in keeps its text and focus, and a button under the
-            // pointer stays.
+            // Same layout: update in place so typing, focus and the hovered button stay.
             refs.side.replaceWith(side);
             refs.side = side;
             this.syncSeriesEditor();
@@ -554,8 +543,7 @@ export class CreatorPanels {
         }
     }
 
-    // What the editor shows apart from the typed values. When it changes, the
-    // editor is built again.
+    // The editor's non-typed state; a change rebuilds the editor.
     seriesEditorStructure() {
         const draft = this.seriesDraft;
         if (!draft || !this.seriesView) return 'none';
@@ -621,8 +609,7 @@ export class CreatorPanels {
         }
     }
 
-    // A typed value is in the draft at once. Only the parts that depend on it
-    // change; the fields stay, so the text and the focus stay.
+    // Typed values enter the draft at once; only dependent parts redraw, so fields keep text and focus.
     markSeriesEdited() {
         this.seriesDirty = true;
         this.syncSeriesEditor();
@@ -885,8 +872,7 @@ export class CreatorPanels {
             if (this.seriesDraft === draft) {
                 const unchanged = seriesTypedContent(draft) === typedAtStart;
                 this.selectedSeriesId = series.id;
-                // The draft keeps its identity, so the field being typed in
-                // keeps its focus. Newer edits stay in it.
+                // The draft keeps its identity, so focus and newer edits stay.
                 if (unchanged) {
                     adoptSavedSeries(draft, series);
                 } else {
@@ -914,8 +900,7 @@ export class CreatorPanels {
         if (conflict) await this.recoverSeriesConflict(draft, seriesId, baseRevision, attempt);
     }
 
-    // Another revision of the series is on the server. Every step works on
-    // the draft that was saved, and stops when another draft is open.
+    // Another series revision exists: each step uses the saved draft and stops if another is open.
     async recoverSeriesConflict(draft, seriesId, baseRevision, attempt) {
         const uncertainKey = `series:${seriesId}`;
         let view;
@@ -1073,9 +1058,7 @@ export class CreatorPanels {
         }
     }
 
-    // ---- Copies into Redis ----
-    // Unplayed tracks, played Dailies and the live Campaign each have their
-    // own copy. The two copies of played tracks write locked tracks.
+    // ---- Copies into Redis: unplayed tracks, played Dailies and live Campaign; played copies are locked ----
 
     async loadCopy() {
         if (this.copyLoading) {
@@ -1140,8 +1123,7 @@ export class CreatorPanels {
         ]);
     }
 
-    // The last check of the copies: what is exact, what a moderator changed,
-    // and what differs from the app track that players raced.
+    // The final copy check: exact, moderator-changed, or different from the raced app track.
     copyCheckSection() {
         const check = this.copyView?.check ?? null;
         const error = this.copyError?.kind === 'check' ? this.copyError.message : null;
@@ -1249,8 +1231,7 @@ export class CreatorPanels {
         );
     }
 
-    // Removes from Redis what a copy wrote, when it is still exactly the app
-    // version. The app still has every track, so players race the same tracks.
+    // Removes what a copy wrote while it is still exactly the app version.
     async runUndo(kind) {
         if (this.busy) return;
         const preview = this.copyView?.undo?.[kind]?.preview ?? null;

@@ -19,8 +19,7 @@ function turnAmount(points, index) {
     return Math.abs(Math.atan2(Math.sin(b - a), Math.cos(b - a)));
 }
 
-// A Draw corner is a sharp wall point paired with a run on the other wall.
-// Hand-shaped tracks use a soft spatial selection around both sides instead.
+// A Draw corner pairs a sharp wall point with a run on the other wall; hand-shaped tracks use a soft selection.
 export function selectCorner(track, path, index, roadWidth) {
     const point = track[path][index];
     if (!point) return null;

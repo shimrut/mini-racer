@@ -5,10 +5,7 @@ import { defineConfig } from 'vite';
 import { devvit } from '@devvit/start/vite';
 import { DEBUG_MODULE_STUBS } from './tools/debug-module-stubs.js';
 
-// A source map holds the full, readable game code. Devvit uploads all of
-// dist/client, so the client maps go to this folder next to it. The game
-// files do not link to them ('hidden'). To read an error from the live game,
-// load the map from this folder into the browser's developer tools.
+// Client source maps go next to dist/client, unlinked ('hidden'); load one in devtools to read a live error.
 const CLIENT_SOURCEMAP_DIR = fileURLToPath(new URL('./dist/client-sourcemaps', import.meta.url));
 
 export function validateWebviewEntrypoints(entrypoints) {

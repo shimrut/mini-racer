@@ -182,8 +182,7 @@ export function cornerShot(outer, inner, from, to, carWidth) {
     };
 }
 
-// Straight shots from the middle of the road at the end of one bend
-// to the middle at the start of the next.
+// Straight shots from road middle at one bend's end to the next bend's start.
 export function wallContinuations(outer, inner, carWidth) {
     const pairs = pairBends(findBends(outer), findBends(inner));
     if (pairs.length < 2) return [];

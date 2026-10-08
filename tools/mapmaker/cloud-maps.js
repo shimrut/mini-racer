@@ -1,5 +1,4 @@
-// The online Mapmaker at miniracer.club/mapmaker is built with the 'online' mode
-// (tools/build-site.js). It saves maps to the cloud instead of the repository.
+// The online Mapmaker (miniracer.club/mapmaker, 'online' mode) saves maps to the cloud.
 import { DEFAULT_TRACK_GROUND_KEY, TRACK_GROUND_KEYS } from '../../game/track/grounds.js';
 
 export const MAPMAKER_ONLINE = import.meta.env?.MODE === 'online';
@@ -58,8 +57,7 @@ export async function verifyCloudSession() {
     }
 }
 
-// Browser drafts, Test Drive and lap times use the authenticated workspace too.
-// Never fall back to old shared browser data in the online editor.
+// Online drafts, Test Drive and lap times use the signed-in workspace, never old shared data.
 export function cloudStorageKey(key) {
     if (!MAPMAKER_ONLINE) return key;
     if (!ownerId) throw new Error('Your maps are still loading.');
@@ -71,9 +69,7 @@ export async function closeCloudSession() {
     if (!response.ok) throw new Error('Could not switch passwords. Try again.');
 }
 
-// Online, the page calls the cloud maps API itself; the unlock cookie lets it
-// in. The local Mapmaker asks its Vite server, which adds the passcode from
-// .env.local (tools/mapmaker/vite-track-authoring-plugin.js).
+// Online calls use the unlock cookie; locally Vite adds the .env.local passcode (vite-track-authoring-plugin.js).
 async function requestCloudMaps(method, key = '', body = undefined) {
     if (MAPMAKER_ONLINE && !ownerId) throw new Error('Your maps are still loading.');
     const response = MAPMAKER_ONLINE

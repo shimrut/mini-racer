@@ -388,8 +388,7 @@ function resolveTrackByName(trackName) {
     return null;
 }
 
-// A podium post names its track. A track made in the Creator is not in the
-// app, so the page learns its key from the replay data and loads it.
+// A Creator track is not in the app, so the page reads its key from the replay data and loads it.
 let storedPodiumTrackKey = '';
 
 function resolvePodiumTrack(podium) {

@@ -16,8 +16,7 @@ export const ROAD_WIDTHS = Object.freeze([
 ].map((preset) => Object.freeze({ ...preset, width: preset.cars * CAR_WIDTH })));
 export const LINE_BUILD_CAR_UNITS = 6.5;
 export const DEFAULT_DRAW_WIDTH = LINE_BUILD_CAR_UNITS * CAR_WIDTH;
-// Before road widths, Draw made every road this wide. The wall point tools
-// still take it as the road width.
+// Draw's width before road widths; the wall point tools still use it.
 export const WIDE_ROAD_WIDTH = ROAD_WIDTHS.at(-1).width;
 const MIN_LINE_SMOOTHING = 0;
 const MAX_LINE_SMOOTHING = 1;
@@ -104,8 +103,7 @@ export function isValidTrackKey(value) {
     return TRACK_KEY_RE.test(value) && !RESERVED_TRACK_KEYS.has(value);
 }
 
-// "Spade Kingdom" -> spadeKingdom. A leading digit is prefixed so the result
-// can be a JavaScript identifier.
+// "Spade Kingdom" -> spadeKingdom; a leading digit gets a prefix to stay an identifier.
 export function trackKeyFromName(name) {
         const words = String(name)
         .normalize('NFKD')

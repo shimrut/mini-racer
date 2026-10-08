@@ -14,8 +14,7 @@ export function seriesDestination(seriesId) {
     return `${SERIES_DESTINATION_PREFIX}${seriesId}`;
 }
 
-// Returns { type: 'daily' }, { type: 'none' } or { type: 'series', seriesId },
-// or null for an unknown value.
+// { type: 'daily' | 'none' } or { type: 'series', seriesId }, or null when unknown.
 export function parseTrackDestination(value, seriesData = null) {
     if (value === DAILY_DESTINATION) return { type: 'daily' };
     if (value === UNUSED_DESTINATION) return { type: 'none' };
@@ -143,8 +142,7 @@ function cloneData(data) {
     };
 }
 
-// Takes the track out of a series that is not live. The later tracks move up
-// one position, and each position keeps its medal target.
+// Removes a track from a non-live series; later tracks move up, targets stay with positions.
 function removeDraftStage(series, stageIndex) {
     const targets = series.stages.map((stage) => stage.requiredMedals);
     const remaining = series.stages.filter((_, index) => index !== stageIndex);
@@ -161,13 +159,7 @@ function liveStageError(series, action) {
     );
 }
 
-/**
- * Applies a track save or a Campaign Planner change to the series list.
- * - destination "daily" or "none": the track leaves its series (a series that is not live only).
- * - destination "series:<id>": the track joins that series after its last stage,
- *   or keeps its stage and gets new laps and a new medal target (not live only).
- * - A rename changes the track key of its stage (not live only).
- */
+/** Applies a save or Planner change: leave, join or update a series (non-live only); a rename updates the stage key. */
 export function applyTrackSeriesUpdate(data, {
     trackKey,
     originalTrackKey = null,
@@ -249,8 +241,7 @@ export function applyTrackSeriesUpdate(data, {
     return { data: next, series, stageIndex, changed: true };
 }
 
-// Moves a stage one position up (-1) or down (+1) in a series that is not live.
-// The tracks and their laps move; the medal targets stay with the positions.
+// Moves a stage up (-1) or down (+1) in a non-live series; medal targets stay with positions.
 export function moveSeriesStage(data, seriesId, trackKey, direction) {
     const next = cloneData(data);
     const series = next.series.find((entry) => entry.id === seriesId);

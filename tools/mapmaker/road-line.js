@@ -1,9 +1,6 @@
 import { isFinitePoint } from '../geometry.js';
 
-// The closed line and the road width that Draw built the walls from. The
-// Creator keeps it on the open track, and saves it beside the track. The game
-// and the race check never read it: they use the walls.
-// These limits match the server. A line out of them is not saved.
+// Draw's road line and width, saved beside the track for the Creator only; limits match the server.
 export const MAX_ROAD_LINE_POINTS = 160;
 const MIN_ROAD_LINE_WIDTH = 1.5;
 const MAX_ROAD_LINE_WIDTH = 20;
@@ -13,8 +10,7 @@ function isValidWidth(width) {
     return Number.isFinite(width) && width >= MIN_ROAD_LINE_WIDTH && width <= MAX_ROAD_LINE_WIDTH;
 }
 
-// A bend can keep its own corner rounding, and its own road width up to the
-// next bend.
+// A bend can keep its own rounding and width up to the next bend.
 function isValidBend(point) {
     return isFinitePoint(point)
         && (point.cornerRadius === undefined

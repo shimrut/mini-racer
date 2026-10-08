@@ -488,8 +488,7 @@ function renderMonths(doc, months) {
     return nodes;
 }
 
-// The one-time walk that lists races saved before the raced lists existed.
-// The Daily archive must wait until it says done.
+// The one-time raced-list walk; the Daily archive waits for it to finish.
 function racedListFillText(fill) {
     if (fill?.state === 'done') return 'Old races recorded: done';
     if (fill?.state === 'working') {
@@ -526,8 +525,7 @@ function compactionButton(state, name) {
     return { label, action: 'start', disabled: Boolean(state?.running) || earlierOpen };
 }
 
-// Rewrites stored ghosts in the compact form, a step at a time. Progress
-// counts ghosts checked out of the ghosts in the step when it started.
+// Ghost compaction progress: ghosts checked out of the step's count at its start.
 export function renderGhostCompaction(root, { state = null, busy = false, error = null, onAction } = {}) {
     const section = root.getElementById('analytics-ghost-compaction');
     if (!section) return;
@@ -649,8 +647,7 @@ const DAILY_GHOST_CHOICES = [
     ['restore', 'Restore'],
 ];
 
-// The move of old Daily ghosts to blob storage. Blob figures come from the
-// last sweep of each day; Redis figures count payload, not Redis memory.
+// Daily ghost move: blob figures from each day's last sweep; Redis figures count payload, not memory.
 export function renderGhostMove(root, { status = null, busy = false, error = null, onChoose } = {}) {
     const section = root.getElementById('analytics-ghost-move');
     if (!section) return;
@@ -1126,8 +1123,7 @@ export function renderAnalyticsSummary(root, summary) {
     revealSections(root);
 }
 
-// The Players sections, and the other tabs' cards, which an access error
-// must clear too.
+// Players sections and other tabs' cards, which an access error also clears.
 const LOCKED_SECTION_IDS = [
     ...SECTION_IDS,
     'analytics-challenges',
@@ -1209,8 +1205,7 @@ function rememberedTab() {
     }
 }
 
-// Three tabs. Each tab's data loads the first time the tab opens, so the
-// Players tab does not wait for the Redis size walk.
+// Each tab loads on first open, so Players never waits for the Redis size walk.
 export function setupAnalyticsTabs(root, { onOpen } = {}) {
     const tabs = TABS.map((name) => root.getElementById(`analytics-tab-${name}`));
     function select(name, { focus = false } = {}) {

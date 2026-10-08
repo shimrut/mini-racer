@@ -20,8 +20,7 @@ import {
 import { getMedalRowError } from './mapmaker/medal-times.js';
 import { TrackPreviews } from './mapmaker/track-preview.js';
 
-// A save rewrites files this page imports, so the dev server may reload the page
-// right after it. The last status is kept briefly so it shows again after that reload.
+// A save can reload the page, so keep the last status briefly to show it again.
 const STATUS_KEY = 'campaign-planner:status:v1';
 const STATUS_KEEP_MS = 5000;
 const MAX_TRACK_RESULTS = 30;

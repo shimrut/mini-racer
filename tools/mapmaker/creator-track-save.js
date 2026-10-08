@@ -13,9 +13,7 @@ import {
     trackContent,
 } from './creator-conflicts.js';
 
-// Read the named track, even when another track is selected by the time a
-// request finishes. The open drawing lives separately from its wall shape.
-// The road line lives on the open track, and goes to the server beside it.
+// Reads the named track even if the selection changed; the drawing and road line travel beside the walls.
 export function creatorTrackContent(editor, key) {
     const medalRow = editor.medalRowByKey.get(key) ?? editor.medalTimes[key] ?? null;
     const { track, roadLine } = splitRoadLine(editor.state.tracks[key]);
@@ -28,8 +26,7 @@ export function creatorTrackContent(editor, key) {
     });
 }
 
-// The unsaved work of each dirty track, taken before a refresh replaces the
-// tracks with the server's.
+// Unsaved work of dirty tracks, taken before a refresh.
 export function captureUnsavedCreatorWork(editor) {
     return [...editor.state.dirtyTrackKeys]
         .filter((key) => editor.state.tracks[key])
@@ -42,8 +39,7 @@ export function captureUnsavedCreatorWork(editor) {
         }));
 }
 
-// Puts the unsaved work back over the server's tracks. A track that is locked
-// now keeps its new record, so it opens read-only.
+// Restores unsaved work over the server tracks; a now-locked track keeps its new record and opens read-only.
 export function restoreUnsavedCreatorWork(editor, unsaved) {
     for (const { key, content, history, record, pending } of unsaved) {
         editor.state.tracks[key] = withRoadLine(content.track, content.roadLine);
@@ -63,8 +59,7 @@ export function restoreUnsavedCreatorWork(editor, unsaved) {
     }
 }
 
-// The version of each track that the server has, with its revision. An edit
-// that brings a track back to it leaves nothing to save.
+// Each track's server version and revision; an edit back to it leaves nothing to save.
 function savedContents(editor) {
     editor.savedContentByKey ??= new Map();
     return editor.savedContentByKey;
@@ -82,9 +77,7 @@ export function rememberSavedCreatorContent(editor, record) {
     });
 }
 
-// True when the track is exactly the version that the server has. A save in
-// flight, a save with no clear answer, typed medal text, or a record of
-// another revision keeps it unsaved.
+// True when the track equals the server version and nothing is in flight, unclear, typed or newer.
 export function isCreatorTrackAtSavedVersion(editor, key) {
     const saved = savedContents(editor).get(key);
     const record = editor.creatorRecords.get(key);
@@ -131,8 +124,7 @@ function setTrackBaseline(editor, key, track, geometrySignature) {
     editor.baselineGeometryByKey.set(key, geometrySignature(track));
 }
 
-// The server has this version of the track. Unless the moderator changed
-// the track since, it is clean.
+// The server has this version; clean unless the moderator changed it since.
 function acknowledgeTrack(editor, key, saved, geometrySignature, unchanged) {
     editor.creatorRecords.set(key, editor.creatorRecordMeta(saved));
     rememberSavedCreatorContent(editor, saved);
@@ -193,23 +185,19 @@ async function sendCreatorTrack(editor, key, geometrySignature) {
     }
 }
 
-// Saves once, with no conflict recovery. Only tests call it: the Creator
-// saves with saveCreatorTrackWithRecovery.
+// One save without recovery, for tests; the Creator uses saveCreatorTrackWithRecovery.
 export async function saveCreatorTrackSnapshot(editor, key, geometrySignature) {
     return (await sendCreatorTrack(editor, key, geometrySignature)).saved;
 }
 
-// Saves the track. When another revision is on the server, it finds out
-// why: a save of this editor whose answer was lost, a lock, a deletion, or
-// another device. Only a lost answer is sent again without a question, once.
+// Saves; on another revision it finds why (lost answer, lock, deletion, other device); resends a lost answer once.
 export async function saveCreatorTrackWithRecovery(editor, key, geometrySignature, attempt = 0) {
     const outcome = await sendCreatorTrack(editor, key, geometrySignature);
     if (outcome.saved || outcome.status !== 409) return outcome.saved;
     return recoverTrackConflict(editor, key, geometrySignature, outcome.baseRevision, attempt);
 }
 
-// The full server record, null when the track is gone, undefined when the
-// read failed.
+// The server record, null when gone, undefined when the read failed.
 async function readServerTrack(editor, key) {
     editor.busy = true;
     editor.syncCreatorTrackState();
@@ -231,8 +219,7 @@ async function recoverTrackConflict(editor, key, geometrySignature, baseRevision
     if (server === undefined || !editor.state.tracks[key]) return false;
     // The same revision: another save held the track. Its message is shown.
     if (server && server.revision === baseRevision) return false;
-    // The server has exactly this work: its revision is taken. Typed medal
-    // text that is not in the row yet keeps the track unsaved.
+    // The server has this work, so take its revision; uncommitted medal text keeps it unsaved.
     if (server && sameTrackContent(server, creatorTrackContent(editor, key))) {
         const typed = hasPendingMedalText(editor.pendingMedalText, key);
         acknowledgeTrack(editor, key, server, geometrySignature, !typed);
@@ -310,8 +297,7 @@ async function askTrackConflict(editor, key, geometrySignature, server, attempt)
     return false;
 }
 
-// The copy is saved only with finished medal times. Otherwise it stays an
-// unsaved new track, and its typed text stays on screen.
+// The copy saves only with finished medals; otherwise it stays unsaved with its typed text.
 async function saveCopy(editor, key, server, geometrySignature) {
     const copyKey = keepCreatorDraftAsCopy(editor, key, server, geometrySignature);
     if (!copyKey) return false;
@@ -329,9 +315,7 @@ async function saveCopy(editor, key, server, geometrySignature) {
     return saveCreatorTrackWithRecovery(editor, copyKey, geometrySignature);
 }
 
-// Moves the unsaved work of a track to a new key. The new key is a new
-// track: no record, so its first save starts from revision 0. The medal row
-// it shows comes with it, even when it is the saved row.
+// Moves unsaved work to a new key that starts from revision 0, with the medal row it shows.
 export function moveCreatorDraft(editor, fromKey, toKey) {
     const medalRow = editor.medalRowByKey.get(fromKey)
         ?? editor.medalTimes[editor.state.originalTrackKeyByKey.get(fromKey) ?? fromKey] ?? null;
@@ -347,8 +331,7 @@ export function moveCreatorDraft(editor, fromKey, toKey) {
     editor.state.dirtyTrackKeys.add(toKey);
 }
 
-// Keep both: the draft becomes a new track named "‹name› copy", and the
-// original key shows the server version, or goes when it was deleted.
+// Keep both: the draft becomes "‹name› copy", and the original key shows the server version or goes.
 export function keepCreatorDraftAsCopy(editor, key, server, geometrySignature) {
     const draft = editor.state.tracks[key];
     if (!draft) return null;
@@ -383,8 +366,7 @@ export function loadCreatorServerTrack(editor, key, server, geometrySignature) {
     editor.setStatus(`Loaded the saved version of ${server.track?.name ?? key}.`);
 }
 
-// A track that players can race now: it shows read-only, with the local
-// work, and the lock note offers the two ways out.
+// A raceable track shows read-only with local work, and the lock note offers two ways out.
 function showLockedCreatorDraft(editor, key, server) {
     editor.creatorRecords.set(key, editor.creatorRecordMeta(server));
     editor.creatorSaveErrors.delete(key);
@@ -392,8 +374,7 @@ function showLockedCreatorDraft(editor, key, server) {
     editor.setStatus(`${server.track?.name ?? key} is locked now. Keep your changes as a new track, or load the locked version.`, true);
 }
 
-// The lock note's buttons. Each reads the locked version again first: the
-// editor keeps only its own work, not the server version.
+// Lock note buttons reread the locked version first; the editor keeps only its own work.
 export async function keepLockedCreatorDraft(editor, key, geometrySignature) {
     const server = await readServerTrack(editor, key);
     if (server === undefined || !editor.state.tracks[key]) return false;

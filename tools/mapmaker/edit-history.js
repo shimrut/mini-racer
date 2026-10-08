@@ -2,8 +2,7 @@ import { isTrackGroundKey } from '../../game/track/grounds.js';
 import { MEDAL_TIERS, normalizeMedalRow } from './medal-times.js';
 import { isValidRoadLine } from './road-line.js';
 
-// A history instance belongs to one selected track. Keep only authored data in
-// snapshots; pointer/canvas state is rebuilt by the editor after restoration.
+// One history per track, holding only authored data; the editor rebuilds pointer and canvas state.
 function copySnapshot(value) {
     const json = JSON.stringify(value);
     if (json === undefined) {
@@ -121,8 +120,7 @@ function validTrack(track) {
         && (track.roadLine === undefined || isValidRoadLine(track.roadLine));
 }
 
-// A draft: { trackKey, originalTrackKey, track, draftLoop }. The browser
-// recovery and the online cloud maps both store drafts.
+// A draft: { trackKey, originalTrackKey, track, draftLoop }, for browser recovery and cloud maps.
 export function isValidDraft(draft) {
     return Boolean(draft) && validKey(draft.trackKey)
         && (draft.originalTrackKey === null || validKey(draft.originalTrackKey))
@@ -159,8 +157,7 @@ function normalizeRecovery(recovery) {
     return { selectedTrackKey, drafts };
 }
 
-// Supply window.sessionStorage or window.localStorage explicitly. Storage access
-// can throw (private mode, quota, disabled storage), so callers receive status.
+// Pass a Storage explicitly; access can throw, so callers get a status.
 export function saveDraftRecovery(storage, recovery, key = DRAFT_RECOVERY_KEY) {
     try {
         const normalized = normalizeRecovery(recovery);

@@ -90,8 +90,7 @@ const CREATOR_MODE = document.body?.dataset.creator === 'true';
 const STATUS_MS = 3500;
 const STATUS_ERROR_MS = 8000;
 const STATUS_MS_PER_CHAR = 60;
-// Picker cards for cloud maps in the local Mapmaker use this key prefix, which
-// no track key can have.
+// Picker key prefix for cloud maps; no track key can have it.
 const CLOUD_CARD_PREFIX = 'cloud:';
 // A finger that moves less than this many pixels is a tap, not a pan.
 const TOUCH_TAP_SLOP = 8;
@@ -503,8 +502,7 @@ class MapmakerApp {
         }, { once: true });
     }
 
-    // Puts a draft in the editor as an unsaved track. A renamed draft replaces
-    // the saved track it came from.
+    // Opens a draft as an unsaved track; a renamed draft replaces its source track.
     addDraft(draft) {
         if (!MAPMAKER_ONLINE && draft.originalTrackKey && draft.originalTrackKey !== draft.trackKey) {
             delete this.state.tracks[draft.originalTrackKey];
@@ -544,16 +542,14 @@ class MapmakerApp {
         this.setStatus(`Restored ${recovery.drafts.length} unsaved map${recovery.drafts.length === 1 ? '' : 's'}.`);
     }
 
-    // A cloud map is a draft of a new track, or of a track that was in the
-    // game when the map was saved.
+    // A cloud map drafts a new track or one that was in the game when saved.
     addCloudMap(map) {
         this.addDraft({ ...map, originalTrackKey: TRACKS[map.originalTrackKey] ? map.originalTrackKey : null });
         if (map.medalRow) this.medalRowByKey.set(map.trackKey, map.medalRow);
         this.cloudKeyByKey.set(map.trackKey, cloudMapId(map));
     }
 
-    // Online, the cloud maps are the saved tracks, so they open clean. A map
-    // with unsaved changes in this browser keeps them.
+    // Online, cloud maps are the saved tracks; local unsaved changes stay.
     async loadCloudMapsOnline() {
         if (this.cloudLoading) return;
         this.cloudLoading = true;
@@ -629,8 +625,7 @@ class MapmakerApp {
         if (this.trackPickerDialog.open) this.renderTrackPicker();
     }
 
-    // The local Mapmaker opens a cloud map as an unsaved draft. Saving it adds
-    // it to the game and deletes the cloud copy.
+    // Locally a cloud map opens as a draft; saving adds it to the game and deletes the cloud copy.
     openCloudMap(cloudId) {
         const map = this.cloudMaps.find((entry) => cloudMapId(entry) === cloudId);
         if (!map) return;
@@ -893,8 +888,7 @@ class MapmakerApp {
         this.syncRoadWidthControl();
     }
 
-    // Road width works on a road made with Draw. Before Draw, it picks the
-    // width that Draw makes.
+    // Road width needs a Draw road; before Draw it picks Draw's width.
     syncRoadWidthControl() {
         if (!this.roadWidthOptions) return;
         const line = this.hasRoadLine() ? this.track.roadLine : null;
@@ -923,8 +917,7 @@ class MapmakerApp {
                     : 'Applies to the whole road.';
     }
 
-    // Whole track sets the road width and clears each section's own width.
-    // Selected bend sets the road from that bend to the next one.
+    // Whole track sets every width; Selected bend sets the road to the next bend.
     setRoadWidth(value) {
         const preset = ROAD_WIDTHS.find((entry) => entry.value === value);
         if (!preset) return;
@@ -1444,8 +1437,7 @@ class MapmakerApp {
         this.medalTimesState.className = `pill${!row || error ? ' pill-warn' : edited ? ' pill-warn' : ' pill-ok'}`;
     }
 
-    // An author time fills the other three medals, so it replaces the whole
-    // row and every typed medal text. A refused time keeps its typed text.
+    // An author time fills all medals and replaces typed text; a refused time keeps it.
     setAuthorTime(authorSec) {
         if (this.medalTimesFixed()) return false;
         const row = suggestMedalTimes(authorSec);
@@ -1470,10 +1462,7 @@ class MapmakerApp {
         this.markDirty('Changed the medal times.');
     }
 
-    // Puts the typed medal text of the open track in its row, as the change
-    // event does. A field can keep text with no change event: text typed back
-    // to its first value. An author time that equals the row changes nothing,
-    // so it does not fill the other medals again.
+    // Commits typed medal text as a change event would; an unchanged author time does not refill.
     commitPendingMedalText(key) {
         if (!hasPendingMedalText(this.pendingMedalText, key)) return true;
         if (key !== this.state.selectedTrackKey) return false;
@@ -1492,8 +1481,7 @@ class MapmakerApp {
         return !hasPendingMedalText(this.pendingMedalText, key);
     }
 
-    // Keeps the typed text and marks the track unsaved. It does not repaint the
-    // field: a number field reports a half-typed "12." as empty.
+    // Keeps typed text without repainting, since a number field reports "12." as empty.
     recordMedalText(tier) {
         if (this.medalTimesFixed()) return;
         const key = this.state.selectedTrackKey;
@@ -1644,8 +1632,7 @@ class MapmakerApp {
         this.trackNameInput.select();
     }
 
-    // Reddit shows the Creator in a frame that ignores window.confirm, so
-    // every question uses this page dialog.
+    // Reddit's frame ignores window.confirm, so questions use this page dialog.
     confirmAction({ title, message, confirmLabel, danger = false }) {
         this.confirmDialogTitle.textContent = title;
         this.confirmDialogMessage.textContent = message;
@@ -1893,8 +1880,7 @@ class MapmakerApp {
         return this.track.outer.length >= 3 && this.track.inner.length >= 3;
     }
 
-    // A track drawn with Draw keeps its road line. Its bends are what you edit:
-    // the walls, the start and the checkpoints are built from them.
+    // A Draw track keeps its road line; walls, start and checkpoints come from its bends.
     hasRoadLine() {
         return Boolean(this.track) && this.hasTrackGeometry() && isValidRoadLine(this.track.roadLine);
     }
@@ -1905,8 +1891,7 @@ class MapmakerApp {
             ? handle.index : null;
     }
 
-    // Builds the road again from the line. The start stays near where it was.
-    // Nothing changes when the line cannot make a road.
+    // Rebuilds the road from the line, keeping the start near; an invalid line changes nothing.
     rebuildRoad(roadLine = this.track.roadLine) {
         const built = buildRoadFromLine(roadLine, {
             cornerRadius: this.getCornerRadius(),
@@ -1976,8 +1961,7 @@ class MapmakerApp {
         this.markDirty('Deleted bend.');
     }
 
-    // Whole track sets every corner and clears each bend's own setting.
-    // Selected corner sets only the selected bend.
+    // Whole track sets every corner; Selected corner sets one bend.
     setRoadCornerRadius(nextRadius, options = {}) {
         const bendIndex = this.state.radiusScope === 'corner' ? this.getSelectedBendIndex() : null;
         if (this.state.radiusScope === 'corner' && bendIndex === null) return;
@@ -2007,8 +1991,7 @@ class MapmakerApp {
         }
     }
 
-    // A rebuilt road can reach past the top or the left edge. Then the whole
-    // track moves back, as after Draw, and the view keeps it in place.
+    // A road past the top or left edge moves back, and the view follows.
     normalizeRoadTrack() {
         const normalized = normalizeTrackLayout(this.track);
         const offset = normalized.normalizationOffset;
@@ -2391,8 +2374,7 @@ class MapmakerApp {
         if (!handle) {
             return;
         }
-        // A bend keeps the open tool. Road width then sets its section, and in
-        // Corner, Wall corners sets its rounding.
+        // A bend keeps the open tool, so Road width and Wall corners apply to it.
         if (handle.kind === 'bend') {
             this.state.selectedHandle = { kind: 'bend', index: handle.index };
             this.state.widthScope = 'section';
@@ -2553,8 +2535,7 @@ class MapmakerApp {
         return true;
     }
 
-    // A mouse pan moves at once. A finger pans only once it moves past the
-    // tap slop, so a tap still draws or selects.
+    // Mouse pans at once; a finger pans only past the tap slop, so taps still work.
     startPan(event, canvasPoint, moved) {
         this.canvas.setPointerCapture(event.pointerId);
         this.state.drag = {
@@ -2571,9 +2552,7 @@ class MapmakerApp {
         }
     }
 
-    // One finger works like the mouse. A second finger pinches to zoom and
-    // pan, and ends what the first finger was doing. Returns true when this
-    // finger is part of a pinch.
+    // One finger acts as the mouse; a second pinches to zoom and pan. Returns true for a pinch finger.
     trackTouch(event) {
         this.touchPoints.set(event.pointerId, this.getCanvasPoint(event));
         if (this.touchPoints.size === 1) {
@@ -3250,9 +3229,7 @@ class MapmakerApp {
         this.draw();
     }
 
-    // Marks the open track changed. In the Creator, an edit that brings the
-    // track back to the version on the server (an Undo, or a value typed back)
-    // leaves it saved, as after a save.
+    // Marks the track changed; in the Creator, an edit back to the server version stays saved.
     markTrackChanged() {
         const key = this.state.selectedTrackKey;
         if (this.creatorMode && isCreatorTrackAtSavedVersion(this, key)) {
@@ -3804,8 +3781,7 @@ class MapmakerApp {
         this.trackPickerBtn.disabled = Boolean(this.creatorDeletingKey);
         this.newTrackBtn.disabled = !this.creatorLoaded || Boolean(this.creatorDeletingKey);
         this.setCreatorEditable(editable);
-        // A locked track with unsaved changes: the work can go to a new
-        // track, or the locked version can replace it.
+        // Locked track with unsaved work: move it to a new track or take the locked version.
         const lockedDraft = Boolean(this.creatorLoaded && record?.lockedAt && this.state.dirtyTrackKeys.has(key));
         if (this.creatorLockActions) {
             this.creatorLockActions.hidden = !lockedDraft;
@@ -3861,8 +3837,7 @@ class MapmakerApp {
         if (record.medalRow) this.medalTimes[key] = record.medalRow;
         else delete this.medalTimes[key];
         this.medalRowByKey.delete(key);
-        // The server version replaces the local one, typed text included. A
-        // refresh puts back the unsaved work of a dirty track after this.
+        // The server version replaces local text; a refresh restores a dirty track's work after.
         clearPendingMedalText(this.pendingMedalText, key);
         if (record.draftLoop?.length) this.draftLoopsByKey.set(key, cloneTracks(record.draftLoop));
         else this.draftLoopsByKey.delete(key);
@@ -4184,8 +4159,7 @@ class MapmakerApp {
                 return;
             }
             if (frame.src === 'about:blank') return;
-            // The frame did not open Test Drive. The page opens it instead,
-            // after a save, because leaving the page drops unsaved changes.
+            // The frame did not open Test Drive, so the page opens it after a save.
             this.closeCreatorTestDrive();
             if (hasCreatorUnsavedWork(this)) {
                 this.setStatus('Save or discard all unsaved tracks and Daily or Campaign changes, then open Test Drive again.', true);
@@ -4235,8 +4209,7 @@ class MapmakerApp {
         }
     }
 
-    // Online, Save keeps unfinished maps too: the checks run when the local
-    // Mapmaker adds the map to the game.
+    // Online Save keeps unfinished maps; checks run when the local Mapmaker adds them.
     async saveToCloud() {
         const trackKey = this.state.selectedTrackKey;
         if (!this.commitPendingMedalText(trackKey)) {
@@ -4262,8 +4235,7 @@ class MapmakerApp {
         this.setStatus(`Saving ${this.track.name} to your cloud maps...`);
         try {
             await saveCloudMap(snapshot);
-            // Bind the acknowledgement to the submitted map, even if the user
-            // renamed it or selected another map while the request was running.
+            // Bind the reply to the submitted map, even if it was renamed or deselected meanwhile.
             const liveKey = Object.keys(this.state.tracks).find((key) => this.state.tracks[key] === submittedTrack)
                 ?? (this.state.tracks[trackKey] ? trackKey : null);
             if (liveKey) {

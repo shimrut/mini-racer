@@ -3,9 +3,7 @@ import { buildAutoGates, closedLoopLength, nearestDistanceAlongLoop } from './au
 import { buildRibbonWallsFromCenterline, findCornerWallGroups, fitCurvesToCorners } from './ribbon-walls.js';
 import { isValidRoadLine } from './road-line.js';
 
-// How Draw turns a closed line of points into a road: the walls, the start
-// and the checkpoints. A track with a saved road line is built again the same
-// way each time a bend moves.
+// How Draw turns a closed line into walls, start and checkpoints, again on every bend move.
 
 export const DEFAULT_LINE_SMOOTHING = 0.35;
 
@@ -84,8 +82,7 @@ function offsetTrackLayout(layout, offsetX, offsetY) {
     };
 }
 
-// Moves the whole track, its road line too, so that no race point is less
-// than `padding` from the top or the left edge.
+// Moves the whole track, road line too, to keep `padding` from the top and left.
 export function normalizeTrackLayout(layout, padding = 4) {
     const points = [
         ...layout.outer,
@@ -109,8 +106,7 @@ export function normalizeTrackLayout(layout, padding = 4) {
     return { ...normalized, normalizationOffset: { x: offsetX, y: offsetY } };
 }
 
-// Each kept bend of the smoothed line, with the rounding of its drawn point
-// and the width of the road from it to the next bend.
+// Each kept bend with its rounding and the road width to the next bend.
 function lineBends(rawPoints, kept, centerline) {
     let from = 0;
     return kept.map((point, index) => {
@@ -129,9 +125,7 @@ function lineBends(rawPoints, kept, centerline) {
     });
 }
 
-// A bend with its own rounding gives it to the sharp wall point of its corner.
-// A road of other widths names that point. Otherwise it is the corner point
-// that is nearest to the bend.
+// A bend's own rounding goes to its corner's sharp wall point, else the nearest corner point.
 function giveBendRoundings(walls, bends, trackWidth) {
     if (!bends.some((bend) => bend.radius !== null)) return;
     if (walls.pivots) {
@@ -196,8 +190,7 @@ export function buildTrackFromLoop(rawPoints, trackWidth, cornerRadius) {
     });
 }
 
-// Where the start line is along the road, and which way the start car faces,
-// so that new checkpoints and a rebuilt road keep the start in its place.
+// Start line position and heading, kept through new checkpoints and rebuilds.
 export function startOnLoop(centerline, startLine, startAngle) {
     if (!startLine?.p1 || !startLine?.p2) return null;
     const nearest = nearestDistanceAlongLoop(centerline, midpoint(startLine.p1, startLine.p2));
@@ -207,9 +200,7 @@ export function startOnLoop(centerline, startLine, startAngle) {
     return { startDistance: nearest.distance, direction };
 }
 
-// The road that a saved road line builds, with the start kept near the given
-// start line and new checkpoints. It is not moved from the edges: see
-// normalizeTrackLayout. Null when the line cannot make a road.
+// The road a line builds, start kept and new checkpoints, not edge-normalized; null when invalid.
 export function buildRoadFromLine(roadLine, { cornerRadius = 3, startLine = null, startAngle = 0 } = {}) {
     if (!isValidRoadLine(roadLine)) return null;
     const walls = buildRoadWallsFromLoop(roadLine.points, roadLine.width, cornerRadius);

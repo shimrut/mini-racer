@@ -59,8 +59,7 @@ function serializeMedalTimes(medalTimes) {
     return `${JSON.stringify(medalTimes, null, 2)}\n`;
 }
 
-// Works out the medal row after a save. A track in a live series keeps its
-// times, because players' saved medals were worked out with them.
+// A track in a live series keeps its medal times, because saved medals used them.
 function applyMedalTimesUpdate(medalTimes, {
     trackKey,
     originalTrackKey,
@@ -227,8 +226,7 @@ function refreshSeriesGrounds(seriesData, groundsByKey) {
     return seriesData;
 }
 
-// Saves a track's shape, name and medal times. It never changes where the track
-// is used: a new track starts as not used, and a rename keeps its place.
+// Saves shape, name and medals, never placement: new tracks start unused, renames keep their place.
 export function buildTrackRepositoryUpdate({
     catalogSource,
     seriesSource,
