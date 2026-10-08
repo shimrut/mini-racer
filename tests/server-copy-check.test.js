@@ -267,9 +267,7 @@ describe('the copy undo', () => {
 });
 
 describe('copies that a moderator saved again', () => {
-    // An app track that nobody raced, with app medal times. A track in the
-    // Daily list cannot keep an unfinished drawing, so that test needs one
-    // outside the list.
+    // An unraced app track outside the Daily list, since listed tracks cannot keep an unfinished drawing.
     function unracedKey({ outsideDailyList = false } = {}) {
         const raced = new Set([...Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE),
             ...seriesData.series.flatMap((entry) => (entry.stages ?? []).map((stage) => stage.trackKey))]);

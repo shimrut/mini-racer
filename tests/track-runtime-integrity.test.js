@@ -16,8 +16,7 @@ import { buildCollisionRuntime, buildTrackGeometry } from '../game/track/runtime
 const NUMBERS_STAGES = getCampaignSeriesStages(CAMPAIGN_NUMBERS_SERIES_ID);
 const MEDAL_TIMES = JSON.parse(readFileSync(new URL('../game/medals/medal-times.json', import.meta.url), 'utf8'));
 
-// Extracted from the installed v2.4.0 server bundle, independently checked
-// against racer-v2-4 (e9a578eb). Pin the entire definitions, legacy fields included.
+// From the v2.4.0 server bundle, checked against racer-v2-4 (e9a578eb); pins whole definitions, legacy fields too.
 const V240_TRACK_CONTRACTS = [
     ['gunSlinger', 'e088f7afbf00b7b7aa1064a85bd2ec100307b8f57e0ce72fb63d485a76b89050', { author: 9.15, gold: 9.39, silver: 9.72, bronze: 10.03 }],
     ['brokenWing', 'e7c79e7b37bf692842b428dde318a9b9e9eb427634b8397dabfb0ab2cb8a6dc8', { author: 11.47, gold: 11.82, silver: 12.15, bronze: 12.41 }],
@@ -286,12 +285,8 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(existingTrackRegistry)).toBe(
             'd5f930078b4bd671d6d50aa8a61cc1c08c74d0acdc14ade07d1f6fcd581d0576',
         );
-        // Eight tracks now restore their original race shapes. Four later layouts
-        // survive as Mountain Pass, Shark Tail, Hook Bend and Winding Lane.
-        // The historical subsets above remain unchanged; the fingerprints below
-        // include the restorations, subsequent additions, metadata cleanup
-        // and the nine v2.4.0 production restorations.
-        // Dedicated shape checks below pin both the originals and saved variants.
+        // Eight tracks got their first shapes back; four later ones are now Mountain Pass, Shark Tail,
+        // Hook Bend and Winding Lane. Fingerprints below add restorations, additions and the v2.4.0 restorations.
         const reshapedKeys = new Set(['doubleTrouble', 'monkeyWrench', 'sharkBite']);
         const addedKeys = new Set(catalogKeys.slice(catalogKeys.indexOf('puzzlePiece')));
         const withoutReshapedOrAdded = Object.fromEntries(
@@ -307,12 +302,8 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(throughSharkBite)).toBe(
             '744984e326e68fa08b1a0c3353a66425cfb3a1f261a17ca00c4e842f92180867',
         );
-        // Keep the unchanged subset pinned while excluding current authoring
-        // edits/additions and the production restorations pinned separately below.
-        // Dirt Snake and Wild Crest were saved in 9a1214b9 after this fingerprint
-        // was taken. Broken Road and Ridge Runner were edited again in 78f10d49.
-        // Those four are excluded here; the complete registry hash pins their
-        // current shapes. Every other track still matches the reviewed fingerprint.
+        // The unchanged subset, without current edits and the separately pinned restorations.
+        // The registry hash pins the excluded Dirt Snake, Wild Crest (9a1214b9), Broken Road, Ridge Runner (78f10d49).
         const latestReshapedKeys = new Set([
             'dirtValley', 'smallSteps', 'lapinLoop', 'centralDistrict', 'roughCut', 'hillsideScramble',
             'dirtSnake', 'wildCrest', 'brokenRoad', 'ridgeRunner',
@@ -353,8 +344,7 @@ describe('track runtime integrity', () => {
         );
     });
 
-    // Expected shapes come from the original definitions: 0feab0e0 for Mountain
-    // Peak/Shark Fin, and 0239dc89 for the other six. Ignore obsolete metadata.
+    // Original shapes: 0feab0e0 for Mountain Peak and Shark Fin, 0239dc89 for the other six; old metadata ignored.
     it.each([
         ['mountainPeak', 'e2a304522363a745bb8cdc19ea4ae638b12c6892502c19706ddfef50938a41a8'],
         ['sharkFin', 'ca6129fa8ea9fef14c634f347aafabd38a0bb5783f3e2f36ec878d128089900b'],
@@ -456,8 +446,7 @@ describe('track runtime integrity', () => {
         });
     });
 
-    // Campaign menus read the series surfaces from the catalog, not from the
-    // track geometry. The two must name the same ground.
+    // Campaign menus read surfaces from the catalog, so it must match the track ground.
     it('names the same ground in the catalog and in the track definition', () => {
         Object.entries(TRACK_CATALOG).forEach(([trackKey, metadata]) => {
             expect(metadata.ground ?? DEFAULT_TRACK_GROUND_KEY, `${trackKey} catalog ground`)

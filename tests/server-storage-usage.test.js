@@ -280,8 +280,7 @@ describe('server storage usage', () => {
         expect(measuredBoards).toHaveLength(60);
     });
 
-    // After the ghost move, a done day holds small stubs and an untouched day
-    // full ghosts. One sample across both would give every day the same size.
+    // Done days hold stubs and untouched days full ghosts, so one sample would size them all alike.
     it('samples moved, partly moved and unmoved Daily days apart', async () => {
         const days = Array.from({ length: 90 }, (_unused, index) => (
             `daily-gp-${new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10)}`

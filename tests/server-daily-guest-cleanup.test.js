@@ -104,8 +104,7 @@ describe("Daily guest clean-up", () => {
     expect(await holdsRows(guest, DAYS[0])).toBe(true);
   });
 
-  // A transfer reads the guest's rows after it sets its mark, and copies them
-  // later. A row deleted after the mark could come back as a stale copy.
+  // A transfer copies rows it read after its mark, so a later delete could return as a stale copy.
   it("stops when a transfer marks the guest after the first check", async () => {
     const guest = "guest:marked-after-check";
     const startMs = Date.parse("2026-01-02T00:00:00.000Z");

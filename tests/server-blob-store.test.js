@@ -32,9 +32,7 @@ function fakeS3(respond) {
   };
 }
 
-// An S3 client made as Devvit makes it: the SDK's own client with its retry
-// and signing steps, a step that fills in the bucket, and a request handler
-// that answers each request with `status` and keeps the request.
+// An S3 client built as Devvit builds it, with a handler that answers `status` and keeps the request.
 function devvitLikeClient(status, requests, clock = null) {
   const client = new S3Client({
     region: "us-east-1",
@@ -159,8 +157,7 @@ describe("Devvit S3 client in the store", () => {
   });
 
   it("sends at most 40 requests in any second, on a clock whose waits end early or late", async () => {
-    // A virtual clock: time moves only when nothing else can run, to the
-    // earliest wait. Waits end up to 2 ms early or 5 ms late.
+    // Virtual clock: time jumps to the earliest wait when idle; waits end up to 2 ms early or 5 ms late.
     const jitter = [-2, 5, 0, -1, 3, -2, 1, 4];
     let nowMs = 0;
     let turn = 0;

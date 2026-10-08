@@ -534,8 +534,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         context.campaignBootstrap = loaded ? bootstrap : null;
         context.handleCampaignWin({ lapTime: 10_000 });
 
-        // Local medal data is provisional; the real win path must reserve the
-        // action even when it cannot determine the server's eventual medal.
+        // Local medals are provisional, so the win path reserves the action without the server's medal.
         const [, , stats, actions] = context.modal.showModal.mock.calls[0];
         expect(stats.lapMedal).toBeNull();
         expect(actions.nextRace).toMatchObject({ label: 'Results', enabled: false, replaceMenu: true });

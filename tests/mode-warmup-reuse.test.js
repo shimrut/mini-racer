@@ -14,8 +14,7 @@ import { PREPARATION_SLOTS, plainRaceChallenge } from '../game/track/race-prepar
 import { clearStoredTrackChecksForTests } from '../game/track/stored-track-service.js';
 import { clearStoredTracksForTests, registerStoredTrack } from '../game/track/stored-tracks.js';
 
-// Rendering is independent of contract reuse. Keep real definition loading,
-// preparation matching and HTTP services while replacing the canvas build.
+// Replace only the canvas build; definitions, preparation matching and HTTP stay real.
 vi.mock('../game/track/assets.js', () => ({
     getTrackRuntimeAsset: vi.fn((trackKey, track) => ({ trackKey, track })),
     getTrackCanvasAsset: vi.fn((trackKey, track) => ({ canvas: { trackKey, track }, origin: { x: 0, y: 0 } })),
@@ -277,8 +276,7 @@ describe('completed mode warmup reuse', () => {
         expect(engine.campaignBootstrap.progress.resultsByRaceId[stage.raceId]).toBeDefined();
         expect(engine.campaignVerifiedBootstrap.progress.resultsByRaceId[stage.raceId]).toBeUndefined();
 
-        // A local rebuild must not promote the displayed pending time into the
-        // authoritative snapshot returned by the original server request.
+        // A local rebuild must not put the pending time into the server's snapshot.
         engine.qualityLevel = 2;
         await engine.activateMode('campaign');
         expect(engine.campaignVerifiedBootstrap.progress.resultsByRaceId[stage.raceId]).toBeUndefined();

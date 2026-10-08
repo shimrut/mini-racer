@@ -3,8 +3,7 @@ import { validateDailyGpReplayDetailed } from '../src/server/competition/replay-
 import { TRACKS } from '../game/track/tracks.js';
 import { driveAutopilot } from './helpers/autopilot.js';
 
-// Pinned before track grounds existed. A tarmac track must keep these exact
-// values, or saved replays drive differently on the server.
+// Pinned before grounds existed; tarmac must keep these exact values or saved replays drive differently.
 const GOLDEN_RUNS = [
     {
         trackKey: 'circuit', laps: 1, lapTime: 6.468003737943669, frames: 389, wallImpacts: 1,

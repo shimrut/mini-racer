@@ -383,8 +383,7 @@ describe("ghost compaction", () => {
     expect((await compaction.readGhostCompactionState()).steps.expired).toMatchObject({ checked: 10, packed: 10 });
   });
 
-  // A step the earlier code left running on its last page: its next Start is
-  // a new run, while a request may still work on the old one.
+  // A step left running on its last page: the next Start is a new run while a request may hold the old one.
   async function storeLegacyRunningStep(day, rows) {
     await redis.set(compaction.GHOST_COMPACTION_STATE_KEY, JSON.stringify({
       running: "expired",
@@ -458,8 +457,7 @@ describe("ghost compaction", () => {
     expect((await compaction.setGhostCompactionStep("start", "expired", NOW)).steps.expired.runId).toBe(2);
   });
 
-  // The first Redis request that carries the packed-write switch fails before
-  // anything in it is saved: a plain write, or a transaction that holds it.
+  // The first request carrying the packed-write switch fails before saving anything.
   function failFirstSwitchWrite() {
     let failed = false;
     const fail = () => {

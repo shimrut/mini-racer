@@ -455,8 +455,7 @@ describe("moving old Daily ghosts to blob storage", () => {
   });
 
   it("passes over old days without ghosts, so a one-day trial moves a day that has them", async () => {
-    // The oldest day has no ghost hash, the next only a best time without a
-    // ghost; the third and fourth hold real ghosts.
+    // Day 1 has no ghost hash, day 2 a ghostless best, days 3 and 4 real ghosts.
     const noRuns = DAY_ID;
     const noGhost = await storeDay("2026-09-21");
     const firstReal = await storeDay("2026-09-22");
@@ -811,8 +810,7 @@ describe("sweeping blob copies that no stub points to", () => {
       const page = await hScan(key, cursor, pattern, count);
       if (key === pbKey() && !moved) {
         moved = true;
-        // Read before the move: the page still shows the guest. Then the
-        // transfer copies the stub to the account and deletes the guest.
+        // The page still shows the guest; then the transfer copies the stub and deletes the guest.
         await redis.hSet(pbKey(), { [field("reddit:a")]: await redis.hGet(pbKey(), field("guest:a")) });
         await redis.hDel(pbKey(), [field("guest:a")]);
         await redis.incrBy(revisionKey(), 2);
@@ -1045,8 +1043,7 @@ describe("sweeping blob copies that no stub points to", () => {
     await runArchive(clock, blobs);
     expect(await runText("guest:late")).toBe(text);
 
-    // The next held upload fails to commit. The day asked for a sweep first,
-    // so a sweep runs, keeps the young copy, and comes back for it later.
+    // The next held upload fails to commit, so the sweep keeps the young copy and returns for it.
     redis.setBeforeExec((keys) => {
       if (keys.includes(pbKey())) redis.touch(pbKey());
     });

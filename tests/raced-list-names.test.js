@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
 
-// Freezes the stored names and the commands of the raced-board lists. The
-// names are written out in full, so a change to the name rules fails here
-// even when the code and its other tests change together.
+// Pins raced-list names and commands written out in full, so a name change fails even if code and tests move together.
 
 const redis = new RedisTestDouble();
 

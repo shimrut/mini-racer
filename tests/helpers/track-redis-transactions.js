@@ -1,7 +1,6 @@
 import { vi } from 'vitest';
 
-// Store tests share one Redis installation. WATCH observes strings/hashes;
-// queued writes are applied only after a successful ownership check.
+// One shared test Redis; WATCH sees strings and hashes, and queued writes apply only after the ownership check.
 export function installTrackRedisTransactions(redis, strings, hashes) {
     const observe = (key) => JSON.stringify([strings.get(key), [...(hashes.get(key) ?? new Map())]]);
     redis.watch = vi.fn(async (...keys) => {

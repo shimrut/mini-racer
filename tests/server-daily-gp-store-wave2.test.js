@@ -343,8 +343,7 @@ describe('server daily gp store wave 2', () => {
 
         const result = await persistServerDailyGpChallenge(challenger);
 
-        // The winner appears when the placement lock re-reads the history,
-        // so the challenger writes nothing.
+        // The lock re-read finds the winner, so the challenger writes nothing.
         expect(result).toEqual(winner);
         expect(mockRedis.hSetNX).not.toHaveBeenCalled();
     });

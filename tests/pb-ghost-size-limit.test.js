@@ -3,10 +3,7 @@ import { normalizePbGhostRecord } from '../game/ghost/pb-ghost.js';
 import { PB_GHOST_MAX_ENCODED_BYTES } from '../game/shared/pb-ghost-format.js';
 import { createPbGhostTraceRecorder, isValidPbGhostTrace } from '../src/server/competition/pb-ghost-trace.ts';
 
-// Freezes where the phone and the server put the ghost size limit, before the
-// two checks become one. The phone counts characters and the server counts
-// UTF-8 bytes. They give the same answer for text in plain English letters,
-// and a different answer for other letters near the limit.
+// Pins both ghost size limits before they merge: the phone counts characters, the server UTF-8 bytes.
 
 function smallTrace() {
     return {

@@ -210,8 +210,7 @@ describe('ground feel settings', () => {
         expect(tap({ ...dirt, slideScrub: 1 }).lostKph).toBeGreaterThan(tap(dirt).lostKph + 5);
     });
 
-    // Reaches top speed, then steers right for the given number of frames.
-    // Returns the widest slide angle, and how far the car goes to the side.
+    // Top speed, then right steering for `frames`; returns the widest slide angle and side distance.
     function holdTurn(ground, frames) {
         const { state, collisionSegments } = createReplaySimulationState(OPEN);
         let widestSlide = 0;
@@ -235,8 +234,7 @@ describe('ground feel settings', () => {
     });
 
     it('changes the line after a tap about as smoothly on grip as on tarmac', () => {
-        // Reaches top speed, taps right for 8 frames, then lets go. Returns
-        // the fastest turn of the car's line, in radians each second.
+        // Top speed, an 8-frame right tap, then release; returns the fastest line turn (rad/s).
         const fastestLineTurn = (ground) => {
             const { state, collisionSegments } = createReplaySimulationState(OPEN);
             let fastest = 0;
@@ -277,8 +275,7 @@ describe('snow driving', () => {
         // Snow speeds up as fast as dirt. Less grip and a lower top speed make it slower.
         expect(snow.accel).toBeLessThanOrEqual(dirt.accel);
 
-        // The snow track. On the short Classic Circuit, the autopilot laps snow
-        // a little faster than dirt.
+        // On the short Classic Circuit the autopilot laps snow a little faster than dirt.
         const track = TRACKS.snowCircuit;
         const tarmacRun = driveAutopilot({ ...track, ground: 'tarmac' });
         const dirtRun = driveAutopilot({ ...track, ground: 'dirt' });

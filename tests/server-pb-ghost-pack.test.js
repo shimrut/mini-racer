@@ -15,8 +15,7 @@ import { classifyStoredPbRecordFor } from "../src/server/competition/pb-ghost-st
 import { createTrackFingerprint } from "../src/server/competition/pb-ghost-trace.ts";
 import { toCampaignCompetition } from "../src/server/competition/competition.ts";
 
-// A ghost the way the game records one: the test autopilot drives the track,
-// and the game's own recorder samples the car.
+// A real recorded ghost: the autopilot drives and the game's recorder samples.
 function recordedGhost(stage) {
   const track = TRACKS[stage.trackKey];
   const run = driveAutopilot(track, { laps: stage.lapCount });

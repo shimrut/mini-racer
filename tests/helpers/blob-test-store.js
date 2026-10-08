@@ -1,8 +1,6 @@
 import { BlobListTokenRejectedError } from "../../src/server/blob/blob-store.ts";
 
-// An in-memory blob store with the shape of the server's BlobStore. Tests can
-// make calls fail, stall, return other bytes, or refuse a listing token.
-// Listings are in key order, as S3 lists them.
+// In-memory BlobStore that can fail, stall, alter bytes or refuse a token; lists in key order like S3.
 export function createBlobTestStore({ now = () => Date.now() } = {}) {
   const objects = new Map();
   const calls = [];

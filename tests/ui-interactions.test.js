@@ -154,9 +154,7 @@ function withSteering({ touchEvents = true } = {}, run) {
             onRightDown: () => { steer.right = true; },
             onRightUp: () => { steer.right = false; },
         });
-        // The browser sends a touch event to the element where the finger
-        // first touched, then to the page. `down` lists the fingers that the
-        // browser thinks are down after the event.
+        // Touch events go to the first-touched element, then the page; `down` is the browser's fingers after it.
         const touch = (button, type, id, down) => {
             const event = {
                 changedTouches: [{ identifier: id }],

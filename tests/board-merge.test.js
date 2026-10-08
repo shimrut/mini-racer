@@ -126,8 +126,7 @@ describe('the writes of one board', () => {
         return commands;
     }
 
-    // The move of old Daily ghosts reads the revision to know that a day's rows
-    // changed, so a personal best copied alone must raise it too.
+    // The Daily ghost move reads the revision, so a PB copied alone must raise it too.
     it('raises the standings revision when it copies a personal best without an entry', async () => {
         const commands = await queued(boardMergeWrite(COMPETITION, ACCOUNT, null, 'pb'));
         expect(commands).toHaveLength(3);

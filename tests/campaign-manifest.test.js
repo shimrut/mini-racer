@@ -54,8 +54,7 @@ describe('Campaign manifest', () => {
     });
 
     it('lets players see only the series on a live ground', () => {
-        // A series is live only when the Creator makes it live. In the app
-        // data, only Numbers is live, whatever the grounds of the others.
+        // Only the Creator makes a series live; in app data only Numbers is, whatever its grounds.
         expect(CAMPAIGN_SERIES.map((series) => series.id)).toEqual(['numbered-v1']);
         expect(campaignHasSeriesChoice()).toBe(false);
         for (const id of ['dirt-v1', 'grip-v1', 'snow-v1']) expect(isAppCampaignSeriesLive({ id }), id).toBe(false);

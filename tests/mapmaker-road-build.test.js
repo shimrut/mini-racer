@@ -222,8 +222,7 @@ describe('road built from a saved road line', () => {
         const normal = ROAD_WIDTHS.find((entry) => entry.value === 'normal');
         const wide = ROAD_WIDTHS.find((entry) => entry.value === 'wide');
         const line = { ...track.roadLine, width: wide.width };
-        // Wall points where the wall turns: the race rounds each one by the
-        // corner setting, but never past 1/2.5 of the wall on either side.
+        // Wall turn points, rounded by the corner setting but never past 1/2.5 of either side.
         const cornerWalls = (road) => [road.outer, road.inner].flatMap((wall) => wall.flatMap((point, index) => {
             const prev = wall[(index - 1 + wall.length) % wall.length];
             const next = wall[(index + 1) % wall.length];

@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
 
-// Freezes how the Daily and the podium lookups find a lost post in the app's
-// own post list, before the two copies become one. A podium post and a Daily
-// post can name the same day. Daily posts made before 2026-09-08 have no post
-// type. Today the podium lookup checks the post type and the Daily lookup does
-// not, so a newer podium post of the same day wins the Daily lookup.
+// Pins how the Daily and podium lookups find a lost post before they merge.
+// Pre-2026-09-08 Daily posts have no type and only the podium lookup checks it, so a same-day podium wins.
 
 const redis = new RedisTestDouble();
 const { reddit } = vi.hoisted(() => ({

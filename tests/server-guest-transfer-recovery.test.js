@@ -118,8 +118,7 @@ describe("guest transfer record contract", () => {
     await seedTransferableGuest(guestPlayerId, redditPlayerId);
     await redis.set(accountKey, JSON.stringify({ campaignId: "numbered-v1", resultsByRaceId: {} }));
 
-    // The first write sets the marks; the second saves the inventory, which is
-    // captured only after the marks. No account write comes before it.
+    // Write 1 sets the marks, write 2 saves the inventory; no account write comes first.
     redis.failTransferRecordWriteAt = 2;
     vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(selectGuestProgress({
@@ -134,8 +133,7 @@ describe("guest transfer record contract", () => {
     expect(marked.sourceInventory).toBeUndefined();
     expect(JSON.parse(await redis.get(accountKey)).resultsByRaceId).toEqual({});
 
-    // The retry sets the marks again, then saves the inventory before it
-    // copies anything; the write after the Campaign copy fails.
+    // The retry resets marks and saves the inventory first; the write after the Campaign copy fails.
     redis.failTransferRecordWriteAt = redis.transferRecordWriteCount + 3;
     await expect(selectGuestProgress({
       guestPlayerId,

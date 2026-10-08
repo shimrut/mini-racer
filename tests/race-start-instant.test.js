@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// The race picture is built for real in the game; here a stand-in records
-// which track it was built for.
+// A stand-in records which track the race picture was built for.
 vi.mock('../game/track/assets.js', () => ({
     getTrackRuntimeAsset: vi.fn((trackKey) => ({
         trackKey,

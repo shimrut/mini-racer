@@ -96,8 +96,7 @@ describe("raced list fill", () => {
 
     await runRacedListFill(NOW_MS, 3);
     const first = await runRacedListFill(START_MS, 3);
-    // The budget is checked after each page, so a run ends after the page
-    // that reached it.
+    // The budget is checked after each page, so a run ends after the page that reached it.
     expect(first).toEqual({ status: "working", rows: 5 });
     expect(await isRacedListFillReady()).toBe(false);
 

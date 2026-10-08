@@ -170,8 +170,7 @@ describe('track presentation resolver', () => {
         expect(dirt.trackColor).not.toBe(tarmac.trackColor);
         expect(dirt.skidColor).not.toBe(tarmac.skidColor);
         expect(dirt.schematicRoadColor).not.toBe(tarmac.schematicRoadColor);
-        // Banks of earth take the place of the kerbs. The series mark still
-        // uses the dirt kerb colours.
+        // Earth banks replace kerbs; the series mark keeps the dirt kerb colours.
         expect(dirt.showCurbs).toBe(false);
         expect(dirt.bankColor).toBeTruthy();
         expect(dirt.bankWidth).toBeGreaterThan(0);

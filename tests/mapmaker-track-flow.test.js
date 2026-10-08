@@ -12,8 +12,7 @@ const TOP_SPEED = 15.5;
 
 const FLOWY = ['doubleCrest', 'anvilCircuit', 'sharkBite', 'ovenMitt', 'whistleRidge', 'safariCircuit'];
 
-// Tracks judged not flowy in play, and the rule each one misses. Winding Road and
-// Hook Loop were judged too, but they were reshaped after that on 2026-09-25.
+// Tracks judged not flowy and the rule each misses (Winding Road and Hook Loop were reshaped 2026-09-25).
 const NOT_FLOWY = {
     slateCircuit: 'flow-left-right',
     puppetMaster: 'flow-beat',

@@ -37,8 +37,7 @@ function buttonsByText(root, text) {
     return [...root.querySelectorAll('button')].filter((button) => button.textContent === text);
 }
 
-// The page dialog answers yes. Reddit's frame ignores window.confirm and
-// answers no, so a panel that still used it would stop.
+// The page dialog answers yes; Reddit's frame answers window.confirm with no, which would stop a panel.
 const confirm = vi.fn(async () => true);
 
 beforeEach(() => {

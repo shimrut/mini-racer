@@ -126,8 +126,7 @@ export function createReplaySimulationState(track, { trackKey = 'autopilot', lap
     };
 }
 
-// Steers toward a point a few samples ahead on the track centerline, and
-// records the key presses as a scoreboard replay.
+// Steers at a centerline point a few samples ahead and records the keys as a replay.
 export function driveAutopilot(track, {
     laps = 1,
     lookAhead = 6,

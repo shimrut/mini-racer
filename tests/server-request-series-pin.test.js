@@ -18,8 +18,7 @@ const { campaignProgressKey } = await import('../src/server/campaign/campaign-pr
 const { toCampaignCompetition } = await import('../src/server/competition/competition.ts');
 const { getCampaignStage } = await import('../game/campaign/manifest.js');
 
-// One-stage series on a built-in track. The order of the list is the order
-// that the published snapshot gives.
+// One-stage series on a built-in track, in snapshot order.
 function definition(id, trackKey) {
     return Object.freeze({
         id,

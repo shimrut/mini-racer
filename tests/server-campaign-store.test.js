@@ -1433,8 +1433,7 @@ describe('Campaign server store', () => {
                 .map(([key]) => key)
                 .filter((key) => String(key).includes(':submit-lock:')
                     || String(key).includes(':progress-lock:')));
-            // A progress lock for the guest and the account in each series. The
-            // merge takes no stage locks.
+            // One progress lock per player and series; the merge takes no stage locks.
             expect(renewedLockKeys.size).toBe(CAMPAIGN_SERIES.length * 2);
         } finally {
             vi.useRealTimers();

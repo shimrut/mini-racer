@@ -127,8 +127,7 @@ describe('a transfer loads the series list again after it blocks saving', () => 
         const guestPlayerId = 'guest:reload-guest-row';
         const redditPlayerId = 'reddit:reload-guest-row';
         await seedBoardRow('numbered-v1', getCampaignStage('numbered-v1-00'), guestPlayerId, 31234);
-        // The request took its list before Night was published, and the guest
-        // raced Night before the marks.
+        // The request listed series before Night was published; the guest raced Night before the marks.
         await publishNightInRedis();
         const guestNight = await seedBoardRow('night-v1', NIGHT_STAGE, guestPlayerId, 9000);
 

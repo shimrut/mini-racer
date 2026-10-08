@@ -584,8 +584,7 @@ const BUDGET_SEQUENTIAL_STEPS = 300;
 const BUDGET_LARGEST_WINDOW = 24;
 // The same fixture when the guest progress is kept (measured 905 / 387).
 const BUDGET_GUEST_KEPT_RPCS = 950;
-// One request of a 77-day history, 60 days of work at most (measured
-// 1,953 calls / 650 steps at most).
+// One request of a 77-day history does at most 60 days (measured: 1,953 calls, 650 steps).
 const BUDGET_LONG_HISTORY_REQUEST_RPCS = 2100;
 const BUDGET_LONG_HISTORY_REQUEST_STEPS = 700;
 const BUDGET_GUEST_KEPT_SEQUENTIAL_STEPS = 420;
@@ -692,8 +691,7 @@ describe("guest transfer cost and recovery", () => {
       if (keys.includes(lockKey) && !firstTransfer) {
         const realExec = transaction.exec;
         transaction.exec = async () => {
-          // The write passed its transfer check and holds its progress lock.
-          // The transfer sets its marks and records the guest data now.
+          // The write passed its transfer check and holds its lock; the transfer now sets marks and records.
           firstTransfer = selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" })
             .then(() => "completed", (error) => error);
           await firstTransfer;
@@ -728,8 +726,7 @@ describe("guest transfer cost and recovery", () => {
     const realSet = RedisTestDouble.prototype.set;
     redis.set = async function transferBeforeProgressWrite(key, value, options) {
       if (key === lockKey && !transfer) {
-        // The save wrote its board row and let go of its stage lock. The
-        // whole transfer runs before the save writes its progress.
+        // The save wrote its board row and freed its stage lock; the transfer runs before its progress write.
         await new Promise((resolve) => setTimeout(resolve, 0));
         transfer = selectGuestProgress({ guestPlayerId, redditPlayerId, choice: "guest" });
         await transfer;
@@ -1541,9 +1538,7 @@ describe("guest transfer cost and recovery", () => {
     return calls;
   }
 
-  // Reads of a stage nobody raced, in the cost fixture: each read of the guest
-  // (3 calls) and of the account (3 calls). The one lock check (mGet) names
-  // every stage. A planned list of raced stages removes these reads.
+  // Reads of an unraced stage: 3 calls per player, plus one mGet lock check; a raced-stage list removes them.
   const UNRACED_STAGE_READS = { account: 6, guest: 15 };
 
   for (const choice of ["account", "guest"]) {

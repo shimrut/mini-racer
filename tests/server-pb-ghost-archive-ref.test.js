@@ -17,8 +17,7 @@ const REF = {
   sha256: "a".repeat(64),
 };
 
-// A record the way the ghost move leaves it: every field kept, the ghost
-// replaced by a reference to its copy in blob storage.
+// A record as the ghost move leaves it: every field kept, the ghost replaced by a reference.
 function stubText(ghostArchive = REF) {
   return JSON.stringify({
     schemaVersion: 2,

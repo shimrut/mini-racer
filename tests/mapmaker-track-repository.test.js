@@ -19,9 +19,7 @@ import {
     parseTrackCatalogSource,
 } from '../tools/mapmaker/track-repository.js';
 
-// Mini Rally is held back from players; these rules need a live dirt series.
-// Only Numbers is live from the app data. These tests need a second live
-// series, as if the Creator had made it live.
+// Mini Rally is held back, so a live dirt series is made here as the Creator would.
 vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
     ...(await importOriginal()),
     isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),
@@ -52,8 +50,7 @@ const REMOVABLE_SOURCE = CATALOG_SOURCE
     .replace("    'sunlitTemple',", "    'sunlitTemple',\n    'newHarborRun',");
 const MEDAL_ROW = { author: 9.5, gold: 9.74, silver: 10.02, bronze: 10.34 };
 
-// Formula Mini stays not live until it has 2 stages. The other series are live
-// from their first stage.
+// Formula Mini goes live at 2 stages; other series at their first.
 function seriesSource(
     numbersStages = [{ trackKey: 'numberZero', laps: 2, requiredMedals: 0 }],
     dirtStages = [],
@@ -477,8 +474,7 @@ describe('Mapmaker Campaign series rules', () => {
     });
 
     it('moves a stage in a series that is not live, and keeps each medal target in place', async () => {
-        // With the current rules a series with 2 stages is live, so its order is fixed.
-        // This checks the move under a rule that keeps a series hidden until 10 stages.
+        // Uses a 10-stage live rule, because a 2-stage series is already live and fixed.
         vi.resetModules();
         vi.doMock('../game/campaign/series-rules.js', async (importOriginal) => ({
             ...(await importOriginal()),

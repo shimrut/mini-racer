@@ -9,8 +9,7 @@ import {
 import { SettingsUi } from '../game/settings/ui.js';
 import { filterVisibleMenuItems } from '../game/ui/menu-keyboard-nav.js';
 
-// Quick Restart is held back: the Settings row is hidden and the game treats
-// it as off, but the saved choice stays.
+// Quick Restart is held back: row hidden, treated as off, saved choice kept.
 
 function mountRow() {
     document.body.innerHTML = `

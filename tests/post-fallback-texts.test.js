@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { postFallbackTexts } from '../src/server/posts/post-fallback-texts.ts';
 
-// Old Reddit posts keep the replay in one of many text shapes. These cases
-// fix the texts that the reader finds, and their order.
+// Pins which texts the reader finds in old post shapes, and their order.
 describe('post fallback texts', () => {
     it('reads nothing from a value that is not a post', () => {
         expect(postFallbackTexts(null)).toEqual([]);

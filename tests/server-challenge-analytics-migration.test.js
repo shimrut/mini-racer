@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
 
-// Add the atomic hash increment/transaction operations this import uses,
-// without changing unrelated transfer-recording fixtures.
+// Adds the hash increment and transaction calls this import needs, leaving other fixtures alone.
 class MigrationRedis extends RedisTestDouble {
     async hSet(...args) {
         const result = super.hSet(...args);
@@ -58,8 +57,7 @@ class MigrationRedis extends RedisTestDouble {
                 }
                 if (this.beforeExec) await this.beforeExec(keys);
                 if (watched.some(([key, version]) => (this.versions.get(key) ?? 0) !== version)) return [];
-                // Apply the complete queued batch before yielding to another
-                // importer, matching EXEC's atomic visibility.
+                // Apply the whole batch before yielding, as EXEC does.
                 const result = await Promise.all(commands.map(([name, args]) => this[name](...args)));
                 if (this.loseAcknowledgementAt === this.execCount) {
                     this.loseAcknowledgementAt = null;

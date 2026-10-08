@@ -3,9 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// jsdom has no canvas; the pictures are drawn by the carousel code, tested elsewhere.
-// Only Numbers is live from the app data. These tests need a second live
-// series, as if the Creator had made it live.
+// jsdom has no canvas (pictures are tested elsewhere); a second series is made live as the Creator would.
 vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
     ...(await importOriginal()),
     isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),

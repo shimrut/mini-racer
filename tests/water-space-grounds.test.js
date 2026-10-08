@@ -46,8 +46,7 @@ const OPEN = {
     startAngle: 0,
 };
 
-// Drives in a straight line for `frames` frames, then steers right for
-// `steerFrames` frames and lets go for `afterFrames` frames.
+// Straight for `frames`, right for `steerFrames`, then released for `afterFrames`.
 function drive(ground, { frames = 600, steerFrames = 0, afterFrames = 0 } = {}) {
     const { state, collisionSegments } = createReplaySimulationState(OPEN);
     const step = () => updateSimulation(state, CONFIG.fixedDt, { ...CONFIG }, OPEN, collisionSegments, ground);
@@ -237,8 +236,7 @@ describe('jet ski and spaceship', () => {
         jetSki.renderFrame();
         for (let i = 0; i < 30; i += 1) jetSki.update(FRAME, { steer: 1 });
         jetSki.renderFrame();
-        // A right turn: the front of the handlebars and the rear end of the
-        // nozzle both swing to +y, the right side.
+        // A right turn swings the bar front and the nozzle rear to +y.
         for (const id of ['handlebar', 'nozzle']) {
             const [straight, turned] = probes[id].slice(-2);
             expect(straight, id).toBeCloseTo(0, 4);

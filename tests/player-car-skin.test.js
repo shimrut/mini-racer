@@ -180,8 +180,7 @@ describe('player car skin', () => {
         expect(labels.some((label) => /^(Mini|Cyber|Steam|Extra)\s/.test(label))).toBe(false);
     });
 
-    // Dirt is not live and the Formula cars are held back for now, so the
-    // garage has neither.
+    // Dirt is not live and Formula cars are held back, so the garage has neither.
     it('groups the skins of live grounds into Extra, MR, Cyberpunk and Steampunk garage sections without gaps', () => {
         expect(PLAYER_CAR_SKIN_SECTIONS.map((s) => s.id))
             .toEqual(['extra', 'mini', 'cyberpunk', 'steampunk']);

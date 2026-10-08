@@ -20,8 +20,7 @@ function deferred() {
     return { promise, resolve };
 }
 
-// Holds the next matching call. With captureFirst, the call reads Redis
-// first and answers late, as a slow reply does.
+// Holds the next matching call; captureFirst reads Redis first and answers late.
 function hold(method, match, { captureFirst = false } = {}) {
     const entry = { method, match, captureFirst, reached: deferred(), release: deferred() };
     holds.push(entry);
@@ -199,8 +198,7 @@ describe('the stored catalog', () => {
         ['the newer load finishes first', true],
         ['the older load finishes first', false],
     ])('never publishes an older picture from equal starting revisions: %s', async (_label, newerFirst) => {
-        // The review's case: two loads start at revision 1. One captures the
-        // old list; the other reads after a save and a Daily lock.
+        // Two loads at revision 1: one keeps the old list, the other reads after a save and a Daily lock.
         await tracks.saveStoredTrack('smallSteps', { track: { ...smallSteps, name: 'Small Steps' }, medalRow }, {
             username: 'ModOne', origin: 'migrated', trusted: true,
         });

@@ -4,12 +4,8 @@ import { validateDailyGpReplayDetailed } from '../src/server/competition/replay-
 import { TRACKS } from '../game/track/tracks.js';
 import { driveAutopilot } from './helpers/autopilot.js';
 
-// Records the server's full answer for runs it accepts and runs it must
-// reject, on tarmac tracks. The tarmac golden times fix the accepted time;
-// this recording also fixes the lap and checkpoint times, the ghost, and the
-// reason and the car state of each rejected run. A change to the race code or
-// to the replay check must keep every recording. To record again on purpose,
-// run this file with -u and read the diff first.
+// Records the server's full verdict for accepted and rejected tarmac runs; race or replay code changes must keep it.
+// To record again on purpose, run this file with -u and read the diff first.
 
 function challengeFor(trackKey, laps) {
     return {

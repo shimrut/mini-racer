@@ -6,8 +6,7 @@ import { getCarAssetUrlCandidates, PLAYER_SELECTABLE_CAR_ASSETS, STOCK_CAR_ASSET
 import { EXTRA_CAR_ASSETS } from '../game/car/car-unlock-policy.js';
 import { isDrawnCarAsset } from '../game/car/drawn-car-skins.js';
 
-// Every page link must point at a real file, wherever the page lives. A broken link does not
-// fail the build: the player sees a missing style, font, or car.
+// Every page link must reach a real file; the build does not fail on a broken one.
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');

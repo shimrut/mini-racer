@@ -1,6 +1,4 @@
-// A fixed live-ground list with Street and Dirt. The tests of the series code
-// mock the live grounds with this list, so they do not change when the game's
-// list changes. Use it as:
+// A fixed Street and Dirt live-ground list, so series tests do not follow the game's list. Use:
 // vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
 export const LIVE_GROUND_KEYS = Object.freeze(['tarmac', 'dirt']);
 

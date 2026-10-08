@@ -2,18 +2,12 @@ import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import saved from './fixtures/replay-posts-2026-09-27.json';
 
-// Reads replay posts that were saved on 2026-09-27 and are never made again.
-// The Head to Head envelope has not changed since 2026-08-08, and the podium
-// envelope since 2026-08-29, so these posts have the same form as the live
-// posts made since then. Each ghost was made by the game's own recorder. The
-// test does not encode anything: a new reader must read these same bytes.
-// Posts made before 2026-08-08 used the name MINIRACER-CHALLENGE-REPLAY-V1,
-// which the reader does not accept.
+// Replay posts saved 2026-09-27, in the live envelopes since 2026-08-08 (podium 08-29); a new reader must read them.
+// Posts before 2026-08-08 used MINIRACER-CHALLENGE-REPLAY-V1, which the reader refuses.
 
 const { reddit } = vi.hoisted(() => ({ reddit: { getPostById: vi.fn() } }));
 
-// Only Numbers is live from the app data. These tests need a second live
-// series, as if the Creator had made it live.
+// A second series is made live here as the Creator would.
 vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
     ...(await importOriginal()),
     isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),

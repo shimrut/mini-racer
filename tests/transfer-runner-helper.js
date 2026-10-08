@@ -1,5 +1,4 @@
-// The transfer passes its own fenced runner to each step. Tests that call a
-// step directly get the same kind of runner, fenced by one test lock.
+// Direct step calls get a fenced runner like the transfer's, fenced by one test lock.
 let nextLock = 0;
 
 export async function createTestTransferRunner() {

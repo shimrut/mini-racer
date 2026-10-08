@@ -252,8 +252,7 @@ describe('drawn car pictures', () => {
 
     it('turns the hub with its tire, and keeps the arms still', () => {
         const car = new DrawnCar(FORMULA_CAR, {}, { pixelsPerUnit: PPU });
-        // The rear end of the hub oval of the left front tire, and a point on
-        // the front arm, clear of the tire.
+        // The rear of the left front hub, and a front arm point clear of the tire.
         const hubEnd = [21.5, -18.6];
         const arm = [22, -12];
         const straightArm = pixel(car.sprite, ...arm);

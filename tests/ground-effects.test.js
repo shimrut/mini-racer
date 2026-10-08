@@ -197,8 +197,7 @@ describe('ground effects', () => {
             recordGroundEffects(engine, resolveTrackPresentation('circuit', { ground: 'dirt' }), CONFIG);
         }
         const gs = 40;
-        // The distances from the middle, and the widths, of the lines drawn in
-        // one colour: the grooves or the skid marks, not the shade lines.
+        // Offsets and widths of the one-colour lines (grooves or skids, not shade lines).
         const draw = (drawMarks, color) => {
             const widths = new Set();
             const halfWidths = new Set();

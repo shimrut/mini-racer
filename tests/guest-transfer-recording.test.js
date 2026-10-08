@@ -3,18 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RedisTestDouble } from './redis-test-double.js';
 import { decodeCompressedValue } from './helpers/redis-compressed-face.js';
 
-// Records what today's guest transfer stores, for a table of player cases.
-// Each case seeds a guest and an account, shows the choice screen, runs the
-// transfer the way the game does, and records every key the transfer
-// changed. A change to the transfer code must keep every recording the same.
-// To record again on purpose, run this file with -u, and read the snapshot
-// diff before you commit it.
+// Records every key the guest transfer changes for a table of player cases; code changes must keep them the same.
+// To record again on purpose, run this file with -u and read the snapshot diff before committing.
 
 const redis = new RedisTestDouble();
 
-// Mini Rally is held back from players; these tests need it live.
-// Only Numbers is live from the app data. These tests need a second live
-// series, as if the Creator had made it live.
+// Mini Rally is held back, so it is made live here as the Creator would.
 vi.mock('../game/campaign/series-rules.js', async (importOriginal) => ({
     ...(await importOriginal()),
     isAppCampaignSeriesLive: (series) => ['numbered-v1', 'dirt-v1'].includes(series?.id),
@@ -406,8 +400,7 @@ const CASES = {
     },
     'an early Campaign time without labels': async (g, a) => {
         await seedDays();
-        // Campaign rows saved from 2026-07-23 to 07-29 had a lapCount field and
-        // no completedLaps or check label.
+        // Campaign rows from 2026-07-23 to 07-29 had lapCount, but no completedLaps or check label.
         const stage = NUMBERS[0];
         const board = toCampaignCompetition(stage.seriesId, stage);
         await redis.hSet(board.entryHashKey, {
@@ -500,9 +493,7 @@ describe('guest transfer recordings', () => {
         })).toMatchObject({ bestTimeMs, lapCount, rulesRevision: 1 });
     });
 
-    // The move of old Daily ghosts leaves a record with `ghost: null` and a
-    // reference to the blob copy. A transfer must copy that text unchanged, so
-    // the account's record still points at the ghost.
+    // A moved-ghost record (`ghost: null` plus reference) must copy unchanged, so the account still finds the ghost.
     for (const choice of ['merge', 'account']) {
         it(`copies a moved ghost's record unchanged on an old day (${choice})`, async () => {
             const guestPlayerId = 'guest:recorded';
@@ -539,8 +530,7 @@ describe('guest transfer recordings', () => {
         });
     }
 
-    // A transfer that stops at any saved step, and then runs again, must end
-    // with the same stored data as a transfer that never stopped.
+    // Stopping at any saved step and running again must store the same data as one clean run.
     for (const [name, choice] of [
         ['both raced, the guest is faster', 'merge'],
         ['both raced, the guest is faster', 'account'],

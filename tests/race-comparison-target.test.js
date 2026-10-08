@@ -187,8 +187,7 @@ describe('leaderboard race comparison target', () => {
   });
 
   it('routes Daily and Campaign leaderboard starts through opponent-preserving entry points', async () => {
-    // The mode loader resolves the competition definitions before standings
-    // expose their interactive opponent rows.
+    // The mode loader resolves definitions before standings show opponent rows.
     await loadRaceDefinitions(['circuit', 'numberZero'], { requireConfirmation: false });
     const target = { displayName: 'Rival', bestTimeMs: 12_000, ghost };
     const dailyChallenge = {
