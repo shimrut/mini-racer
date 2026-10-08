@@ -39,6 +39,26 @@ the contrast with the new grounds and a phone steering fix.
    narrower, which makes them harder, not easier. New Street tracks are about 3% wider at the
    median. Budapest Run is the widest (4.77u) with round corners (5).
 
+## Visual changes on Street
+
+Unchanged on Street: road, kerbs, tyre walls and background, skid marks, car shadow, camera,
+the speed bar, the on-screen car angle, and the old picture cars. Dirt, Snow, Water and Space
+effects (tyre tracks, spray, wall debris) do not appear on Street.
+
+The only new thing a Street player can see is the **drawn cars** (Formula and the other drawn
+Street cars, added with grounds on 2026-09-25):
+- The front wheels turn up to 24° with the steering and follow it within 0.06 s. The car looks
+  like it steers through the corner instead of sliding. This is the most likely visual cause.
+- The tires roll with the speed, and a brake light comes on when the car loses speed quickly.
+
+A player who kept an old picture car sees no visual change.
+
+## Reports by platform
+
+One Android, one iOS and one Windows (no touch screen) player. The phone fix explains Android
+and iOS. Windows steers by keyboard, which did not change, so that report is the drawn cars or
+the contrast with the looser grounds.
+
 ## Not checked
 
 Track shapes stored only in Redis (Creator edits, the live Daily list). They cannot be read from
