@@ -14,7 +14,7 @@ import {
 import { PREPARATION_SLOTS } from '../track/race-preparation.js';
 import { createPersonalBestPaceBaseline } from '../ghost/pb-pace.js';
 import { createModalActions, isNewBestResult } from '../race/result-flow.js';
-import { objectiveTypeForLapCount } from '../race/race-spec.js';
+import { permanentRaceChallenge } from '../race/race-spec.js';
 import {
     deriveCampaignProgress,
     getCampaignBootstrap,
@@ -71,20 +71,7 @@ function campaignTracksListPayload(engine) {
 }
 
 function toRaceChallenge(stage) {
-    return {
-        id: stage.raceId,
-        challengeDate: stage.challengeDate || 'Campaign',
-        trackKey: stage.trackKey,
-        startsAt: '1970-01-01T00:00:00.000Z',
-        endsAt: '9999-12-31T23:59:59.999Z',
-        availableUntil: '9999-12-31T23:59:59.999Z',
-        status: 'active',
-        rulesRevision: stage.rulesRevision,
-        objectiveType: objectiveTypeForLapCount(stage.lapCount),
-        objectiveParams: { lapCount: stage.lapCount },
-        skin: 'default',
-        mode: 'campaign',
-    };
+    return permanentRaceChallenge(stage, { mode: 'campaign', fallbackDate: 'Campaign' });
 }
 
 function getStoredCampaignStageMedal(bootstrap, raceId) {

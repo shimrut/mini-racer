@@ -44,3 +44,21 @@ export function normalizeRaceSpec(value) {
         objectiveType: objectiveTypeForLapCount(lapCount),
     });
 }
+
+// A Campaign stage or a Head to Head race, as a challenge that never ends.
+export function permanentRaceChallenge(stage, { mode, fallbackDate }) {
+    return {
+        id: stage.raceId,
+        challengeDate: stage.challengeDate || fallbackDate,
+        trackKey: stage.trackKey,
+        startsAt: '1970-01-01T00:00:00.000Z',
+        endsAt: '9999-12-31T23:59:59.999Z',
+        availableUntil: '9999-12-31T23:59:59.999Z',
+        status: 'active',
+        rulesRevision: stage.rulesRevision,
+        objectiveType: objectiveTypeForLapCount(stage.lapCount),
+        objectiveParams: { lapCount: stage.lapCount },
+        skin: 'default',
+        mode,
+    };
+}

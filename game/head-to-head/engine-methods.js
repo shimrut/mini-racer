@@ -21,7 +21,7 @@ import {
     cancelDeferredLobbyWork,
 } from '../lobby/deferred-work.js';
 import { createModalActions } from '../race/result-flow.js';
-import { objectiveTypeForLapCount } from '../race/race-spec.js';
+import { permanentRaceChallenge } from '../race/race-spec.js';
 import {
     isRetryableVerificationFailure,
     isVerificationQueueSubmissionBlocked,
@@ -125,20 +125,7 @@ export function resolveHeadToHeadHeldBest(engine, challenge) {
 }
 
 function toRaceChallenge(stage) {
-    return {
-        id: stage.raceId,
-        challengeDate: stage.challengeDate || 'Head to Head',
-        trackKey: stage.trackKey,
-        startsAt: '1970-01-01T00:00:00.000Z',
-        endsAt: '9999-12-31T23:59:59.999Z',
-        availableUntil: '9999-12-31T23:59:59.999Z',
-        status: 'active',
-        rulesRevision: stage.rulesRevision,
-        objectiveType: objectiveTypeForLapCount(stage.lapCount),
-        objectiveParams: { lapCount: stage.lapCount },
-        skin: 'default',
-        mode: 'challenge',
-    };
+    return permanentRaceChallenge(stage, { mode: 'challenge', fallbackDate: 'Head to Head' });
 }
 
 function showLoadedChallengeLobby(engine, challenge, extras = {}) {
