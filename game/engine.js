@@ -140,7 +140,6 @@ export class RealTimeRacer {
     this.carSpriteDrawHeight = 32;
     this.drawnCar = null;
     this.carSpriteLoader = new CarSpriteLoader();
-    this.carAssetPromise = Promise.resolve(this.carSprite);
     this.opponentCarSprite = createCarSprite();
     this.opponentCarSpriteLoader = new CarSpriteLoader();
     this.raceComparisonTarget = null;
@@ -220,8 +219,6 @@ export class RealTimeRacer {
     }
     this.lastPlayedDailyChallenge = null;
     this.currentChallengeRun = null;
-    this.trackMedalBeforeLastLapWrite = null;
-    this.hasTrackMedalBeforeLastLapWrite = false;
     this.sessionBestLapSecByTrackKey = Object.create(null);
     this.sessionBestCheckpointTimesByTrackKey = Object.create(null);
     this.dailyChallengeBestResult = null;
@@ -324,7 +321,6 @@ export class RealTimeRacer {
     this.runHadTimingAnomaly = false;
     this.rankedSubmissionBlockedReason = null;
 
-    this._previewPresentationOpId = 0;
     this.dailyChallengeUi = new DailyChallengeUi({
       previewQualityLevel: this.qualityLevel,
       previewFrameSkip: this.frameSkip,
@@ -449,7 +445,6 @@ export class RealTimeRacer {
     });
     this.modalContent = new ModalContentUi();
     this.trackReadyPromise = Promise.resolve(null);
-    this.fontsReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
     this.modal = new ModalShell({
       content: this.modalContent,
       getLeaderboards: () => this.leaderboards,
@@ -605,7 +600,6 @@ export class RealTimeRacer {
 
     this.playerHistoryPromise = null;
     this.dailyChallengePromise = Promise.resolve(null);
-    this.initialPbGhostAssetPromise = Promise.resolve(null);
     this.initialCampaignLaunchPromise = Promise.resolve(null);
     this.initialChallengeLobbyPromise = null;
 
@@ -922,7 +916,7 @@ export class RealTimeRacer {
   }
 
   async loadStartupGraphics(mode, { onContractPhase, onTrackPhase } = {}) {
-    this.carAssetPromise = this.syncCarSpriteAsset();
+    void this.syncCarSpriteAsset();
     const fontsReadyPromise = globalThis.document?.fonts?.ready;
 
     onContractPhase?.();
@@ -944,14 +938,14 @@ export class RealTimeRacer {
       this.loadStartupPlayer({ retry }),
     ]);
     if (mode === "daily") {
-      this.initialPbGhostAssetPromise = this.loadInitialPersonalBestGhostAsset();
+      void this.loadInitialPersonalBestGhostAsset();
       if (result?.id) {
         void getDailyChallengeSnapshot({ challengeId: result.id }).catch((error) => {
           console.error("Error loading the opening daily challenge standings:", error);
         });
       }
     } else if (mode === "campaign" && result?.stage) {
-      this.initialPbGhostAssetPromise = this.loadInitialCampaignPersonalBest?.(result.stage);
+      void this.loadInitialCampaignPersonalBest?.(result.stage);
     }
     return result;
   }
@@ -1176,7 +1170,7 @@ export class RealTimeRacer {
     if (this._secondaryStartupStarted) return;
     this._secondaryStartupStarted = true;
     const secondaryModes = selectModeSecondaryStartupTasks(this.launchTarget.mode);
-    this.dailyChallengeSummaryPromise = Promise.resolve()
+    void Promise.resolve()
       .then(() => {
         // A summary updates race context, so refresh it only for the visible
         // Daily. Home/background warming only populates definition/asset caches.

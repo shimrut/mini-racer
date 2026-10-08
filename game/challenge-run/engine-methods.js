@@ -265,8 +265,6 @@ export const challengeRunEngineMethods = {
 
     applyDailyChallenge(challenge) {
         this.activeDailyChallenge = challenge;
-        this.trackMedalBeforeLastLapWrite = null;
-        this.hasTrackMedalBeforeLastLapWrite = false;
         this.currentChallengeRun = this.createDailyChallengeRun(challenge);
         this.syncCurrentRunPolicy();
         this.setRuntimeConfig(null);
@@ -300,8 +298,6 @@ export const challengeRunEngineMethods = {
     },
 
     clearDailyChallengeRun() {
-        this.trackMedalBeforeLastLapWrite = null;
-        this.hasTrackMedalBeforeLastLapWrite = false;
         this.currentChallengeRun = null;
         this.activeDailyChallenge = null;
         this.dailyChallengeBestResult = null;

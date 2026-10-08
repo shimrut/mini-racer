@@ -652,8 +652,6 @@ export const dailyChallengeEngineMethods = {
 
   applyDailyChallenge(challenge) {
     this.activeDailyChallenge = challenge;
-    this.trackMedalBeforeLastLapWrite = null;
-    this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = this.createDailyChallengeRun(challenge);
     this.syncCurrentRunPolicy();
     this.setRuntimeConfig(null);
@@ -693,8 +691,6 @@ export const dailyChallengeEngineMethods = {
   },
 
   clearDailyChallengeRun() {
-    this.trackMedalBeforeLastLapWrite = null;
-    this.hasTrackMedalBeforeLastLapWrite = false;
     this.currentChallengeRun = null;
     this.activeDailyChallenge = null;
     this.dailyChallengeBestResult = null;
@@ -1198,8 +1194,6 @@ export const dailyChallengeEngineMethods = {
     const requiredLaps = getDailyChallengeRequiredLaps(challenge);
     const finishMedal = getMedalForRaceTime(challenge.trackKey, finalTime, requiredLaps);
     const previousTrackMedal = readTrackLastLapMedal(challenge.trackKey);
-    this.hasTrackMedalBeforeLastLapWrite = false;
-    this.trackMedalBeforeLastLapWrite = null;
     writeTrackLastLapMedal(challenge.trackKey, finishMedal);
     const lapMedal = readTrackLastLapMedal(challenge.trackKey);
     const isDailyBest = isNewBestResult(

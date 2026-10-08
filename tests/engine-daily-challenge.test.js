@@ -654,8 +654,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       bestLapTime: null,
       cachedSpeed: 0,
       rankedSubmissionBlockedReason: null,
-      hasTrackMedalBeforeLastLapWrite: false,
-      trackMedalBeforeLastLapWrite: null,
       sessionBestLapSecByTrackKey: {},
       sessionBestCheckpointTimesByTrackKey: {},
       hud: {
@@ -735,8 +733,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
         objectiveType: "single_lap_fastest",
       },
       currentTrackKey: "circuit",
-      trackMedalBeforeLastLapWrite: null,
-      hasTrackMedalBeforeLastLapWrite: false,
       _resetLapTrailAfterIntermediateLap: vi.fn(),
       updateDailyChallengeHud: vi.fn(),
       requestRender: vi.fn(),
@@ -767,9 +763,6 @@ describe("RealTimeRacer daily challenge modal payload", () => {
       requiredLaps: 1,
       isFinalLap: true,
     });
-
-    expect(engine.hasTrackMedalBeforeLastLapWrite).toBe(false);
-    expect(engine.trackMedalBeforeLastLapWrite).toBe(null);
 
     RealTimeRacer.prototype.handleDailyChallengeWin.call(engine, {
       lapTime: 5.1,
