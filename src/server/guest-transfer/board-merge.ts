@@ -6,18 +6,14 @@ import { queueRacedBoard } from '../player/raced-list.js';
 import type { RedisLockMutation } from '../redis/redis-lock.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 
-// One board in a guest transfer: a Campaign stage or a Daily day. Campaign
-// and Daily use the same rule, so that the faster time wins the same way.
+// One transfer board (Campaign stage or Daily day); both use the same faster-time rule.
 
 export type BoardShape = {
     trackKey: string;
     lapCount: number;
 };
 
-// A time counts on a board only if it fits the board: the same player, the
-// same track, and the board's lap count. A time saved before the lap count was
-// stored (Daily and Campaign rows from July 2026) has no lap count, and still
-// counts: the server checked it on the day it was driven.
+// A time counts only for the same player, track and lap count; July 2026 rows without a lap count still count.
 export function timeFitsBoard(
     entry: DailyGpLeaderboardEntry | null,
     board: BoardShape,
@@ -44,9 +40,7 @@ export type BoardMergeDecision = {
     guestPbWins: boolean;
 };
 
-// The faster fitting time wins; a tie keeps the account's time. The account's
-// own entry is written again when its ranking lost step with it, also on a
-// board the guest never raced.
+// The faster fitting time wins, a tie keeps the account's; an out-of-step account ranking is rewritten too.
 export function decideBoardMerge({
     board,
     guestPlayerId,
@@ -82,14 +76,8 @@ export function decideBoardMerge({
     return { guestEntryWins, entryToWrite, guestPbWins };
 }
 
-// The writes of one board, or null when the board needs none. It queues at
-// most 5 commands: an account entry is never a guest's, so writeEntry queues
-// 4 (with the raced list), and the personal best queues 1. A personal best
-// copied without an entry queues 3.
-//
-// Every write that changes a board's rows raises its standings revision.
-// writeEntry does it for an entry; a personal best copied alone does it here.
-// The move of old Daily ghosts reads the revision to know that a day changed.
+// One board's writes, or null; at most 5 commands (entry 4 with the raced list, PB 1; a PB alone 3).
+// Every row change raises the standings revision, which the Daily ghost move reads.
 export function boardMergeWrite(
     competition: Competition,
     redditPlayerId: string,

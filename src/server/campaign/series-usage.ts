@@ -1,8 +1,6 @@
 import { listAppSeriesDefinitions, listStoredSeries } from './series-store.js';
 
-// A track goes in one place only: the Daily list or one Campaign stage. This
-// finds the series that use a track: the stored series, and the app series
-// that no stored copy replaces.
+// A track has one place: the Daily list or one Campaign stage; finds the series that use it.
 export async function readSeriesTrackUse(): Promise<Map<string, string>> {
     const stored = await listStoredSeries();
     const storedIds = new Set(stored.map((series) => series.id));

@@ -24,14 +24,12 @@ export type CampaignRouteDependencies = {
     // The published Creator series, and the placed stored tracks among these keys.
     describeStoredSeries?(): readonly { stages: readonly { trackKey: string }[] }[];
     describeStoredTracks?(trackKeys: string[]): unknown[];
-    // Reads the catalog again after the answer is built, then loads the
-    // tracks that the answer names.
+    // Rereads the catalog after building the answer, then loads its tracks.
     refreshStoredCatalog?(): Promise<void>;
     loadStoredTracks?(trackKeys: string[]): Promise<void>;
 };
 
-// The Campaign answer carries the published Creator series and their stored
-// tracks, so the game can show them without a second request.
+// Includes published Creator series and their tracks, so no second request is needed.
 async function withStoredSeries(result: ServiceResult, dependencies: CampaignRouteDependencies): Promise<ServiceResult> {
     await dependencies.refreshStoredCatalog?.();
     const storedSeries = dependencies.describeStoredSeries?.() ?? [];

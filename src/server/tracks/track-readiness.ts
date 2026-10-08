@@ -12,8 +12,7 @@ export function getTrackCompletenessError(
     track: TrackShape, draftLoop: readonly Point[], medalRow: unknown, appTrackKey?: string,
 ): string | null {
     if (draftLoop.length || track.outer.length < 3 || track.inner.length < 3) return 'Finish the road.';
-    // Published app layouts predate some authoring heuristics. Admit their
-    // exact race contract, but recheck any edited shape or medal targets.
+    // Published app layouts predate some checks: admit their exact contract, recheck any edit.
     if (appTrackKey && matchesAppTrack({
         key: appTrackKey,
         track: normalizeTrackShape(track),
@@ -32,8 +31,7 @@ export function isBuiltInTrackComplete(trackKey: string): boolean {
     return Boolean(track) && !getTrackCompletenessError(track, [], (medalTimes as Record<string, unknown>)[trackKey], trackKey);
 }
 
-// Admission uses the current record, rather than the request's cached overlay
-// or the migration's trusted checks flag. All four raw medal times are needed.
+// Uses the current record, not a cache or trusted flag, and needs all four raw medal times.
 export async function readCompleteTrack(trackKey: string, username?: string) {
     const stored = await readStoredTrack(trackKey);
     if (username !== undefined) await assertCreatorTrackAccess(stored, username);

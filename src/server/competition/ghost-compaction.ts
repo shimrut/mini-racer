@@ -21,14 +21,8 @@ import {
 } from '../redis/redis-lock.js';
 import { isRedisTransactionConflict } from '../redis/redis-transaction-conflict.js';
 
-// Rewrites stored ghosts in the packed form, a moderator-started step at a
-// time, with progress on the Storage tab. A ghost is rewritten only when its
-// packed form unpacks to the same ghost, the row did not change since it was
-// read, and no sign-in owns its player. Nothing else in the row changes.
-//
-// Steps, in order: expired Daily days, then live Campaign stages, least played
-// first. Live Daily days are left out: each one expires within a week, and new
-// best times are saved packed once a step has started.
+// Moderator-run rewrite of stored ghosts in packed form; a row changes only if it unpacks the same and is unowned.
+// Steps: expired Daily days, then live Campaign stages, least played first; live Daily days expire on their own.
 
 export type GhostCompactionStepName = 'expired' | 'campaign';
 export const GHOST_COMPACTION_STEPS: readonly GhostCompactionStepName[] = ['expired', 'campaign'];
@@ -45,8 +39,7 @@ type Board = {
 };
 
 export type GhostCompactionStep = {
-    // Raised for every new run of the step, and kept on Resume. A request
-    // saves only into the run it started on.
+    // New per run and kept on Resume; a request saves only into the run it started on.
     runId: number;
     boards: Board[];
     index: number;
@@ -55,15 +48,12 @@ export type GhostCompactionStep = {
     checked: number;
     packed: number;
     savedBytes: number;
-    // Rows left as they were for a sign-in or a change, in this run, and on
-    // the current board. A board with such rows is read again by Run again.
+    // Rows skipped for a sign-in or change in this run and board; Run again rereads such boards.
     skipped: number;
     boardSkipped: number;
-    // Boards finished with no row skipped, in any run of this step, so a new
-    // run passes over them.
+    // Boards finished with no skipped row in any run, so a new run passes them.
     doneKeys: string[];
-    // False for a step saved before skipped rows were counted: its doneKeys
-    // may hide skipped rows, so its next Start reads every board again.
+    // False for steps saved before skip counting; their next Start rereads every board.
     skipTracked: boolean;
     startedAt: string | null;
     finishedAt: string | null;
@@ -147,12 +137,8 @@ export async function readGhostCompactionState(): Promise<GhostCompactionState> 
     return parseState(await redis.get(GHOST_COMPACTION_STATE_KEY));
 }
 
-// Changes the state in a transaction that watches it, so a change saved in
-// the meantime is never written over: `decide` gets the state as it is now and
-// returns the next one, or the same object to change nothing. It may refuse by
-// throwing; the watch is then dropped. With `turnOnPackedWrites`, the same
-// transaction also turns on packed best-time writes, so both are saved or
-// neither is.
+// Watched transaction: `decide` returns the next state (same object: no change; throw: refuse).
+// With `turnOnPackedWrites`, packed writes turn on in the same transaction.
 async function updateState(
     decide: (current: GhostCompactionState) => Promise<GhostCompactionState>,
     { turnOnPackedWrites = false }: { turnOnPackedWrites?: boolean } = {},
@@ -187,9 +173,7 @@ async function updateState(
     throw new Error('Ghost compaction changed meanwhile. Try again.');
 }
 
-// The text a row is stored with when its ghost is packed, or null when the
-// row holds no plain ghost, the ghost cannot be packed exactly, or packing
-// would not make the row smaller.
+// The packed row text, or null when there is no plain ghost, packing is inexact, or it saves no space.
 export function packedRunText(raw: unknown): string | null {
     if (typeof raw !== 'string' || !raw) return null;
     let value: Record<string, unknown>;
@@ -242,12 +226,7 @@ async function boardsFor(step: GhostCompactionStepName, nowMs: number, doneKeys:
 
 export type GhostCompactionAction = 'start' | 'pause';
 
-// Starts a step (or runs it again over boards it has not finished), or pauses
-// the running step. A step starts only after the steps before it finished
-// once, and never while another step runs. Every choice is made on the state
-// as it is when it is saved. Every Start that is not refused also turns on
-// packed best-time writes in the same transaction, a Start of a step already
-// running too, so a switch that a failed write left off is set again.
+// Starts, reruns or pauses a step in order, one at a time; each Start also turns packed writes on again.
 export async function setGhostCompactionStep(
     action: GhostCompactionAction,
     step: GhostCompactionStepName,
@@ -266,8 +245,7 @@ export async function setGhostCompactionStep(
             throw new GhostCompactionRefusal('Finish the step before this one first.');
         }
         const previous = current.steps[step];
-        // A step saved before skipped rows were counted starts again from the
-        // first board, even when it was paused part-way.
+        // A step saved before skip counting restarts from the first board.
         const resume = previous.skipTracked && Boolean(previous.startedAt && !previous.finishedAt);
         const doneKeys = previous.skipTracked ? previous.doneKeys : [];
         const boards = resume ? previous.boards : await boardsFor(step, now.getTime(), doneKeys);
@@ -301,8 +279,7 @@ export async function setGhostCompactionStep(
             updatedAt: now.toISOString(),
         };
     }, { turnOnPackedWrites: true });
-    // Every server reads packed ghosts by now; new best times are saved packed
-    // too. This server knows it only once the switch is saved.
+    // All servers read packed ghosts now; this one writes them once the switch is saved.
     notePackedGhostWritesOn(now.getTime());
     return next;
 }
@@ -328,9 +305,7 @@ function isOwnRun(state: GhostCompactionState, name: GhostCompactionStepName, ru
     return state.running === name && state.steps[name].runId === runId;
 }
 
-// True when a failed request's error describes the state: the failed step is
-// still in the run the request started on, and that step runs, or no step is
-// running. While another step runs, the error is only logged.
+// True when the error belongs to the running step of this request's run; otherwise it is only logged.
 function errorBelongsToState(state: GhostCompactionState, name: GhostCompactionStepName, runId: number): boolean {
     return state.steps[name].runId === runId && (state.running === null || state.running === name);
 }
@@ -339,10 +314,7 @@ class StepStoppedError extends Error {}
 
 type CommitResult = 'saved' | 'conflict' | 'stopped';
 
-// Saves the state with the given writes in one transaction that holds the
-// lock. After WATCH it reads the state again, so a pause or a new run saved
-// meanwhile is never written over: when the request's run is no longer
-// running, nothing is saved. `check` then decides the writes.
+// Saves under the lock in a watched transaction; if the run is no longer running, nothing is saved.
 async function commit(
     ctx: RunContext,
     name: GhostCompactionStepName,
@@ -399,9 +371,7 @@ function withStep(
     return { ...state, steps: { ...state.steps, [name]: change(state.steps[name]) } };
 }
 
-// Packs one group of rows. A row is rewritten only if it still holds exactly
-// the text that was read and no sign-in owns its player. A row left for a
-// sign-in, or one that changed and still holds a plain ghost, is skipped.
+// Packs a group of rows; a row that changed since the read or that a sign-in owns is skipped.
 async function packGroup(
     ctx: RunContext,
     name: GhostCompactionStepName,
@@ -447,8 +417,7 @@ async function packGroup(
     return { result, skipped };
 }
 
-// One page of the current board: pack its rows in groups, then save the scan
-// position. A page cut short is read again; rows already packed are skipped.
+// Packs one board page in groups, then saves the scan position; a cut page is reread and packed rows skipped.
 async function finishStep(ctx: RunContext, name: GhostCompactionStepName): Promise<void> {
     const result = await commit(ctx, name, (state) => withStep({ ...state, running: null }, name, (current) => ({
         ...current,
@@ -473,8 +442,7 @@ async function workPage(ctx: RunContext, name: GhostCompactionStepName): Promise
     const rows = page.fieldValues
         .map(({ field, value }) => ({ field, raw: value, next: packedRunText(value) }))
         .filter((row): row is { field: string; raw: string; next: string } => row.next !== null);
-    // Skipped rows are saved with the scan position, so a page cut short and
-    // read again counts them once.
+    // Saved with the scan position, so a reread page counts its skips once.
     let pageSkipped = 0;
     for (let index = 0; index < rows.length; index += GROUP_SIZE) {
         if (ctx.now() > ctx.deadlineMs) return false;
@@ -534,9 +502,7 @@ export async function runGhostCompaction({ now = () => Date.now() }: { now?: () 
         console.error('Ghost compaction failed:', error);
         const lastError = error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300);
         const failedStep = name;
-        // Only the error is added, and only when it describes the state now: a
-        // Pause saved meanwhile stays, a new run does not get an old run's
-        // error, and another running step does not get it either.
+        // Adds the error only if it still fits the state: a later Pause, new run or other running step keeps its state.
         if (failedStep) {
             await updateState(async (current) => (errorBelongsToState(current, failedStep, ctx.runId)
                 ? { ...current, lastError }

@@ -70,8 +70,7 @@ function gate(value: unknown): Gate {
     return { p1: point(input.p1), p2: point(input.p2) };
 }
 
-// Keeps only the fields a track uses, in the order of the track files, and
-// refuses values out of range. It does not run the track checks.
+// Keeps known fields in track-file order and refuses out-of-range values; no track checks.
 export function normalizeTrackShape(value: unknown, { maxNameLength = 80 } = {}): TrackShape {
     const trackInput = object(value);
     const byteLength = Buffer.byteLength(JSON.stringify(trackInput) ?? '', 'utf8');
@@ -125,9 +124,7 @@ function roadLineWidth(value: unknown, message: string): number {
     return value;
 }
 
-// The closed line and the road width that Draw built the walls from. A bend
-// can keep its own corner rounding, and its own road width up to the next
-// bend. Only the Creator reads it. The game and the race check use the walls.
+// The Draw road line and widths the walls came from; only the Creator reads it.
 export function normalizeRoadLine(value: unknown): RoadLine | null {
     if (value === undefined || value === null) return null;
     if (typeof value !== 'object' || Array.isArray(value)) {

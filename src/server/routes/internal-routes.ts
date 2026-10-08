@@ -401,8 +401,7 @@ export function registerInternalRoutes(
         }
     });
 
-    // Fills the raced lists once for rows stored before the lists existed.
-    // After the fill is done, each run only reads the ready record.
+    // Fills the raced lists once; after that a run only reads the ready record.
     app.post('/internal/scheduler/raced-list-fill', async (_req, res) => {
         try {
             const result = await dependencies.runRacedListFill();
@@ -413,9 +412,7 @@ export function registerInternalRoutes(
         }
     });
 
-    // Moves the ghosts of old Daily days to blob storage, as a moderator chose
-    // on the Storage tab of the analytics page. While the choice is Off, a run
-    // does nothing.
+    // Moves old Daily ghosts to blob storage as the moderator chose; Off does nothing.
     app.post('/internal/scheduler/daily-ghost-archive', async (_req, res) => {
         try {
             const result = await dependencies.runDailyGhostArchive();
@@ -426,8 +423,7 @@ export function registerInternalRoutes(
         }
     });
 
-    // Packs stored ghosts while a moderator has a compaction step running on
-    // the Storage tab. Otherwise a run only reads the state.
+    // Packs ghosts while a compaction step runs; otherwise only reads the state.
     app.post('/internal/scheduler/ghost-compaction', async (_req, res) => {
         try {
             const result = await dependencies.runGhostCompaction();

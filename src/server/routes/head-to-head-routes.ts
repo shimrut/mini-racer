@@ -74,8 +74,7 @@ function withRequestIdentity(
         guestToken: typeof input?.guestToken === 'string' ? input.guestToken : null,
     };
 }
-// A challenge on a track made in the Creator carries that track, so the game
-// can load it without a second request.
+// A Creator-track challenge carries its track, so no second request is needed.
 async function withStoredTracks(body: unknown, dependencies: HeadToHeadRouteDependencies): Promise<unknown> {
     if (!body || typeof body !== 'object' || !dependencies.describeStoredTracks) return body;
     const challenge = (body as { challenge?: { trackKey?: unknown } }).challenge;

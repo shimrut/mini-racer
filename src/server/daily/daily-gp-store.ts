@@ -203,24 +203,20 @@ type GuestProgressSelectionRecord = {
     cleanedDomains?: string[];
     dailyChallengeIds?: string[];
     dailyChallengeSpecs?: GuestTransferDailyChallengeSpec[];
-    // How many frozen days the current Daily step finished, while it works in
-    // pieces. Absent between steps.
+    // Frozen days the current Daily step finished; absent between steps.
     dailyStepDone?: number;
     sourceInventory?: GuestTransferSourceInventory;
     completedAt?: string;
 };
 
-// Keep account drops the guest's progress, and Merge keeps the faster time on
-// every board. 'guest' is the retired Keep guest, which runs as Merge.
+// Keep account drops guest progress; Merge keeps the faster time; 'guest' (retired Keep guest) runs as Merge.
 export type GuestTransferChoice = 'guest' | 'account' | 'merge';
 
 function isGuestTransferChoice(value: unknown): value is GuestTransferChoice {
     return value === 'guest' || value === 'account' || value === 'merge';
 }
 
-// Keep guest is retired: it deleted the account's results wherever the guest
-// had none. A request for it from an old game page, and a Keep guest transfer
-// that started before, both run as Merge, which loses nothing.
+// Keep guest deleted account results, so old requests and started transfers run as Merge instead.
 function runnableTransferChoice(choice: GuestTransferChoice): 'account' | 'merge' {
     return choice === 'account' ? 'account' : 'merge';
 }
@@ -248,8 +244,7 @@ type GuestTransferDailyChallengeSpec = {
 };
 
 type GuestTransferSourceInventory = {
-    // The Numbers progress record. It keeps this name so that transfers that
-    // started before there were series still compare.
+    // The Numbers progress record keeps its old name so older transfers still compare.
     campaignProgress: string;
     // The progress records of the other series. Older transfers have none.
     campaignSeriesProgress?: Record<string, string>;
@@ -707,12 +702,10 @@ export function parseStoredChallenge(raw: string | null | undefined): DailyGpCha
     }
 }
 
-// Transfer/history readers keep their pinned catalog. Player geometry readers
-// first discover contracts without dropping a key published after that pin.
+// Transfers keep their pinned catalog; geometry readers keep keys published after the pin.
 type DailyChallengeReadMode = 'pinned' | 'contract';
 
-// Loads the stored tracks that these Dailies race, in one read, before the
-// request reads their layout, name or medal times.
+// Loads these Dailies' stored tracks in one read, before any layout, name or medal read.
 async function loadChallengeTracks(challenges: readonly (DailyGpChallenge | null | undefined)[]): Promise<void> {
     await loadStoredTracks(challenges.map((challenge) => challenge?.trackKey));
 }
@@ -762,9 +755,7 @@ async function maintainChallengeHistory(now = new Date()): Promise<void> {
 const DAILY_COMMIT_ATTEMPTS = 5;
 const DAILY_COMMIT_RETRY_MS = 150;
 
-// Players who open a new Daily together all try to create it. One request
-// holds the placement lock and commits. The others wait, then return the
-// Daily that it committed. Only a committed Daily is returned.
+// One request creates a new Daily under the placement lock; others wait and return the committed Daily.
 async function commitDailyChallenge(challenge: DailyGpChallenge, dayIndex?: number): Promise<DailyGpChallenge> {
     for (let attempt = 1; ; attempt += 1) {
         const stored = await readStoredDailyGpChallenge(challenge.id);
@@ -778,8 +769,7 @@ async function commitDailyChallenge(challenge: DailyGpChallenge, dayIndex?: numb
     }
 }
 
-// History and a new stored track's freeze commit together. A failed write
-// leaves neither an orphan lock nor a playable, editable challenge.
+// History and the track freeze commit together, so a failure leaves no orphan lock or editable challenge.
 async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: number): Promise<DailyGpChallenge> {
     const result = await withTrackPlacementLock((lock) => commitTrackPlacement(
         [lock], [DAILY_GP_CHALLENGE_HISTORY_HASH_KEY], async () => {
@@ -809,8 +799,7 @@ async function placeDailyChallenge(challenge: DailyGpChallenge, dayIndex?: numbe
     ));
     await stampDailyCompetitionExpiry(result);
     await maintainChallengeHistory();
-    // The placement is committed. If the catalog cannot load now, the retry
-    // finds the stored Daily, and its answer confirms the catalog again.
+    // Committed; if the catalog cannot load now, the retry finds the stored Daily.
     await reloadPinnedCatalog();
     await loadChallengeTracks([result]);
     return result;
@@ -862,8 +851,7 @@ async function readStoredChallengeEntries(): Promise<DailyGpChallenge[]> {
     return entries;
 }
 
-// A scheduled track on a ground that players cannot see yet keeps its place.
-// The schedule skips it until its ground is live.
+// A track on a hidden ground keeps its slot; the schedule skips it until the ground is live.
 function isScheduleTrackLive(trackKey: string): boolean {
     return isLiveGround(getTrackGround(TRACKS[trackKey]).key);
 }
@@ -1003,12 +991,9 @@ async function readFinalPodiumPositions(
     return [positionAt(1), positionAt(2), positionAt(3)];
 }
 
-// A copied day queues at most 5 commands and a cleared day 4, so 4 days stay
-// under the budget of 24 commands for one transaction.
+// A copied day queues 5 commands and a cleared one 4, so 4 days fit the 24-command budget.
 const DAILY_DAYS_PER_TRANSFER_WRITE = 4;
-// A Daily step works on this many frozen days at a time, and one request does
-// at most DAILY_DAYS_PER_TRANSFER_REQUEST of them, so a request stays well
-// inside the client's 15-second wait.
+// Days per Daily step piece, capped per request to stay well inside the client's 15 s wait.
 const DAILY_DAYS_PER_TRANSFER_PIECE = 20;
 const DAILY_DAYS_PER_TRANSFER_REQUEST = 60;
 
@@ -1021,8 +1006,7 @@ function dailySubmissionLockKeys(
     ));
 }
 
-// Freezes the Daily days a transfer works on: the playable days it already
-// holds, and every day either player raced. Days stay in order, oldest first.
+// The transfer's Daily days: playable days it holds and every day either player raced, oldest first.
 async function freezeTransferDays(
     record: GuestProgressSelectionRecord,
     racedChallengeIds: readonly string[],
@@ -1037,9 +1021,7 @@ async function freezeTransferDays(
     record.dailyChallengeSpecs = challengeIds.map((challengeId) => specsById.get(challengeId)!);
 }
 
-// A race save takes its stage lock and then checks the transfer marks. After
-// the marks are set, a new save stops at that check, so the transfer only has
-// to find a save that took its lock before the marks: one read of every lock.
+// Saves check the marks after their lock, so the transfer reads every lock once to find earlier saves.
 async function ensureNoRaceSaveInFlight(
     playerIds: readonly string[],
     campaignRaceIds: readonly string[] | null,
@@ -1325,9 +1307,7 @@ async function readDailyGpPlaylist(
     return challenges;
 }
 
-// PB summaries intersect these contracts with their requested IDs before
-// confirming/loading tracks; another playable day's missing record cannot
-// block an otherwise valid PB request.
+// PB summaries use only the requested IDs, so another day's missing record cannot block them.
 export async function getServerDailyGpPlaylistContracts(
     now = new Date(),
     requestedIds?: readonly string[],
@@ -1389,8 +1369,7 @@ async function captureClassifiedGuestDailySource(
     };
 }
 
-// Moves the guest's Daily rows onto the account, keeping the faster time on
-// every day.
+// Moves guest Daily rows to the account, keeping the faster time per day.
 export async function mergeGuestDailyProgress({
     guestPlayerId,
     redditPlayerId,
@@ -1410,8 +1389,7 @@ export async function mergeGuestDailyProgress({
     }) => void | Promise<void>;
     recordedDailyChallengeIds?: ReadonlySet<string>;
     transactionRunner: RedisLockTransactionRunner;
-    // Checks the guest's rows for damage before any write, so a damaged row
-    // stops the transfer for review instead of being dropped.
+    // Checks guest rows before any write, so a damaged row stops the transfer instead of being dropped.
     classifySource?: boolean;
 }): Promise<{ merged: boolean; mergedChallengeIds: string[] }> {
     if (!guestPlayerId.startsWith('guest:') || !redditPlayerId.startsWith('reddit:')) {
@@ -1424,8 +1402,7 @@ export async function mergeGuestDailyProgress({
 
     await verifyGuestSource?.();
 
-    // Read every day at the same time. A day is taken only when one of the two
-    // players holds a row there, or when the transfer recorded it.
+    // Reads all days at once; takes a day only if a player holds a row there or the transfer recorded it.
     const days = await Promise.all(playlist.map(async (challenge) => {
         const competition = toDailyCompetition(challenge);
         const track = TRACKS[challenge.trackKey];
@@ -1514,9 +1491,7 @@ export async function mergeGuestDailyProgress({
     };
 }
 
-// Deletes a guest's Daily rows after a transfer copied them (cleanup) or when
-// the account keeps its own progress (discard). Only days where the guest
-// holds a row are touched, in groups.
+// Deletes guest Daily rows in groups (cleanup or discard), only on days the guest holds a row.
 async function clearGuestDailyProgress({
     guestPlayerId,
     challengeIds,
@@ -1600,9 +1575,7 @@ async function readProgressEvidence(playerId: string, dailyPlaylist: DailyGpChal
         : initialCampaign;
     const campaignResults = Object.keys(campaign.resultsByRaceId).length;
     const campaignUnlockedTracks = getCampaignUnlockedRaceIds(campaign.resultsByRaceId).length;
-    // Once the raced lists are complete, count every Daily day the player
-    // raced, archived days too. The list only grows, so a day whose rows were
-    // removed since still counts.
+    // With complete raced lists, count every raced day, archived or emptied too; the list only grows.
     const listed = await readTransferBoards([playerId]);
     const [dailySavedResults, carUnlocks] = await Promise.all([
         listed
@@ -1651,8 +1624,7 @@ async function guestHoldsTransferableProgress(
     }
     if (await hasCarUnlockProgress(guestPlayerId)) return true;
     if ((await readPlayerProfile(guestPlayerId))?.hasAnyData) return true;
-    // Once the raced lists are complete, they name every board the guest can
-    // hold a row on, archived Daily days too.
+    // Complete raced lists name every board the guest can hold a row on, archived days too.
     const listed = await readTransferBoards([guestPlayerId]);
     const listedStages = listed ? new Set(listed.campaignRaceIds) : null;
     const boards = [
@@ -1769,8 +1741,7 @@ function resumableRecordState(
 ): 'resume_required' | 'recovery_required' {
     if (record.phase === 'recovery_required') return 'recovery_required';
     if (!hasReplacementRemaining(record)) return 'resume_required';
-    // A transfer that set its marks but copied nothing yet captures its
-    // inventory on the next try.
+    // A transfer with marks but no copy yet captures its inventory on the next try.
     if (record.version === 4 && record.phase === 'preparing' && record.completedDomains.length === 0) {
         return 'resume_required';
     }
@@ -2374,8 +2345,7 @@ export async function selectGuestProgress({
             && !TRANSFER_COMPLETION_DOMAINS.every(
                 (domain) => currentRecord?.completedDomains?.includes(domain),
             );
-        // A new inventory is captured only after the marks are set, below, so
-        // no race can change the guest's rows between the capture and the copy.
+        // Capture only after the marks, so no race changes the guest's rows before the copy.
         const recaptureInventory = replacementRemaining
             && (preparing || !isValidSourceInventory(currentRecord?.sourceInventory));
         const sourceInventory = recaptureInventory ? undefined : currentRecord?.sourceInventory;
@@ -2413,18 +2383,14 @@ export async function selectGuestProgress({
             reportedPhase = 'preparing';
             await saveRecord(record, { markPending: true });
         }
-        // A save that passed its mark check took its series list before the
-        // marks. So a list loaded now knows every stage that either player
-        // can hold a row on. The rest of this request keeps that list.
+        // Saves past the mark check took their series list first, so a list loaded now covers every stage.
         try {
             await reloadPinnedCatalog();
         } catch (error) {
             console.error('Guest progress transfer could not load the series list:', error);
             throw new GuestProgressSelectionRetryableError('The tracks could not load. Try again.');
         }
-        // After the marks no new race can start, so the raced lists hold every
-        // board either player can have a row on. Without complete lists, the
-        // transfer works on every Campaign stage and the playable Daily days.
+        // No race starts after the marks, so complete raced lists cover every board; else use all stages and days.
         const transferBoards = await readTransferBoards([guestPlayerId, redditPlayerId]);
         const campaignRaceIds = transferBoards?.campaignRaceIds ?? null;
         await ensureNoRaceSaveInFlight(
@@ -2518,8 +2484,7 @@ export async function selectGuestProgress({
                         campaignStages: await captureCampaignStageEvidence(guestPlayerId, campaignRaceIds),
                     };
                 } else if (domain === 'daily') {
-                    // A piece checks its own days; the other days keep their
-                    // recorded rows, so only the piece can differ.
+                    // Only this piece's days can differ; other days keep their recorded rows.
                     evidence = {
                         daily: {
                             ...record.sourceInventory.daily,
@@ -2542,9 +2507,7 @@ export async function selectGuestProgress({
             }
         );
         await saveRecord(record, { markPending: true });
-        // A Daily step goes through the frozen days in pieces. When this
-        // request did its share and days remain, it saves its position and
-        // asks the client to continue the same transfer.
+        // When this request's share is done and days remain, save the position and ask the client to continue.
         let dailyDaysThisRequest = 0;
         const runDailyInPieces = async (
             step: (
@@ -2573,8 +2536,7 @@ export async function selectGuestProgress({
             delete record.dailyStepDone;
         };
         if (copiesGuestProgress(choice)) {
-            // Merge keeps the faster time on each board. It checks the guest's
-            // rows for damage first, so a damaged row stops for review.
+            // Merge keeps the faster time per board, after checking guest rows for damage.
             await confirmSelectionOwnership();
             if (!record.completedDomains?.includes('campaign')) {
                 await timed('campaignMs', () => mergeGuestCampaignProgress({

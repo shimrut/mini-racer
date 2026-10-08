@@ -10,9 +10,7 @@ import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-pl
 import { findSeriesUsingTrack as readSeriesUsingTrack } from '../campaign/series-usage.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
 
-// The Daily list: the order in which tracks become the Daily. The app has a
-// built-in list. After a moderator saves a list in the Creator, the Daily
-// reads the stored list, so a new track needs no release.
+// The Daily track order: the app list until a moderator saves one in the Creator, so new tracks need no release.
 
 export type DailySchedule = {
     keys: string[];
@@ -69,8 +67,7 @@ export async function readDailySchedule(): Promise<DailySchedule> {
     };
 }
 
-// The track keys that the Daily picks from, in order. A key that the game
-// does not know is left out, so a bad list cannot stop the Daily.
+// The Daily track keys in order; unknown keys are dropped so a bad list cannot stop the Daily.
 export async function readDailySchedulePool(): Promise<string[]> {
     const { keys } = await readDailySchedule();
     const known = keys.filter((trackKey) => hasTrack(trackKey));
@@ -81,8 +78,7 @@ export async function isTrackInDailySchedule(trackKey: string): Promise<boolean>
     return (await readDailySchedule()).keys.includes(trackKey);
 }
 
-// Puts back the app Daily list. Only the undo of the first copy uses this,
-// and only while `canRestore` accepts the stored list.
+// Restores the app list; only the first copy's undo uses it, while `canRestore` accepts the stored list.
 export async function restoreAppDailySchedule(
     canRestore: (schedule: DailySchedule) => boolean,
 ): Promise<'restored' | 'app' | 'kept'> {
@@ -102,8 +98,7 @@ export type SaveDailyScheduleOptions = {
     baseRevision?: unknown;
     // The Campaign series that uses a track, if any. Such a track cannot be a Daily.
     findSeriesUsingTrack?: (trackKey: string) => Promise<string | null>;
-    // The track of the latest Daily. The next Daily comes after it, so the
-    // list must keep it.
+    // The latest Daily's track; the next Daily follows it, so the list must keep it.
     currentTrackKey?: string | null;
     now?: Date;
 };

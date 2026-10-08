@@ -15,9 +15,7 @@ export async function resolveMenuTargetSubredditName(targetId: string): Promise<
         : null;
 }
 
-// Every Creator request checks the moderator, and the moderator list costs two
-// calls to Reddit. The list is shared for a few minutes, so a moderator added
-// or removed on Reddit counts here within that time. A failed read is not kept.
+// The moderator list costs two Reddit calls, so it is shared for a few minutes; failed reads are not kept.
 const MODERATOR_LIST_TTL_SECONDS = 5 * 60;
 
 async function readModeratorNames(subredditName: string): Promise<string[]> {

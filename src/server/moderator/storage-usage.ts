@@ -62,8 +62,7 @@ const SAMPLED_TRACKS = 60;
 const READ_CONCURRENCY = 8;
 const SORTED_SET_SCORE_BYTES = 8;
 const STORAGE_USAGE_CACHE_TTL_SECONDS = 5 * 60;
-// Daily boards are kept for the archive, so their number only grows. The
-// ghost and leaderboard families measure a spread of stored days and scale up.
+// Daily boards only grow; ghost and leaderboard families sample a spread of days and scale up.
 const SAMPLED_DAILY_DAYS = 60;
 
 export type StorageUsageGroup = {
@@ -273,8 +272,7 @@ function mergeGroupParts(parts: readonly StorageUsageGroup[]): StorageUsageGroup
     return [...merged.values()];
 }
 
-// Every stored Daily day, oldest first; the analytics window if the day list
-// cannot be read.
+// Every stored Daily day, oldest first, or the analytics window if the list cannot be read.
 async function readStoredDailyChallengeIds(fallback: readonly string[]): Promise<string[]> {
     try {
         const ids = (await redis.hKeys(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY))
@@ -327,8 +325,7 @@ const TRACKS_GROUP = {
     detail: 'Every track saved in the Creator or copied from the app: shape, medal times and checks',
 } as const;
 
-// The track list names every saved track. A spread of the track records is
-// measured and scaled up to all of them; the list itself is measured as usual.
+// Samples a spread of track records and scales to all; the list itself is measured as usual.
 async function measureTracks(): Promise<StorageUsageGroup> {
     let trackKeys: string[] = [];
     try {
@@ -473,9 +470,7 @@ function buildKeyGroups({
         detail: 'Standings order, the row behind each place, and the change counter',
     };
 
-    // A day whose ghosts moved holds small stubs, a day still moving holds
-    // both, and other days hold full ghosts. Each kind is sampled apart, so
-    // one kind cannot set the row size of another.
+    // Moved, moving and full-ghost days are sampled apart, so one kind cannot set another's row size.
     const ghostDayGroups = archiveDayStates
         ? [
             storedDays.filter((day) => archiveDayStates.get(day) === 'done'),
@@ -587,14 +582,8 @@ function readSubredditName(subredditName?: unknown): string {
     }
 }
 
-// The walk does not count these keys:
-// - Head to Head create locks, the 10-minute post identity, and share previews.
-//   They are short-lived, and no list names them.
-// - Locks, rate limits and share links. They are short-lived, and no list names them.
-// - Signed-out guest records. A guest is listed only after Campaign progress.
-// - The Creator's Campaign series, its Daily list, and the Copy tab reports.
-// - The ghost move's own small records: its day states, lists and totals.
-// Redis also adds its own overhead for each key and each row.
+// Not counted: short-lived locks, limits, links and H2H keys; signed-out guests; Creator data;
+// ghost-move records; Redis per-key overhead.
 async function walkStorage(subreddit: string, now: Date): Promise<StorageUsage> {
     const windowChallengeIds = analyticsRetentionWindow(now).dates.map((date) => createDailyChallengeId(date));
     const storedDailyChallengeIds = await readStoredDailyChallengeIds(windowChallengeIds);

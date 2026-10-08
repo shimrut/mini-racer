@@ -1,16 +1,8 @@
 import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 import { isValidPbGhostTrace, type PbGhostTrace } from './pb-ghost-trace.js';
 
-// A compact, lossless way to store a ghost in Redis and in blob storage. The
-// game never sees it: the server unpacks a ghost before it sends one.
-//
-// Layout (version 1), every number a variable-length integer:
-//   version, schemaVersion, sampleIntervalMs, finishTimeMs,
-//   origin x, origin y, origin angle, step count,
-//   then every x step, then every y step, then every angle step.
-// Each step is stored as its change from the step before, which is small for a
-// moving car. Signed numbers use zigzag. The bytes are brotli-compressed, then
-// written as base64, because a Redis value is text.
+// Lossless compact ghost for Redis and blob storage; the server unpacks it before sending.
+// v1: varint header, origin and step count, then x, y and angle deltas; zigzag, brotli, base64.
 
 const PACK_VERSION = 1;
 const BROTLI_QUALITY = 9;
@@ -128,8 +120,7 @@ function sameTrace(a: PbGhostTrace, b: PbGhostTrace): boolean {
         && Object.keys(a).length === 5;
 }
 
-// The packed form of a ghost, or null when the ghost cannot be packed without
-// a loss: a packed ghost is always unpacked once and compared before use.
+// The packed ghost, or null when packing is lossy; it is unpacked and compared before use.
 export function packPbGhostTrace(trace: unknown): string | null {
     if (!isValidPbGhostTrace(trace) || !fitsPacking(trace)) return null;
     const packed = encode(trace);
@@ -137,8 +128,7 @@ export function packPbGhostTrace(trace: unknown): string | null {
     return unpacked && sameTrace(trace, unpacked) ? packed : null;
 }
 
-// The ghost a stored run holds, in either form: the plain `ghost`, or a packed
-// `ghostPacked`. Null when it holds neither.
+// The run's ghost from `ghost` or `ghostPacked`, or null.
 export function storedRunGhost(value: Record<string, unknown> | null | undefined): PbGhostTrace | null {
     if (!value) return null;
     if (isValidPbGhostTrace(value.ghost)) return value.ghost;

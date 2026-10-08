@@ -64,16 +64,13 @@ function parseFillState(raw: string | null | undefined, finalStageId: string): F
             && state.cursor >= 0 && typeof state.scanned === 'boolean'
             && Array.isArray(state.pending) && state.pending.every((id: unknown) => typeof id === 'string')
             && (state.queued === undefined || (Array.isArray(state.queued) && state.queued.every((id: unknown) => typeof id === 'string')))
-            // Older builds persisted a rollout delay. Keep their cursor and
-            // retry work, but resume the inventory immediately.
+            // Old builds saved a rollout delay; keep their cursor and retry work, but resume now.
             ? { finalStageId, cursor: state.cursor, scanned: state.scanned,
                 pending: state.pending, queued: state.queued ?? [] } : null;
     } catch (_error) { return null; }
 }
 
-// Candidate reconciliation owns the same player progress lock and transfer
-// fences as online saves. false means retry later; it never loses that owner
-// by advancing a cursor after a busy save or account transfer.
+// Uses the same progress lock and transfer fences as saves; false means retry later, with the cursor kept.
 export async function runCampaignAggregateFill(
     seriesId: string, reconcile: (playerId: string) => Promise<boolean>,
 ): Promise<boolean> {
@@ -88,9 +85,7 @@ export async function runCampaignAggregateFill(
         const state: FillState = stored ?? {
             finalStageId: finalStage.raceId, cursor: 0, scanned: false, pending: [], queued: [],
         };
-        // Reserve part of the hard budget for fresh candidates, so one busy
-        // owner cannot starve later pages. HSCAN COUNT is only a hint: overflow
-        // stays in queued rather than causing an unbounded request.
+        // Reserve budget for fresh candidates so one busy owner cannot starve later pages; overflow stays queued.
         const hasNewWork = !state.scanned || state.queued.length > 0;
         const retry = state.pending.splice(0, hasNewWork ? Math.floor(FILL_PAGE_SIZE / 2) : FILL_PAGE_SIZE);
         if (!state.scanned && state.queued.length === 0) {
@@ -159,8 +154,7 @@ export async function readCampaignAggregateSnapshot({ seriesId, playerId, totalT
     const [page, rankZero, indexedTotal] = await Promise.all([
         readPage(seriesId, offset, limit), redis.zRank(keys.leaderboard, playerId), redis.zScore(keys.leaderboard, playerId),
     ]);
-    // Another accepted stage improvement may commit after the source repair.
-    // Its derived score is canonical too; pair the live place with that score.
+    // A newer stage improvement may commit after the repair; pair the live place with that score.
     const currentTotalTimeMs = Number.isSafeInteger(indexedTotal) && Number(indexedTotal) > 0
         ? Number(indexedTotal) : totalTimeMs;
     const playerRank = Number.isFinite(rankZero) ? Number(rankZero) + 1 : null;

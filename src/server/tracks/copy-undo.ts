@@ -15,11 +15,7 @@ import { matchesAppTrack } from './track-copy.js';
 import { runCopy } from './track-migration.js';
 import { listStoredTrackRecords, removeTrackCopy, type StoredTrackRecord } from './track-store.js';
 
-// Undo of a copy. The app still has every track and series until the release
-// that removes them, so an undo removes only Redis copies that are still
-// exactly the app version: players then race the same tracks from the app,
-// and saved times, ghosts and leaderboards stay valid. A copy that changed
-// since stays, and the report says why.
+// Undo removes only Redis copies still exactly the app version, so players race the same tracks; changed copies stay.
 
 export type CopyUndoKind = 'unplayed' | 'played-dailies' | 'live-campaign';
 
@@ -101,8 +97,7 @@ async function undoTracks(
     }
 }
 
-// The unplayed copy: the app Daily list first, then the hidden series
-// drafts, then each track copy that is not one of the locked copies.
+// The unplayed copy: app Daily list, then hidden series drafts, then unlocked track copies.
 async function undoUnplayed(report: CopyUndoReport): Promise<void> {
     const canRestore = (schedule: { keys: string[] }) => sameAsAppList(schedule.keys);
     const schedule = await readDailySchedule();
@@ -132,8 +127,7 @@ async function undoUnplayed(report: CopyUndoReport): Promise<void> {
         .filter((record) => record.origin === 'migrated' && isAppTrack(record.key)
             && !isLockedCopy(record, 'daily') && !isLockedCopy(record, 'series'))
         .sort((a, b) => a.key.localeCompare(b.key));
-    // A copy that a Daily locked since is still exactly the app track, so it
-    // can go too: players raced the same track.
+    // A copy a Daily locked since is still the exact app track, so it can go too.
     await undoTracks(report, records, (record) => record.origin === 'migrated'
         && !isLockedCopy(record, 'daily') && !isLockedCopy(record, 'series') && matchesAppTrack(record));
 }

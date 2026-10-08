@@ -123,8 +123,7 @@ const CAMPAIGN_TRANSFER_LOCK_RENEWAL_INTERVAL_MS = Math.max(
     1,
     Math.floor(CAMPAIGN_PROGRESS_LOCK_TTL_MS / 3),
 );
-// A copied stage queues at most 5 commands and a cleared stage 4, so 4 stages
-// stay under the budget of 24 commands for one transaction.
+// A copied stage queues 5 commands and a cleared one 4, so 4 stages fit the 24-command budget.
 const CAMPAIGN_STAGES_PER_TRANSFER_WRITE = 4;
 const CAMPAIGN_GUEST_CLEANUP_THROTTLE_SECONDS = 60;
 const CAMPAIGN_GUEST_CLEANUP_LIMIT = 10;
@@ -155,16 +154,14 @@ function competitionFor(stage: CampaignStage): Competition {
     return toCampaignCompetition(stage.seriesId, stage);
 }
 
-// The live stages named by `raceIds`, in stage order; every live stage when
-// `raceIds` is not given.
+// The live stages in `raceIds`, in stage order, or all live stages.
 function transferStages(raceIds?: readonly string[] | null): readonly CampaignStage[] {
     if (!raceIds) return CAMPAIGN_LIVE_STAGES;
     const named = new Set(raceIds);
     return CAMPAIGN_LIVE_STAGES.filter((stage) => named.has(stage.raceId));
 }
 
-// The race-save lock of every live stage, for each player. A transfer reads
-// them once to find a save that started before it set its marks.
+// Each live stage's race-save lock per player; a transfer reads them to find a save that started first.
 export function campaignSubmissionLockKeys(
     playerIds: readonly string[],
     raceIds?: readonly string[] | null,
@@ -230,8 +227,7 @@ function campaignResultFromEntry(
     entry: DailyGpLeaderboardEntry | null,
     expectedPlayerId: string,
 ): CampaignBestResult | null {
-    // The same rule as a guest transfer: an early time with no lap count or
-    // check label still counts.
+    // As in a guest transfer, an early time without a lap count or check label still counts.
     if (
         !timeFitsBoard(entry, stage, expectedPlayerId)
         || !Number.isSafeInteger(entry.bestTimeMs)
@@ -293,9 +289,7 @@ async function readProgress(playerId: string, seriesId: string): Promise<Campaig
 
 const STAGE_NUMBER_RE = /^\d{2,}$/;
 
-// Saved rows of this series whose stage the request's list does not know: a
-// stage published after the request took its list. They are not verified, so
-// they never count as progress, but a write keeps them as they are.
+// Rows for stages published after the request took its list: never progress, but writes keep them.
 function unknownStageRows(raw: string | null | undefined, seriesId: string): Record<string, unknown> {
     if (!raw) return {};
     let value: { campaignId?: unknown; resultsByRaceId?: unknown };
@@ -310,8 +304,7 @@ function unknownStageRows(raw: string | null | undefined, seriesId: string): Rec
     const kept: Record<string, unknown> = {};
     const prefix = `${seriesId}-`;
     for (const [raceId, row] of Object.entries(rows)) {
-        // A series name can start with another series name ("night" and
-        // "night-v1"), so the stage number must be all that follows.
+        // Series names can prefix each other ("night", "night-v1"), so the rest must be the stage number.
         if (!raceId.startsWith(prefix) || !STAGE_NUMBER_RE.test(raceId.slice(prefix.length))) continue;
         if (!row || typeof row !== 'object' || (row as { raceId?: unknown }).raceId !== raceId) continue;
         if (getCampaignStage(raceId)) continue;
@@ -334,8 +327,7 @@ async function readAllProgress(playerId: string): Promise<CampaignProgress[]> {
     return Promise.all(CAMPAIGN_SERIES.map((series) => readProgress(playerId, series.id)));
 }
 
-// The results of every series in one map. Stage IDs start with the series name,
-// so they never clash.
+// Results of every series in one map; stage IDs start with the series name, so they never clash.
 function mergeSeriesResults(
     progressList: readonly CampaignProgress[],
 ): Record<string, CampaignBestResult> {
@@ -352,8 +344,7 @@ export class CampaignProgressTransferPendingError extends Error {
     }
 }
 
-// The keys that show a transfer of this player: its marks, and for a guest
-// the account it went to.
+// Keys that show this player's transfer: its marks, and for a guest the target account.
 function transferStateKeys(playerId: string): string[] {
     return isGuestPlayerId(playerId)
         ? [guestProgressSelectionPendingKey(playerId), guestPromotionKey(playerId)]
@@ -372,8 +363,7 @@ async function writeProgressWithOwnedLock(
     transactionRunner?: RedisLockTransactionRunner,
     { unknownRows = {}, fenceTransfer = false }: {
         unknownRows?: Record<string, unknown>;
-        // A race write stops if a transfer of the player started. The check
-        // holds until EXEC: a transfer that starts later fails the commit.
+        // Stops if a transfer started; the check holds until EXEC, so a later transfer fails the commit.
         fenceTransfer?: boolean;
     } = {},
 ): Promise<void> {
@@ -410,8 +400,7 @@ async function writeProgressWithOwnedLock(
     if (isGuestPlayerId(playerId)) await extendOtherGuestSeriesBestEffort(playerId, progress.campaignId);
 }
 
-// Play in one series counts as play in all series: the guest's other series
-// records get the same expiry, so a guest who plays only Dirt keeps Numbers.
+// Play in one series renews the guest's other series records too.
 async function extendOtherGuestSeriesBestEffort(playerId: string, seriesId: string): Promise<void> {
     const otherKeys = CAMPAIGN_SERIES
         .filter((series) => series.id !== seriesId)
@@ -440,8 +429,7 @@ async function mutateProgress(
         const { progress: current, unknownRows } = await readProgressForWrite(playerId, seriesId);
         const next = await mutate(current);
         if (next === current) {
-            // Adopt retained complete progress and repair a lost derived row,
-            // even when there is no new source PB to save.
+            // Adopt retained progress and repair a lost derived row, even without a new PB.
             if (await campaignAggregateNeedsUpdate(playerId, seriesId, current.resultsByRaceId)) {
                 const transaction = await beginOwnedRedisLockTransaction(lock, redis, {
                     watchedKeys: transferStateKeys(playerId), check: () => assertNoProgressTransfer(playerId),
@@ -569,8 +557,7 @@ function latestTime(values: readonly (string | null)[]): string | null {
     return values.filter((value): value is string => typeof value === 'string').sort().at(-1) ?? null;
 }
 
-// The Campaign of one player over every series: the results of all series, the
-// first start and the last change.
+// A player's Campaign across all series: results, first start and last change.
 export type CampaignProgressSummary = {
     startedAt: string | null;
     resultsByRaceId: Record<string, CampaignBestResult>;
@@ -656,8 +643,7 @@ async function readCampaignStandingsByRaceId(playerId: string | null, seriesId: 
     return Object.fromEntries(entries);
 }
 
-// Loads the stored tracks of these stages, in one read, before the request
-// reads their layout or medal times.
+// Loads the stages' stored tracks in one read, before any layout or medal read.
 async function loadStageTracks(stages: readonly { trackKey: string }[]): Promise<void> {
     await loadStoredTracks(stages.map((stage) => stage.trackKey));
 }
@@ -694,18 +680,14 @@ async function repairCampaignProgressFromLeaderboard(
     };
     try {
         return await mutateProgress(playerId, seriesId, async (current) => {
-            // Entries may have committed a faster accepted PB before its
-            // progress save failed. Read them after taking the progress lock
-            // and keep the faster compatible evidence on every stage.
+            // A faster PB may have committed before its progress save failed; keep the faster evidence per stage.
             recoveredResults = await readRecoveredResults();
             await assertNoProgressTransfer(playerId);
             return withRecovered(current);
         });
     } catch (error) {
         if (!retryIfBusy && (error instanceof CampaignProgressBusyError || error instanceof CampaignProgressTransferPendingError)) {
-            // Existing bootstrap/sign-in summaries can project accepted board
-            // evidence while transfer owns the source. They persist nothing;
-            // aggregate adoption and rank access still require owned writes.
+            // Summaries may show board evidence while a transfer owns the source, but they save nothing.
             if (!recoveredResults.length) recoveredResults = await readRecoveredResults();
             return withRecovered(progress);
         }
@@ -713,9 +695,7 @@ async function repairCampaignProgressFromLeaderboard(
     }
 }
 
-// A completed share needs its saved medal distribution, without loading the
-// standings. Preserve the cheap complete-record path; missing rows recover
-// through the same compatible-entry repair as bootstrap.
+// A completed share needs only the saved medals; missing rows recover through the bootstrap repair.
 export async function getCampaignResultsForSeries(
     playerId: string,
     seriesId: string,
@@ -730,8 +710,7 @@ export async function repairCampaignStandingsFromEntries(
     playerId: string,
     seriesId: string | null = null,
 ): Promise<void> {
-    // A transfer owns the player's rows until it ends. Like a race save, the
-    // repair checks for one again after it takes each stage lock.
+    // A transfer owns the rows; as in a race save, the repair rechecks after each stage lock.
     if (await isProgressTransferPending(playerId)) return;
     const stages = seriesId ? getCampaignSeriesStages(seriesId) : CAMPAIGN_LIVE_STAGES;
     for (const stage of stages) {
@@ -786,8 +765,7 @@ export async function getServerCampaignBootstrap({
     guestToken?: unknown;
     seriesId?: unknown;
 } = {}) {
-    // Stage details (standings, ranks, repairs) cost 4 to 5 reads for each
-    // stage, so the bootstrap reads them for one series only.
+    // Stage details cost 4 to 5 reads each, so the bootstrap reads one series only.
     const requested = requestedSeriesId != null && requestedSeriesId !== '';
     const series = getCampaignSeries(requested ? requestedSeriesId : CAMPAIGN_NUMBERS_SERIES_ID);
     if (!series) {
@@ -955,8 +933,7 @@ async function removeRetiredAggregateCandidate(playerId: string, seriesId: strin
             },
         });
         if (!transaction) return false;
-        // The player may have raced and refreshed retention while this fill
-        // waited for its progress lock. Retry from its current source instead.
+        // The player may have raced while this fill waited; retry from the current source.
         if (!retired) {
             await transaction.discard();
             return false;
@@ -1007,9 +984,7 @@ async function retainCampaignAggregateGuestCandidate(
             await transaction.discard();
             return state;
         }
-        // Another series can refresh the shared guest retention while this
-        // series owns its progress lock. WATCH prevents inferred old evidence
-        // from overwriting that newer activity.
+        // Another series can renew the shared guest expiry meanwhile; WATCH stops old evidence overwriting it.
         await transaction.zAdd(CAMPAIGN_GUEST_EXPIRY_KEY, { member: playerId, score: inferredExpiry });
         return await commitOwnedRedisLockTransaction(transaction) ? state : 'busy';
     } catch (error) {
@@ -1039,8 +1014,7 @@ async function reconcileCampaignAggregateCandidate(playerId: string, seriesId: s
     }
 }
 
-// Reuses the existing bounded migration scheduler; ranking adoption does not
-// depend on historic finishers visiting the new screen.
+// Uses the existing migration scheduler; ranks never wait for old finishers to visit.
 export async function runCampaignAggregateFills(): Promise<void> {
     for (const series of CAMPAIGN_SERIES) {
         if (!getCampaignFinalStage(series.id)) continue;
@@ -1213,8 +1187,7 @@ export async function submitServerCampaignRun({
                     body: { accepted: false, error: 'Campaign progress save was interrupted. Retry.' },
                 };
             }
-            // The board row was written before the transfer marks, so the
-            // transfer copies it. The guest's progress is not written again.
+            // The board row predates the transfer marks, so the transfer copies it; progress is not written again.
             if (error instanceof CampaignProgressTransferPendingError) return progressTransferPendingReply();
             throw error;
         }
@@ -1385,8 +1358,7 @@ async function captureClassifiedGuestCampaignSource(
     };
 }
 
-// Moves the guest's Campaign progress onto the account, keeping the faster
-// time on every stage.
+// Moves guest Campaign progress to the account, keeping the faster time per stage.
 export async function mergeGuestCampaignProgress({
     guestPlayerId,
     redditPlayerId,
@@ -1397,8 +1369,7 @@ export async function mergeGuestCampaignProgress({
 }: {
     guestPlayerId: string;
     redditPlayerId: string;
-    // Checks the guest's rows for damage before any write, so a damaged row
-    // stops the transfer for review instead of being dropped.
+    // Checks guest rows before any write, so a damaged row stops the transfer instead of being dropped.
     classifySource?: boolean;
     // The stages either player holds a row on; every live stage when absent.
     raceIds?: readonly string[] | null;
@@ -1448,8 +1419,7 @@ export async function mergeGuestCampaignProgress({
         lease = startLease();
     };
     try {
-        // A race save cannot start once the transfer marks are set, and the
-        // transfer checks for one in flight, so the merge takes no stage locks.
+        // Transfer marks block new saves and in-flight saves are checked, so the merge needs no stage locks.
         for (const key of [
             ...allProgressLockKeys(guestPlayerId),
             ...allProgressLockKeys(redditPlayerId),
@@ -1495,8 +1465,7 @@ export async function mergeGuestCampaignProgress({
         const redditProgressBySeries = new Map<string, CampaignProgress>();
         const mergedResultsBySeries = new Map<string, Record<string, CampaignBestResult>>();
         let hasGuestEvidence = false;
-        // The account's rows on stages this list does not know stay as they
-        // are. Unknown guest rows are not evidence to copy.
+        // Account rows on unknown stages stay; unknown guest rows are not copied.
         const redditUnknownRowsBySeries = new Map<string, Record<string, unknown>>();
         const seriesProgress = await Promise.all(CAMPAIGN_SERIES.map(async (series) => {
             const [guestProgress, redditRead] = await Promise.all([
@@ -1629,8 +1598,7 @@ export async function mergeGuestCampaignProgress({
             const hasRecord = (progress: CampaignProgress) => Boolean(
                 progress.startedAt || Object.keys(progress.resultsByRaceId).length,
             );
-            // Numbers is always written, as before. A later series is written
-            // only when one of the two players has a record in it.
+            // Numbers is always written; a later series only when a player has a record in it.
             const touched = series.id === CAMPAIGN_NUMBERS_SERIES_ID
                 || hasRecord(guestProgress)
                 || Object.keys(mergedResults).length !== Object.keys(redditProgress.resultsByRaceId).length
@@ -1665,10 +1633,7 @@ async function guestHasAnyProgress(guestPlayerId: string): Promise<boolean> {
     return values.some(Boolean);
 }
 
-// Deletes a guest's Campaign rows after a transfer copied them (cleanup) or
-// when the account keeps its own progress (discard). Only stages where the
-// guest holds a row are touched, in groups, so a stopped run can resume
-// without bumping cleared stages again. The progress records go last.
+// Deletes guest Campaign rows in resumable groups (cleanup or discard); progress records go last.
 async function clearGuestCampaignProgress(
     guestPlayerId: string,
     label: 'cleanup' | 'discard',
@@ -1683,8 +1648,7 @@ async function clearGuestCampaignProgress(
             if (!lock) throw new CampaignProgressBusyError(`Campaign ${label} is already in progress.`);
             locks.push(lock);
         }
-        // Each write renews and watches the progress locks (and the transfer's
-        // own lock when the transfer runs this step).
+        // Each write renews and watches the progress locks, and the transfer lock when the transfer runs it.
         const runner = transactionRunner ?? createOwnedLockGroupRunner(
             [],
             (reason) => new CampaignProgressBusyError(reason === 'lost'

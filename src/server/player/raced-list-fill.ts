@@ -15,15 +15,8 @@ import {
     racedListKey,
 } from './raced-list.js';
 
-// A one-time walk that adds every row stored before the raced lists existed.
-// It goes through every live Campaign stage and every stored Daily day, and
-// through the entries, the rankings and the personal bests of each. Rows
-// written since the lists exist are already listed, so a row the walk sees
-// twice costs nothing. Each run does a bounded amount of work, saves where it
-// stopped, and the next run goes on from there. The last run writes the ready
-// record; only then may a transfer trust the lists.
-//
-// Every install has its own storage, so every install runs its own fill.
+// One-time, resumable walk that lists every row stored before raced lists existed (stages, days, entries, ranks, PBs).
+// Only its last run writes the ready record that lets transfers trust the lists; each install runs its own.
 export const RACED_LIST_FILL_READY_KEY = 'miniracer:raced:v1:fill-ready';
 const RACED_LIST_FILL_STATE_KEY = 'miniracer:raced:v1:fill-state';
 const RACED_LIST_FILL_LOCK_KEY = 'miniracer:raced:v1:fill-lock';
@@ -31,9 +24,7 @@ const RACED_LIST_FILL_LOCK_TTL_MS = 55_000;
 const RACED_LIST_FILL_ROWS_PER_RUN = 1_000;
 const RACED_LIST_FILL_PAGE_SIZE = 200;
 const RACED_LIST_FILL_WRITE_CONCURRENCY = 25;
-// While a deploy rolls out, a request still running on the old version can
-// write a row without listing it. The walk waits this long after its first
-// run, so every such row exists before the walk reaches its board.
+// Wait out a deploy rollout, when an old server can still write an unlisted row.
 const RACED_LIST_FILL_START_DELAY_MS = 10 * 60 * 1000;
 
 const PARTS = ['entries', 'ranks', 'pbs'] as const;
@@ -97,9 +88,7 @@ function parseFillState(raw: string | null | undefined): FillState | null {
     }
 }
 
-// Adds one board to one owner's list. `owner` is a player ID, or the coded name
-// when the row is a personal best. A guest's list keeps its guest expiry, and
-// a guest's Daily row enters the guest clean-up a year from now.
+// Lists one board for an owner (player ID, or coded name for a PB); guest rows keep their expiry and clean-up time.
 async function addOwner(board: string, owner: string, coded: boolean, nowMs: number): Promise<void> {
     const key = coded ? `miniracer:raced:v1:${owner}` : racedListKey(owner);
     await redis.hSet(key, { [board]: '1' });
@@ -197,8 +186,7 @@ export type RacedListFillStatus =
     | { state: 'working'; boardsDone: number; boards: number }
     | { state: 'waiting' };
 
-// How far the fill has come, for the moderator analytics page. `waiting` means
-// the first run has not happened yet, or the walk has not started.
+// Fill progress for the moderator page; `waiting` means the walk has not started.
 export async function readRacedListFillStatus(): Promise<RacedListFillStatus> {
     const [rawReady, rawState] = await redis.mGet([RACED_LIST_FILL_READY_KEY, RACED_LIST_FILL_STATE_KEY]);
     if (rawReady) {
@@ -229,8 +217,7 @@ export type TransferBoards = {
     dailyChallengeIds: string[];
 };
 
-// The boards any of the players holds a row on, from their raced lists. It
-// returns null until the fill is ready: then the lists may miss old rows.
+// Boards the players hold rows on, or null until the fill is ready.
 export async function readTransferBoards(playerIds: readonly string[]): Promise<TransferBoards | null> {
     if (!await isRacedListFillReady()) return null;
     const lists = await Promise.all(playerIds.map((playerId) => redis.hKeys(racedListKey(playerId))));

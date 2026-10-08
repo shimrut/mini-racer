@@ -22,9 +22,7 @@ import { playerFieldHash } from '../redis/redis-names.js';
 import { queueRacedBoard } from '../player/raced-list.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 
-// Where a moved ghost is kept. The move of old Daily ghosts writes the run's
-// full text to blob storage, then leaves this record behind with `ghost: null`
-// and this reference. `sha256` is the hash of the full text.
+// Blob location of a moved ghost; the record keeps `ghost: null` and this reference (sha256 of the full text).
 export type PbGhostArchiveRef = {
     v: 1;
     key: string;

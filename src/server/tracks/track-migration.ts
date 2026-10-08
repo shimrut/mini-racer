@@ -12,14 +12,8 @@ import { TrackInputError } from './track-shape.js';
 import { deleteStoredTrack, readStoredTrackKeys, saveLockedTrackCopy, saveStoredTrack } from './track-store.js';
 import { isTrackPlayedNow, readTrackUsage } from './track-usage.js';
 
-// Three copies move the app tracks into Redis. A second run of each copies
-// only what the first run did not copy.
-// - Unplayed: the tracks nobody has raced, with their medal times, the Daily
-//   list and the hidden series. The Creator can change these copies.
-// - Played Dailies: the tracks of past Dailies, locked. A track whose Daily
-//   players can still race waits for a later run.
-// - Live Campaign: each live app series with its stage tracks, locked.
-// The app keeps its own tracks until a later release removes them.
+// Three resumable copies into Redis: unplayed tracks with the Daily list and hidden series (editable),
+// played Dailies (locked, still-raceable ones wait), and live Campaign series with stage tracks (locked).
 
 export type MigrationReport = {
     dryRun: boolean;
@@ -38,8 +32,7 @@ export type MigrationHooks = {
     copySeries?: (options: { dryRun: boolean; username: string }) => Promise<Record<string, unknown>>;
 };
 
-// The report of a locked copy. `copied` and `alreadyStored` hold track keys
-// for the played Dailies and series keys for the live Campaign.
+// A locked copy report; keys are tracks for played Dailies and series for the live Campaign.
 export type LockedCopyReport = {
     dryRun: boolean;
     ranAt: string;
@@ -70,8 +63,7 @@ const LOCKED_COPY_REPORT_KEYS: Record<LockedCopyKind, string> = {
     'live-campaign': 'dailygp:tracks:v1:copy-report:live-campaign:v1',
 };
 const MIGRATION_LOCK_TTL_MS = 120_000;
-// The Daily picks its track at midnight UTC. The migration waits a few minutes
-// on each side, so the two never run at the same time.
+// The Daily picks its track at midnight UTC, so the migration avoids a few minutes around it.
 const MIDNIGHT_GUARD_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -100,9 +92,7 @@ export async function readLockedCopyReport(kind: LockedCopyKind): Promise<Locked
     return readReport<LockedCopyReport>(LOCKED_COPY_REPORT_KEYS[kind]);
 }
 
-// Every copy and every undo waits around midnight UTC, runs one at a time,
-// and keeps the report of its last real run. A trial run (dryRun) writes
-// nothing.
+// Copies and undos avoid midnight UTC, run one at a time, and keep their last real report; dryRun writes nothing.
 export async function runCopy<T>(
     { dryRun, now, reportKey }: { dryRun: boolean; now: Date; reportKey: string },
     work: () => Promise<T>,
@@ -166,8 +156,7 @@ export async function runTrackMigration({
 }): Promise<MigrationReport> {
     return runCopy({ dryRun, now, reportKey: MIGRATION_REPORT_KEY }, async () => {
         const usage = await readTrackUsage();
-        // One read of the stored keys, not one read per track: the Copy tab
-        // runs this trial when it loads.
+        // One read of stored keys, because the Copy tab runs this trial on load.
         const storedKeys = await readStoredTrackKeys();
         const report: MigrationReport = {
             dryRun,
@@ -230,8 +219,7 @@ function newLockedCopyReport(dryRun: boolean, username: string, now: Date): Lock
     };
 }
 
-// Copies the tracks of past Dailies, locked. A track that is also a stage of
-// the live Campaign goes with the Campaign copy.
+// Copies past Daily tracks, locked; a live Campaign stage track goes with the Campaign copy.
 export async function runPlayedDailyCopy({
     username,
     dryRun = false,

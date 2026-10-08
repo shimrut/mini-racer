@@ -1,13 +1,7 @@
 import { playerFieldHash } from '../redis/redis-names.js';
 
-// Each player's list of the boards they hold a row on: one field for each
-// Campaign stage or Daily day, such as `campaign:numbered-v1-00` or
-// `daily:daily-gp-2026-09-26`. Every write that creates a row adds its board,
-// so a transfer can work on the raced boards only. The list only grows: a
-// board it names may hold no row any more.
-//
-// The key uses the same coded name as the personal bests, so the one-time fill
-// can match a personal-best row to its owner.
+// Each player's boards with a row (`campaign:<stage>`, `daily:<day>`), so a transfer works only on those.
+// It only grows, and uses the PB coded name so the one-time fill can match PB rows to owners.
 export function racedListKey(playerId: string): string {
     return `miniracer:raced:v1:${playerFieldHash(playerId)}`;
 }
@@ -16,18 +10,14 @@ export function racedListField(board: { mode: string; id: string }): string {
     return `${board.mode}:${board.id}`;
 }
 
-// A guest's list outlives the year after its last write, so the guest
-// clean-up can still read it. Each write sets the time again.
+// A guest's list outlives its year, so the guest clean-up can still read it; each write renews it.
 export const GUEST_RACED_LIST_TTL_SECONDS = 400 * 24 * 60 * 60;
 
-// Daily boards stay for the archive, so a guest's Daily rows need their own
-// clean-up. Each Daily row a guest writes sets the time when that clean-up may
-// remove them: one year after the guest's last Daily write.
+// Each guest Daily write sets the clean-up time: a year after the last Daily write.
 export const DAILY_GUEST_EXPIRY_KEY = 'dailygp:guest-expiry:v1';
 export const DAILY_GUEST_ROW_KEEP_SECONDS = 365 * 24 * 60 * 60;
 
-// Queues 1 command for an account, 2 for a guest on a Campaign stage, and 3
-// for a guest on a Daily day.
+// Queues 1 command for an account, 2 for a guest stage, 3 for a guest Daily day.
 export async function queueRacedBoard(
     transaction: {
         hSet(key: string, values: Record<string, string>): Promise<unknown>;
@@ -50,10 +40,7 @@ export async function queueRacedBoard(
     }
 }
 
-// A race save lists its board right after it takes its stage lock, before it
-// checks the transfer marks. A save that passed that check therefore listed
-// its board before any transfer set its marks, so the transfer's one check of
-// the listed boards finds every save still running.
+// Saves list their board before checking the marks, so one transfer check finds every running save.
 export async function listRacedBoard(
     client: {
         hSet(key: string, values: Record<string, string>): Promise<unknown>;

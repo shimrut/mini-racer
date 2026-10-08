@@ -26,9 +26,7 @@ import { withTrackPlacementLock, commitTrackPlacement } from '../tracks/track-pl
 import { readCompleteTrack } from '../tracks/track-readiness.js';
 import { readTracksToShare } from '../tracks/creator-track-access.js';
 
-// Campaign series made in the Creator, and copies of the app series that are
-// not live. A draft is private. A published series is live for players: its
-// stages are fixed. It can grow until a designated final stage is published.
+// Creator series and copies of hidden app series; a draft is private, a published series is live and fixed.
 
 export type StoredSeriesStage = { trackKey: string; laps: number; requiredMedals: number };
 export type StoredSeriesStatus = 'draft' | 'published';
@@ -119,8 +117,7 @@ export function toSeriesDefinition(record: StoredSeriesRecord): StoredSeriesDefi
     };
 }
 
-// Missing fields on old Creator series mean an ongoing Campaign. Only an
-// exact migrated app copy may inherit the app's explicit endpoint.
+// Old Creator series without these fields are ongoing; only an exact app copy keeps the app endpoint.
 function publishedFinalStageId(record: StoredSeriesRecord): string | null {
     if (typeof record.publishedFinalStageId === 'string') return record.publishedFinalStageId;
     if (record.publishedFinalStageId !== undefined || record.origin !== 'migrated') return null;
@@ -151,9 +148,7 @@ function cachedPublishedSeries(): readonly StoredSeriesDefinition[] {
     return scope ? cacheByInstall.get(scope)?.published ?? EMPTY : EMPTY;
 }
 
-// Each request reads one fixed copy of the published series, taken when it
-// starts. Another request can refresh the cache meanwhile; this request
-// keeps its own list, so its reads of the series always agree.
+// Each request keeps the series list it started with, so its reads agree while the cache refreshes.
 type PinnedSeries = { published: readonly StoredSeriesDefinition[] };
 const pinnedSeries = new AsyncLocalStorage<PinnedSeries>();
 
@@ -166,8 +161,7 @@ export function runWithPinnedStoredSeries<T>(run: () => T): T {
     return pinnedSeries.run({ published: cachedPublishedSeries() }, run);
 }
 
-// Takes the current cache as this request's list from now on. It changes
-// only this request's holder. Outside a request it does nothing.
+// Re-pins this request to the current cache; outside a request it does nothing.
 export function repinStoredSeries(): void {
     const pinned = pinnedSeries.getStore();
     if (pinned) pinned.published = cachedPublishedSeries();
@@ -201,8 +195,7 @@ export function readStoredSeriesCacheRevision(scope: string): string | null {
     return cacheByInstall.get(scope)?.revision ?? null;
 }
 
-// Reads the published series for this revision. The stored catalog publishes
-// the snapshot only when the revision did not change during the reads.
+// The catalog publishes this snapshot only if the revision stayed the same during the reads.
 export async function readStoredSeriesSnapshot(revision: string): Promise<StoredSeriesSnapshot> {
     const records = revision === '0' ? [] : await readAllRecords();
     const published = Object.freeze(records
@@ -240,8 +233,7 @@ export async function isTrackInStoredSeries(trackKey: string, exceptSeriesId?: s
         && record.stages.some((stage) => stage.trackKey === trackKey));
 }
 
-// The app series that are not in Redis yet. A copy of a hidden app series
-// replaces it after it is published.
+// App series not in Redis yet; a published copy replaces a hidden one.
 export function listAppSeriesDefinitions(): AppSeriesDefinition[] {
     return APP_SERIES_DEFINITIONS;
 }
@@ -409,8 +401,7 @@ export async function saveStoredSeries(
         })));
 }
 
-// Makes the series live, or makes its new stages live. The stages cannot
-// change after this, and their stored tracks are locked.
+// Makes the series or its new stages live; stages then stay fixed and their tracks lock.
 export async function publishStoredSeries(
     seriesIdInput: unknown,
     { username, baseRevision, now = new Date() }: { username: string; baseRevision?: unknown; now?: Date },
@@ -501,8 +492,7 @@ export async function deleteStoredSeries(
         })));
 }
 
-// Writes a copy of a live app series and the stage tracks that Redis does
-// not hold yet, in one transaction, so a copy is never half done.
+// Writes a live app series copy and its missing stage tracks in one transaction.
 async function commitLiveSeriesCopy(
     record: StoredSeriesRecord,
     trackRecords: StoredTrackRecord[],
@@ -529,9 +519,7 @@ async function commitLiveSeriesCopy(
         })));
 }
 
-// Removes a copy of an app series, and the stage tracks that came with it,
-// in one transaction. Only the undo of a copy uses this; the checks decide
-// what may go, so a series or track that changed since the copy stays.
+// Undo of a copy: removes it and its tracks in one transaction; anything changed since stays.
 export async function removeSeriesCopy(
     seriesId: string,
     { canRemoveSeries, canRemoveTrack }: {
@@ -571,10 +559,7 @@ export async function removeSeriesCopy(
             })));
 }
 
-// Live in the app itself. The Campaign lists also hold the series published
-// from Redis, so they cannot tell a live app series from a hidden app series
-// that a moderator made live in the Creator. Only Numbers is live in the app
-// itself; the others go live only from the Creator.
+// Live in the app itself: only Numbers; the others go live only from the Creator.
 export function isLiveAppSeries(definition: AppSeriesDefinition): boolean {
     return isAppCampaignSeriesLive({
         id: definition.id,
@@ -591,10 +576,7 @@ function appSeriesGrounds(definition: AppSeriesDefinition): string[] {
     });
 }
 
-// Copies each live app series as players race it now: published with all
-// its stages, and each stage track locked, as an exact copy of the app
-// track. The game still reads Numbers from the app; the copy is ready for
-// the release that removes the app tracks.
+// Copies each live app series, published with locked exact stage tracks, ready for the app-track removal.
 export async function copyLiveAppSeries({
     dryRun,
     username,
@@ -655,8 +637,7 @@ export async function copyLiveAppSeries({
     return report;
 }
 
-// Copies each app series that is not live into Redis as a draft, so the
-// Creator can change it. A live app series goes with the live Campaign copy.
+// Copies each hidden app series as a draft so the Creator can change it.
 export async function copyAppSeriesDrafts({
     dryRun,
     username,

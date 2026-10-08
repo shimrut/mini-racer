@@ -11,9 +11,7 @@ export async function getModeratorAnalyticsSummary({
     return getSummary();
 }
 
-// The Storage tab's Redis card: the size, and the raced-list fill. Each part
-// fails on its own, so one failure leaves the other shown. The ghost move has
-// its own request, which the tab repeats while it is open.
+// The Storage tab's Redis card: size and raced-list fill, each failing alone; the ghost move has its own request.
 export async function getModeratorStorageSummary({
     getStorage = getServerStorageUsage,
     getRacedListFill = readRacedListFillStatus,

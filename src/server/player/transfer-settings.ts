@@ -14,8 +14,7 @@ const GROUND_SKIN_FIELDS = [
     'carSkinSpace',
 ] as const;
 
-// The settings the account keeps after a transfer: the account's, and with
-// Merge the guest's fill what the account never set.
+// The account keeps its settings; with Merge, the guest's fill any it never set.
 export function transferredSettings(
     choice: TransferSettingsChoice,
     guest: DailyGpPlayerPreferences | null,
@@ -41,10 +40,7 @@ export function transferredSettings(
     return merged;
 }
 
-// Writes the chosen settings onto the account. It runs after the car unlocks
-// moved, so every chosen skin is unlocked on the account; the account's next
-// bootstrap checks the skins against its unlocks again. Running it twice
-// writes the same settings.
+// Writes the chosen settings after the unlocks moved, so every skin is unlocked; running twice is safe.
 export async function carryGuestSettings({
     guestPlayerId,
     redditPlayerId,

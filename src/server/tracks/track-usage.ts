@@ -4,9 +4,7 @@ import { readDailyChallengeHistory } from '../daily/daily-gp-store.js';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 import { isLiveAppSeries, listAppSeriesDefinitions, listStoredSeries } from '../campaign/series-store.js';
 
-// Where players have met a track. A track is played when it was a Daily or
-// when it is a stage of a live Campaign series. Head to Head comes only from
-// those two modes. A played track never changes.
+// A track is played once it was a Daily or is a live Campaign stage; a played track never changes.
 
 export type TrackUsage = {
     playedTrackKeys: Set<string>;
@@ -25,9 +23,7 @@ export async function readTrackUsage(): Promise<TrackUsage> {
     };
 }
 
-// Whether players can meet a track now, read from the records in Redis, not
-// from the request's series list. A safety check under the placement lock
-// uses it: a publication takes the same lock, so the answer is current.
+// Whether players can meet a track now, from Redis records; used under the placement lock, so it is current.
 export async function isTrackPlayedNow(trackKey: string): Promise<boolean> {
     if (Object.values(PUBLISHED_DAILY_GP_TRACKS_BY_DATE).some((key) => String(key) === trackKey)) return true;
     const inLiveAppSeries = listAppSeriesDefinitions().some((series) => (

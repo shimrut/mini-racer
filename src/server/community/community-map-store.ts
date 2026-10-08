@@ -146,8 +146,7 @@ export async function publishCommunityDraft(
         version: 1,
         laps: 1,
     };
-    // A saved draft owns one publication ID. Concurrent clicks and retries
-    // complete the same record, without replacing its first immutable snapshot.
+    // A draft owns one publication ID; retries complete the same record without replacing its first snapshot.
     await redis.set(mapKey(record.id), JSON.stringify(record), { nx: true });
     const saved = await readRecord(subredditName, record.id);
     if (!saved) throw new Error('Published map could not be read back.');

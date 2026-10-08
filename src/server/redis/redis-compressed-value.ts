@@ -13,8 +13,7 @@ export function encodeRedisCompressedValue(value: string): string {
     }
 }
 
-// Reads a value stored through the compressing client, as the plain client
-// returns it. A value without the envelope is returned as it is.
+// Decodes a compressed value as the plain client returns it; other values pass through.
 export function decodeRedisCompressedValue(value: string): string {
     if (!value.startsWith(REDIS_COMPRESSION_PREFIX)) return value;
     return gunzipSync(Buffer.from(value.slice(REDIS_COMPRESSION_PREFIX.length), 'base64')).toString('utf8');

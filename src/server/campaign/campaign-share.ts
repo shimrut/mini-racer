@@ -52,8 +52,7 @@ function failure(status: number, reason: string, error: string) {
     return { status, body: { status: reason, error } };
 }
 
-// Public artwork metadata comes only from the published manifest. Reading a
-// completion poster never needs the viewer's progress, identity or standings.
+// Artwork metadata comes only from the manifest; a poster never reads viewer progress or standings.
 export async function getServerCampaignPoster({ seriesId }: { seriesId?: unknown } = {}) {
     const series = getCampaignSeries(seriesId);
     const finalStage = series ? getCampaignFinalStage(series.id) : null;
@@ -160,8 +159,7 @@ async function clearClaim(key: string, lock: RedisLock): Promise<void> {
     await commitOwnedRedisLockTransaction(transaction);
 }
 
-// A pending claim is permanent: an inconclusive Reddit response may still have
-// posted. Retry searches the same player's posts and never submits a duplicate.
+// A pending claim is permanent, because an unclear Reddit reply may have posted; retry searches, never reposts.
 async function recoverPublication(claim: ShareRecord, subredditName: string, username: string, seriesId: string) {
     try {
         const posts = await reddit.getPostsByUser({ username, sort: 'new', limit: 100, pageSize: 100 }).all();
@@ -203,8 +201,7 @@ export async function markServerCampaignResultsSharePending({
     await markRefreshPending(resultKey(stage.seriesId, request.subredditName, request.canonicalPlayerId));
 }
 
-// Read current saved results after taking the publication lock, rather than
-// writing the possibly older snapshot returned by a concurrent race submission.
+// Read saved results after taking the lock, not an older snapshot from a concurrent submission.
 export async function refreshServerCampaignResultsShare({
     raceId,
     seriesId,

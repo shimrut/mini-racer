@@ -15,10 +15,7 @@ import {
 import { matchesAppTrack } from './track-copy.js';
 import { listStoredTrackRecords, type StoredTrackRecord } from './track-store.js';
 
-// Reads Redis again and compares each copy of an app track and app series
-// with the app. Players race the Redis copy, so a copy must race exactly like
-// the app version that players raced before. A copy that a moderator changed
-// before anyone raced it is allowed.
+// Rereads Redis and checks that each raced app copy races exactly like the app; unraced edited copies are allowed.
 
 export type CopyProblem = { key: string; problem: string };
 
@@ -107,8 +104,7 @@ function checkSeries(definition: AppSeries, record: StoredSeriesRecord, report: 
         (sameContent ? report.series.exact : report.series.changed).push(definition.id);
         return;
     }
-    // Players raced every stage of a live app series. Its copy must keep them
-    // live and unchanged, including an explicitly designated app endpoint.
+    // A live app series copy keeps every raced stage live and unchanged, including its endpoint.
     const keepsLiveStages = record.status === 'published'
         && record.publishedStageCount >= stages.length
         && record.ground === (definition.ground ?? 'tarmac')
@@ -175,8 +171,7 @@ export async function runCopyCheck({ username, now = new Date() }: { username: s
     return report;
 }
 
-// One line for each check, and one line for each problem, so the server logs
-// show them with one search for the prefix.
+// One log line per check and per problem, all under one searchable prefix.
 function logCopyCheck(report: CopyCheckReport): void {
     const problems = [...report.tracks.problems, ...report.series.problems];
     console.log(`${COPY_LOG_PREFIX} check by u/${report.checkedBy}: `

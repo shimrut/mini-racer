@@ -165,8 +165,7 @@ const headToHeadService = createHeadToHeadService({
     readViewerBest: readHeadToHeadViewerBest,
 });
 
-// Every track lookup in this server reads the stored tracks of the current
-// request's subreddit first, and the Campaign reads its published series.
+// Track lookups read the request subreddit's stored tracks first; Campaign reads its published series.
 installStoredTrackResolver();
 installStoredSeriesResolver();
 
@@ -367,8 +366,7 @@ function registerProductionRoutes(app: express.Application): void {
     });
 }
 
-// Routes that need no catalog load: they read no track and no series, or they
-// read their own tracks. Match the method and the exact path.
+// Routes that skip the catalog load (no tracks or series, or their own); match method and exact path.
 const CATALOG_FREE_ROUTES = new Set([
     'POST /api/analytics/race-start',
     'POST /api/analytics/podium',
@@ -385,8 +383,7 @@ export function createServerApp({
     const app = express();
     app.use(express.json({ limit: '256kb' }));
     app.use(createTelemetryRouter());
-    // A request that cannot know which layout is live must not answer as if
-    // the app layout were live. Only routes that never read a track skip this.
+    // Without a known live layout, never answer as if the app layout were live; only trackless routes skip this.
     app.use(async (req, res, next) => {
         if (CATALOG_FREE_ROUTES.has(`${req.method} ${req.path}`)) {
             next();
@@ -399,8 +396,7 @@ export function createServerApp({
             res.status(503).json({ error: 'The tracks could not load. Try again.' });
             return;
         }
-        // The route reads one fixed track list and series list from here to
-        // its end.
+        // The route keeps one track list and series list until it ends.
         runWithPinnedStoredSeries(() => runWithPinnedStoredTracks(next));
     });
     registerRoutes(app);

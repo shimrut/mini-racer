@@ -17,9 +17,7 @@ import {
 } from '../campaign/series-store.js';
 import { TrackPlacementRetryError } from './track-placement-lock.js';
 
-// The stored tracks and the published series that a request can rely on.
-// If they cannot load, the request cannot know which layout is live, so it
-// answers "retry", as a Daily that cannot be confirmed does.
+// The stored tracks and series a request relies on; if they cannot load, the request answers retry.
 export class StoredCatalogUnavailableError extends TrackPlacementRetryError {
     constructor(cause?: unknown) {
         super('The tracks could not load. Try again.');
@@ -39,8 +37,7 @@ function parseRevision(value: unknown): string {
     throw new Error('A stored catalog revision could not be read.');
 }
 
-// One read for both revisions. A save changes a track and its revision in one
-// transaction; a Campaign publication changes both revisions in one.
+// One read for both revisions; saves and publications change their revision in the same transaction.
 async function readCatalogRevisions(): Promise<CatalogRevisions> {
     const values = await redis.mGet([STORED_TRACKS_REVISION_KEY, STORED_SERIES_REVISION_KEY]);
     if (!Array.isArray(values) || values.length !== 2) {
@@ -49,11 +46,7 @@ async function readCatalogRevisions(): Promise<CatalogRevisions> {
     return { tracks: parseRevision(values[0]), series: parseRevision(values[1]) };
 }
 
-// Brings this install's track list and published series up to date. It reads
-// no track: a request loads the tracks that it names. The list and the series
-// are read between two reads of their revisions. Only when neither revision
-// changed is the pair one picture of Redis, and only then is it published,
-// both halves together. A newer pair is never replaced by an older one.
+// Refreshes the install's track list and series (no tracks); publishes both only if neither revision changed.
 export async function ensureStoredCatalogLoaded(): Promise<void> {
     const scope = readStoredTrackInstallScope();
     if (!scope) return;
@@ -81,19 +74,14 @@ export async function ensureStoredCatalogLoaded(): Promise<void> {
     throw new StoredCatalogUnavailableError(lastError);
 }
 
-// Loads the catalog again, and makes it the track list and the series list
-// of this request from now on. A transfer uses it after it blocks saving, and
-// a route uses it after it learns its track.
+// Reloads and pins the catalog for the rest of the request.
 export async function reloadPinnedCatalog(): Promise<void> {
     await ensureStoredCatalogLoaded();
     repinStoredSeries();
     repinStoredTracks();
 }
 
-// Loads the listed tracks among these keys for this request, in one read. A
-// record that does not match the pinned list means a write landed after the
-// list was read: the list is read and pinned again, a few times at most, and
-// then the request answers "retry". No record is ever left out.
+// Loads the listed tracks in one read; a mismatch re-pins the list a few times, then answers retry, never omits.
 export async function loadStoredTracks(trackKeys: readonly (string | null | undefined)[]): Promise<void> {
     const keys = trackKeys.filter((trackKey): trackKey is string => typeof trackKey === 'string' && Boolean(trackKey));
     for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt += 1) {
@@ -107,8 +95,7 @@ export async function loadStoredTracks(trackKeys: readonly (string | null | unde
     throw new StoredCatalogUnavailableError(new Error('A stored track did not match the track list.'));
 }
 
-// A route that learned its tracks while it ran reads the catalog again, since
-// another server can have placed one of them meanwhile, and then loads them.
+// Rereads the catalog once the route knows its tracks (another server may have placed one), then loads them.
 export async function confirmStoredTracks(trackKeys: readonly (string | null | undefined)[]): Promise<void> {
     await reloadPinnedCatalog();
     await loadStoredTracks(trackKeys);

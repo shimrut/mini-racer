@@ -18,8 +18,7 @@ const LEGACY_PREFIX = 'miniracer:challenge-analytics:v1';
 const PREFIX = 'miniracer:challenge-analytics:v2';
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const CHALLENGE_ANALYTICS_PAGE_SIZE = 25;
-// The page sorts every indexed track by views, so it reads them all; the
-// catalog has a few hundred tracks at most.
+// The page sorts all indexed tracks by views, so it reads them all (a few hundred at most).
 const MAX_INDEXED_TRACKS = 5_000;
 const VIEW_READ_BATCH = 100;
 
@@ -120,8 +119,7 @@ export async function recordChallengeAnalyticsEvent(
     const identity = action === 'view' ? getRequestAnalyticsViewerIdentity() : null;
     const viewerField = identity ? playerFieldHash(identity) : null;
 
-    // Lifetime includes Today as events arrive. Write totals before membership;
-    // uniques are exact hash lengths, never sums of per-post or per-day counts.
+    // Lifetime includes Today; write totals before membership, and uniques are exact hash lengths.
     await redis.hIncrBy(lifetimeKey, field, 1);
     await redis.hSetNX(lifetimeKey, fields.trackingStartedAt, eventTime.toISOString());
     // Equal scores give a stable alphabetical track order without a catalog read.
@@ -160,8 +158,7 @@ async function readViewCounts(key: string, fields: readonly string[]): Promise<n
     return counts;
 }
 
-// Most viewed first in the chosen period. Ties go to the other period, then
-// to the track key, so the order is stable from page to page.
+// Most viewed first; ties go to the other period, then the track key, for a stable order.
 async function rankTracksByViews(
     subredditName: string,
     date: string,
@@ -208,13 +205,11 @@ export async function getChallengeAnalyticsPage(
     // The middleware loads the index, not these stored track records.
     await loadStoredTracks(tracks);
     const fields = tracks.map((trackKey) => challengeTrackAnalyticsCounterFields(trackKey));
-    // Read daily membership before lifetime membership, then both totals. A
-    // concurrent view cannot make displayed uniques exceed their own totals.
+    // Membership before totals, so a concurrent view never makes uniques exceed totals.
     const dailyUniques = await Promise.all(tracks.map((key) => redis.hLen(challengeTrackAnalyticsViewersKey(subredditName, key, date))));
     const lifetimeUniques = await Promise.all(tracks.map((key) => redis.hLen(challengeTrackAnalyticsViewersKey(subredditName, key))));
     const daily = await redis.hMGet(challengeTrackAnalyticsCountsKey(subredditName, date), fields.flatMap((field) => [field.views, field.acceptClicks, field.ownOpens]));
-    // Lifetime writes precede daily writes; read Lifetime last to include the
-    // Today values in this response even when new events arrive between reads.
+    // Lifetime is written first, so read it last to include this response's Today values.
     const lifetime = await redis.hMGet(challengeTrackAnalyticsCountsKey(subredditName), fields.flatMap((field) => [field.views, field.acceptClicks, field.ownOpens, field.trackingStartedAt]));
     return {
         date,

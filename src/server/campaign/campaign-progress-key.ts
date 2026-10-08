@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { CAMPAIGN_NUMBERS_SERIES_ID, CAMPAIGN_SERIES } from '../../../game/campaign/manifest.js';
 
-// One progress record for each series and player. The Numbers key keeps its
-// old form, because the series name of Numbers is the old Campaign name.
+// One progress record per series and player; Numbers keeps its old key.
 export function campaignProgressKey(
     playerId: string,
     seriesId: string = CAMPAIGN_NUMBERS_SERIES_ID,

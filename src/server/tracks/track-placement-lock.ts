@@ -5,8 +5,7 @@ import {
 } from '../redis/redis-lock.js';
 import { isRedisTransactionConflict } from '../redis/redis-transaction-conflict.js';
 
-// Moderator track edits and Daily/Campaign placement share this lock. A list
-// does not need to lock every track: edits cannot cross its admission check.
+// Track edits and Daily/Campaign placement share this lock; edits cannot cross a list's admission check.
 const PLACEMENT_LOCK_KEY = 'dailygp:tracks:v1:placement-write-lock:v1';
 const PLACEMENT_LOCK_TTL_MS = 30_000;
 
@@ -26,9 +25,7 @@ export async function withTrackPlacementLock<T>(work: (lock: RedisLock) => Promi
     }
 }
 
-// Read through the base Redis client after WATCH; transaction reads queue.
-// Every competing placement/edit owns the shared lock. Extra watched keys
-// also protect challenge history from its independent maintenance writer.
+// Read through the base client after WATCH; extra watched keys also guard challenge history.
 export async function commitTrackPlacement<T>(
     locks: readonly RedisLock[],
     watchedKeys: readonly string[],
@@ -55,8 +52,7 @@ export async function commitTrackPlacement<T>(
         try {
             results = await transaction.exec();
         } catch (error) {
-            // EXEC may have committed even when its reply was lost. Only the
-            // operation's exact authoritative records can confirm success.
+            // EXEC may commit with a lost reply; only the operation's own records confirm success.
             if (!isRedisTransactionConflict(error) && prepared.reconcile
                 && await prepared.reconcile().catch(() => false)) return prepared.result;
             throw new TrackPlacementRetryError('The save could not be confirmed. Retry before racing.');

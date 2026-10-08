@@ -158,8 +158,7 @@ function cohortFillLockKey(scope: string): string {
 
 const SUMMARY_READY = 'ready';
 const COHORT_OFFSETS = [1, 2, 3, 7, 14, 30] as const;
-// Cohort counts are kept as players race from the day the new counting first served the page.
-// Days before that are counted once from the day player lists, a few days at a time.
+// Cohorts count live from the first page load of the new counting; earlier days are filled a few at a time.
 const COHORTS_LIVE_FROM = 'cohorts-live-from';
 const COHORTS_FILLED_THROUGH = 'cohorts-filled-through';
 const COHORT_FILL_PAGE = 5000;
@@ -892,8 +891,7 @@ function readCohorts(
 ): AnalyticsCohort[] {
     const filledThrough = summary[COHORTS_FILLED_THROUGH] ?? '';
     const liveFrom = summary[COHORTS_LIVE_FROM] ?? '';
-    // A day the fill has not reached yet holds only part of its count. The first day of
-    // the new counting can miss races from before the upload, so it also waits for the fill.
+    // Days the fill has not reached are partial; the first new-counting day also waits for the fill.
     const counted = (date: string) => date <= filledThrough || date > liveFrom;
     const retention = (
         cohortDate: string,

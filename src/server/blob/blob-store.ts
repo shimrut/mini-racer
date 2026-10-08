@@ -7,9 +7,7 @@ import {
     type S3Client,
 } from '@aws-sdk/client-s3';
 
-// Reddit's blob storage: one private S3 namespace for each install. The
-// Devvit client puts the install's prefix in front of every key, and takes it
-// off the keys a listing returns.
+// Reddit blob storage: one private S3 namespace per install; the Devvit client adds and strips its prefix.
 
 export type BlobObjectInfo = {
     key: string;
@@ -81,8 +79,7 @@ const REQUEST_WINDOW_MS = 1000;
 // Covers a step of the millisecond clock between the check and the send.
 const REQUEST_MARGIN_MS = 2;
 
-// The SDK's retry strategy for one attempt: a failed call is not sent again.
-// The job tries a failed call again on its own, in a later request.
+// One attempt per call; the job retries a failed call in a later request.
 const ONE_ATTEMPT = {
     async acquireInitialRetryToken() {
         return { getRetryCount: () => 0, getRetryDelay: () => 0 };
@@ -99,11 +96,7 @@ function abortedError(): Error {
     return error;
 }
 
-// Sends a request only when fewer than `limit` went out in the last second,
-// counting both ends of the second. The check and the send are one step, and
-// a small margin covers a clock step between the two, so the limit also holds
-// where the requests are seen. The clock is read again after each wait, so a
-// timer that ends early cannot let a request through too soon.
+// Sends only when under `limit` in the last second, with a clock margin, and rechecks the clock after each wait.
 function gateRequests<Result>(
     limit: number,
     clock: BlobClock,
@@ -125,9 +118,7 @@ function gateRequests<Result>(
     };
 }
 
-// Makes each call one HTTP request, and sends no request past the limit. The
-// SDK's retry step stays in place, because its signing step is placed next to
-// it; it reads its strategy from the config on each call.
+// One HTTP request per call and none past the limit; the SDK retry step stays because signing sits next to it.
 function limitClient(client: S3Client, limit: number, clock: BlobClock): S3Client {
     const config = client.config as unknown as {
         retryStrategy: () => Promise<unknown>;
@@ -141,9 +132,7 @@ function limitClient(client: S3Client, limit: number, clock: BlobClock): S3Clien
     return client;
 }
 
-// The store for one server request. The Devvit client must not be kept from
-// one request to the next, so the client is made on first use. Every call is
-// one request, and at most `maxRequestsPerSecond` requests go out in any second.
+// The store for one request; the Devvit client is made on first use and never kept across requests.
 export function createDevvitBlobStore(
     makeClient: () => Promise<S3Client> = newS3Client,
     { maxRequestsPerSecond = MAX_REQUESTS_PER_SECOND, clock = SYSTEM_BLOB_CLOCK }: {
@@ -214,9 +203,7 @@ export function createDevvitBlobStore(
     };
 }
 
-// Every call of one request goes through a session. A session keeps calls
-// under a rate, aborts a call that runs too long, and starts no call that
-// could end after the request deadline.
+// Rate-limits calls, aborts slow ones, and starts none that could end after the request deadline.
 export type BlobSession = {
     readonly callTimeoutMs: number;
     readonly deadlineMs: number;

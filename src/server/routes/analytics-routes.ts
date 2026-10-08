@@ -128,8 +128,7 @@ export function registerAnalyticsRoutes(
         }
     });
 
-    // The Storage tab: the Redis size walk and the ghost move, read only when
-    // the tab opens, so the Players tab does not wait for the walk.
+    // Storage tab data, read only when it opens so the Players tab does not wait.
     app.get('/api/analytics/storage', async (_req, res: Response) => {
         try {
             const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
@@ -147,8 +146,7 @@ export function registerAnalyticsRoutes(
         }
     });
 
-    // The move of old Daily ghosts to blob storage: its progress, and the
-    // moderator's choice. Each install keeps its own choice.
+    // Daily ghost move progress and the moderator's per-install choice.
     app.get('/api/analytics/ghost-archive', async (_req, res: Response) => {
         try {
             const subredditName = await dependencies.resolveAnalyticsToolSubredditName();

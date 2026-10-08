@@ -196,8 +196,7 @@ export function registerTrackRoutes(app: Application, dependencies: TrackRouteDe
         }
     });
 
-    // Each copy checks every copy again when it ends. A failed check does not
-    // undo the copy: the answer shows the copy report and the check error.
+    // Each copy rechecks all copies; a failed check does not undo it, and the answer shows both.
     async function withCopyCheck(username: string, report: unknown) {
         if (!dependencies.runCopyCheck) return { report };
         try {

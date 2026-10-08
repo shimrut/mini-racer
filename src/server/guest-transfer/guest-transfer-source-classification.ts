@@ -224,8 +224,7 @@ export function classifyStoredLeaderboardEntry(
             return { state: 'obsolete', reason: 'stage_redefined', updatedAt };
         }
     }
-    // The check label never makes a time old: every label came from the
-    // server's own check on the day of the race (see board-merge.ts).
+    // A check label never makes a time old; every label is the server's own check (see board-merge.ts).
 
     return {
         state: 'valid',

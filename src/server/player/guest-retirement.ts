@@ -17,9 +17,7 @@ export function guestProgressSelectionAccountPendingKey(redditPlayerId: string):
         .digest('base64url'));
 }
 
-// The same two marks, from the player's coded name. The coded name is also the
-// field of the player's personal best (playerFieldHash), so a job that holds
-// only that field can still find both marks.
+// Both marks from the player's coded name (the PB field), so a job holding only that field finds them.
 export function guestProgressSelectionPendingKeyForHash(playerHash: string): string {
     return `dailygp:guest-progress-selection-pending:v1:${playerHash}`;
 }

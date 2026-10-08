@@ -14,10 +14,7 @@ import { DAILY_GUEST_EXPIRY_KEY, racedListKey } from '../player/raced-list.js';
 import { playerFieldHash } from '../redis/redis-names.js';
 import { isRedisTransactionConflict } from '../redis/redis-transaction-conflict.js';
 
-// Daily boards stay for the archive. A guest who has not written a Daily row
-// for a year loses their Daily rows: this clean-up finds the days in the
-// guest's raced list and deletes the guest's entry, ranking and personal best
-// on each. A guest who races again during the clean-up keeps the rest.
+// Deletes the Daily rows of a guest idle for a year, day by day from the raced list; racing again keeps the rest.
 const DAILY_GUEST_CLEANUP_LIMIT = 10;
 const DAILY_GUEST_CLEANUP_THROTTLE_SECONDS = 60;
 const DAILY_GUEST_CLEANUP_THROTTLE_KEY = `${DAILY_GUEST_EXPIRY_KEY}:cleanup-throttle`;
@@ -33,13 +30,8 @@ function dailyBoard(challengeId: string) {
     };
 }
 
-// Runs `mutate` only while the guest is still expired and no transfer owns
-// them. It watches the expiry list and the raced list, which every Daily write
-// of the guest changes, and the transfer mark. A transfer reads the guest's
-// rows after it sets the mark and copies them later, so a row deleted after
-// the mark could come back as a copy of what was read.
-// Returns false when the guest raced again, a transfer started, or a write
-// got in first.
+// Runs `mutate` only while the guest is expired and no transfer owns them; false when either changed or a write got in.
+// Watches the expiry list, raced list and transfer mark, because a transfer copies rows it read after setting its mark.
 async function writeWhileExpired(
     guestPlayerId: string,
     nowMs: number,
@@ -95,8 +87,7 @@ async function cleanupExpiredDailyGuest(guestPlayerId: string, nowMs: number): P
         });
         if (!written) return false;
     }
-    // The raced list goes too: it named only rows of a guest who left. A
-    // Campaign stage it names is cleaned by the Campaign guest clean-up.
+    // The raced list goes too; the Campaign clean-up handles its Campaign stages.
     return writeWhileExpired(guestPlayerId, nowMs, async (transaction) => {
         await transaction.zRem(DAILY_GUEST_EXPIRY_KEY, [guestPlayerId]);
         await transaction.del(racedListKey(guestPlayerId));

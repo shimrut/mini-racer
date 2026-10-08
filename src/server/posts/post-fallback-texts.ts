@@ -1,7 +1,6 @@
 import { isRecord } from '../shared/value-guards.js';
 
-// Old posts keep their replay text in one of many Reddit and Devvit shapes.
-// The readers try each text that these keys can hold, in this order.
+// Keys that can hold an old post's replay text, in the order the readers try them.
 const FALLBACK_TEXT_KEYS = [
     'text',
     'markdown',

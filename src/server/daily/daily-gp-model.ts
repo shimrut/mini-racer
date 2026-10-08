@@ -19,9 +19,7 @@ export const DAILY_GP_DEFAULT_LIMIT = 10;
 export const DAILY_GP_REDIS_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_GUEST_PROFILE_TTL_SECONDS = 365 * 24 * 60 * 60;
 export const DAILY_GP_SIGNED_IN_PROFILE_TTL_SECONDS = null;
-// The Daily archive keeps every day. Devvit Redis cannot remove an expiry, so
-// a day's boards, ghosts and its entry in the day list expire 50 years after
-// the day. The value stays under 2^31 seconds.
+// Daily data is kept forever, but Devvit cannot remove an expiry, so it expires in 50 years (under 2^31 s).
 export const DAILY_GP_BOARD_KEEP_SECONDS = 50 * 365 * 24 * 60 * 60;
 export const DAILY_GP_CHALLENGE_HISTORY_TTL_SECONDS = DAILY_GP_BOARD_KEEP_SECONDS;
 export const DAILY_GP_PLAYLIST_DAYS = 7;
@@ -144,8 +142,7 @@ export type DailyGpPlayerProfile = {
 
 export type DailyGpPlayerPreferences = {
     carSkin: string;
-    // The skin picked for circuit, dirt, snow, water and space tracks.
-    // Absent until picked.
+    // The picked skin per non-tarmac ground; absent until picked.
     carSkinGrip?: string;
     carSkinDirt?: string;
     carSkinSnow?: string;

@@ -27,8 +27,7 @@ import { isTrackInDailySchedule } from '../daily/daily-schedule-store.js';
 import { findSeriesUsingTrack } from '../campaign/series-usage.js';
 import { assertCreatorTrackAccess, canAccessCreatorTrack, readCreatorTrackPlacements } from './creator-track-access.js';
 
-// Tracks made in the Creator, and copies of built-in tracks that nobody has
-// raced. Each subreddit install has its own Redis, so each has its own list.
+// Creator tracks and unraced built-in copies, one list per install.
 
 // A copy of a built-in track keeps the app row, which can have no author time.
 export type AuthoredMedalRow = { author: number | null; gold: number; silver: number; bronze: number };
@@ -62,8 +61,7 @@ export type StoredTrackSummary = Pick<StoredTrackRecord,
     'key' | 'checksPassed' | 'checkError' | 'origin' | 'revision' | 'updatedAt' | 'updatedBy'
     | 'lockedAt' | 'lockReason' | 'medalRow'> & { name: string; ground: string; ready: boolean };
 
-// The form that the game uses to look up a track (game/track/stored-tracks.js).
-// `placed` is true once players can race the track.
+// The form game/track/stored-tracks.js looks up; `placed` means players can race it.
 export type StoredTrackEntry = {
     key: string;
     name: string;
@@ -84,10 +82,7 @@ const REVISION_KEY = `${TRACK_KEY_PREFIX}:revision`;
 const WRITE_LOCK_TTL_MS = 10_000;
 const LOAD_BATCH_SIZE = 25;
 
-// The index keeps one value per track: its revision and the time the record
-// was made. A track that is deleted and made again starts at revision 1, but
-// with a new time, so its value never repeats and a cache of the old track
-// never answers for the new one. An older value holds only the revision.
+// Index value: revision and creation time, so a recreated track never matches an old cache (old values: revision only).
 export function storedTrackIndexValue(record: Pick<StoredTrackRecord, 'revision' | 'createdAt'>): string {
     return `${record.revision}:${record.createdAt}`;
 }
@@ -158,14 +153,8 @@ export function summarizeStoredTrack(record: StoredTrackRecord): StoredTrackSumm
     };
 }
 
-// ---- The per-install cache that the game's track lookup reads ----
-//
-// A request loads only the tracks that it names. For each install the server
-// keeps the track list (key -> index value), read again only when the list's
-// revision changes, and the tracks that requests loaded, keyed by key and
-// index value. Each request pins one list. Its lookups read that list and the
-// loaded tracks. A listed track that the request did not load is an error that
-// answers "retry": the lookup never falls back to the app layout.
+// ---- Per-install cache for the game's track lookup ----
+// Requests pin one list and load only named tracks; a listed unloaded track answers retry, never the app layout.
 
 export type StoredTrackIndex = {
     revision: string;
@@ -227,8 +216,7 @@ function keepLoadedTrack(scope: string, trackKey: string, indexValue: string, en
     }
 }
 
-// The track list that this request reads: its pinned list, or else the
-// install's newest list.
+// The request's pinned list, else the install's newest.
 export function currentStoredTrackIndex(scope = readStoredTrackInstallScope()): StoredTrackIndex | null {
     if (!scope) return null;
     return pinnedIndex.getStore()?.index ?? indexByInstall.get(scope) ?? null;
@@ -261,8 +249,7 @@ export function storedTrackExistsForRequest(trackKey: string): boolean {
     return currentStoredTrackIndex()?.values.has(trackKey) === true;
 }
 
-// The placed stored tracks among these keys. The request must have loaded
-// them: a listed track that is not loaded is never described as absent.
+// Placed stored tracks among these keys; an unloaded listed track is never reported absent.
 export function describePlacedStoredTracks(trackKeys: string[]): StoredTrackEntry[] {
     return [...new Set(trackKeys)].flatMap((trackKey) => {
         if (typeof trackKey !== 'string') return [];
@@ -275,8 +262,7 @@ export function installStoredTrackResolver(): void {
     setStoredTrackResolver(resolveStoredTrackForRequest, { exists: storedTrackExistsForRequest });
 }
 
-// The raw record of each key, in the order of the keys. The batches go out
-// at the same time.
+// Raw records in key order, batches in parallel.
 async function readRecordValues(trackKeys: string[]): Promise<(string | null)[]> {
     const batches: string[][] = [];
     for (let index = 0; index < trackKeys.length; index += LOAD_BATCH_SIZE) {
@@ -306,9 +292,7 @@ export function readStoredTrackCacheRevision(scope: string): string | null {
     return indexByInstall.get(scope)?.revision ?? null;
 }
 
-// Reads the track list for this revision. It does not publish it: the stored
-// catalog publishes a list only when the revision did not change during the
-// reads.
+// Reads the list for this revision; the stored catalog decides whether to publish it.
 export async function readStoredTrackIndex(revision: string): Promise<StoredTrackIndex> {
     if (revision === '0') return { revision, values: new Map() };
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
@@ -324,9 +308,7 @@ export function publishStoredTrackIndex(scope: string, index: StoredTrackIndex):
     return true;
 }
 
-// Loads the listed tracks among these keys that this request's list names and
-// the cache does not hold yet, in one read. False when a record does not match
-// the list: a write landed after the list was read.
+// Loads missing listed tracks in one read; false when a record does not match the list.
 export async function loadStoredTrackEntries(trackKeys: string[]): Promise<boolean> {
     const scope = readStoredTrackInstallScope();
     const index = currentStoredTrackIndex(scope);
@@ -368,8 +350,7 @@ export async function readStoredTrackKeys(): Promise<Set<string>> {
     return new Set(Object.keys((await redis.hGetAll(INDEX_KEY)) ?? {}));
 }
 
-// Every stored track with its shape, newest change first. Only the Creator
-// reads this list.
+// Every stored track with its shape, newest first, for the Creator.
 export async function listStoredTrackRecords(): Promise<StoredTrackRecord[]> {
     const index = (await redis.hGetAll(INDEX_KEY)) ?? {};
     const records = await readRecords(Object.keys(index));
@@ -384,14 +365,8 @@ export async function listStoredTracks(): Promise<StoredTrackSummary[]> {
         .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
-// Players see a stored track only after it is placed: a Daily or a published
-// series locks it. A track that is still being made stays private.
-// The placed stored tracks among these keys. The index and the records are
-// read at the same time, so the two reads must agree. A key is absent, and
-// the app track is valid, only when it has no index field and no record.
-// A field without a matching record, or a record without a field, is a write
-// between the reads or a broken record. The reads run once more, and then the
-// answer is "retry", never "absent".
+// Players see a stored track only once a Daily or published series places and locks it.
+// A key is absent only with no index field and no record; a mismatch rereads once, then answers retry.
 export async function readPlacedStoredTracks(trackKeys: string[]): Promise<StoredTrackEntry[]> {
     const keys = [...new Set(trackKeys.filter((trackKey) => TRACK_KEY_RE.test(trackKey)))];
     if (!keys.length) return [];
@@ -484,15 +459,13 @@ export type SaveStoredTrackOptions = {
     username: string;
     baseRevision?: unknown;
     origin?: StoredTrackOrigin;
-    // Only for an exact copy of a built-in track: the app already approved
-    // its shape and its medal times, so the checks do not run again.
+    // Exact built-in copies only: the app already approved the shape and medals.
     trusted?: boolean;
     now?: Date;
     assertUnplayed?: (trackKey: string) => Promise<void>;
 };
 
-// Creates a track, or saves a new revision of an unlocked one. A save must
-// start from the current revision, so two devices cannot overwrite each other.
+// Creates a track or saves a revision of an unlocked one, from the current revision only.
 export async function saveStoredTrack(
     trackKeyInput: unknown,
     input: unknown,
@@ -578,10 +551,7 @@ export async function saveStoredTrack(
 const LOCK_ATTEMPTS = 5;
 const LOCK_RETRY_MS = 150;
 
-// Locks a stored track. It does nothing to a built-in track or to a track
-// that is locked already. A save that holds the track at the same moment
-// makes it wait and try again. Only tests call it, to set up a locked track:
-// the game locks a track in the Daily or series placement (freezeStoredTrack).
+// Locks a stored track (built-in or locked: no-op); only tests call it, the game locks on placement.
 export async function lockStoredTrack(
     trackKey: string,
     reason: StoredTrackLockReason,
@@ -608,8 +578,7 @@ export async function lockStoredTrack(
     }
 }
 
-// Writes a locked copy of a played app track (track-copy.ts). It never
-// replaces a track that Redis holds already, and answers whether it wrote.
+// Writes a locked copy of a played app track, never over an existing one; returns whether it wrote.
 export async function saveLockedTrackCopy(record: StoredTrackRecord): Promise<boolean> {
     return withTrackPlacementLock((placementLock) => withTrackWriteLock(record.key, (trackLock) =>
         commitTrackPlacement([placementLock, trackLock], [], async () => {
@@ -626,8 +595,7 @@ export type DeleteStoredTrackOptions = {
     isPlaced?: (trackKey: string) => Promise<boolean>;
 };
 
-// Removes an unlocked track that no list uses. For a copy of a built-in
-// track, the game then uses the app copy again.
+// Removes an unlocked unused track; a built-in copy falls back to the app track.
 export async function deleteStoredTrack(
     trackKeyInput: unknown,
     { username, baseRevision, isPlaced }: DeleteStoredTrackOptions = {},
@@ -657,10 +625,7 @@ export async function deleteStoredTrack(
         })));
 }
 
-// Removes a copy of an app track when `canRemove` accepts it. The game then
-// reads the app track. Only the undo of a copy uses this. It is the one way
-// a locked track goes, so the undo accepts only a copy that is exactly the
-// app track: players race the same track as before.
+// Undo only: removes an app copy that `canRemove` accepts, the one way a locked track goes.
 export async function removeTrackCopy(
     trackKey: string,
     canRemove: (record: StoredTrackRecord) => boolean,

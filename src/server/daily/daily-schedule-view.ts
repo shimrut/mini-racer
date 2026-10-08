@@ -8,8 +8,7 @@ import { listCreatorTracks } from '../tracks/creator-track-access.js';
 import { readTrackUsage } from '../tracks/track-usage.js';
 import { readSeriesTrackUse } from '../campaign/series-usage.js';
 
-// What the Creator shows for the Daily list: the list, the latest Daily, and
-// every track that the list can use.
+// The Creator's Daily list view: the list, the latest Daily and every usable track.
 
 export type CreatorDailyTrack = {
     key: string;

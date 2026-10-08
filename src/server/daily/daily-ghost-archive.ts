@@ -31,22 +31,13 @@ import {
     DAILY_GP_CHALLENGE_HISTORY_HASH_KEY,
 } from './daily-gp-model.js';
 
-// Moves the ghosts of old Daily days to blob storage. A day's ghosts move on
-// its 8th day, after the podium window closes. A ghost leaves Redis only after
-// its blob copy was read back and matched. The run keeps its time, splits and
-// every other field in Redis, with `ghost: null` and a reference to the copy.
-//
-// Only the old-day writers can change a moved day: a sign-in copies or keeps
-// rows, and the clean-ups delete them. Each of them raises the day's standings
-// revision in the same transaction, so a pass that ends on the revision it
-// started with has seen every row.
+// Moves old Daily ghosts to blob storage on day 8, after the podium window; Redis keeps the run with a reference.
+// A ghost leaves Redis only after its copy reads back the same.
+// Every old-day writer raises the day's revision, so an unchanged revision means the pass saw every row.
 
 export type DailyGhostArchiveMode = 'off' | 'move' | 'restore';
 
-// What a moderator picks in the subreddit menu. Each install keeps its own
-// choice, because each install has its own Redis and its own blob storage.
-// 'off' does nothing, and pauses a sweep. 'trial' moves one day only.
-// 'restore' writes every moved ghost back to Redis and deletes nothing.
+// The moderator's choice per install: off (pauses a sweep), trial (one day), move, or restore (deletes nothing).
 export type DailyGhostArchiveChoice = 'off' | 'trial' | 'all' | 'restore';
 
 export const DAILY_GHOST_ARCHIVE_CHOICES: readonly { value: DailyGhostArchiveChoice; label: string }[] = [
@@ -69,9 +60,7 @@ export function dailyGhostArchiveRunFor(choice: DailyGhostArchiveChoice): {
     return { mode: choice, dayLimit: null };
 }
 
-// Raise after a rollback to an older app version: every done day is checked
-// again, because an older version may change a day without raising its
-// revision.
+// Raise after a rollback: an older version may change a day without its revision, so every done day is rechecked.
 export const DAILY_GHOST_ARCHIVE_EPOCH = 1;
 
 const KEY_PREFIX = 'dailygp:ghost-archive:v1';
@@ -79,8 +68,7 @@ export const DAILY_GHOST_ARCHIVE_LOCK_KEY = `${KEY_PREFIX}:lock`;
 export const DAILY_GHOST_ARCHIVE_DAYS_KEY = `${KEY_PREFIX}:days`;
 export const DAILY_GHOST_ARCHIVE_TOTALS_KEY = `${KEY_PREFIX}:totals`;
 export const DAILY_GHOST_ARCHIVE_SETTING_KEY = `${KEY_PREFIX}:setting`;
-// The last refusal from blob storage, shown on the moderator page until a
-// request goes through again.
+// The last blob storage refusal, shown to moderators until a request succeeds.
 export const DAILY_GHOST_ARCHIVE_BLOB_ERROR_KEY = `${KEY_PREFIX}:blob-error`;
 const BLOB_ERROR_LOGGED_KEY = `${KEY_PREFIX}:blob-error-logged`;
 const BLOB_ERROR_LOG_EVERY_MS = 60 * 60 * 1000;
@@ -133,8 +121,7 @@ export function dailyGhostBlobKey(challengeId: string, field: string, sha256: st
 }
 
 const LOCK_TTL_MS = 55_000;
-// Blob calls end by T + 22 s; Redis commits start by T + 25 s. Reddit stops a
-// request at 30 s.
+// Blob calls end by T + 22 s and commits start by T + 25 s; Reddit stops a request at 30 s.
 const BLOB_WORK_MS = 22_000;
 const COMMIT_UNTIL_MS = 25_000;
 const UPKEEP_RESERVE_MS = 6_000;
@@ -147,14 +134,12 @@ const SLICE_SIZE = 25;
 // One hourly turn of a held list reads at most this many scan pages.
 const HELD_PAGE_LIMIT = 4;
 const SWEEP_LIST_PAGE = 200;
-// An unreferenced object this much younger than the sweep's snapshot may be
-// an upload whose stub is not committed yet, so it is kept for a later sweep.
+// A young unreferenced object may be an upload whose stub is not committed yet, so a later sweep decides.
 const SWEEP_GRACE_MS = 60 * 60 * 1000;
 const SWEEP_RETRY_MARGIN_MS = 5 * 60 * 1000;
 // After a damaged reference or row, the next sweep waits this long.
 const SWEEP_DAMAGED_WAIT_MS = 24 * 60 * 60 * 1000;
-// Version 2 also saves the time and date of each run without a ghost, and
-// stops at a row it cannot read.
+// v2 also saves the time and date of runs without a ghost, and stops at an unreadable row.
 const SWEEP_REFS_VERSION = 2;
 const WORKERS = 8;
 const STEP_MARGIN_MS = 1_000;
@@ -164,8 +149,7 @@ type DayState = 'moving' | 'waiting' | 'done' | 'restoring' | 'restored';
 
 export type DailyGhostArchiveSweep = {
     phase: 'refs' | 'list';
-    // The rules its saved references were built with. A sweep built with older
-    // rules starts again before it deletes anything.
+    // Reference rules version; an older sweep restarts before it deletes anything.
     refsVersion?: number;
     modeSerial: number;
     startedAt: number;
@@ -194,8 +178,7 @@ export type DailyGhostArchiveDay = {
     nextPassAt: number;
     doneRevision: number | null;
     hasHeld: boolean;
-    // Where the hourly work on the held list goes on: a scan page, and the
-    // last name taken from it. Names behind a stuck name get their turn.
+    // Held-list position: scan page and last name taken; names behind a stuck name still get a turn.
     heldCursor: number;
     heldAfter: string | null;
     heldThisPass: number;
@@ -316,8 +299,7 @@ function isStub(run: { value: Record<string, unknown> } | null): boolean {
         && isPbGhostArchiveRef(run.value.ghostArchive));
 }
 
-// The text left in Redis after the ghost moved: every field as it was, the
-// ghost, plain or packed, replaced by the reference.
+// The row left in Redis: every field kept, with the ghost replaced by the reference.
 export function buildDailyGhostStub(fullText: string, ref: PbGhostArchiveRef): string {
     const value = JSON.parse(fullText) as Record<string, unknown>;
     value.ghost = null;
@@ -326,8 +308,7 @@ export function buildDailyGhostStub(fullText: string, ref: PbGhostArchiveRef): s
     return JSON.stringify(value);
 }
 
-// A ghost so small that its stub would take as much room stays in Redis:
-// moving it would save nothing.
+// A ghost no bigger than its stub stays, because moving it saves nothing.
 function stubIsSmaller(challengeId: string, name: string, raw: string, text: string): boolean {
     const sha256 = sha256Hex(text);
     const stub = encodeRedisCompressedValue(
@@ -338,8 +319,7 @@ function stubIsSmaller(challengeId: string, name: string, raw: string, text: str
 
 type StoredDay = { id: string; availableUntilMs: number };
 
-// Every stored day, oldest first. Only the id and the end of play matter
-// here, so a day is kept even when its track is not loaded.
+// Every stored day, oldest first; only id and end of play matter, so unloaded tracks are fine.
 async function readStoredDays(): Promise<StoredDay[]> {
     const raw = await redis.hGetAll(DAILY_GP_CHALLENGE_HISTORY_HASH_KEY);
     const days: StoredDay[] = [];
@@ -366,8 +346,7 @@ type RunContext = {
     clock: BlobClock;
     session: BlobSession;
     commitUntilMs: number;
-    // New work starts only until this time. Blob calls must still end by the
-    // session deadline.
+    // No new work after this; blob calls must still end by the session deadline.
     startUntilMs: number;
     days: Map<string, DailyGhostArchiveDay>;
     totals: DailyGhostArchiveTotals;
@@ -389,8 +368,7 @@ function canStep(ctx: RunContext): boolean {
     return !ctx.lockLost && ctx.clock.now() + STEP_MARGIN_MS <= ctx.startUntilMs;
 }
 
-// A moved ghost needs an upload and a read-back; a restored one needs one
-// read. All of a ghost's calls must end by the deadline.
+// A move needs an upload and a read-back, a restore one read; all must end by the deadline.
 function canStartGhost(ctx: RunContext, calls = ctx.mode === 'restore' ? 1 : 2): boolean {
     return !ctx.lockLost
         && ctx.clock.now() <= ctx.startUntilMs
@@ -401,8 +379,7 @@ function canCommit(ctx: RunContext): boolean {
     return !ctx.lockLost && ctx.clock.now() <= ctx.commitUntilMs;
 }
 
-// Runs `mutate` in a transaction that holds the job lock. Returns false when
-// the lock was lost or a watched key changed.
+// Runs `mutate` under the job lock; false when the lock was lost or a watched key changed.
 async function commitOwned(
     ctx: RunContext,
     mutate: (transaction: Awaited<ReturnType<typeof redis.watch>>) => Promise<void>,
@@ -560,8 +537,7 @@ async function forEachWorker<Item>(items: readonly Item[], run: (item: Item) => 
     }));
 }
 
-// Uploads each full ghost, reads it back and compares it. Only a ghost whose
-// copy matches byte for byte is ready to leave Redis.
+// Uploads each ghost and reads it back; only a byte-exact copy may leave Redis.
 async function prepareMoves(
     ctx: RunContext,
     challengeId: string,
@@ -624,9 +600,7 @@ async function prepareMoves(
     return outcome;
 }
 
-// Reads each stub's blob copy and checks it: the sha256 of the text, and the
-// same best time and save time as the stub. Only a matching copy is ready to
-// go back into Redis.
+// Checks each stub's copy (sha256, best time, save time); only a match may go back to Redis.
 async function prepareRestores(
     ctx: RunContext,
     names: readonly string[],
@@ -684,11 +658,7 @@ async function prepareRestores(
     return outcome;
 }
 
-// Writes the confirmed changes of one slice, with its progress and counts, in
-// one transaction. A run is changed only when it still holds the text that
-// was copied and no sign-in owns its player. Names that were not started stay
-// in their list. `dayPatch` is saved with the day, such as the held list's
-// position.
+// Commits a slice with its progress; a run changes only if unchanged and unowned, and unstarted names stay.
 async function commitSlice(
     ctx: RunContext,
     challengeId: string,
@@ -714,9 +684,7 @@ async function commitSlice(
         for (const { name, code } of outcome.failed) heldReasons[name] = `failed:${code}`;
         const held = [...signin, ...(outcome.marked ?? [])];
         if (source === 'page') {
-            // A row that changed after it was copied (packed by the ghost
-            // compaction, or written by a sign-in) is tried again from the held
-            // list, so a finished day never keeps a full ghost behind.
+            // A row changed after the copy goes to the held list, so a finished day never keeps a full ghost.
             remove.push(...outcome.failed.map((item) => item.name), ...held, ...changed);
             for (const name of held) heldReasons[name] = 'signin';
             for (const name of changed) heldReasons[name] = 'changed';
@@ -799,8 +767,7 @@ async function prepareSlice(
     names: readonly string[],
 ): Promise<SliceOutcome> {
     const raws = await redis.hMGet(challengeCollectionKey(challengeId), [...names]);
-    // A player with a sign-in in progress is held before any blob call, so no
-    // copy is made for nothing. The commit checks the marks again.
+    // Hold players mid sign-in before any blob call; the commit checks the marks again.
     const marks = await redis.mGet(names.flatMap(markerKeys));
     const marked = names.filter((_name, index) => marks[index * 2] || marks[index * 2 + 1]);
     const free = names.filter((name) => !marked.includes(name));
@@ -811,9 +778,7 @@ async function prepareSlice(
     return { ...outcome, marked };
 }
 
-// A move pass is done when the revision did not move. A restore pass ends the
-// restore only when, besides, it left no stub behind and the held list is
-// empty; a stub whose owner never finishes signing in keeps the day restoring.
+// A move ends on an unchanged revision; a restore also needs no stub left and an empty held list.
 async function endPass(ctx: RunContext, challengeId: string): Promise<boolean> {
     const day = ctx.days.get(challengeId)!;
     const revision = await readRevision(challengeId);
@@ -847,8 +812,7 @@ async function endPass(ctx: RunContext, challengeId: string): Promise<boolean> {
     return saved;
 }
 
-// Works on one day's open pass until it ends, time runs out, or a slice keeps
-// conflicting. Returns false when no progress is possible now.
+// Works one day's pass until it ends, time runs out, or a slice keeps conflicting; false when stuck.
 async function workPass(ctx: RunContext, challengeId: string): Promise<boolean> {
     while (canStep(ctx)) {
         const day = ctx.days.get(challengeId)!;
@@ -861,8 +825,7 @@ async function workPass(ctx: RunContext, challengeId: string): Promise<boolean> 
         }
         if (!canStartGhost(ctx)) return false;
         const outcome = await prepareSlice(ctx, challengeId, names);
-        // A failed commit is tried again with the same copies: the check reads
-        // each run again, so a run that changed is left as it is.
+        // Retry with the same copies; the check rereads each run, so a changed run stays.
         let committed = false;
         for (let attempt = 0; attempt < MAX_SLICE_COMMITS && !committed && !ctx.lockLost; attempt += 1) {
             committed = await commitSlice(ctx, challengeId, 'page', outcome);
@@ -905,9 +868,7 @@ function pickRestoreDay(
     return null;
 }
 
-// A day counts toward the day limit once it holds ghosts. A finished day where
-// nothing needed moving does not count, so a one-day trial passes over empty
-// old days and reaches a day with real ghosts.
+// Only days with ghosts count toward the limit, so a one-day trial skips empty days.
 function countsTowardDayLimit(day: DailyGhostArchiveDay): boolean {
     return day.active || day.state !== 'done' || day.moved > 0 || day.hasHeld || day.failedThisPass > 0;
 }
@@ -935,10 +896,7 @@ type HeldPick = {
     after: string | null;
 };
 
-// The next names of a held list, going on from the day's saved position. Each
-// page's names are taken in name order, after the last name taken from it.
-// When a page has no more, the next page is read, and after the last page the
-// list starts again from the top, once in a call.
+// Next held names from the saved position, page by page in name order, wrapping once per call.
 async function pickHeldNames(heldKey: string, day: DailyGhostArchiveDay): Promise<HeldPick> {
     let cursor = day.heldCursor;
     let after = day.heldAfter;
@@ -965,8 +923,7 @@ async function pickHeldNames(heldKey: string, day: DailyGhostArchiveDay): Promis
     return { names: [], cursor, after };
 }
 
-// The last of `names` up to which every name was dealt with, so the next turn
-// goes on after it. Names not started for lack of time come first next turn.
+// The last name with everything before it done; unstarted names come first next turn.
 function heldPosition(pick: HeldPick, handled: ReadonlySet<string>): Partial<DailyGhostArchiveDay> {
     let after = pick.after;
     for (const name of pick.names) {
@@ -976,10 +933,7 @@ function heldPosition(pick: HeldPick, handled: ReadonlySet<string>): Partial<Dai
     return { heldCursor: pick.cursor, heldAfter: after };
 }
 
-// The held list of one day: up to one slice of names, from where the last
-// turn stopped. A name whose row is gone or already in the wanted form is
-// dropped first. Only a row that still needs a change has its marks checked;
-// a marked owner keeps the name.
+// One slice of a day's held list; finished rows drop out, and a marked owner keeps its name.
 async function workHeld(ctx: RunContext, challengeId: string): Promise<void> {
     const day = ctx.days.get(challengeId);
     if (!day || day.sweep) return;
@@ -1080,9 +1034,7 @@ async function startSweep(ctx: RunContext, challengeId: string): Promise<boolean
     });
 }
 
-// The name a run without a ghost is kept under in the saved refs: its time and
-// date. A stub that lost its reference still holds both, so the blob copy of
-// the same run is kept, whatever player name the copy carries.
+// A ghostless run's saved-refs name is its time and date, so a stub that lost its reference keeps its copy.
 function sweepRunToken(value: Record<string, unknown>): string | null {
     const { bestTimeMs, updatedAt } = value;
     if (typeof bestTimeMs !== 'number' || !Number.isFinite(bestTimeMs) || typeof updatedAt !== 'string') return null;
@@ -1094,9 +1046,7 @@ type SweepRow =
     | { kind: 'none' }
     | { kind: 'damaged'; error: 'damaged_ref' | 'damaged_row' };
 
-// What the sweep keeps for one row of the day: the object its stub points to,
-// or the time and date of a run without a ghost. A row the sweep cannot read
-// safely stops it.
+// What the sweep keeps per row: the stub's object, or a ghostless run's time and date; an unreadable row stops it.
 function sweepRow(raw: unknown): SweepRow {
     const run = readRun(raw);
     if (!run) return { kind: 'damaged', error: 'damaged_row' };
@@ -1110,9 +1060,7 @@ function sweepRow(raw: unknown): SweepRow {
     return token ? { kind: 'ref', name: token } : { kind: 'damaged', error: 'damaged_row' };
 }
 
-// One page of the reference scan. The refs and the scan position are saved
-// together. At the end, the snapshot counts only if the day's revision did not
-// move while it was taken; otherwise the scan starts again.
+// One reference scan page; the snapshot counts only if the day's revision held, else the scan restarts.
 async function sweepRefsStep(ctx: RunContext, challengeId: string): Promise<boolean> {
     const day = ctx.days.get(challengeId)!;
     const sweep = day.sweep!;
@@ -1162,8 +1110,7 @@ async function sweepRefsStep(ctx: RunContext, challengeId: string): Promise<bool
     });
 }
 
-// The saved-refs name of the run a blob copy holds, or null when the copy is
-// not a run with a time and a date. Throws when the copy cannot be read now.
+// The saved-refs name of a blob copy's run, or null; throws when the copy cannot be read now.
 async function copyRunToken(ctx: RunContext, key: string): Promise<{ gone: boolean; token: string | null }> {
     const copy = await ctx.session.get(key);
     if (copy === null) return { gone: true, token: null };
@@ -1215,9 +1162,7 @@ async function finishSweep(ctx: RunContext, challengeId: string, sweep: DailyGho
     return saved;
 }
 
-// One listing page, in key order. An object is kept when a stub points to it,
-// or when it is not older than the snapshot by the grace time. Progress is
-// saved after each batch, so a page cut short resumes after `lastKey`.
+// One listing page in key order; keep referenced or young objects, and save progress after each batch.
 async function sweepListStep(ctx: RunContext, challengeId: string): Promise<boolean> {
     let sweep = ctx.days.get(challengeId)!.sweep!;
     if (!ctx.session.hasTimeFor(1)) return false;
@@ -1280,8 +1225,7 @@ async function sweepListStep(ctx: RunContext, challengeId: string): Promise<bool
                 sweep = { ...sweep, lastKey: object.key };
                 continue;
             }
-            // A run without a ghost, with the same time and date, may be a stub
-            // that lost its reference: its copy stays.
+            // A same-time ghostless run may be a stub that lost its reference, so its copy stays.
             if (copy.token && await redis.hGet(refsKey, copy.token)) {
                 sweep = { ...sweep, kept: sweep.kept + 1, keptBytes: sweep.keptBytes + object.size, lastKey: object.key };
                 continue;
@@ -1320,9 +1264,7 @@ async function workSweep(ctx: RunContext, challengeId: string): Promise<void> {
     }
 }
 
-// One small request before any day changes. When blob storage refuses it, the
-// run stops with every day as it was, keeps the reason for the moderator page,
-// and logs it at most once an hour.
+// A probe before any change; a refusal stops the run, is kept for moderators, and is logged at most hourly.
 async function blobStorageRefusal(ctx: RunContext): Promise<string | null> {
     try {
         await ctx.session.list(`${BLOB_PREFIX}/`, null, 1);
@@ -1550,8 +1492,7 @@ export async function readDailyGhostArchiveStatus(nowMs = Date.now()): Promise<D
     };
 }
 
-// The state of each day the job touched, so the storage view can sample moved
-// and unmoved days apart.
+// Each touched day's state, so the storage view can sample moved and unmoved days apart.
 export async function readDailyGhostArchiveDayStates(): Promise<Map<string, DayState>> {
     const ids = await redis.hKeys(DAILY_GHOST_ARCHIVE_DAYS_KEY);
     const states = new Map<string, DayState>();

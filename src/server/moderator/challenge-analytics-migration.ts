@@ -51,8 +51,7 @@ function parseReceipt(raw: string | null | undefined): LegacyReceipt {
     throw new Error(IMPORT_ERROR);
 }
 
-// Seed the fixed post-to-track map, including posts whose first v1 view may
-// still be in flight. NX preserves any receipt another request already used.
+// Seed the fixed post-to-track map; NX keeps any receipt another request already used.
 async function addMappings(subredditName: string, cards: HeadToHeadCatalogCard[]): Promise<boolean> {
     if (!cards.length) return true;
     const keys = challengeAnalyticsMigrationKeys(subredditName);
@@ -90,8 +89,7 @@ async function initializeMappings(subredditName: string): Promise<void> {
     await redis.set(keys.complete, '1', { nx: true });
 }
 
-// Raw deltas, viewer unions, and the imported source snapshot commit together.
-// A lost acknowledgement or competing request cannot import an event twice.
+// Deltas, viewers and the source snapshot commit together, so no event imports twice.
 async function reconcilePost(subredditName: string, postId: string): Promise<void> {
     const keys = challengeAnalyticsMigrationKeys(subredditName);
     const oldCountsKey = challengeAnalyticsCountsKey(subredditName);
@@ -118,9 +116,7 @@ async function reconcilePost(subredditName: string, postId: string): Promise<voi
             const newCountsKey = challengeTrackAnalyticsCountsKey(subredditName);
             const newViewersKey = challengeTrackAnalyticsViewersKey(subredditName, receipt.trackKey);
             const fields = challengeTrackAnalyticsCounterFields(receipt.trackKey);
-            // A live v2 event can insert its timestamp between our read and
-            // EXEC. Fence only timestamp changes so we preserve the earliest
-            // date without making membership-only reconciliation watch totals.
+            // Fence only timestamp changes, to keep the earliest date without watching totals.
             if (next.startedAt && next.startedAt !== receipt.startedAt) {
                 await transaction.watch(newCountsKey);
             }
@@ -175,9 +171,7 @@ async function reconcileBatch(subredditName: string, posts: { postId: string; re
     }
 }
 
-// The marker freezes catalogue mappings, not v1 data: requests from the old
-// version can still finish afterward. Recheck only the mapped sources, adding
-// new lifetime deltas and identities without inventing historical Today data.
+// The marker freezes mappings, not v1 data; recheck mapped sources for new lifetime data, never old Today data.
 export async function migrateLegacyChallengeAnalytics(subredditName: string): Promise<void> {
     await initializeMappings(subredditName);
     const keys = challengeAnalyticsMigrationKeys(subredditName);

@@ -24,9 +24,7 @@ function parseRecord(raw: string | null | undefined): CreatorPostRecord | null {
 export function resolveCreatorToolSubredditName(): string | null {
     const postData = readContextPostData();
     const fromContext = readContextSubredditName();
-    // Some Devvit requests omit postData after the webview has opened. The
-    // signed subreddit context still scopes those requests; moderator checks
-    // remain mandatory in every creator route.
+    // Some requests omit postData; the signed subreddit still scopes them, and every route checks the moderator.
     if (!postData) return fromContext;
     if (postData.tool !== 'community-creator') return null;
     const fromPost = typeof postData.subredditName === 'string' ? postData.subredditName.trim() : '';

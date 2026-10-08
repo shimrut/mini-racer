@@ -98,9 +98,7 @@ export async function isRedisLockOwned(
     return await client.get(lock.key) === lock.value;
 }
 
-// `watchedKeys` are watched with the lock. `check` runs after WATCH and before
-// MULTI, so a state it reads cannot change before EXEC without failing the
-// commit. When `check` throws, the transaction is given up.
+// `check` runs between WATCH and MULTI, so what it reads cannot change before EXEC; a throw gives up.
 export async function beginOwnedRedisLockTransaction(
     lock: RedisLock,
     client: RedisClient = redis,
@@ -285,9 +283,7 @@ export async function commitOwnedRedisLockTransaction(
     }
 }
 
-// Runs each mutation in one transaction that watches the owner locks and the
-// step locks, after it renews them all. It throws `failure('lost')` when a lock
-// is no longer owned, and `failure('interrupted')` when a watched key changed.
+// Renews and watches all locks per mutation; throws `lost` for a lost lock, `interrupted` for a changed key.
 export function createOwnedLockGroupRunner(
     ownerLocks: readonly RedisLock[],
     failure: (reason: 'lost' | 'interrupted') => Error,

@@ -11,8 +11,7 @@ export function normalizedCreatorUsername(username: unknown): string {
     return typeof username === 'string' ? username.trim().toLowerCase() : '';
 }
 
-// Membership is also checked for records written before sharedAt existed.
-// Missing owners/origins remain private, rather than exposing an unaudited draft.
+// Also check membership for records older than sharedAt; missing owners or origins stay private.
 export async function readCreatorTrackPlacements(): Promise<Set<string>> {
     const [schedule, series] = await Promise.all([readDailySchedule(), listStoredSeries()]);
     return new Set([...schedule.keys, ...series.flatMap((entry) => entry.stages.map((stage) => stage.trackKey))]);
@@ -78,8 +77,7 @@ export async function listCreatorTracks(username: string) {
     }));
 }
 
-// Placement makes a draft shared permanently. Its geometry and edit stamps
-// stay unchanged; the revision invalidates old editor snapshots and caches.
+// Placement shares a draft for good; geometry stays, and the revision drops old editor snapshots.
 export async function readTracksToShare(trackKeys: Iterable<string>, now: Date): Promise<StoredTrackRecord[]> {
     const records = await Promise.all([...new Set(trackKeys)].map(readStoredTrack));
     return records.flatMap((record) => record && record.origin !== 'migrated' && !record.lockedAt && !record.sharedAt

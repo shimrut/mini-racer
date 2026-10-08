@@ -24,8 +24,7 @@ export class GuestProgressRecoveryRequiredError extends Error {
 
 export const PROGRESS_SELECTION_CONTINUE_REASON = 'progress_selection_continue' as const;
 
-// A transfer with many Daily days works in pieces, one request at a time. It
-// saved its position; the client resumes the same transfer at once.
+// A long Daily transfer saved its position; the client resumes it at once.
 export class GuestProgressSelectionContinueError extends Error {
     readonly statusCode = 503;
     readonly reason = PROGRESS_SELECTION_CONTINUE_REASON;

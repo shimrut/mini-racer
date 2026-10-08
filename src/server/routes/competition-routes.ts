@@ -16,9 +16,7 @@ export type CompetitionRouteDependencies = {
     getServerDailyGpSnapshot(input: Record<string, unknown>): Promise<unknown>;
     submitServerDailyGpRun(input: Record<string, unknown>): Promise<ServiceResult>;
     isDailyGpChallengePlayable(challenge: DailyGpChallenge): boolean;
-    // Reads the catalog again after the answer knows which challenge it names,
-    // since another server can place that Daily after this request began,
-    // then loads the tracks that it names.
+    // Rereads the catalog once the challenge is known (another server may place it), then loads its tracks.
     refreshStoredCatalog?(): Promise<void>;
     loadStoredTracks?(trackKeys: string[]): Promise<void>;
     // The placed stored tracks among these keys, so the game can load them.

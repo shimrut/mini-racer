@@ -86,8 +86,7 @@ function isAllowedGroundCarSkin(
         && isCarAssetUnlocked(assetName, carUnlocks);
 }
 
-// Each skin must be unlocked and belong to its own ground. A bad tarmac skin
-// falls back to the stock car; a bad skin for any other ground is dropped.
+// A skin must be unlocked and on its own ground; a bad tarmac skin falls back to stock, others are dropped.
 function preferencesAllowedByCarUnlocks(
     preferences: DailyGpPlayerPreferences | null,
     carUnlocks: CarUnlockSnapshot,

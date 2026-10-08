@@ -2,8 +2,7 @@ import { CAMPAIGN_ID, getCampaignStage } from '../../../game/campaign/manifest.j
 
 export { CAMPAIGN_ID };
 
-// A Campaign origin names the series and one of its stages. Posts made before
-// there were series name Numbers.
+// A Campaign origin names the series and stage; posts from before series name Numbers.
 export function isCampaignStageOfSeries(campaignId: unknown, raceId: unknown): boolean {
     return typeof campaignId === 'string' && getCampaignStage(raceId)?.seriesId === campaignId;
 }

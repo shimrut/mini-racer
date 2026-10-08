@@ -309,8 +309,7 @@ export async function mergeGuestCarUnlockProgress({
         await verifyGuestSource?.({ unlocks: fields });
         const hadGuestProgress = Object.keys(fields).length > 0;
 
-        // Every Garage field is a one-time event flag, so adding the guest's
-        // fields to the account's is a union of both Garages.
+        // Garage fields are one-time flags, so merging is a union of both Garages.
         const enqueue: RedisLockMutation = async (transaction) => {
             if (hadGuestProgress) {
                 await transaction.hSet(carUnlockHashKey(redditPlayerId), fields);

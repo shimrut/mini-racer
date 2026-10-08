@@ -9,11 +9,7 @@ import {
     type StoredTrackRecord,
 } from './track-store.js';
 
-// Copies of app tracks in Redis. A copy must race exactly like the app track:
-// the same walls, corner rounding, start, checkpoints, ground, name and medal
-// times. The ghost fingerprint alone is not enough, because it leaves out the
-// corner rounding. Saved times, ghosts and replays stay valid only when the
-// copy is exact.
+// A Redis copy must race exactly like the app track, medals and name included; the fingerprint skips rounding.
 
 const APP_MEDAL_ROWS = medalTimes as Record<string, unknown>;
 
@@ -32,8 +28,7 @@ export function appMedalRow(trackKey: string) {
     return normalizeGameMedalRow(APP_MEDAL_ROWS[trackKey]) ?? null;
 }
 
-// An unfinished drawing or a saved road line is a moderator's work, so a copy
-// with one is not exactly the app track, even when its road is.
+// An unfinished drawing or saved road line is moderator work, so the copy is not exact.
 export function matchesAppTrack(
     record: Pick<StoredTrackRecord, 'key' | 'track' | 'medalRow' | 'fingerprint'>
         & Partial<Pick<StoredTrackRecord, 'draftLoop' | 'roadLine'>>,
@@ -51,9 +46,7 @@ export function matchesAppTrack(
         && record.fingerprint === createTrackFingerprint(source!);
 }
 
-// A played app track, copied locked: a raced track never changes. The app
-// already approved its shape and medal times, so the authoring checks do not
-// run. A copy that does not match the app track is refused before any write.
+// A played app track copied locked, without authoring checks; a mismatch is refused before any write.
 export function buildLockedTrackCopy(
     trackKey: string,
     { username, reason, now }: { username: string; reason: StoredTrackLockReason; now: Date },

@@ -10,10 +10,7 @@ import { readTrackUsage } from '../tracks/track-usage.js';
 import { listAppSeriesDefinitions, listStoredSeries } from './series-store.js';
 import { readSeriesTrackUse } from './series-usage.js';
 
-// What the Creator's Campaign Planner shows: the stored series, the app series
-// that no stored copy replaces, and every track with the place that uses it.
-// The locked copy of Numbers is not listed: the game reads Numbers from the
-// app, and nobody can change it.
+// The Campaign Planner view: stored and unreplaced app series, and each track's place; locked Numbers is left out.
 export async function readCreatorSeriesView(username: string) {
     const [allStored, schedule, usage, storedTracks, seriesUse] = await Promise.all([
         listStoredSeries(),
