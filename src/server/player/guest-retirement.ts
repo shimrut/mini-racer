@@ -60,11 +60,10 @@ export async function resolveGuestIdentityStatus(
     canonicalGuestPlayerId: string,
 ): Promise<{
     status: GuestIdentityStatus;
-    promotedPlayerId: string | null;
     selectionPending: boolean;
 }> {
     if (!canonicalGuestPlayerId.startsWith('guest:')) {
-        return { status: 'active', promotedPlayerId: null, selectionPending: false };
+        return { status: 'active', selectionPending: false };
     }
 
     const selectionPending = await isGuestProgressSelectionPending(canonicalGuestPlayerId);
@@ -72,7 +71,6 @@ export async function resolveGuestIdentityStatus(
     if (!promotedPlayerId) {
         return {
             status: selectionPending ? 'guest_promotion_pending' : 'active',
-            promotedPlayerId: null,
             selectionPending,
         };
     }
@@ -84,7 +82,6 @@ export async function resolveGuestIdentityStatus(
     const migrationPending = Boolean(progressValues.some(Boolean) || selectionPending);
     return {
         status: migrationPending ? 'guest_promotion_pending' : 'guest_identity_retired',
-        promotedPlayerId,
         selectionPending,
     };
 }

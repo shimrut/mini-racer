@@ -24,10 +24,6 @@ const MAX_INDEXED_TRACKS = 5_000;
 const VIEW_READ_BATCH = 100;
 
 export type ChallengeAnalyticsPeriod = 'today' | 'lifetime';
-
-export function isChallengeAnalyticsPeriod(value: unknown): value is ChallengeAnalyticsPeriod {
-    return value === 'today' || value === 'lifetime';
-}
 export const CHALLENGE_TRACK_ANALYTICS_DAILY_RETENTION_DAYS = 2;
 
 export type ChallengeAnalyticsMetrics = {

@@ -365,7 +365,6 @@ type RunContext = {
     serial: number;
     clock: BlobClock;
     session: BlobSession;
-    startMs: number;
     commitUntilMs: number;
     // New work starts only until this time. Blob calls must still end by the
     // session deadline.
@@ -1418,7 +1417,6 @@ export async function runDailyGhostArchive({
                 maxCallsPerSecond,
                 clock,
             }),
-            startMs,
             commitUntilMs: startMs + COMMIT_UNTIL_MS,
             startUntilMs: startMs + BLOB_WORK_MS,
             days,

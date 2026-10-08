@@ -34,7 +34,6 @@ import {
     classifyStoredCampaignProgress,
     classifyStoredLeaderboardEntry,
     readStoredUpdatedAt,
-    type StoredRecordClassification,
 } from '../guest-transfer/guest-transfer-source-classification.js';
 import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
 import { boardMergeWrite, decideBoardMerge, timeFitsBoard } from '../guest-transfer/board-merge.js';
@@ -1298,9 +1297,7 @@ type GuestCampaignStageSource = {
     rawEntry: string | null;
     rank: number | null;
     entry: DailyGpLeaderboardEntry | null;
-    entryClass: StoredRecordClassification<unknown>;
     pb: PlayerTrackPbRecord | null;
-    pbClass: StoredRecordClassification<PlayerTrackPbRecord>;
     rawPb: string | null;
 };
 
@@ -1374,9 +1371,7 @@ async function captureClassifiedGuestCampaignSource(
             entry: entryClass.state === 'valid'
                 ? parseStoredEntry(rawEntry, stage.trackKey)
                 : null,
-            entryClass,
             pb: pbClass.state === 'valid' ? pbClass.record : null,
-            pbClass,
             rawPb: rawPb ?? null,
         });
     }
