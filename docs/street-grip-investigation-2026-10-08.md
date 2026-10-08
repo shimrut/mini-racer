@@ -164,6 +164,15 @@ holds its presses or taps in pulses. Means per lap over the 156 Street tracks:
 - The 1 in 40 rate is a guess. The real rate changes the size of every number, not which style
   feels it more.
 
+## Earlier, related report
+
+No earlier report of this exact issue was found. The closest is a cloud session of 2026-08-29
+on the separate Mini Rally prototype (city, sand and dirt): "sand feels the gripiest, tarmac
+second, dirt third". There the car always followed the racing line, whatever the surface, and a
+bigger drift angle turned the nose into the corner, so the loosest surface looked the most
+planted. It ended with a revert. The grounds plan (2026-09-24) only set the rule that tarmac
+times stay the same to the last bit.
+
 ## Not checked
 
 Track shapes stored only in Redis (Creator edits, the live Daily list). They cannot be read from
