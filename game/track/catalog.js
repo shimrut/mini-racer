@@ -174,6 +174,8 @@ export const TRACK_CATALOG = {
     crescentValley: { name: "Crescent Valley" },
     seaCharger: { name: "Sea Charger" },
     gunSlinger: { name: "Gun Slinger" },
+    rightLeftRight: { name: "Right Left Right" },
+    tailTurn: { name: "Tail Turn" },
 };
 
 export const TRACK_SCHEDULE_KEYS = [

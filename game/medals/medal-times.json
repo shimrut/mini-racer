@@ -1024,5 +1024,17 @@
     "gold": 9.39,
     "silver": 9.72,
     "bronze": 10.03
+  },
+  "rightLeftRight": {
+    "author": 12,
+    "gold": 14.3,
+    "silver": 17,
+    "bronze": 20
+  },
+  "tailTurn": {
+    "author": 10.46,
+    "gold": 10.71,
+    "silver": 10.9,
+    "bronze": 11.5
   }
 }

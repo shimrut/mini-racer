@@ -171,6 +171,8 @@ import endlessLoop from './definitions/endless-loop.js';
 import crescentValley from './definitions/crescent-valley.js';
 import seaCharger from './definitions/sea-charger.js';
 import gunSlinger from './definitions/gun-slinger.js';
+import rightLeftRight from './definitions/right-left-right.js';
+import tailTurn from './definitions/tail-turn.js';
 import { TRACK_CATALOG } from './catalog.js';
 import { getStoredTrack, isStoredTrack } from './stored-tracks.js';
 
@@ -348,6 +350,8 @@ const TRACK_GEOMETRY = {
     crescentValley,
     seaCharger,
     gunSlinger,
+    rightLeftRight,
+    tailTurn,
 };
 
 // The tracks in the app, without the stored tracks.
