@@ -104,6 +104,30 @@ the design below instead.
 
 ## What is left
 
+### Screenshot UX review — 2026-10-08
+
+The reviewed series screen has a coherent racing identity: bold italic names,
+track previews, a quiet background and readable progress hierarchy. This is a
+visual assessment of the supplied screenshot, with the row semantics checked
+in `game/lobby/campaign-series-screen.js`; it is not device or interaction QA.
+
+Current finished-series rows use gold detail text and expose a separate
+leaderboard button. The full row selects the series. Finishing does not require
+the maximum medal total, so a finished row can still show `22/24 medals`.
+
+Suggested refinements, not implemented or approved:
+
+- Add an explicit Finished label or check with text so completion is not
+  communicated only by gold, especially beside an incomplete medal tally.
+- Give the podium action a clearer visible leaderboard cue; the current
+  accessible label and hover title do not explain it in a touch screenshot.
+- Make row selection more discoverable with a restrained navigation cue or
+  a short Choose a series instruction.
+- Increase the inactive Daily label's contrast so it reads as available.
+
+Preserve the current visual direction. Tap accuracy, small-screen overflow,
+focus behavior and scroll discoverability require interaction checks.
+
 1. **Dirt content.** Build the dirt tracks. Set their medal times in the Mapmaker.
    Dirt goes live on the first build with 1 stage. Formula Mini needs 2.
 2. **Optional:** a split of Campaign analytics by series.

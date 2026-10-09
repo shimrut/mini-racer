@@ -119,6 +119,27 @@ Saved times, leaderboards, PB ghosts, podiums and Head to Head posts find a
 track by its key. The server already reads a stored track first. An exact
 copy therefore changes nothing for players.
 
+### Copying while a Campaign race is running
+
+Checked against the current source on 2026-10-06. The moderator's file-to-Redis
+copy does not pause a player's race or set a player-progress transfer block.
+The running attempt keeps its installed track. `buildLockedTrackCopy` checks
+the normalized full shape, medal times and fingerprint against the app version;
+`commitLiveSeriesCopy` commits the series and newly copied tracks together.
+The app definitions remain available before commit and after a failed copy.
+
+A normal exact copy therefore leaves the running replay valid: a finish can
+be validated against either the app track or its identical Redis copy, with
+the same stage/track keys and medal thresholds. Existing progress and standings
+are not moved or cleared. Numbers still takes its stage definitions from the
+app manifest even when its series copy exists in Redis.
+
+This conclusion is about the supported Copy operation. Existing Redis tracks
+are retained rather than overwritten by that operation; a pre-existing changed
+override is a separate Copy Check problem. A geometry change is not an exact
+copy and cannot be assumed safe for an in-flight replay. Local copy/consistency
+tests do not establish a live hosted race finishing during the copy.
+
 ## Check and undo of the copies
 
 The Copy tab has a **Check copies** button, and each copy runs the check
