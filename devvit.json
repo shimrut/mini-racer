@@ -193,6 +193,10 @@
       "mini-racer-ghost-compaction": {
         "endpoint": "/internal/scheduler/ghost-compaction",
         "cron": "* * * * *"
+      },
+      "mini-racer-campaign-ghost-move": {
+        "endpoint": "/internal/scheduler/campaign-ghost-move",
+        "cron": "* * * * *"
       }
     }
   },

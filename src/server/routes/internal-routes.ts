@@ -2,6 +2,7 @@ import type { Application, Response } from 'express';
 import type { MenuItemRequest } from '@devvit/web/shared';
 import type { DailyGhostArchiveReport } from '../daily/daily-ghost-archive.js';
 import type { GhostCompactionReport } from '../competition/ghost-compaction.js';
+import type { CampaignGhostMoveReport } from '../campaign/campaign-ghost-move.js';
 import type { DailyGpChallenge } from '../daily/daily-gp-model.js';
 import type { FinalDailyGpPodium } from '../podium/daily-podium-model.js';
 import type { LauncherPostKind } from '../posts/launcher-post-store.js';
@@ -56,6 +57,7 @@ export type InternalRouteDependencies = {
     runRacedListFill(): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }>;
     runDailyGhostArchive(): Promise<DailyGhostArchiveReport>;
     runGhostCompaction(): Promise<GhostCompactionReport>;
+    runCampaignGhostMove(): Promise<CampaignGhostMoveReport>;
     sweepHeadToHeadCatalog(subredditName: string): Promise<{
         scanned: number;
         saved: number;
@@ -420,6 +422,17 @@ export function registerInternalRoutes(
         } catch (error) {
             console.error('Failed scheduled Daily ghost archive run:', error);
             res.status(500).json({ ok: false, error: 'Scheduled Daily ghost archive run failed' });
+        }
+    });
+
+    // Moves or restores Campaign ghosts while a Storage tab choice runs; otherwise only reads the state.
+    app.post('/internal/scheduler/campaign-ghost-move', async (_req, res) => {
+        try {
+            const result = await dependencies.runCampaignGhostMove();
+            res.status(200).json({ ok: true, ...result });
+        } catch (error) {
+            console.error('Failed scheduled Campaign ghost move run:', error);
+            res.status(500).json({ ok: false, error: 'Scheduled Campaign ghost move run failed' });
         }
     });
 

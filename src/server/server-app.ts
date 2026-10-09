@@ -2,6 +2,11 @@ import express from 'express';
 import { runRacedListFill } from './player/raced-list-fill.js';
 import { runLastRacedFill } from './player/last-raced-fill.js';
 import {
+    readCampaignGhostMoveStatus,
+    runCampaignGhostMove,
+    setCampaignGhostMove,
+} from './campaign/campaign-ghost-move.js';
+import {
     readDailyGhostArchiveStatus,
     runDailyGhostArchive,
     saveDailyGhostArchiveSetting,
@@ -248,6 +253,10 @@ function registerProductionRoutes(app: express.Application): void {
         readGhostCompactionState: () => readGhostCompactionState(),
         setGhostCompactionStep: (action, step) => setGhostCompactionStep(action, step),
         isGhostCompactionStepName,
+        readCampaignGhostMoveStatus: () => readCampaignGhostMoveStatus(),
+        setCampaignGhostMove: (action, choice, moderatorUsername) => setCampaignGhostMove(action, choice, {
+            ownerPlayerId: `reddit:${moderatorUsername.toLowerCase()}`,
+        }),
     });
     registerPlayerRoutes(app, {
         getRequestUsername,
@@ -351,6 +360,7 @@ function registerProductionRoutes(app: express.Application): void {
         },
         runDailyGhostArchive: () => runDailyGhostArchive(),
         runGhostCompaction: () => runGhostCompaction(),
+        runCampaignGhostMove: () => runCampaignGhostMove(),
         resolveMenuTargetSubredditName,
         getServerDailyGpChallenge,
         getServerFinalDailyGpPodium,

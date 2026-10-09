@@ -3,12 +3,14 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import {
     bootAnalytics,
+    createCampaignGhostMoveController,
     createGhostCompactionController,
     createGhostMoveController,
     loadAnalyticsSummary,
     renderAnalyticsMessage,
     renderAnalyticsSummary,
     renderGhostCompaction,
+    renderCampaignGhostMove,
     renderGhostMove,
     renderStorageSummary,
 } from '../pages/mod-analytics.js';
@@ -286,6 +288,92 @@ describe('moderator analytics page', () => {
         expect(onChoose).toHaveBeenCalledWith('all');
     });
 
+    it('shows the Campaign ghost move: tabs pick, Run starts the pick, Away waits for the last race days', () => {
+        const { window } = analyticsDom();
+        const onSelect = vi.fn();
+        const onAction = vi.fn();
+        const base = {
+            running: false, choice: null, total: 0, checked: 0, moved: 0, restored: 0, freedBytes: 0,
+            uploadedBytes: 0, skipped: {}, movedPayloadBytes: 0, measured: null, dailyBlobBytes: 0,
+            outcome: null, startedAt: null, lastRacedReady: false,
+        };
+        const render = (status, selected = null) => {
+            renderCampaignGhostMove(window.document, { status, selected, onSelect, onAction });
+            return window.document.getElementById('analytics-campaign-ghost-move');
+        };
+        const button = (card, label) => [...card.querySelectorAll('button')].find((node) => node.textContent === label);
+
+        let card = render(base);
+        expect([...card.querySelectorAll('button')].map((node) => [node.textContent, node.disabled])).toEqual([
+            ['Mine', false], ['Away 60 days', false], ['Away 30 days', false], ['Restore', false], ['Run', false],
+        ]);
+        expect(card.textContent).toContain('Not started · 0 of 0 rows checked');
+        expect(card.textContent).toContain('Last race days are still filling; Away waits for them');
+        button(card, 'Away 60 days').click();
+        expect(onSelect).toHaveBeenCalledWith('away60');
+        expect(onAction).not.toHaveBeenCalled();
+        card = render(base, 'away60');
+        expect(button(card, 'Run').disabled).toBe(true);
+        card = render({ ...base, lastRacedReady: true }, 'away60');
+        button(card, 'Run').click();
+        expect(onAction).toHaveBeenCalledWith('run', 'away60');
+
+        card = render({
+            ...base,
+            running: true,
+            choice: 'restore',
+            waiting: 'daily',
+            total: 10,
+            checked: 4,
+            restored: 3,
+            skipped: { 'copy missing': 1 },
+            measured: { objects: 12, bytes: 2048 },
+            dailyBlobBytes: 1024,
+            lastRacedReady: true,
+        });
+        expect([...card.querySelectorAll('button')].map((node) => [node.textContent, node.disabled])).toEqual([
+            ['Mine', true], ['Away 60 days', true], ['Away 30 days', true], ['Restore', true], ['Pause', false],
+        ]);
+        expect(card.textContent).toContain('Waiting: Daily move is on · 4 of 10 rows checked');
+        expect(card.textContent).toContain('restored 3');
+        expect(card.textContent).toContain('Skipped 1 copy missing');
+        expect(card.textContent).toContain('Campaign copies 2.0 KB in 12 objects');
+        expect(card.textContent).toContain('Blob storage 3.0 KB of 10 GB');
+        button(card, 'Pause').click();
+        expect(onAction).toHaveBeenLastCalledWith('pause', 'restore');
+    });
+
+    it('sends Run and Pause for the Campaign ghost move and shows a refused Run', async () => {
+        const { window } = analyticsDom();
+        let status = { running: false, choice: null, skipped: {}, lastRacedReady: true };
+        const fetchImpl = vi.fn(async (_url, init) => {
+            if (init?.method !== 'POST') return { status: 200, ok: true, json: async () => status };
+            const body = JSON.parse(init.body);
+            if (body.choice === 'away30') {
+                return { status: 409, ok: false, json: async () => ({ error: 'Pause the running choice first.' }) };
+            }
+            status = body.action === 'run'
+                ? { ...status, running: true, choice: body.choice }
+                : { ...status, running: false };
+            return { status: 200, ok: true, json: async () => status };
+        });
+        const controller = createCampaignGhostMoveController(window.document, fetchImpl, { pollMs: 1000 });
+        await controller.refresh();
+        await controller.act('run', 'mine');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/campaign-ghost-move', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ action: 'run', choice: 'mine' }),
+        }));
+        const card = window.document.getElementById('analytics-campaign-ghost-move');
+        expect(card.querySelector('button[aria-pressed="true"]').textContent).toBe('Mine');
+        await controller.act('pause', 'mine');
+        expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/campaign-ghost-move', expect.objectContaining({
+            body: JSON.stringify({ action: 'pause', choice: 'mine' }),
+        }));
+        await controller.act('run', 'away30');
+        expect(card.textContent).toContain('Pause the running choice first.');
+    });
+
     it('shows each compaction step with its progress and the one action it allows', () => {
         const step = (overrides = {}) => ({
             total: 0, checked: 0, packed: 0, savedBytes: 0, startedAt: null, finishedAt: null, ...overrides,
@@ -538,6 +626,8 @@ describe('moderator analytics page', () => {
                 ? { storage: { totalBytes: 2048, groups: [] }, racedListFill: null }
                 : url.startsWith('/api/analytics/ghost-archive')
                     ? { choice: 'off', days: {}, eligibleDays: 0, blob: {} }
+                    : url.startsWith('/api/analytics/campaign-ghost-move')
+                    ? { running: false, choice: null, skipped: {}, lastRacedReady: true }
                     : url.startsWith('/api/analytics/ghost-compaction')
                     ? { running: null, writePacked: false, steps: { expired: {}, campaign: {} } }
                     : url.startsWith('/api/analytics/challenges')
@@ -558,11 +648,12 @@ describe('moderator analytics page', () => {
         expect(panel('storage').hidden).toBe(false);
         expect(panel('players').hidden).toBe(true);
         tab('challenges').click();
-        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(5));
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(6));
         expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
             '/api/analytics/summary',
             '/api/analytics/ghost-compaction',
             '/api/analytics/ghost-archive',
+            '/api/analytics/campaign-ghost-move',
             '/api/analytics/storage',
             '/api/analytics/challenges?offset=0&period=today',
         ]);

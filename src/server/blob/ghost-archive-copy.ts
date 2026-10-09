@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import type { PbGhostArchiveRef } from '../competition/pb-ghost-archive-ref.js';
 import { storedRunGhost } from '../competition/pb-ghost-pack.js';
 import type { PbGhostTrace } from '../competition/pb-ghost-trace.js';
+import { encodeRedisCompressedValue } from '../redis/redis-compressed-value.js';
+import { BlobDeadlineError, type BlobSession } from './blob-store.js';
 
 // A moved ghost: blob storage holds the full row text; Redis keeps a stub with every other field and a reference.
 
@@ -71,5 +73,40 @@ export function verifyArchivedCopy({
         return ghost ? { ok: true, fullText, ghost } : { ok: false, code: 'mismatch' };
     } catch (_error) {
         return { ok: false, code: 'mismatch' };
+    }
+}
+
+export function ghostCopyKey(prefix: string, field: string, sha256: string): string {
+    return `${prefix}${field}-${sha256.slice(0, 16)}.gz`;
+}
+
+// A ghost no bigger than its stub stays, because moving it saves nothing.
+export function stubSavesSpace(raw: string, fullText: string, ref: PbGhostArchiveRef): boolean {
+    const stub = encodeRedisCompressedValue(buildGhostStub(fullText, ref));
+    return Buffer.byteLength(stub, 'utf8') < Buffer.byteLength(raw, 'utf8');
+}
+
+export type CopyUpload = { status: 'ok'; bytes: number } | { status: 'upload' | 'confirm' | 'deadline' };
+
+// Uploads the full row and reads it back; only a byte-exact copy may let the ghost leave Redis.
+export async function uploadAndConfirmCopy(session: BlobSession, key: string, fullText: string): Promise<CopyUpload> {
+    const body = new Uint8Array(gzipSync(Buffer.from(fullText, 'utf8')));
+    try {
+        await session.put(key, body);
+    } catch (error) {
+        return { status: error instanceof BlobDeadlineError ? 'deadline' : 'upload' };
+    }
+    let copy: Uint8Array | null;
+    try {
+        copy = await session.get(key);
+    } catch (error) {
+        return { status: error instanceof BlobDeadlineError ? 'deadline' : 'confirm' };
+    }
+    try {
+        return copy && gunzipSync(copy).toString('utf8') === fullText
+            ? { status: 'ok', bytes: body.byteLength }
+            : { status: 'confirm' };
+    } catch (_error) {
+        return { status: 'confirm' };
     }
 }

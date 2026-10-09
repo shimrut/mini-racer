@@ -453,6 +453,43 @@ describe('issued challenge analytics routes', () => {
         }
     });
 
+    it('reads, runs and pauses the Campaign ghost move for moderators, and passes on a refusal', async () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const status = { running: false, choice: null };
+        const services = dependencies({
+            readCampaignGhostMoveStatus: vi.fn(async () => status),
+            setCampaignGhostMove: vi.fn(async () => {}),
+        });
+        const baseUrl = await startApp((app) => registerAnalyticsRoutes(app, services));
+        const post = (body) => fetch(`${baseUrl}/api/analytics/campaign-ghost-move`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        expect(await (await fetch(`${baseUrl}/api/analytics/campaign-ghost-move`)).json()).toEqual(status);
+        expect((await post({ action: 'run', choice: 'mine' })).status).toBe(200);
+        expect(services.setCampaignGhostMove).toHaveBeenCalledWith('run', 'mine', expect.any(String));
+        expect((await post({ action: 'pause' })).status).toBe(200);
+        expect((await post({ action: 'delete', choice: 'mine' })).status).toBe(400);
+
+        services.setCampaignGhostMove.mockRejectedValueOnce(
+            Object.assign(new Error('Last race days are not ready yet.'), { name: 'CampaignGhostMoveRefusal' }),
+        );
+        const refused = await post({ action: 'run', choice: 'away60' });
+        expect(refused.status).toBe(409);
+        expect(await refused.json()).toEqual({ error: 'Last race days are not ready yet.' });
+
+        const denied = dependencies({
+            readCampaignGhostMoveStatus: vi.fn(async () => status),
+            setCampaignGhostMove: vi.fn(async () => {}),
+            assertModeratorForSubreddit: vi.fn(async () => { throw new Error('Moderator access required for r/MiniRacer.'); }),
+        });
+        const deniedUrl = await startApp((app) => registerAnalyticsRoutes(app, denied));
+        expect((await fetch(`${deniedUrl}/api/analytics/campaign-ghost-move`)).status).toBe(403);
+        expect(denied.setCampaignGhostMove).not.toHaveBeenCalled();
+    });
+
     it('serves the Storage tab to moderators only', async () => {
         const payload = { storage: { totalBytes: 10, groups: [] }, racedListFill: null, dailyGhostArchive: null };
         const services = dependencies({ getStorageSummary: vi.fn(async () => payload) });

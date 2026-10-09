@@ -20,6 +20,8 @@ export type AnalyticsRouteDependencies = {
     readGhostCompactionState(): Promise<unknown>;
     setGhostCompactionStep(action: 'start' | 'pause', step: 'expired' | 'campaign'): Promise<unknown>;
     isGhostCompactionStepName(value: unknown): value is 'expired' | 'campaign';
+    readCampaignGhostMoveStatus(): Promise<unknown>;
+    setCampaignGhostMove(action: 'run' | 'pause', choice: unknown, moderatorUsername: string): Promise<unknown>;
 };
 
 const PODIUM_ANALYTICS_ACTIONS = new Set(['play', 'replay']);
@@ -229,6 +231,51 @@ export function registerAnalyticsRoutes(
                 ? 403
                 : error instanceof Error && error.name === 'GhostCompactionRefusal' ? 409 : 500;
             if (status === 500) console.error('Failed to change the ghost compaction step:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    // Campaign ghost move: progress, and Run or Pause for the picked choice.
+    app.get('/api/analytics/campaign-ghost-move', async (_req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            await dependencies.assertModeratorForSubreddit(subredditName);
+            res.status(200).json(await dependencies.readCampaignGhostMoveStatus());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Campaign ghost move status failed';
+            const status = message.includes('Moderator access required') ? 403 : 500;
+            if (status !== 403) console.error('Failed to load the Campaign ghost move status:', error);
+            res.status(status).json({ error: message });
+        }
+    });
+
+    app.post('/api/analytics/campaign-ghost-move', async (req, res: Response) => {
+        try {
+            const subredditName = await dependencies.resolveAnalyticsToolSubredditName();
+            if (!subredditName) {
+                res.status(400).json({ error: 'Missing subreddit context for analytics.' });
+                return;
+            }
+            const username = await dependencies.assertModeratorForSubreddit(subredditName);
+            const { action, choice } = req.body ?? {};
+            if (action !== 'run' && action !== 'pause') {
+                res.status(400).json({ error: 'Unknown Campaign ghost move action.' });
+                return;
+            }
+            await dependencies.setCampaignGhostMove(action, choice, username);
+            console.log(`Campaign ghost move ${action} ${action === 'run' ? choice : ''} by u/${username} in r/${subredditName}.`);
+            res.status(200).json(await dependencies.readCampaignGhostMoveStatus());
+        } catch (error) {
+            const message = error instanceof Error && error.message ? error.message : 'Campaign ghost move action failed';
+            // A refused Run says why: another choice runs, or the last race days are not ready.
+            const status = message.includes('Moderator access required')
+                ? 403
+                : error instanceof Error && error.name === 'CampaignGhostMoveRefusal' ? 409 : 500;
+            if (status === 500) console.error('Failed to change the Campaign ghost move:', error);
             res.status(status).json({ error: message });
         }
     });

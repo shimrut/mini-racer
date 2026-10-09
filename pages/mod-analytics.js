@@ -4,6 +4,7 @@ const CHALLENGES_URL = '/api/analytics/challenges';
 const STORAGE_URL = '/api/analytics/storage';
 const GHOST_MOVE_URL = '/api/analytics/ghost-archive';
 const GHOST_COMPACTION_URL = '/api/analytics/ghost-compaction';
+const CAMPAIGN_GHOST_MOVE_URL = '/api/analytics/campaign-ghost-move';
 const GHOST_MOVE_POLL_MS = 5_000;
 const TABS = ['players', 'challenges', 'storage'];
 const TAB_MEMORY_KEY = 'MiniRacerAnalyticsTab';
@@ -774,6 +775,159 @@ export function createGhostMoveController(root, fetchImpl = fetch, { pollMs = GH
     return { refresh, choose, setActive };
 }
 
+const CAMPAIGN_GHOST_CHOICES = [
+    ['mine', 'Mine'],
+    ['away60', 'Away 60 days'],
+    ['away30', 'Away 30 days'],
+    ['restore', 'Restore'],
+];
+
+function campaignGhostStage(status) {
+    if (status.running) return status.waiting === 'daily' ? 'Waiting: Daily move is on' : 'Running';
+    if (status.outcome === 'done') return `Done ${String(status.finishedAt ?? '').slice(0, 10)}`.trim();
+    if (status.outcome === 'incomplete') return 'Not all restored';
+    return status.startedAt ? 'Paused' : 'Not started';
+}
+
+// Campaign ghost move: the tabs only pick; Run starts the pick and Pause stops it.
+export function renderCampaignGhostMove(root, {
+    status = null, busy = false, error = null, selected = null, onSelect, onAction,
+} = {}) {
+    const section = root.getElementById('analytics-campaign-ghost-move');
+    if (!section) return;
+    const running = status?.running === true;
+    const shown = running ? status.choice : (selected ?? CAMPAIGN_GHOST_CHOICES[0][0]);
+    const needsDays = shown === 'away60' || shown === 'away30';
+    const heading = cardHeading(root, 'Campaign ghosts to blob storage');
+    const choices = element(root, 'div', 'analytics-periods');
+    choices.setAttribute('role', 'group');
+    choices.setAttribute('aria-label', 'Campaign ghost move choice');
+    for (const [value, label] of CAMPAIGN_GHOST_CHOICES) {
+        const button = element(root, 'button', 'analytics-period', label);
+        button.type = 'button';
+        button.disabled = busy || !status || running;
+        button.setAttribute('aria-pressed', String(shown === value));
+        button.addEventListener('click', () => { onSelect?.(value); });
+        choices.append(button);
+    }
+    const run = element(root, 'button', 'analytics-button', running ? 'Pause' : 'Run');
+    run.type = 'button';
+    run.disabled = busy || !status || (!running && needsDays && status.lastRacedReady !== true);
+    run.addEventListener('click', () => { void onAction?.(running ? 'pause' : 'run', shown); });
+    heading.append(choices, run);
+    const nodes = [heading];
+    if (status) {
+        const total = toCount(status.total);
+        const checked = toCount(status.checked);
+        const unit = status.choice === 'mine' ? 'boards' : 'rows';
+        const skipped = Object.entries(status.skipped ?? {})
+            .filter(([, count]) => toCount(count) > 0)
+            .map(([reason, count]) => `${formatCount(count)} ${reason}`);
+        const campaignBytes = toCount(status.measured?.bytes);
+        const blobLine = status.measured
+            ? `Campaign copies ${formatBytes(campaignBytes)} in ${formatCount(status.measured.objects)} objects`
+            : 'Campaign copies not measured yet';
+        const lines = [
+            `${campaignGhostStage(status)} · ${formatCount(checked)} of ${formatCount(total)} ${unit} checked`,
+            `Moved ${formatCount(status.moved)} runs · Redis payload removed ${formatBytes(status.freedBytes)}`
+                + (toCount(status.restored) > 0 ? ` · restored ${formatCount(status.restored)}` : ''),
+            ...(skipped.length ? [`Skipped ${skipped.join(' · ')}`] : []),
+            `${blobLine} · uploaded ${formatBytes(status.uploadedBytes)}`,
+            // Reddit granted this game 10 GB of blob storage per install.
+            `Blob storage ${formatBytes(campaignBytes + toCount(status.dailyBlobBytes))} of 10 GB`
+                + ` · Restore would write back about ${formatBytes(status.movedPayloadBytes)}`,
+            ...(status.lastRacedReady === true ? [] : ['Last race days are still filling; Away waits for them']),
+        ];
+        nodes.push(
+            progressBar(root, 'Campaign ghost rows checked', checked, total),
+            ...lines.map((text) => element(root, 'p', 'analytics-note', text)),
+        );
+        if (status.lastError) {
+            const failed = element(root, 'p', 'analytics-status', String(status.lastError).slice(0, 200));
+            failed.dataset.state = 'error';
+            nodes.push(failed);
+        }
+    }
+    if (error) {
+        const failed = element(root, 'p', 'analytics-status', error);
+        failed.dataset.state = 'error';
+        nodes.push(failed);
+    }
+    section.replaceChildren(...nodes);
+    section.hidden = false;
+    section.setAttribute('aria-busy', String(busy));
+}
+
+async function readCampaignGhostMoveResponse(response) {
+    if (response.status === 403) return { error: 'Moderator access required.' };
+    if (response.status === 409) {
+        // The server says why: another choice runs, or the last race days are not ready.
+        const body = await response.json().catch(() => null);
+        return { error: typeof body?.error === 'string' && body.error ? body.error : 'That choice cannot run now.' };
+    }
+    if (!response.ok) return { error: 'Could not load the Campaign ghost move.' };
+    return { status: await response.json() };
+}
+
+export function createCampaignGhostMoveController(root, fetchImpl = fetch, { pollMs = GHOST_MOVE_POLL_MS } = {}) {
+    let status = null;
+    let busy = false;
+    let error = null;
+    let timer = null;
+    let selected = null;
+    const select = (value) => {
+        selected = value;
+        render();
+    };
+    // A running choice stays picked after Pause, so Run continues it.
+    const accept = (next) => {
+        status = next;
+        error = null;
+        if (next?.running === true && next.choice) selected = next.choice;
+    };
+    const render = () => renderCampaignGhostMove(root, { status, busy, error, selected, onSelect: select, onAction: act });
+    async function refresh() {
+        try {
+            const result = await readCampaignGhostMoveResponse(await fetchImpl(CAMPAIGN_GHOST_MOVE_URL));
+            if (result.error) error = result.error;
+            else accept(result.status);
+        } catch (_error) {
+            error = 'Could not load the Campaign ghost move.';
+        }
+        render();
+    }
+    async function act(action, choice) {
+        if (busy) return;
+        busy = true;
+        render();
+        try {
+            const result = await readCampaignGhostMoveResponse(await fetchImpl(CAMPAIGN_GHOST_MOVE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, choice }),
+            }));
+            if (result.error) error = result.error;
+            else accept(result.status);
+        } catch (_error) {
+            error = 'Could not change the Campaign ghost move.';
+        } finally {
+            busy = false;
+            render();
+        }
+    }
+    // The tab repeats the read every few seconds while it is open.
+    function setActive(active) {
+        if (active && timer === null) {
+            void refresh();
+            timer = setInterval(() => { void refresh(); }, pollMs);
+        } else if (!active && timer !== null) {
+            clearInterval(timer);
+            timer = null;
+        }
+    }
+    return { refresh, act, setActive };
+}
+
 function renderStorage(doc, storage, racedListFill = null) {
     const fillText = racedListFillText(racedListFill);
     const fillNode = fillText ? [element(doc, 'p', 'analytics-note', fillText)] : [];
@@ -1149,6 +1303,7 @@ const LOCKED_SECTION_IDS = [
     'analytics-storage',
     'analytics-ghost-compaction',
     'analytics-ghost-move',
+    'analytics-campaign-ghost-move',
 ];
 
 export function renderAnalyticsMessage(root, message, state = 'error') {
@@ -1261,12 +1416,14 @@ export async function bootAnalytics(root = document, fetchImpl = fetch) {
     const challenges = createChallengeAnalyticsController(root, fetchImpl);
     const storage = createStorageTabController(root, fetchImpl);
     const ghostMove = createGhostMoveController(root, fetchImpl);
+    const campaignGhostMove = createCampaignGhostMoveController(root, fetchImpl);
     const compaction = createGhostCompactionController(root, fetchImpl);
     const opened = new Set();
     const tabs = setupAnalyticsTabs(root, {
         onOpen: (name) => {
             compaction.setActive(name === 'storage');
             ghostMove.setActive(name === 'storage');
+            campaignGhostMove.setActive(name === 'storage');
             if (opened.has(name)) return;
             opened.add(name);
             if (name === 'challenges') void challenges.loadMore();
