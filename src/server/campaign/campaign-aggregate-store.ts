@@ -55,6 +55,8 @@ export async function queueRemoveCampaignAggregate(
 
 const FILL_PAGE_SIZE = 10;
 const FILL_LOCK_TTL_MS = 55_000;
+// Time kept after the last step for the progress save.
+const FILL_DEADLINE_RESERVE_MS = 2_000;
 type FillState = { finalStageId: string; cursor: number; scanned: boolean; pending: string[]; queued: string[] };
 
 function parseFillState(raw: string | null | undefined, finalStageId: string): FillState | null {
@@ -73,11 +75,14 @@ function parseFillState(raw: string | null | undefined, finalStageId: string): F
 // Uses the same progress lock and transfer fences as saves; false means retry later, with the cursor kept.
 export async function runCampaignAggregateFill(
     seriesId: string, reconcile: (playerId: string) => Promise<boolean>,
+    deadlineMs = Number.POSITIVE_INFINITY,
 ): Promise<boolean> {
     const finalStage = getCampaignFinalStage(seriesId);
     if (!finalStage) return false;
     const keys = campaignAggregateKeys(seriesId);
     if (await redis.get(keys.fillReady) === finalStage.raceId) return true;
+    const hasTime = () => Date.now() + FILL_DEADLINE_RESERVE_MS <= deadlineMs;
+    if (!hasTime()) return false;
     const lock = await acquireRedisLock(keys.fillLock, FILL_LOCK_TTL_MS, redis);
     if (!lock) return false;
     try {
@@ -97,9 +102,15 @@ export async function runCampaignAggregateFill(
             state.scanned = page.cursor === 0;
         }
         const candidates = state.queued.splice(0, FILL_PAGE_SIZE - retry.length);
-        for (const playerId of [...retry, ...candidates]) {
+        const work = [...retry, ...candidates];
+        let done = 0;
+        for (; done < work.length && hasTime(); done += 1) {
+            const playerId = work[done];
             if (!await reconcile(playerId) && !state.pending.includes(playerId)) state.pending.push(playerId);
         }
+        // Work the deadline cut goes back to the front of its list for the next tick.
+        state.pending.unshift(...retry.slice(Math.min(done, retry.length)));
+        state.queued.unshift(...candidates.slice(Math.max(0, done - retry.length)));
         const ready = state.scanned && state.pending.length === 0 && state.queued.length === 0;
         const transaction = await beginOwnedRedisLockTransaction(lock, redis);
         if (!transaction) return false;

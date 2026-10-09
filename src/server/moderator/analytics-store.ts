@@ -1,4 +1,5 @@
 import { redis } from '@devvit/redis';
+import { bumpLastRaced } from '../player/last-raced.js';
 import { readContextSubredditName } from '../request/request-context.js';
 import { readPlayerProfile } from '../competition/competition-identity.js';
 import {
@@ -533,21 +534,25 @@ export async function recordAnalyticsRace({
     subredditName?: unknown;
     now?: Date;
 } = {}): Promise<void> {
+    const normalizedMode = normalizeMode(mode);
+    const normalizedAction = normalizeAction(action);
+    const player = classifyPlayerId(playerId);
+    if (!normalizedMode || !normalizedAction || !player) return;
+    const date = formatUtcChallengeDate(now);
     try {
-        const normalizedMode = normalizeMode(mode);
-        const normalizedAction = normalizeAction(action);
-        const player = classifyPlayerId(playerId);
-        if (!normalizedMode || !normalizedAction || !player) return;
-
         const scope = sanitizeScope(subredditName ?? readScopeFromContext());
-        const date = formatUtcChallengeDate(now);
-
         const cohortStarted = await markCohortStart(scope, date, player);
         await markPlayerPresence(scope, date, normalizedMode, player, cohortStarted);
         await bumpCounter(scope, date, countField(normalizedMode, normalizedAction));
         await finishAnalyticsWrite(scope, date, raceRetentionKeys(scope, date));
     } catch (error) {
         logAnalyticsFailure('race', error);
+    }
+    // Every race event raises the day, so a failed write heals on the next one; the full id matches ghost rows.
+    try {
+        await bumpLastRaced((playerId as string).trim(), date);
+    } catch (error) {
+        logAnalyticsFailure('last race day', error);
     }
 }
 

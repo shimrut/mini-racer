@@ -16,6 +16,7 @@ import {
 import { campaignProgressKeys } from '../campaign/campaign-progress-key.js';
 import { campaignAggregateKeys } from '../campaign/campaign-aggregate-store.js';
 import { carUnlockHashKey } from '../player/car-unlock-store.js';
+import { LAST_RACED_BUCKET_KEYS } from '../player/last-raced.js';
 import { createRedisPlayerProfileKey } from '../competition/competition-identity.js';
 import { toCampaignCompetition } from '../competition/competition.js';
 import { DAILY_AUTPOST_SUBREDDITS_KEY } from '../daily/daily-autopost-store.js';
@@ -547,6 +548,14 @@ function buildKeyGroups({
                 firstSeenKey(scope),
                 cohortStartsKey(scope),
             ],
+            sortedSets: [],
+        },
+        {
+            id: 'last-raced',
+            label: 'Last race days',
+            detail: 'The day each player last raced, which the Campaign ghost move reads',
+            strings: [],
+            hashes: [...LAST_RACED_BUCKET_KEYS],
             sortedSets: [],
         },
         {

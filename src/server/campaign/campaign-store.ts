@@ -1016,10 +1016,15 @@ async function reconcileCampaignAggregateCandidate(playerId: string, seriesId: s
 }
 
 // Uses the existing migration scheduler; ranks never wait for old finishers to visit.
-export async function runCampaignAggregateFills(): Promise<void> {
+export async function runCampaignAggregateFills(deadlineMs = Number.POSITIVE_INFINITY): Promise<void> {
     for (const series of CAMPAIGN_SERIES) {
+        if (Date.now() >= deadlineMs) return;
         if (!getCampaignFinalStage(series.id)) continue;
-        await runCampaignAggregateFill(series.id, (playerId) => reconcileCampaignAggregateCandidate(playerId, series.id));
+        await runCampaignAggregateFill(
+            series.id,
+            (playerId) => reconcileCampaignAggregateCandidate(playerId, series.id),
+            deadlineMs,
+        );
     }
 }
 

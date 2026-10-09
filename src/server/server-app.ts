@@ -1,5 +1,6 @@
 import express from 'express';
 import { runRacedListFill } from './player/raced-list-fill.js';
+import { runLastRacedFill } from './player/last-raced-fill.js';
 import {
     readDailyGhostArchiveStatus,
     runDailyGhostArchive,
@@ -341,9 +342,12 @@ function registerProductionRoutes(app: express.Application): void {
     });
     registerInternalRoutes(app, {
         runRacedListFill: async () => {
-            const result = await runRacedListFill();
-            await runCampaignAggregateFills();
-            return result;
+            // One deadline for the whole request; each fill stops before it and keeps its place.
+            const deadlineMs = Date.now() + SCHEDULER_FILL_WORK_MS;
+            const result = await runRacedListFill(Date.now(), undefined, deadlineMs);
+            await runCampaignAggregateFills(deadlineMs);
+            const lastRaced = await runLastRacedFill({ deadlineMs });
+            return { ...result, lastRaced: lastRaced.status };
         },
         runDailyGhostArchive: () => runDailyGhostArchive(),
         runGhostCompaction: () => runGhostCompaction(),
@@ -365,6 +369,9 @@ function registerProductionRoutes(app: express.Application): void {
         sweepHeadToHeadCatalog,
     });
 }
+
+// Reddit stops a request at 30 s; the scheduler fills share this much of it.
+const SCHEDULER_FILL_WORK_MS = 20_000;
 
 // Routes that skip the catalog load (no tracks or series, or their own); match method and exact path.
 const CATALOG_FREE_ROUTES = new Set([

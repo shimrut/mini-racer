@@ -357,6 +357,30 @@ describe('Campaign aggregate ownership and recovery', () => {
 describe('Campaign aggregate page and bounded fill', () => {
     beforeEach(() => { redis.reset(); profiles.clear(); });
 
+    it('stops at the shared deadline and gives the cut players back to the next tick', async () => {
+        for (let index = 0; index < 25; index++) await seedEntry(`reddit:player-${index}`, finalStage);
+        let now = Date.now();
+        const deadline = now + 10_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const seen = [];
+        const reconcile = vi.fn(async (playerId) => {
+            seen.push(playerId);
+            // The third player uses up the request's time.
+            if (seen.length === 3) now = deadline;
+            return true;
+        });
+        try {
+            expect(await runCampaignAggregateFill(SERIES_ID, reconcile, deadline)).toBe(false);
+            expect(reconcile).toHaveBeenCalledTimes(3);
+            now = deadline + 60_000;
+            while (!await runCampaignAggregateFill(SERIES_ID, reconcile));
+        } finally {
+            vi.restoreAllMocks();
+        }
+        expect(seen).toHaveLength(25);
+        expect(new Set(seen).size).toBe(25);
+    });
+
     it('scans immediately in bounded pages and stops scanning when ready', async () => {
         const reconcile = vi.fn(async () => true);
         for (let index = 0; index < 25; index++) await seedEntry(`reddit:player-${index}`, finalStage);

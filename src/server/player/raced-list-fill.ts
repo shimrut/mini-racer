@@ -24,6 +24,8 @@ const RACED_LIST_FILL_LOCK_TTL_MS = 55_000;
 const RACED_LIST_FILL_ROWS_PER_RUN = 1_000;
 const RACED_LIST_FILL_PAGE_SIZE = 200;
 const RACED_LIST_FILL_WRITE_CONCURRENCY = 25;
+// Time kept after the last step for the progress save.
+const FILL_DEADLINE_RESERVE_MS = 2_000;
 // Wait out a deploy rollout, when an old server can still write an unlisted row.
 const RACED_LIST_FILL_START_DELAY_MS = 10 * 60 * 1000;
 
@@ -119,8 +121,12 @@ async function readPage(keys: BoardKeys, part: FillPart, cursor: number): Promis
 export async function runRacedListFill(
     nowMs = Date.now(),
     rowsPerRun = RACED_LIST_FILL_ROWS_PER_RUN,
+    deadlineMs = Number.POSITIVE_INFINITY,
 ): Promise<{ status: 'ready' | 'busy' | 'working'; rows: number }> {
     if (await redis.get(RACED_LIST_FILL_READY_KEY)) return { status: 'ready', rows: 0 };
+    // Stops before the request's shared deadline; a cut page is read again (the writes repeat harmlessly).
+    const hasTime = () => Date.now() + FILL_DEADLINE_RESERVE_MS <= deadlineMs;
+    if (!hasTime()) return { status: 'working', rows: 0 };
     const lock = await acquireRedisLock(RACED_LIST_FILL_LOCK_KEY, RACED_LIST_FILL_LOCK_TTL_MS, redis);
     if (!lock) return { status: 'busy', rows: 0 };
     try {
@@ -143,11 +149,12 @@ export async function runRacedListFill(
             ? { boards: await listBoards(), boardIndex: 0, part: 'entries', cursor: 0 }
             : stored;
         let rows = 0;
-        while (state.boardIndex < state.boards.length && rows < rowsPerRun) {
+        while (state.boardIndex < state.boards.length && rows < rowsPerRun && hasTime()) {
             const board = state.boards[state.boardIndex];
             const keys = boardKeys(board);
             const page = keys ? await readPage(keys, state.part, state.cursor) : { owners: [], cursor: 0 };
             for (let index = 0; index < page.owners.length; index += RACED_LIST_FILL_WRITE_CONCURRENCY) {
+                if (!hasTime()) return { status: 'working', rows };
                 await Promise.all(page.owners
                     .slice(index, index + RACED_LIST_FILL_WRITE_CONCURRENCY)
                     .map((owner) => addOwner(board, owner, state.part === 'pbs', nowMs)));

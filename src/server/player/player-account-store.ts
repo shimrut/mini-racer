@@ -28,6 +28,7 @@ import {
     seedPlayerTrackPersonalBest,
 } from '../competition/pb-ghost-store.js';
 import { isMovedPbRecord } from '../competition/pb-ghost-archive-ref.js';
+import { bumpLastRaced } from './last-raced.js';
 import { resolveMovedPbGhost } from '../blob/archived-ghost.js';
 import {
     readGuestPromotionTarget,
@@ -117,6 +118,15 @@ function carSkinsDiffer(a: DailyGpPlayerPreferences, b: DailyGpPlayerPreferences
         || a.carSkinSpace !== b.carSkinSpace;
 }
 
+// Sign-in moves guest rows to the account; the player is here today, which is no earlier than either day.
+async function markAccountRacedToday(redditPlayerId: string): Promise<void> {
+    try {
+        await bumpLastRaced(redditPlayerId);
+    } catch (error) {
+        console.error('Last race day update at sign-in failed:', error);
+    }
+}
+
 export async function selectServerGuestProgress({
     playerId,
     redditUsername,
@@ -153,6 +163,7 @@ export async function selectServerGuestProgress({
             || transferId !== known.transferId) {
             throw guestProgressRecoveryRequiredError();
         }
+        await markAccountRacedToday(redditPlayerId);
         const result = await selectGuestProgress({
             guestPlayerId: known.sourceGuestPlayerId,
             redditPlayerId,
@@ -184,6 +195,7 @@ export async function selectServerGuestProgress({
         (error as Error & { statusCode?: number }).statusCode = 401;
         throw error;
     }
+    await markAccountRacedToday(`reddit:${safeUsername.toLowerCase()}`);
     await selectGuestProgress({
         guestPlayerId: `guest:${verifiedGuestPlayerId}`,
         redditPlayerId: `reddit:${safeUsername.toLowerCase()}`,
