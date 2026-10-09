@@ -24,11 +24,11 @@ describe('Campaign series screen', () => {
     it('lists every series on a live ground with its ground, stage count and medals', () => {
         const rows = buildCampaignSeriesRows({
             seriesId: 'numbered-v1',
-            series: [{ id: 'numbered-v1', medalCount: 23, stageCount: 17, finished: false }],
+            series: [{ id: 'numbered-v1', medalCount: 34, stageCount: 17, finished: false }],
         });
-        expect(rows.map((row) => [row.name, row.infoParts])).toEqual([
-            ['Numbers', ['Street · 17 stages', '23/68 medals']],
-            ['Mini Rally', ['Dirt · 10 stages', '0/40 medals']],
+        expect(rows.map((row) => [row.name, row.ground, row.stageCount, row.medals, row.medalShare])).toEqual([
+            ['Numbers', 'Street', 17, '34/68', 0.5],
+            ['Mini Rally', 'Dirt', 10, '0/40', 0],
         ]);
         expect(rows[0].current).toBe(true);
     });
@@ -50,8 +50,19 @@ describe('Campaign series screen', () => {
         const row = buildCampaignSeriesRows({ series: [{ id: 'mixed-v1', medalCount: 3 }] })
             .find((entry) => entry.id === 'mixed-v1');
         expect(row).toMatchObject({
-            previewTrackKey: 'countryRoad', infoParts: ['Mixed · 2 stages', '3/8 medals'],
+            previewTrackKey: 'countryRoad', ground: 'Mixed', stageCount: 2, medals: '3/8', medalShare: 3 / 8,
         });
+    });
+
+    it('says "1 stage" to a screen reader for a series with one stage', () => {
+        registerStoredSeries([{
+            id: 'one-v1', name: 'One Race', ground: 'tarmac',
+            stages: [{ trackKey: 'numberZero', laps: 1, requiredMedals: 0 }],
+        }]);
+        const container = document.createElement('div');
+        renderCampaignSeriesList(container, buildCampaignSeriesRows({}));
+        expect(container.querySelector('[data-series-id="one-v1"]').getAttribute('aria-label'))
+            .toBe('One Race. 1 stage, Street, 0/4 medals');
     });
 
     it('lists a series made live in the Creator, whatever its stage surfaces', () => {
@@ -62,15 +73,23 @@ describe('Campaign series screen', () => {
                 { trackKey: 'snowCircuit', laps: 1, requiredMedals: 2 },
             ],
         }]);
-        expect(buildCampaignSeriesRows({}).find((row) => row.id === 'held-v1')?.infoParts)
-            .toEqual(['Mixed · 2 stages', '0/8 medals']);
+        expect(buildCampaignSeriesRows({}).find((row) => row.id === 'held-v1'))
+            .toMatchObject({ ground: 'Mixed', stageCount: 2, medals: '0/8' });
     });
 
-    it('shows medals in gold for a finished series', () => {
-        const rows = buildCampaignSeriesRows({
-            series: [{ id: 'numbered-v1', medalCount: 40, stageCount: 16, finished: true }],
-        });
-        expect(rows[0].finished).toBe(true);
+    it('draws the stage count with the road icon, the ground, and the medal count over its bar', () => {
+        const container = document.createElement('div');
+        renderCampaignSeriesList(container, buildCampaignSeriesRows({
+            series: [{ id: 'numbered-v1', medalCount: 17, finished: true }],
+        }));
+        const row = container.querySelector('.campaign-series-row');
+        const info = row.querySelector('.campaign-series-row__info');
+        expect(info.querySelector('.campaign-series-row__stages').textContent).toBe('17');
+        expect(info.querySelector('.campaign-series-row__stages svg')).not.toBeNull();
+        expect(info.textContent).toBe('17Street');
+        expect(row.querySelector('.campaign-series-row__count').textContent).toBe('17/68');
+        expect(row.querySelector('.campaign-series-row__bar').style.getPropertyValue('--medal-share')).toBe('0.25');
+        expect(row.getAttribute('aria-label')).toBe('Numbers. 17 stages, Street, 17/68 medals');
     });
 
     it('opens only a live series, and keeps its rows when nothing changed', () => {

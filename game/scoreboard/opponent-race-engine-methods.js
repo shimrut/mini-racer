@@ -1,4 +1,11 @@
 import { prepareLeaderboardOpponentRace } from './opponent-race-service.js';
+import { GhostWatchView } from '../ghost/ghost-watch.js';
+import { normalizePbGhostRecord } from '../ghost/pb-ghost.js';
+import { chooseOpponentCarAsset } from '../race/engine-methods.js';
+import { getTrackCanvasAsset } from '../track/assets.js';
+import { getLoadedClientTrack } from '../track/client-registry.js';
+import { getTrackGround } from '../track/grounds.js';
+import { plainRaceChallenge, resolveRacePresentation } from '../track/race-preparation.js';
 
 function competitionIdFor(mode, race) {
     if (mode === 'daily') return race?.id || null;
@@ -38,6 +45,7 @@ export const opponentRaceEngineMethods = {
         mode,
         competitionId,
         entry,
+        watch = false,
     } = {}) {
         const response = await prepareLeaderboardOpponentRace({
             mode,
@@ -45,6 +53,7 @@ export const opponentRaceEngineMethods = {
             entry,
         });
         if (!response?.ok) return response;
+        if (watch) return this.watchPreparedLeaderboardOpponent(mode, response);
 
         const race = response.body?.race;
         const resolvedCompetitionId = competitionIdFor(mode, race) || competitionId;
@@ -68,6 +77,57 @@ export const opponentRaceEngineMethods = {
                 status: 409,
                 body: { error: 'Opponent ghost could not be prepared.' },
             };
+    },
+
+    // Opens the replay of a prepared opponent's ghost. The race state does
+    // not change, so the screen behind the replay stays as it was.
+    async watchPreparedLeaderboardOpponent(mode, response) {
+        const race = response.body?.race;
+        const target = response.body?.target;
+        const record = normalizePbGhostRecord({ ghost: target?.ghost });
+        const trackKey = race?.trackKey;
+        const failed = (error) => ({ ok: false, status: 502, body: { error } });
+        if (!record || typeof trackKey !== 'string' || !trackKey) {
+            return failed('This ghost could not be prepared.');
+        }
+        const challenge = mode === 'campaign' ? plainRaceChallenge(trackKey) : race;
+        let track = getLoadedClientTrack(trackKey);
+        if (!track) {
+            try {
+                await this.loadRaceDefinitions?.([trackKey], { challenge });
+            } catch (error) {
+                console.error('Could not load the track for a ghost replay:', error);
+            }
+            track = getLoadedClientTrack(trackKey);
+        }
+        if (!track) return failed('Track failed to load.');
+
+        const presentation = resolveRacePresentation(trackKey, track, challenge);
+        const trackCanvasAsset = getTrackCanvasAsset(trackKey, track, {
+            qualityLevel: this.qualityLevel,
+            frameSkip: this.frameSkip,
+            presentation,
+        });
+        this.ghostWatchView?.close?.();
+        const rank = Number.isInteger(Number(target.rank)) ? `#${target.rank} ` : '';
+        this.ghostWatchView = new GhostWatchView({
+            track,
+            trackCanvasAsset,
+            presentation,
+            samples: record.samples,
+            carAssetName: chooseOpponentCarAsset({
+                playerAssetName: this.getSelectedCarAssetName?.(track),
+                ground: getTrackGround(track).key,
+            }),
+            title: `${rank}${target.displayName || ''}`.trim(),
+            turnRate: this.runtimeConfig?.turnRate,
+            isCoarsePointer: this.isCoarsePointer,
+            lowQuality: this.frameSkip > 0 || this.qualityLevel > 0,
+            onClose: () => {
+                this.ghostWatchView = null;
+            },
+        }).open();
+        return { ...response, watching: true };
     },
 
     async prepareNextLeaderboardOpponent({

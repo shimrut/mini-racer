@@ -389,7 +389,10 @@ export class LobbyUi {
             }
             if (document.body?.dataset) {
                 document.body.dataset.lobbyMode = mode;
-                if (mode !== 'campaign') delete document.body.dataset.campaignView;
+                if (mode !== 'campaign') {
+                    delete document.body.dataset.campaignView;
+                    delete document.body.dataset.campaignSeriesStandings;
+                }
                 if (previousMode !== mode) {
                     document.body.dataset.lobbyPaneSwap = toggleSwap ? 'toggle' : 'mode';
                 }
@@ -892,6 +895,15 @@ export class LobbyUi {
         if (document.body?.dataset) {
             if (this.mode === 'campaign') document.body.dataset.campaignView = seriesView ? 'series' : 'stages';
             else delete document.body.dataset.campaignView;
+            // Standings on the series screen opens the leaderboard of a
+            // finished series, so it shows once a series is finished.
+            const hasFinishedSeries = (this.campaignState.series ?? [])
+                .some((summary) => summary?.finished === true);
+            if (this.mode === 'campaign' && seriesView && hasFinishedSeries) {
+                document.body.dataset.campaignSeriesStandings = 'true';
+            } else {
+                delete document.body.dataset.campaignSeriesStandings;
+            }
         }
         const list = this.campaignSeriesList;
         const carousel = document.getElementById('campaign-carousel');

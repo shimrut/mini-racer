@@ -328,6 +328,25 @@
     display: none;
 }
 
+/* A rail of names, such as the Campaign series: each chip is as wide as its
+   name, on one line. */
+.leaderboard-day-rail--named {
+    grid-template-columns: none;
+    grid-auto-columns: max-content;
+}
+
+.leaderboard-day-rail--named .leaderboard-day-chip {
+    padding: 0 0.9rem;
+}
+
+.leaderboard-day-rail--named .leaderboard-day-chip__month {
+    display: none;
+}
+
+.leaderboard-day-rail--named .leaderboard-day-chip__day {
+    white-space: nowrap;
+}
+
 .leaderboard-day-chip {
     display: inline-flex;
     align-items: center;

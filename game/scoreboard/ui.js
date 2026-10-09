@@ -547,7 +547,7 @@ export class LeaderboardsUi {
             ),
             ...(typeof this.onRaceOpponent === 'function'
                 ? {
-                    onRaceOpponent: (entry) => this.onRaceOpponent(challenge, entry),
+                    onRaceOpponent: (entry, options) => this.onRaceOpponent(challenge, entry, options),
                 }
                 : {}),
         };

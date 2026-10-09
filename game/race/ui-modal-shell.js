@@ -1838,6 +1838,7 @@ export class ModalShell {
         scoreboardSubhead = null,
         leaderboardDayOptions = null,
         leaderboardRailLabel = null,
+        leaderboardRailNamed = false,
         selectedLeaderboardDayId = null,
         onSelectLeaderboardDay = null,
         onLoadMoreLeaderboard = null,
@@ -1889,6 +1890,7 @@ export class ModalShell {
             scoreboardSubhead,
             leaderboardDayOptions,
             leaderboardRailLabel,
+            leaderboardRailNamed,
             selectedLeaderboardDayId,
             onSelectLeaderboardDay,
             onLoadMoreLeaderboard,
@@ -2554,7 +2556,10 @@ export class ModalShell {
             && payload.leaderboardDayOptions.length > 1
         ) {
             const rail = document.createElement('div');
-            rail.className = 'leaderboard-day-rail';
+            // A rail of names (the Campaign series) sizes each chip to its name.
+            rail.className = payload?.leaderboardRailNamed === true
+                ? 'leaderboard-day-rail leaderboard-day-rail--named'
+                : 'leaderboard-day-rail';
             rail.setAttribute('role', 'tablist');
             rail.setAttribute(
                 'aria-label',
@@ -2818,27 +2823,45 @@ export class ModalShell {
         confirm.type = 'button';
         confirm.className = 'result-share-panel__button result-share-panel__button--primary';
         confirm.textContent = 'Race Ghost';
-        confirm.onclick = () => {
+        const watch = document.createElement('button');
+        watch.type = 'button';
+        watch.className = 'result-share-panel__button';
+        watch.textContent = 'Watch';
+        const contextText = context.textContent;
+        const buttons = [confirm, watch, cancel];
+        // Race Ghost starts the race and closes the panel. Watch opens the
+        // replay over the panel, and the panel stays for Race Ghost after it.
+        const run = (button, { busyLabel, statusText, watching }) => {
             const onRaceOpponent = this._onRaceOpponent;
-            confirm.disabled = true;
-            cancel.disabled = true;
-            confirm.textContent = 'Preparing…';
-            context.textContent = 'Loading the verified ghost and split times…';
+            const label = button.textContent;
+            buttons.forEach((item) => { item.disabled = true; });
+            button.textContent = busyLabel;
+            context.textContent = statusText;
+            context.classList.remove('is-error');
+            const restore = () => {
+                buttons.forEach((item) => { item.disabled = false; });
+                button.textContent = label;
+            };
             const handleResult = (result) => {
                 if (result?.ok === false) {
                     throw new Error(result.body?.error || 'This ghost is no longer available.');
                 }
-                this._closeSharePanel({ restoreScroll: false });
+                if (!watching) {
+                    this._closeSharePanel({ restoreScroll: false });
+                    return;
+                }
+                restore();
+                context.textContent = contextText;
             };
             const handleError = (error) => {
-                confirm.disabled = false;
-                cancel.disabled = false;
-                confirm.textContent = 'Race Ghost';
+                restore();
                 context.textContent = error?.message || 'This ghost could not be prepared.';
                 context.classList.add('is-error');
             };
             try {
-                const result = onRaceOpponent?.(entry);
+                const result = watching
+                    ? onRaceOpponent?.(entry, { watch: true })
+                    : onRaceOpponent?.(entry);
                 if (result && typeof result.then === 'function') {
                     void result.then(handleResult).catch(handleError);
                 } else {
@@ -2848,13 +2871,23 @@ export class ModalShell {
                 handleError(error);
             }
         };
+        confirm.onclick = () => run(confirm, {
+            busyLabel: 'Preparing…',
+            statusText: 'Loading the verified ghost and split times…',
+            watching: false,
+        });
+        watch.onclick = () => run(watch, {
+            busyLabel: 'Loading…',
+            statusText: 'Loading the ghost…',
+            watching: true,
+        });
 
-        actions.append(confirm, cancel);
+        actions.append(confirm, watch, cancel);
         panel.append(title, context, target, actions);
         scrim.appendChild(panel);
         this.modalRunsView.appendChild(scrim);
         this.clearFinishMenuKeyboardCue();
-        resetMenuKeyboardState(this._shareMenuKeyboardState, [confirm, cancel], {
+        resetMenuKeyboardState(this._shareMenuKeyboardState, [confirm, watch, cancel], {
             preferredIndex: 0,
             container: actions,
             focusPreferred: true,

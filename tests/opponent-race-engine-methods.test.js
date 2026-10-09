@@ -43,6 +43,45 @@ describe('opponent race engine orchestration', () => {
         );
     });
 
+    it('opens the replay for Watch, and does not close standings or start a race', async () => {
+        const response = {
+            ok: true,
+            status: 200,
+            body: {
+                race: { id: 'daily-1', trackKey: 'circuit' },
+                target: { displayName: 'Rival', bestTimeMs: 12_345, ghost: {} },
+            },
+        };
+        service.prepareLeaderboardOpponentRace.mockResolvedValue(response);
+        const context = {
+            modal: { closeModal: vi.fn() },
+            startDailyChallengeAgainstOpponent: vi.fn(),
+            watchPreparedLeaderboardOpponent: vi.fn().mockResolvedValue({ ok: true, watching: true }),
+        };
+
+        const result = await opponentRaceEngineMethods.prepareAndStartLeaderboardOpponent.call(
+            context,
+            { mode: 'daily', competitionId: 'daily-1', entry: { rank: 2 }, watch: true },
+        );
+
+        expect(result).toEqual({ ok: true, watching: true });
+        expect(context.watchPreparedLeaderboardOpponent).toHaveBeenCalledWith('daily', response);
+        expect(context.modal.closeModal).not.toHaveBeenCalled();
+        expect(context.startDailyChallengeAgainstOpponent).not.toHaveBeenCalled();
+    });
+
+    it('refuses a replay when the ghost cannot be read', async () => {
+        const result = await opponentRaceEngineMethods.watchPreparedLeaderboardOpponent.call({}, 'daily', {
+            ok: true,
+            body: {
+                race: { id: 'daily-1', trackKey: 'circuit' },
+                target: { displayName: 'Rival', ghost: null },
+            },
+        });
+        expect(result.ok).toBe(false);
+        expect(result.body.error).toBe('This ghost could not be prepared.');
+    });
+
     it('normalizes no faster ghost to the personal-best fallback', async () => {
         service.prepareLeaderboardOpponentRace.mockResolvedValue({
             ok: false,

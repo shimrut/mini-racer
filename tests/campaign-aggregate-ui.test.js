@@ -11,6 +11,7 @@ import { getCampaignSeriesStages } from '../game/campaign/manifest.js';
 import { ModalShell } from '../game/race/ui-modal-shell.js';
 import { ModalContentUi } from '../game/race/ui-modal-content.js';
 import { clearActivePlayerOwnerId, setActivePlayerOwnerId } from '../game/player/active-owner.js';
+import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
 
 const seriesId = 'numbered-v1';
 const stages = getCampaignSeriesStages(seriesId);
@@ -186,3 +187,46 @@ describe('Campaign aggregate results', () => {
         expect(modal.isCampaignFinishedViewActive()).toBe(true);
     });
 });
+
+describe('Campaign leaderboard from the series screen', () => {
+    afterEach(() => clearStoredSeriesForTests());
+
+    it('names every finished series on the rail, switches between them, and shows a loaded board at once', async () => {
+        registerStoredSeries([{
+            id: 'bla-v1', name: 'Test Bla', ground: 'tarmac', finalStageId: 'bla-v1-01',
+            stages: [
+                { trackKey: 'numberZero', laps: 1, requiredMedals: 0 },
+                { trackKey: 'numberOne', laps: 1, requiredMedals: 1 },
+            ],
+        }]);
+        api.getCampaignAggregate.mockImplementation(async (id) => (id === 'bla-v1'
+            ? reply({ seriesId: 'bla-v1', finalStageId: 'bla-v1-01', totalCount: 7 })
+            : reply()));
+        const { engine, modal } = mount();
+        engine.campaignLobbyState = { series: [
+            { id: seriesId, finished: true }, { id: 'bla-v1', finished: true },
+        ] };
+
+        await engine.openCampaignSeriesStandings();
+        const chips = () => [...document.querySelectorAll('.leaderboard-day-rail--named .leaderboard-day-chip')];
+        expect(chips().map((chip) => chip.textContent)).toEqual(['Numbers', 'Test Bla']);
+        expect(chips()[0].getAttribute('aria-selected')).toBe('true');
+        expect(document.querySelector('#modal-runs-view [data-modal-title]').textContent).toBe('Numbers');
+
+        chips()[1].click();
+        await vi.waitFor(() => expect(document.querySelector('#modal-runs-view [data-modal-title]').textContent)
+            .toBe('Test Bla'));
+        expect(chips()[1].getAttribute('aria-selected')).toBe('true');
+        expect(api.getCampaignAggregate).toHaveBeenCalledTimes(2);
+
+        modal.closeModal({ instant: true });
+        let finishRefresh;
+        api.getCampaignAggregate.mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+        const reopened = engine.openCampaignSeriesStandings(seriesId);
+        expect(document.getElementById('modal-runs-view').textContent).not.toContain('Loading leaderboard');
+        expect(document.querySelectorAll('.leaderboard-row').length).toBeGreaterThan(0);
+        finishRefresh(reply());
+        await reopened;
+    });
+});
+

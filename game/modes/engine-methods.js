@@ -56,6 +56,12 @@ export const modeRouterEngineMethods = {
             return;
         }
         if (mode === 'campaign') {
+            // The series screen has no stage: Standings opens the Campaign
+            // leaderboard of a finished series.
+            if (this.campaignLobbyView === 'series') {
+                void this.openCampaignSeriesStandings?.();
+                return;
+            }
             const stage = this.campaignCarousel?.getSelectedChallenge?.();
             if (stage) {
                 void this.openCampaignStandings?.(stage, { returnMode: 'close' });

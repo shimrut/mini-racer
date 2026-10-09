@@ -730,13 +730,15 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     text-overflow: ellipsis;
 }
 
-/* Campaign series screen: one row for each series, in the Home menu type, with
-   a picture of the first track of the series. */
+/* Campaign series screen: one row per series, with track picture, name, stages and ground, and medal bar. */
 .campaign-series-list {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
     width: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     /* Room for the keyboard ring: the pane clips what is outside it. */
     padding: 0.2rem;
 }
@@ -747,9 +749,10 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 
 .campaign-series-row {
     display: grid;
-    grid-template-columns: 6.5rem minmax(0, 1fr);
-    align-items: center;
-    gap: 1rem;
+    grid-template-columns: 5rem minmax(0, 1fr) 7rem;
+    /* The outer rows take the picture height, so the two text lines stay tight. */
+    grid-template-rows: 1fr auto auto 1fr;
+    gap: 0 1rem;
     width: 100%;
     margin: 0;
     padding: 0.55rem 0.6rem;
@@ -772,8 +775,10 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 
 .campaign-series-row__preview {
     display: block;
-    width: 6.5rem;
-    aspect-ratio: 104 / 58;
+    grid-row: 1 / 5;
+    align-self: center;
+    width: 100%;
+    aspect-ratio: 80 / 58;
 }
 
 .campaign-series-row__preview canvas {
@@ -782,13 +787,26 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     height: 100%;
 }
 
-.campaign-series-row__text {
-    display: grid;
-    gap: 0.5rem;
-    min-width: 0;
+/* Name and count share the first line, ground and bar the second, so they align. */
+.campaign-series-row__text,
+.campaign-series-row__medals {
+    display: contents;
 }
 
-.campaign-series-row__info {
+.campaign-series-row__name {
+    grid-area: 2 / 2;
+    align-self: end;
+    min-width: 0;
+    overflow: hidden;
+    /* The italic slant needs room, or the clip cuts the last letter. */
+    padding-inline-end: 0.1em;
+    font-size: clamp(1.15rem, 4.5vw, 1.4rem);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.campaign-series-row__info,
+.campaign-series-row__count {
     color: var(--text-dim);
     font-family: var(--mono-font);
     font-size: 0.68rem;
@@ -796,32 +814,111 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     letter-spacing: 0.16em;
     line-height: 1.4;
     text-transform: uppercase;
-}
-
-.campaign-series-row__info[data-finished="true"] {
-    color: var(--medal-gold);
-}
-
-.campaign-series-row__part {
     white-space: nowrap;
 }
 
-.campaign-series-row__part + .campaign-series-row__part::before {
-    content: " · ";
+/* Stage count and road icon read as one group, set apart from the ground. */
+.campaign-series-row__info {
+    grid-area: 3 / 2;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+    margin-top: 0.5rem;
+}
+
+.campaign-series-row__stages {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+/* The road shape fills 70% of its box; this size makes it as tall as the digits. */
+.campaign-series-row__stages svg {
+    display: block;
+    width: 0.71rem;
+    height: 0.71rem;
+    translate: 0 -0.02rem;
+    fill: currentColor;
+}
+
+.campaign-series-row__count {
+    grid-area: 2 / 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    align-self: end;
+    justify-self: start;
+    color: var(--text-color);
+}
+
+.campaign-series-row__medal-icon {
+    display: block;
+    flex: none;
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.campaign-series-row__medal-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.campaign-series-row__bar {
+    grid-area: 3 / 3;
+    display: block;
+    align-self: end;
+    /* Centres the bar on the ground line. */
+    margin-bottom: calc((0.68rem * 1.4 - 6px) / 2);
+    height: 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-full);
+}
+
+.campaign-series-row__bar::before {
+    content: "";
+    display: block;
+    width: calc(var(--medal-share, 0) * 100%);
+    height: 100%;
+    background: var(--medal-gold);
+    border-radius: inherit;
 }
 
 @media (max-width: 480px) {
-    .campaign-series-row__part {
-        display: block;
-    }
-
-    .campaign-series-row__part + .campaign-series-row__part::before {
-        content: none;
+    .campaign-series-row {
+        grid-template-columns: 4.5rem minmax(0, 1fr) 6.5rem;
+        column-gap: 0.75rem;
     }
 }
 
-/* Standings and Tracks need a stage, so the series screen does not show them. */
-body[data-lobby-mode="campaign"][data-campaign-view="series"] #lobby-mode-standings-btn,
+@media (max-width: 400px) {
+    .campaign-series-row {
+        grid-template-columns: 4rem minmax(0, 1fr) 5.5rem;
+        column-gap: 0.6rem;
+    }
+
+    .campaign-series-row__name {
+        font-size: 1.1rem;
+    }
+
+    .campaign-series-row__count {
+        gap: 0.2rem;
+        letter-spacing: 0.04em;
+    }
+
+    .campaign-series-row__medal-icon {
+        width: 0.8rem;
+        height: 0.8rem;
+    }
+}
+
+/* Tracks needs a stage, so the series screen does not show it. Standings on
+   the series screen opens the leaderboard of a finished series, so it shows
+   only once a series is finished. */
+body[data-lobby-mode="campaign"][data-campaign-view="series"]:not([data-campaign-series-standings]) #lobby-mode-standings-btn,
 body[data-lobby-mode="campaign"][data-campaign-view="series"] #lobby-mode-tracks-btn {
     display: none;
 }

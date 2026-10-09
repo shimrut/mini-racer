@@ -34,6 +34,7 @@ import {
     countCampaignMedals,
     getCampaignSeriesStages,
     getCampaignFinalStage,
+    getCampaignSeries,
     getCampaignStage,
     isCampaignSeriesFinished,
     isCampaignSeriesId,
@@ -180,6 +181,50 @@ function requestCampaignLeaderboardSessionRefresh(raceId, refreshSession) {
         }
     });
     refreshSession.inFlightByRaceId.set(raceId, requestPromise);
+    return requestPromise;
+}
+
+// One opening of the series leaderboard. It keeps the boards of the last
+// opening, so a board shows at once, and asks the server once for each series.
+function createCampaignSeriesStandingsSession(previousSession = null) {
+    return {
+        refreshedSeriesIds: new Set(),
+        inFlightBySeriesId: new Map(),
+        snapshotBySeriesId: new Map(previousSession?.snapshotBySeriesId || []),
+        selectedSeriesId: null,
+        timer: null,
+    };
+}
+
+// The answer is the board, { pending: true } while the server still fills
+// it, or null when it failed.
+function requestCampaignSeriesStandingsRefresh(seriesId, finalStageId, refreshSession) {
+    if (refreshSession.refreshedSeriesIds.has(seriesId)) {
+        return Promise.resolve(refreshSession.snapshotBySeriesId.get(seriesId) || null);
+    }
+    const existingRequest = refreshSession.inFlightBySeriesId.get(seriesId);
+    if (existingRequest) return existingRequest;
+
+    let requestPromise = null;
+    requestPromise = getCampaignAggregate(seriesId).then((response) => {
+        const body = response?.body;
+        if (!response?.ok || body?.seriesId !== seriesId || body.finalStageId !== finalStageId) return null;
+        if (body.ready !== true) return { pending: true };
+        const snapshot = normalizeScoreboardSnapshot(body);
+        if (refreshSession.inFlightBySeriesId.get(seriesId) === requestPromise) {
+            refreshSession.refreshedSeriesIds.add(seriesId);
+            refreshSession.snapshotBySeriesId.set(seriesId, snapshot);
+        }
+        return snapshot;
+    }).catch((error) => {
+        console.error('Could not load the Campaign leaderboard:', error);
+        return null;
+    }).finally(() => {
+        if (refreshSession.inFlightBySeriesId.get(seriesId) === requestPromise) {
+            refreshSession.inFlightBySeriesId.delete(seriesId);
+        }
+    });
+    refreshSession.inFlightBySeriesId.set(seriesId, requestPromise);
     return requestPromise;
 }
 
@@ -1388,6 +1433,110 @@ export const campaignEngineMethods = {
         });
     },
 
+    // Standings on the series screen: the Campaign leaderboard of a finished
+    // series. The server shows it only to a player who finished the series.
+    // A rail with the series names switches between the finished series. As
+    // the stage leaderboards do, the board shows what it loaded before at
+    // once, and asks the server again once each time the leaderboard opens.
+    // While the server still fills the board, it asks again later.
+    async openCampaignSeriesStandings(requestedSeriesId = null, {
+        refreshSession: providedRefreshSession = null,
+    } = {}) {
+        if (this.activeRaceMode !== 'campaign') return;
+        const finishedIds = new Set((this.campaignLobbyState?.series ?? [])
+            .filter((summary) => summary?.finished === true)
+            .map((summary) => summary.id));
+        const finishedSeries = CAMPAIGN_SERIES
+            .filter((series) => finishedIds.has(series.id) && getCampaignFinalStage(series.id));
+        if (!finishedSeries.length) return;
+        const seriesId = [requestedSeriesId, selectedCampaignSeriesId(this), finishedSeries[0].id]
+            .find((id) => finishedSeries.some((series) => series.id === id));
+        const series = getCampaignSeries(seriesId);
+        const finalStageId = getCampaignFinalStage(seriesId)?.raceId;
+        if (!series || !finalStageId) return;
+
+        const refreshSession = providedRefreshSession
+            || createCampaignSeriesStandingsSession(this._lastCampaignSeriesStandingsSession);
+        this._activeCampaignSeriesStandingsSession = refreshSession;
+        this._lastCampaignSeriesStandingsSession = refreshSession;
+        clearTimeout(refreshSession.timer);
+        refreshSession.selectedSeriesId = seriesId;
+        const isCurrent = () => this._activeCampaignSeriesStandingsSession === refreshSession
+            && refreshSession.selectedSeriesId === seriesId
+            && this.activeRaceMode === 'campaign'
+            && this.modal.isRunsViewActive?.() === true
+            && this.modal.matchesModalScoreboardContext?.({ challengeId: seriesId }) === true;
+        const cachedSnapshot = refreshSession.snapshotBySeriesId.get(seriesId) ?? null;
+        const shouldRefresh = !refreshSession.refreshedSeriesIds.has(seriesId);
+        let currentSnapshot = cachedSnapshot;
+        let pageRequest = null;
+
+        this.modal.showRunsModal(null, null, null, 'close', {
+            scoreboardSnapshot: shouldRefresh
+                ? (cachedSnapshot ? { ...cachedSnapshot, isRefreshing: true } : { isLoading: true })
+                : cachedSnapshot,
+            scoreboardMode: 'campaign-aggregate',
+            scoreboardChallengeId: seriesId,
+            scoreboardTitle: series.name,
+            leaderboardDayOptions: finishedSeries.map((option) => ({
+                challengeId: option.id,
+                monthLabel: '',
+                dayNumberLabel: option.name,
+                ariaLabel: `View ${option.name} Campaign leaderboard`,
+            })),
+            leaderboardRailLabel: 'Campaign series',
+            leaderboardRailNamed: true,
+            selectedLeaderboardDayId: seriesId,
+            onSelectLeaderboardDay: (nextSeriesId) => void this.openCampaignSeriesStandings(nextSeriesId, {
+                refreshSession,
+            }),
+            showGlobalLeaderboard: true,
+            allowLeaderboardOpen: false,
+            onLoadMoreLeaderboard: async () => {
+                if (pageRequest) return pageRequest;
+                const snapshot = currentSnapshot;
+                if (!snapshot?.hasMore || !isCurrent()) return snapshot;
+                pageRequest = getCampaignAggregate(seriesId, {
+                    limit: 50, offset: snapshot.nextOffset,
+                }).then((response) => {
+                    if (!isCurrent() || currentSnapshot !== snapshot) return currentSnapshot;
+                    const body = response?.body;
+                    if (!response?.ok || body?.ready !== true
+                        || body.seriesId !== seriesId || body.finalStageId !== finalStageId) {
+                        throw new Error('Could not load more Campaign results.');
+                    }
+                    currentSnapshot = mergeLeaderboardPages(snapshot, normalizeScoreboardSnapshot(body));
+                    refreshSession.snapshotBySeriesId.set(seriesId, currentSnapshot);
+                    this.modal.updateModalScoreboardSnapshot?.(currentSnapshot);
+                    return currentSnapshot;
+                }).finally(() => { pageRequest = null; });
+                return pageRequest;
+            },
+            onClose: () => {
+                clearTimeout(refreshSession.timer);
+                if (this._activeCampaignSeriesStandingsSession === refreshSession) {
+                    refreshSession.selectedSeriesId = null;
+                    this._activeCampaignSeriesStandingsSession = null;
+                }
+            },
+        });
+
+        if (!shouldRefresh) return;
+        let pollDelayMs = 2000;
+        const refresh = async () => {
+            const result = await requestCampaignSeriesStandingsRefresh(seriesId, finalStageId, refreshSession);
+            if (!isCurrent()) return;
+            if (result?.pending) {
+                refreshSession.timer = setTimeout(() => void refresh(), pollDelayMs);
+                pollDelayMs = Math.min(pollDelayMs * 2, 15000);
+                return;
+            }
+            currentSnapshot = result || cachedSnapshot || normalizeScoreboardSnapshot(null);
+            this.modal.updateModalScoreboardSnapshot?.(currentSnapshot);
+        };
+        await refresh();
+    },
+
     // Next stays disabled until the next stage's track is prepared. A failed
     // preparation enables Next again, and its press prepares once more.
     prepareCampaignNextTrack(finishedStage, nextTarget) {
@@ -1903,10 +2052,11 @@ export const campaignEngineMethods = {
                 returnMode,
                 refreshSession,
             }),
-            onRaceOpponent: (entry) => this.prepareAndStartLeaderboardOpponent?.({
+            onRaceOpponent: (entry, options) => this.prepareAndStartLeaderboardOpponent?.({
                 mode: 'campaign',
                 competitionId: stage.raceId,
                 entry,
+                watch: options?.watch === true,
             }),
             onLoadMoreLeaderboard,
             showGlobalLeaderboard: true,

@@ -1253,15 +1253,28 @@ describe('ui modal runs helpers', () => {
 
         const button = (label) => [...dom.window.document.querySelectorAll('.leaderboard-race-panel button')]
             .find((item) => item.textContent === label);
-        expect([...panel.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['Race Ghost', 'Cancel']);
+        expect([...panel.querySelectorAll('button')].map((item) => item.textContent)).toEqual(['Race Ghost', 'Watch', 'Cancel']);
         button('Cancel').click();
         expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
         expect(dom.window.document.activeElement).toBe(triggerRow);
         expect(onRaceOpponent).not.toHaveBeenCalled();
 
         _showLeaderboardOpponentConfirmation.call(shell, entry, triggerRow);
+        onRaceOpponent.mockReturnValueOnce({ ok: true, watching: true });
+        button('Watch').click();
+        expect(onRaceOpponent).toHaveBeenLastCalledWith(entry, { watch: true });
+        expect(dom.window.document.querySelector('.leaderboard-race-panel')).not.toBe(null);
+        expect(button('Watch').disabled).toBe(false);
+        expect(dom.window.document.querySelector('.leaderboard-race-panel')?.textContent)
+            .toContain('Classic Circuit · Stage 3');
+
+        onRaceOpponent.mockReturnValueOnce({ ok: false, body: { error: 'Track failed to load.' } });
+        button('Watch').click();
+        expect(dom.window.document.querySelector('.leaderboard-race-panel .is-error')?.textContent)
+            .toBe('Track failed to load.');
+
         button('Race Ghost').click();
-        expect(onRaceOpponent).toHaveBeenCalledWith(entry);
+        expect(onRaceOpponent).toHaveBeenLastCalledWith(entry);
         expect(dom.window.document.querySelector('.leaderboard-race-panel')).toBe(null);
 
         global.document = originalDocument;

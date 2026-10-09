@@ -258,6 +258,9 @@ function buildRunsViewFields(source) {
     if (typeof source.leaderboardRailLabel === 'string' && source.leaderboardRailLabel) {
         fields.leaderboardRailLabel = source.leaderboardRailLabel;
     }
+    if (source.leaderboardRailNamed === true) {
+        fields.leaderboardRailNamed = true;
+    }
     if (typeof source.onRaceOpponent === 'function') {
         fields.onRaceOpponent = source.onRaceOpponent;
     }

@@ -318,3 +318,205 @@
     font-weight: 800;
     text-align: center;
 }
+
+/* Watch: the replay of a leaderboard ghost in the race view, over the
+   leaderboard. The bar follows the podium replay bar. */
+.ghost-watch {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) + 10);
+    background: var(--bg-color);
+    overflow: hidden;
+    touch-action: manipulation;
+}
+
+.ghost-watch__canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.ghost-watch__top {
+    position: absolute;
+    top: calc(0.75rem + env(safe-area-inset-top));
+    left: calc(0.75rem + env(safe-area-inset-left));
+    right: calc(0.75rem + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    pointer-events: none;
+}
+
+.ghost-watch__top > * {
+    pointer-events: auto;
+}
+
+.ghost-watch__back,
+.ghost-watch__toggle,
+.ghost-watch__trail {
+    min-height: 2.45rem;
+    border: 1px solid rgba(248, 250, 252, 0.28);
+    border-radius: 0.4rem;
+    background: rgba(15, 23, 42, 0.88);
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+.ghost-watch__back,
+.ghost-watch__trail {
+    padding: 0.3rem 0.9rem;
+    font-family: var(--header-font);
+    font-size: 0.78rem;
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ghost-watch__title {
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.4rem;
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    font-size: 0.85rem;
+    font-weight: 800;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.ghost-watch__title:empty {
+    display: none;
+}
+
+.ghost-watch__bar {
+    position: absolute;
+    right: calc(0.75rem + env(safe-area-inset-right));
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    left: calc(0.75rem + env(safe-area-inset-left));
+    display: grid;
+    gap: 0.65rem;
+}
+
+.ghost-watch__seek-wrap {
+    --track-h: 0.38rem;
+    --knob-h: 1.1rem;
+    --knob-w: 2.35rem;
+    position: relative;
+    display: block;
+    height: var(--knob-h);
+}
+
+.ghost-watch__seek-track {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: var(--track-h);
+    transform: translateY(-50%);
+    border-radius: var(--radius-full);
+    background: rgba(51, 65, 85, 0.85);
+    pointer-events: none;
+}
+
+.ghost-watch__seek-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(100% * var(--progress-n, 0));
+    border-radius: var(--radius-full);
+    background: var(--accent-color);
+}
+
+.ghost-watch__seek-knob {
+    position: absolute;
+    top: 50%;
+    left: clamp(calc(var(--knob-w) / 2), calc(100% * var(--progress-n, 0)), calc(100% - var(--knob-w) / 2));
+    z-index: 1;
+    width: var(--knob-w);
+    height: var(--knob-h);
+    transform: translate(-50%, -50%);
+    border-radius: var(--radius-full);
+    background: var(--accent-color);
+    pointer-events: none;
+}
+
+.ghost-watch__seek-wrap:focus-within {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.ghost-watch__seek {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.ghost-watch__seek:focus {
+    outline: none;
+}
+
+.ghost-watch__chrome {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ghost-watch__trail[aria-pressed="true"] {
+    border-color: var(--accent-color);
+    background: var(--accent-color);
+}
+
+.ghost-watch__spacer {
+    flex: 1;
+}
+
+.ghost-watch__toggle {
+    display: grid;
+    place-items: center;
+    min-width: 2.45rem;
+    padding: 0;
+    line-height: 0;
+}
+
+.ghost-watch__icon {
+    grid-area: 1 / 1;
+    display: block;
+    width: 1rem;
+    height: auto;
+}
+
+.ghost-watch__icon--pause {
+    display: none;
+    width: 0.85rem;
+}
+
+.ghost-watch__toggle[data-playing="true"] .ghost-watch__icon--play {
+    display: none;
+}
+
+.ghost-watch__toggle[data-playing="true"] .ghost-watch__icon--pause {
+    display: block;
+}
+
+.ghost-watch__clock {
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.4rem;
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--text-color);
+    font-family: var(--mono-font);
+    font-size: clamp(0.92rem, 2.4vw, 1.2rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}

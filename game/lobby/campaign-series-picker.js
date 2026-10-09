@@ -1,5 +1,5 @@
 // Shared Campaign medal count used by the series screen and completion screen.
-const MEDALS_PER_STAGE = 4;
+export const MEDALS_PER_STAGE = 4;
 
 // "12/64": the medals a player holds in a series, of the most it can give.
 export function formatSeriesMedals(series) {

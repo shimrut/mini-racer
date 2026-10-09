@@ -504,10 +504,11 @@ export class RealTimeRacer {
       onStartDailyChallenge: (challenge, options = {}) => {
         void this.invokeModeMethod("daily", "handleStartDailyChallenge", challenge, options);
       },
-      onRaceOpponent: (challenge, entry) => this.prepareAndStartLeaderboardOpponent({
+      onRaceOpponent: (challenge, entry, options) => this.prepareAndStartLeaderboardOpponent({
         mode: "daily",
         competitionId: challenge?.id,
         entry,
+        watch: options?.watch === true,
       }),
       isRunsViewActive: () => this.modal.isRunsViewActive?.(),
       updateModalScoreboardSnapshot: (snapshot) => this.modal.updateModalScoreboardSnapshot?.(snapshot),
