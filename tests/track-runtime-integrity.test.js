@@ -249,6 +249,8 @@ describe('track runtime integrity', () => {
             'crescentValley',
             'seaCharger',
             'gunSlinger',
+            'rightLeftRight',
+            'tailTurn',
         ]);
         const campaignTrackKeys = new Set(NUMBERS_STAGES.map((stage) => stage.trackKey));
         const existingCatalogKeys = catalogKeys.slice(0, firstNewTrackIndex);
@@ -309,7 +311,10 @@ describe('track runtime integrity', () => {
             'dirtSnake', 'wildCrest', 'brokenRoad', 'ridgeRunner',
             ...V240_TRACK_CONTRACTS.map(([trackKey]) => trackKey),
         ]);
-        const latestAddedKeys = new Set(['grandSlam', 'dirtyDancing', 'greyHarbor', 'endlessLoop', 'crescentValley', 'seaCharger']);
+        const latestAddedKeys = new Set([
+            'grandSlam', 'dirtyDancing', 'greyHarbor', 'endlessLoop', 'crescentValley', 'seaCharger',
+            'rightLeftRight', 'tailTurn',
+        ]);
         const unchangedSinceWindingLane = Object.fromEntries(
             Object.entries(TRACKS)
                 .filter(([trackKey]) => !latestReshapedKeys.has(trackKey) && !latestAddedKeys.has(trackKey)),
@@ -334,12 +339,14 @@ describe('track runtime integrity', () => {
         expect(hashTrackRegistry(TRACK_SCHEDULE_KEYS.filter((key) => (
             key !== 'gunSlinger' && key !== 'waterPistol'
         )))).toBe('fd4c78dbd38136623dc7155358ed3dfac8e2bab002765b39a56413e099e6fba2');
-        // Pin every existing track, including Water Pistol, before this restoration.
+        // Pin every existing track, including Water Pistol, before this restoration; tracks added later are left out.
+        const addedLater = new Set(['rightLeftRight', 'tailTurn']);
         expect(hashTrackRegistry(Object.fromEntries(Object.entries(TRACKS)
-            .filter(([key]) => key !== 'gunSlinger')))).toBe(
+            .filter(([key]) => key !== 'gunSlinger' && !addedLater.has(key))))).toBe(
             '40f62fd7f1ba367e32766512b877a4aa014ff7c572d2506507e087ad9d255f4f',
         );
-        expect(hashTrackRegistry(TRACKS)).toBe(
+        expect(hashTrackRegistry(Object.fromEntries(Object.entries(TRACKS)
+            .filter(([key]) => !addedLater.has(key))))).toBe(
             '31e461881c505623ee939b3aa7a479acbdb277494658608c6433f1b23e06e1e0',
         );
     });
