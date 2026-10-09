@@ -27,6 +27,13 @@ export function mirrorHalf(halfPoints) {
   return [...halfPoints, ...mirror];
 }
 
+// Adds a closed shape through the corners, with straight sides.
+export function tracePolygon(ctx, corners) {
+  ctx.moveTo(corners[0][0], corners[0][1]);
+  for (const [x, y] of corners.slice(1)) ctx.lineTo(x, y);
+  ctx.closePath();
+}
+
 // Adds a closed shape through the corners, with rounded corners.
 export function traceRoundedPolygon(ctx, corners, radius) {
   const last = corners[corners.length - 1];

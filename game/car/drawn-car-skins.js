@@ -258,29 +258,25 @@ export const DRAWN_CAR_SKINS = Object.freeze({
         label: 'Red',
         series: 'space',
         car: 'spaceship',
-        livery: Object.freeze({ main: '#d7263d', accent: '#ffd23f', tertiary: '#1b1b1f' }),
-        decals: Object.freeze({ wingStripes: 'accent', podRing: 'accent', frontWingTips: 'tertiary', noseTip: 'tertiary' }),
+        livery: Object.freeze({ main: '#e3161f', accent: '#ffd23f', tertiary: '#2f8fff' }),
     }),
     'drawn/mr_space_ship-black': Object.freeze({
         label: 'Black',
         series: 'space',
         car: 'spaceship',
         livery: Object.freeze({ main: '#1d1f27', accent: '#3de8ff', tertiary: '#ff4fd8' }),
-        decals: Object.freeze({ cockpitRim: 'accent', pods: 'main' }),
     }),
     'drawn/mr_space_ship-gold': Object.freeze({
         label: 'Gold',
         series: 'space',
         car: 'spaceship',
         livery: Object.freeze({ main: '#f2b705', accent: '#1b1b1f', tertiary: '#ffffff' }),
-        decals: Object.freeze({ wingTips: 'tertiary', wingStripes: 'accent', sidePodStripes: 'accent' }),
     }),
     'drawn/mr_space_ship-purple': Object.freeze({
         label: 'Purple',
         series: 'space',
         car: 'spaceship',
         livery: Object.freeze({ main: '#6a3fd1', accent: '#3de8ff', tertiary: '#ffffff' }),
-        decals: Object.freeze({ noseTip: 'tertiary', wingStripes: 'tertiary', podRing: 'accent', pods: 'main' }),
     }),
 });
 

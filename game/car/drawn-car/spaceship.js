@@ -1,21 +1,17 @@
 import { FORMULA_CAR } from "./formula.js";
-import { body } from "./parts/body.js";
-import { brakeLight } from "./parts/brake-light.js";
-import { cockpit } from "./parts/cockpit.js";
 import { engineFlame } from "./parts/engine-flame.js";
-import { enginePod } from "./parts/engine-pod.js";
-import { frontWing } from "./parts/front-wing.js";
-import { gearbox } from "./parts/gearbox.js";
-import { louvers } from "./parts/louvers.js";
-import { navLight } from "./parts/nav-light.js";
 import { noseStripe } from "./parts/nose-stripe.js";
+import { shipEngine } from "./parts/ship-engine.js";
+import { shipHull } from "./parts/ship-hull.js";
 import { shipWing } from "./parts/ship-wing.js";
-import { sideIntake } from "./parts/side-intake.js";
 
-// The Spaceship: Formula body parts plus swept wings, engine pods with flames and wing-tip lights.
+// The Spaceship: a dart hull with a big canopy, swept wings with tip lights, and two engines side by side.
+// Shapes are traced from the concept art; WIDTH narrows them to the car's width.
+const WIDTH = 0.71;
 
-const POD_Y = -17.5;
-const NOZZLE_X = -46;
+const at = (points) => points.map(([x, y]) => [x, y * WIDTH]);
+const ENGINE_Y = -7.3 * WIDTH;
+const NOZZLE_X = -48;
 
 export const SPACESHIP = {
   boxSize: FORMULA_CAR.boxSize,
@@ -27,36 +23,25 @@ export const SPACESHIP = {
     tertiary: "#ff7a1a",
   },
 
-  // Areas take main, accent, tertiary, a color or null; body, cockpit and front wing work as on the car.
+  // Areas take main, accent, tertiary, a color or null.
   decals: {
     body: "main",
-    centerStripe: "accent",
-    sidePodStripes: "tertiary",
-    noseTip: "accent",
-    noseStripe: null,
-    cockpitRim: "main",
-    intakes: null,
-    frontWing: "main",
-    frontWingTips: "accent",
-    frontWingEdge: null,
     wings: "main",
     wingTips: "accent",
-    wingStripes: "tertiary",
-    pods: null,
-    podRing: "tertiary",
+    noseStripe: "accent",
+    engineRing: "tertiary",
   },
 
   colors: {
     ...FORMULA_CAR.colors,
-    frame: "#4a525c",
-    frameLight: "#8b95a1",
+    frame: "#2b3038",
+    frameLight: "#4b535d",
+    engine: "#25282d",
+    engineLight: "#3c4148",
     nozzle: "#1c2026",
-    nozzleGlow: "#bff4ff",
-    flame: "#3fd4ff",
-    flameCore: "#effdff",
-    navRed: "#ff3b30",
-    navGreen: "#2ee86a",
-    lampShine: "#ffffff",
+    flame: "#3fa8ff",
+    flameCore: "#e6f6ff",
+    glassShine: "#9db0c0",
   },
 
   parts: [
@@ -67,54 +52,70 @@ export const SPACESHIP = {
       mirror: true,
       steers: true,
       steerScale: -1,
-      pivot: [NOZZLE_X, POD_Y],
-      settings: { x: NOZZLE_X, y: POD_Y, halfWidth: 3.6, length: [3, 9] },
+      pivot: [NOZZLE_X, ENGINE_Y],
+      settings: { x: NOZZLE_X, y: ENGINE_Y, halfWidth: 3.6 * WIDTH, length: [3, 7] },
     },
     {
       id: "wing",
       part: shipWing,
       mirror: true,
       settings: {
-        corners: [[1, -13], [-22, -29], [-33.5, -29], [-38, -12.5]],
-        tipFrom: -24,
-        stripe: { from: [-2, -14.4], to: [-21, -27.6], width: 1.6 },
-        panels: [[[-10, -15.6], [-29, -27]], [[-24, -14.6], [-35, -21.5]]],
-        endPlate: { from: -35.5, to: -20.5, y: -29, width: 2.6 },
+        under: at([
+          [10.5, -11], [5, -13.5], [0, -15], [-5, -16.6], [-10, -18.4], [-20, -22.8], [-30, -30],
+          [-40, -37.5], [-45, -40.3], [-50.2, -40.6], [-51.5, -39.6], [-51.2, -36], [-49.4, -30],
+          [-47, -24.5], [-44.6, -20.4], [-41.6, -16.4], [-38.6, -14], [-30, -12.5], [0, -11],
+        ]),
+        top: at([
+          [10.5, -11], [5, -13.5], [0, -15], [-5, -16.6], [-10, -18.4], [-20, -22.8], [-30, -30],
+          [-40, -37.5], [-45, -40.3], [-50.2, -40.6], [-50.9, -39.6], [-46.8, -36], [-42.5, -30],
+          [-38, -24], [-34, -18.5], [-31, -15.2], [-29, -14.2], [-22, -13.6], [0, -11],
+        ]),
+        facet: at([[-44.5, -27], [-37.4, -14.6], [-35.2, -14.8], [-41.4, -24.6]]),
+        strip: at([[-50.6, -35.2], [-48, -36.8], [-41, -22.4], [-43.6, -20.8]]),
+        stripLine: at([[-46.6, -27.2], [-43, -26]]),
       },
     },
-    { id: "pod", part: enginePod, mirror: true, settings: { from: NOZZLE_X, to: -14, y: POD_Y, ringAt: -22 } },
-    { id: "engineBlock", part: gearbox, settings: { from: -44, to: -37, width: 13 } },
-    { id: "tailLight", part: brakeLight, settings: { from: -48.4, to: -43.6, width: 4.4 } },
-    { id: "frontWing", part: frontWing, mirror: true },
+    {
+      id: "engine",
+      part: shipEngine,
+      mirror: true,
+      settings: {
+        y: ENGINE_Y,
+        halfWidth: 5.8 * WIDTH,
+        housing: at([[-39.5, -13.4], [-30.5, -13.4], [-26, -9.4], [-31, -6.8], [-37.2, -4.6], [-39.5, -4.6]]),
+        housingFacet: at([[-37, -12.8], [-31.6, -12.8], [-29.6, -10.6], [-35.6, -10.6]]),
+        glint: { from: -44.5, to: -37.5, y: -8.9 * WIDTH },
+      },
+    },
     {
       id: "body",
-      part: body,
+      part: shipHull,
       settings: {
-        shape: [
-          [-40, 0], [-40, -7], [-37, -10.5], [-31, -13.5], [-22, -16], [-12, -17],
-          [-2, -16], [8, -13], [18, -9.6], [28, -7], [38, -4.8], [46, -2.6], [51, 0],
-        ],
-        tub: [
-          [-38, 0], [-37.4, -4], [-34, -6.4], [-26, -7.4], [-16, -8.6], [-6, -9.4],
-          [3, -9], [10, -7.8], [18, -6], [28, -4.6], [38, -3.2], [45.5, -1.8], [49, 0],
-        ],
-        rearChevron: [[-37, 0], [-34, -1.8], [-28, -4.2], [-20, -6], [-13, -6.6], [-9, 0]],
-        noseChevron: [[20, 0], [21, -3.8], [26, -3.4], [30, -2.4], [33, -1.2], [35, 0]],
-        centerStripe: { from: -38, to: 51, rearHalf: 2, noseHalf: 0.7 },
-        sidePodStripe: {
-          points: [[-30, -12.6], [-20, -14.6], [-10, -15.4], [-1, -14.6], [8, -11.8], [18, -8.6], [30, -6.2], [40, -4.2]],
-          width: 1.2,
-        },
-        noseTipFrom: 45,
+        strake: at([
+          [-25, -12.6], [-21, -13.9], [-10, -14.3], [0, -13.5], [8, -11.8], [16, -9.4], [20, -7.6],
+          [10, -9.6], [0, -10.2], [-10, -10], [-18, -9.4],
+        ]),
+        ventRim: at([[-36, -6], [-29.5, -10.6], [-25.5, -11.4], [-22, -10.6], [-16.6, -8.8], [-22, -8.2], [-30, -7]]),
+        ventSlot: at([[-31, -7.4], [-27, -9.9], [-24.5, -10.3], [-17.8, -8.8], [-24, -8.4], [-28.5, -7.8]]),
+        pod: at([
+          [-38.6, 0], [-38.6, -2.6], [-37.6, -4.4], [-33, -6], [-28, -7.6], [-22, -8.8], [-14, -9.6],
+          [-4, -10], [4, -9.9], [10, -9.8], [20, -7.9], [30, -5.9], [40, -4.2], [46, -3.4], [49.6, -2.8], [51.2, -1.6], [51.6, 0],
+        ]),
+        recess: at([[-36.4, 0], [-36.4, -2.4], [-34, -3.2], [-24, -3.6], [-21.4, -1.6], [-21, 0]]),
+        chevron: at([[14.4, 0], [14.6, -3], [17, -2.8], [21, -1.6], [24, 0]]),
+        canopy: at([
+          [-20.6, 0], [-20.2, -3.8], [-18.4, -6], [-14.5, -7.1], [-8, -7.2], [-1, -6.5], [5, -5], [9, -2.8], [10.8, 0],
+        ]),
+        shine: at([
+          [-12.6, -4.6], [-10, -5.4], [0, -4.6], [6, -3], [8.4, -1.4], [7.6, -1], [0, -2.8], [-10, -3.4], [-12.4, -3.6],
+        ]),
       },
     },
-    { id: "sideIntake", part: sideIntake, mirror: true },
-    { id: "louvers", part: louvers, mirror: true },
-    { id: "canopy", part: cockpit, settings: { x: 10, length: 22, width: 11.5, rim: 1.4 } },
-    { id: "noseStripe", part: noseStripe },
-    // A red light on the left wing tip and a green light on the right.
-    { id: "navLightLeft", part: navLight, settings: { x: -18.6, y: -29, radius: 1.5, color: "navRed" } },
-    { id: "navLightRight", part: navLight, settings: { x: -18.6, y: 29, radius: 1.5, color: "navGreen" } },
+    {
+      id: "noseStripe",
+      part: noseStripe,
+      settings: { from: 34, to: 47.5, width: 3.6 * WIDTH, frontWidth: 1.8 * WIDTH },
+    },
   ],
 
   steering: {

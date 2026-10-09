@@ -273,7 +273,7 @@ describe('jet ski and spaceship', () => {
     it('makes the spaceship flames longer at speed', () => {
         const ship = new DrawnCar(DRAWN_CAR_MODELS.spaceship, {}, { pixelsPerUnit: PPU });
         // Behind the nozzle of the left engine.
-        const tail = [-52, -17.5];
+        const tail = [-52, -5.2];
         expect(alphaAt(ship.sprite, ...tail)).toBe(0);
         for (let i = 0; i < 60; i += 1) ship.update(FRAME, { speedPx: 670, size: 52 });
         expect(alphaAt(ship.renderFrame(), ...tail)).toBeGreaterThan(200);
