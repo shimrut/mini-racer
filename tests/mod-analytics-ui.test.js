@@ -246,13 +246,44 @@ describe('moderator analytics page', () => {
         expect(bar.getAttribute('aria-valuenow')).toBe('4');
         expect(bar.getAttribute('aria-valuemax')).toBe('8');
         expect(card.querySelector('.analytics-progress__fill').style.width).toBe('50%');
-        expect(card.textContent).toContain('4 of 8 finished days done · 4 waiting');
+        expect(card.textContent).toContain('Running · 4 of 8 finished days done · 4 waiting');
         expect(card.textContent).toContain('Moved 12,345 runs · Redis payload removed 3.0 MB');
         expect(card.textContent).toContain('Held 3 runs · blob 2.5 MB in 12,000 objects (measured on 4 of 5 days)');
         expect(card.textContent).toContain('Blob storage refused: app not allowed to use blob storage');
 
-        [...card.querySelectorAll('button')].find((node) => node.textContent === 'Restore').click();
-        expect(onChoose).toHaveBeenCalledWith('restore');
+        // While a move runs, the tabs are locked and the one action is Pause.
+        const buttons = [...card.querySelectorAll('button')].map((node) => [node.textContent, node.disabled]);
+        expect(buttons).toEqual([['Move one day', true], ['Move all', true], ['Restore', true], ['Pause', false]]);
+        [...card.querySelectorAll('button')].find((node) => node.textContent === 'Pause').click();
+        expect(onChoose).toHaveBeenCalledWith('off');
+    });
+
+    it('lets a tab only pick the ghost move, and starts it from Run', () => {
+        const status = { choice: 'off', days: {}, eligibleDays: 69, waitingDays: 69, blob: {} };
+        const { window } = analyticsDom();
+        const onSelect = vi.fn();
+        const onChoose = vi.fn();
+        const render = (selected) => {
+            renderGhostMove(window.document, { status, selected, onSelect, onChoose });
+            return window.document.getElementById('analytics-ghost-move');
+        };
+        const button = (card, label) => [...card.querySelectorAll('button')].find((node) => node.textContent === label);
+
+        let card = render(null);
+        expect([...card.querySelectorAll('button')].map((node) => [node.textContent, node.disabled])).toEqual([
+            ['Move one day', false], ['Move all', false], ['Restore', false], ['Run', false],
+        ]);
+        expect(button(card, 'Move one day').getAttribute('aria-pressed')).toBe('true');
+        expect(card.textContent).toContain('Not started · 0 of 69 finished days done · 69 waiting');
+
+        button(card, 'Move all').click();
+        expect(onSelect).toHaveBeenCalledWith('all');
+        expect(onChoose).not.toHaveBeenCalled();
+
+        card = render('all');
+        expect(button(card, 'Move all').getAttribute('aria-pressed')).toBe('true');
+        button(card, 'Run').click();
+        expect(onChoose).toHaveBeenCalledWith('all');
     });
 
     it('shows each compaction step with its progress and the one action it allows', () => {
@@ -342,13 +373,26 @@ describe('moderator analytics page', () => {
             controller.setActive(true);
             await vi.advanceTimersByTimeAsync(2500);
             expect(fetchImpl).toHaveBeenCalledTimes(3);
-            await controller.choose('trial');
+            const button = (label) => [...window.document.querySelectorAll('#analytics-ghost-move button')]
+                .find((node) => node.textContent === label);
+            const pressed = () => window.document.querySelector('#analytics-ghost-move button[aria-pressed="true"]').textContent;
+
+            // A tab saves nothing; Run saves the picked tab, and Pause saves Off.
+            button('Move all').click();
+            expect(fetchImpl).toHaveBeenCalledTimes(3);
+            expect(pressed()).toBe('Move all');
+            button('Run').click();
+            await vi.waitFor(() => expect(button('Pause')).toBeTruthy());
             expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/ghost-archive', expect.objectContaining({
                 method: 'POST',
-                body: JSON.stringify({ choice: 'trial' }),
+                body: JSON.stringify({ choice: 'all' }),
             }));
-            const pressed = window.document.querySelector('#analytics-ghost-move button[aria-pressed="true"]');
-            expect(pressed.textContent).toBe('Move one day');
+            button('Pause').click();
+            await vi.waitFor(() => expect(button('Run')).toBeTruthy());
+            expect(fetchImpl).toHaveBeenLastCalledWith('/api/analytics/ghost-archive', expect.objectContaining({
+                body: JSON.stringify({ choice: 'off' }),
+            }));
+            expect(pressed()).toBe('Move all');
 
             controller.setActive(false);
             const calls = fetchImpl.mock.calls.length;

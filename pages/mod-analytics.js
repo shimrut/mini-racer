@@ -640,17 +640,25 @@ export function createGhostCompactionController(root, fetchImpl = fetch, { pollM
     return { refresh, act, setActive };
 }
 
+// The tabs only pick; Run saves the pick and Pause saves Off, as the compaction steps do.
 const DAILY_GHOST_CHOICES = [
-    ['off', 'Off'],
     ['trial', 'Move one day'],
     ['all', 'Move all'],
     ['restore', 'Restore'],
 ];
 
+function isGhostMoveRunning(status) {
+    return DAILY_GHOST_CHOICES.some(([value]) => value === status?.choice);
+}
+
 // Daily ghost move: blob figures from each day's last sweep; Redis figures count payload, not memory.
-export function renderGhostMove(root, { status = null, busy = false, error = null, onChoose } = {}) {
+export function renderGhostMove(root, {
+    status = null, busy = false, error = null, selected = null, onSelect, onChoose,
+} = {}) {
     const section = root.getElementById('analytics-ghost-move');
     if (!section) return;
+    const running = isGhostMoveRunning(status);
+    const shown = running ? status.choice : (selected ?? DAILY_GHOST_CHOICES[0][0]);
     const heading = cardHeading(root, 'Old Daily ghosts to blob storage');
     const choices = element(root, 'div', 'analytics-periods');
     choices.setAttribute('role', 'group');
@@ -658,12 +666,16 @@ export function renderGhostMove(root, { status = null, busy = false, error = nul
     for (const [value, label] of DAILY_GHOST_CHOICES) {
         const button = element(root, 'button', 'analytics-period', label);
         button.type = 'button';
-        button.disabled = busy || !status;
-        button.setAttribute('aria-pressed', String(status?.choice === value));
-        button.addEventListener('click', () => { void onChoose?.(value); });
+        button.disabled = busy || !status || running;
+        button.setAttribute('aria-pressed', String(shown === value));
+        button.addEventListener('click', () => { onSelect?.(value); });
         choices.append(button);
     }
-    heading.append(choices);
+    const run = element(root, 'button', 'analytics-button', running ? 'Pause' : 'Run');
+    run.type = 'button';
+    run.disabled = busy || !status;
+    run.addEventListener('click', () => { void onChoose?.(running ? 'off' : shown); });
+    heading.append(choices, run);
     const nodes = [heading];
     if (status) {
         const eligible = toCount(status.eligibleDays);
@@ -671,8 +683,10 @@ export function renderGhostMove(root, { status = null, busy = false, error = nul
         const bar = progressBar(root, 'Finished Daily days moved', done, eligible);
         const blob = status.blob ?? {};
         const touched = Object.values(status.days ?? {}).reduce((sum, count) => sum + toCount(count), 0);
+        const stage = running ? 'Running' : touched > 0 ? 'Paused' : 'Not started';
         const lines = [
-            `${formatCount(done)} of ${formatCount(eligible)} finished days done · ${formatCount(status.waitingDays)} waiting`,
+            `${stage} · ${formatCount(done)} of ${formatCount(eligible)} finished days done`
+                + ` · ${formatCount(status.waitingDays)} waiting`,
             `Moved ${formatCount(status.moved)} runs · Redis payload removed ${formatBytes(status.freed)}`
                 + (toCount(status.restored) > 0 ? ` · restored ${formatCount(status.restored)}` : ''),
             `Held ${formatCount(status.held)} runs · blob ${formatBytes(blob.bytes)} in ${formatCount(blob.objects)} objects`
@@ -706,15 +720,23 @@ export function createGhostMoveController(root, fetchImpl = fetch, { pollMs = GH
     let busy = false;
     let error = null;
     let timer = null;
-    const render = () => renderGhostMove(root, { status, busy, error, onChoose: choose });
+    let selected = null;
+    const select = (value) => {
+        selected = value;
+        render();
+    };
+    // A running choice stays picked after Pause, so Run continues it.
+    const accept = (next) => {
+        status = next;
+        error = null;
+        if (isGhostMoveRunning(next)) selected = next.choice;
+    };
+    const render = () => renderGhostMove(root, { status, busy, error, selected, onSelect: select, onChoose: choose });
     async function refresh() {
         try {
             const result = await readGhostMoveResponse(await fetchImpl(GHOST_MOVE_URL));
             if (result.error) error = result.error;
-            else {
-                status = result.status;
-                error = null;
-            }
+            else accept(result.status);
         } catch (_error) {
             error = 'Could not load the ghost move.';
         }
@@ -731,10 +753,7 @@ export function createGhostMoveController(root, fetchImpl = fetch, { pollMs = GH
                 body: JSON.stringify({ choice }),
             }));
             if (result.error) error = result.error;
-            else {
-                status = result.status;
-                error = null;
-            }
+            else accept(result.status);
         } catch (_error) {
             error = 'Could not save the choice.';
         } finally {
