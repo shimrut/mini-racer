@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mini Racer — Small tracks. Big competition.</title>
+  <meta name="description" content="A top-down racing game on Reddit. Race daily tracks, earn Campaign medals and challenge other players.">
+  <meta name="robots" content="noindex, follow">
+  <meta name="theme-color" content="#020617">
+  <link rel="icon" href="favicon.png">
+  <link rel="preload" href="fonts/outfit.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="v2.css">
+  <script src="config.js" defer></script>
+  <script src="v2.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="wordmark lobby-title" href="#" aria-label="Mini Racer home"><span class="lobby-title__mini">MINI</span><span class="lobby-title__racer">RACER</span></a>
+    <nav aria-label="Main navigation"><a href="#modes">Game modes</a><a href="#garage">Garage</a><a data-destination="community" href="https://www.reddit.com/r/MiniRacerGame/">The Club ↗</a></nav>
+  </header>
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="poster-scene" aria-hidden="true">
+        <img class="poster-track" src="showcase/race-sharkBite.png" width="1900" height="1200" alt="" fetchpriority="high">
+        <img class="poster-ghost" src="showcase/street-blue.png" width="600" height="300" alt="">
+        <img class="poster-car" src="showcase/street-white.png" width="600" height="300" alt="">
+      </div>
+      <div class="hero-copy">
+        <h1 id="hero-title" class="lobby-title"><span class="lobby-title__mini">MINI</span><span class="lobby-title__racer">RACER</span></h1>
+        <p class="hero-tagline">Small tracks.<br>Big competition.</p>
+        <p class="hero-description">A top-down racing game on Reddit.</p>
+        <div class="hero-actions"><a class="button main-menu__item main-menu__item--primary" data-destination="daily" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/"><span class="main-menu__label">Play Daily</span></a><a class="text-link lobby-mode-action" data-destination="campaign" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtk99/mini_racer_campaign/"><span class="lobby-mode-action__label">Play Campaign</span></a></div>
+        <p class="play-note">Free to play. Opens on Reddit.</p>
+      </div>
+    </section>
+
+    <section class="modes" id="modes" aria-label="Game modes">
+      <div class="section-wrap">
+        <div class="mode-picker" role="tablist" aria-label="Explore game modes">
+          <button id="daily-tab" class="main-menu__item main-menu__item--primary" type="button" role="tab" aria-selected="true" aria-controls="daily-panel" data-mode="daily"><span class="main-menu__label">Daily</span></button>
+          <button id="campaign-tab" class="main-menu__item" type="button" role="tab" aria-selected="false" aria-controls="campaign-panel" tabindex="-1" data-mode="campaign"><span class="main-menu__label">Campaign</span></button>
+          <button id="challenge-tab" class="main-menu__item" type="button" role="tab" aria-selected="false" aria-controls="challenge-panel" tabindex="-1" data-mode="challenge"><span class="main-menu__label">Head to Head</span></button>
+        </div>
+        <div class="mode-panel" id="daily-panel" role="tabpanel" aria-labelledby="daily-tab">
+          <div class="mode-copy"><h2>Daily</h2><p>A new track every day. Everyone races the same course. Set your best lap and compare times in the standings.</p><a class="text-link lobby-mode-action" data-destination="daily" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/"><span class="lobby-mode-action__label">Play Daily ↗</span></a></div>
+          <figure class="race-scene" aria-label="A recorded Mini Racer lap on Classic Circuit">
+            <img id="race-track" src="showcase/race-circuit.png" width="1400" height="1000" alt="Classic Circuit with the game’s red and white curbs and tire barriers" loading="lazy">
+            <canvas id="replay-canvas" width="1400" height="1000" aria-hidden="true"></canvas>
+            <figcaption class="race-caption"><div><strong>Classic Circuit</strong><span class="replay-label">Recorded lap</span></div><div class="replay-controls"><span id="replay-time" class="race-time">0.000<span>s</span></span><button id="replay-toggle" type="button" aria-label="Pause lap replay" aria-pressed="false" hidden>Ⅱ</button></div></figcaption>
+          </figure>
+        </div>
+        <div class="mode-panel" id="campaign-panel" role="tabpanel" aria-labelledby="campaign-tab" hidden>
+          <div class="mode-copy"><h2>Campaign</h2><p>Race through track series. Beat the Bronze, Silver, Gold and Author times, and earn medals to unlock more races.</p><a class="text-link lobby-mode-action" data-destination="campaign" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtk99/mini_racer_campaign/"><span class="lobby-mode-action__label">Play Campaign ↗</span></a></div>
+          <div class="campaign-scene"><img src="showcase/goldenRatio.png" width="700" height="500" alt="Golden Ratio track" loading="lazy"><div class="medal-art" aria-label="Bronze, Silver, Gold and Author medals"><span class="medal-slot" data-medal-tier="bronze"></span><span class="medal-slot" data-medal-tier="silver"></span><span class="medal-slot" data-medal-tier="gold"></span><span class="medal-slot" data-medal-tier="author"></span></div></div>
+        </div>
+        <div class="mode-panel" id="challenge-panel" role="tabpanel" aria-labelledby="challenge-tab" hidden>
+          <div class="mode-copy"><h2>Head to Head</h2><p>Share a lap as a challenge. Race another player’s saved ghost on the same track and beat their time.</p><a class="text-link lobby-mode-action" data-destination="community" href="https://www.reddit.com/r/MiniRacerGame/"><span class="lobby-mode-action__label">Find challenges in The Club ↗</span></a></div>
+          <div class="duel-scene"><span class="duel-road" aria-hidden="true"></span><img class="duel-ghost" src="showcase/street-blue.png" alt="A translucent opponent ghost" width="600" height="300" loading="lazy"><img class="duel-car" src="showcase/street-red.png" alt="A red Street car racing the ghost" width="600" height="300" loading="lazy"></div>
+        </div>
+        <div class="track-strip" aria-label="A selection of Mini Racer tracks">
+          <figure><img src="showcase/circuit.png" width="700" height="500" alt="Classic Circuit track" loading="lazy"><figcaption>Classic Circuit</figcaption></figure>
+          <figure><img src="showcase/goldenRatio.png" width="700" height="500" alt="Golden Ratio track" loading="lazy"><figcaption>Golden Ratio</figcaption></figure>
+          <figure><img src="showcase/squareRoot.png" width="700" height="500" alt="Square Root track" loading="lazy"><figcaption>Square Root</figcaption></figure>
+          <figure><img src="showcase/halfLife.png" width="700" height="500" alt="Half Life track" loading="lazy"><figcaption>Half Life</figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="garage" id="garage" aria-labelledby="garage-title">
+      <div class="garage-backdrop" aria-hidden="true"></div>
+      <div class="section-wrap garage-layout">
+        <div class="garage-copy"><h2 id="garage-title">Garage</h2><p>Choose your car, paint, decals and trail. Paint and decals change the look without changing performance.</p><div id="garage-modal"><div class="garage-paint-panel"><div class="garage-paint-row"><h3 class="garage-paint-label">Body color</h3><div class="garage-color-options" role="group" aria-label="Preview body colors"><button type="button" data-paint="white" class="garage-color-option" aria-label="Preview white car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#f4f6ff"></span></button><button type="button" data-paint="orange" class="garage-color-option" aria-label="Preview orange car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#ff851b"></span></button><button type="button" data-paint="blue" class="garage-color-option" aria-label="Preview blue car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#246bff"></span></button><button type="button" data-paint="red" class="garage-color-option is-selected" aria-label="Preview red car" aria-pressed="true"><span class="color-swatch garage-color-swatch" style="--paint-color:#ff303e"></span></button><button type="button" data-paint="yellow" class="garage-color-option" aria-label="Preview yellow car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#ffe34a"></span></button><button type="button" data-paint="lime" class="garage-color-option" aria-label="Preview lime car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#a8ed35"></span></button><button type="button" data-paint="black" class="garage-color-option" aria-label="Preview black car" aria-pressed="false"><span class="color-swatch garage-color-swatch" style="--paint-color:#252936"></span></button></div></div></div></div><p class="garage-note">Try the Street car’s body colors.</p></div>
+        <div class="garage-stage"><img id="garage-car" src="showcase/street-red.png" width="600" height="300" alt="Red Street car" loading="lazy"></div>
+      </div>
+    </section>
+    <section class="controls section-wrap" aria-label="Controls and play">
+      <div><p>The car accelerates automatically.</p><p><span class="key">←</span> <span class="key">→</span> or A / D to steer. On a phone, hold either side.</p></div>
+      <a class="button main-menu__item main-menu__item--primary" data-destination="daily" href="https://www.reddit.com/r/MiniRacerGame/comments/1vqtl3i/mini_racer_daily/"><span class="main-menu__label">Play Daily</span></a>
+    </section>
+  </main>
+  <footer class="site-footer section-wrap"><a class="wordmark lobby-title" href="#" aria-label="Back to top"><span class="lobby-title__mini">MINI</span><span class="lobby-title__racer">RACER</span></a><a data-destination="community" href="https://www.reddit.com/r/MiniRacerGame/">Join The Club ↗</a></footer>
+</body>
+</html>

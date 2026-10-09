@@ -1,0 +1,143 @@
+* {
+    box-sizing: border-box
+}
+
+:root {
+    --bg-color: #020617;
+    --bg-color-darker: #010410;
+    --bg-surface: #0f172a;
+    --text-color: #f8fafc;
+    --text-dim: #94a3b8;
+    --text-muted: #64748b;
+    --accent-color: #ef4444;
+    --accent-bright: #ff3e3e;
+    --success: #22c55e;
+    --success-bright: #4ade80;
+    --warning: #fbbf24;
+    --medal-bronze: #c17f59;
+    --medal-silver: #b8c4d4;
+    --medal-gold: #e8b84a;
+    --medal-author: #c4b5fd;
+
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --menu-ring: 0 0 0 2px rgba(255, 255, 255, 0.92);
+
+    --hud-panel-bg: var(--bg-color-darker);
+    --hud-panel-border: rgba(148, 163, 184, 0.2);
+
+    --header-font: "Outfit", sans-serif;
+    --mono-font: "JetBrains Mono", monospace;
+
+    --space-xl: 2rem;
+
+    --radius-sm: 0.5rem;
+    --radius-md: 1rem;
+    --radius-lg: 1.25rem;
+    --radius-full: 999px;
+
+    --modal-floating-back-height: 2.55rem;
+    --modal-floating-back-offset: 0.85rem;
+    /* JS sets this from visualViewport.height. */
+    --app-visible-height: 100vh;
+    --screen-height-cap: 1000px;
+    --screen-fill-height: min(var(--app-visible-height), var(--screen-height-cap));
+
+    --dur-fast: 120ms;
+    --dur-base: 160ms;
+    --dur-slow: 200ms;
+    --dur-race-start-exit: 100ms;
+    --dur-quick-pause: 180ms;
+    --dur-finish-headline: 10ms;
+
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --z-hud: 100;
+    --z-overlay: 1000;
+    --z-modal: 2000
+}
+
+@supports (height: 100svh) {
+    :root {
+        --app-visible-height: min(100svh, 100dvh);
+    }
+}
+
+button:focus-visible,
+.touch-btn:focus-visible,
+a:focus-visible,
+[role="button"]:focus,
+[role="button"]:focus-visible {
+    outline: none !important;
+}
+
+button,
+a,
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+html,
+body {
+    height: var(--app-visible-height);
+    min-height: 0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--header-font);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none
+}
+
+body.start-overlay-active:not(:has(#start-overlay.is-race-start-exiting)) :is(.hud-bar,
+    .speedometer,
+    .mobile-hud-bar,
+    .mobile-controls,
+    .hud-pause-btn,
+    .lap-flash),
+body.start-selection-active :is(.hud-bar,
+    .speedometer,
+    .mobile-hud-bar,
+    .mobile-controls,
+    .hud-pause-btn,
+    .lap-flash) {
+    display: none !important
+}
+
+body:has(#start-overlay.is-race-start-exiting) :is(.hud-bar, .mobile-hud-bar, .mobile-controls) {
+    animation: opacityIn var(--dur-race-start-exit) ease-out both;
+}
+
+@keyframes opacityIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body:has(#start-overlay.is-race-start-exiting) :is(.hud-bar, .mobile-hud-bar, .mobile-controls) {
+        animation: none;
+    }
+}

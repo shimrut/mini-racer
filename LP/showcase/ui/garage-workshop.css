@@ -1,0 +1,170 @@
+/* The Garage workshop: a car stage, decals, paint and a trail-color row. */
+/* The shared modal owns width, heading, scrolling and Back clearance. */
+#garage-modal .garage-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-shadow: 0 0 0 .85rem var(--bg-color);
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    align-items: stretch;
+    flex: 0 0 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+
+#garage-modal .garage-tab {
+    width: auto;
+    padding-inline: 1rem;
+    white-space: nowrap;
+}
+
+#garage-modal .garage-tab.is-selected,
+#garage-modal .garage-tab.is-selected:hover {
+    background: var(--accent-color);
+}
+
+#garage-modal :is(.garage-skin-option, .garage-color-option) {
+    /* Leave room for the pinned rail and its opaque edge when focus scrolls. */
+    scroll-margin-top: 3.25rem;
+}
+
+#garage-modal .garage-custom-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    gap: 0;
+}
+
+#garage-modal .garage-showcase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: .65rem .65rem .85rem;
+}
+
+#garage-modal .garage-car-stage {
+    display: grid;
+    align-items: center;
+    width: 100%;
+    height: clamp(11rem, 25vh, 15rem);
+}
+
+#garage-modal .garage-car-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    object-fit: contain;
+    filter: drop-shadow(0 .8rem .7rem rgba(0, 0, 0, .65));
+}
+
+#garage-modal .garage-paint-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+#garage-modal .garage-paint-row {
+    display: grid;
+    grid-template-columns: 4.3rem minmax(0, 1fr);
+    align-items: center;
+    gap: .4rem .65rem;
+    min-height: 5.5rem;
+    padding: .85rem .65rem;
+    border-top: 1px solid var(--border-default);
+}
+
+#garage-modal .garage-part-detail {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    padding-right: .65rem;
+}
+
+#garage-modal .garage-part-preview {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 6 / 5;
+}
+
+#garage-modal .garage-paint-label {
+    margin: 0;
+    font-family: var(--header-font);
+    font-size: .86rem;
+    font-weight: 900;
+    font-style: italic;
+    line-height: 1.25;
+    text-transform: uppercase;
+}
+
+#garage-modal .garage-decal-options,
+#garage-modal .garage-color-options {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: center;
+    justify-items: center;
+    gap: .2rem;
+    min-width: 0;
+}
+
+#garage-modal .garage-decal-options {
+    grid-template-columns: repeat(var(--decal-count, 4), minmax(0, 1fr));
+}
+
+#garage-modal .garage-decal-option {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: .35rem .15rem .3rem;
+    gap: .15rem;
+}
+
+#garage-modal .garage-decal-option .garage-skin-option__thumb { height: 2.6rem; }
+#garage-modal .garage-decal-option .garage-skin-option__label { font-size: .6rem; letter-spacing: 0; white-space: nowrap; }
+
+#garage-modal .garage-color-option {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    max-width: 44px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+#garage-modal .garage-color-swatch {
+    --color-swatch-size: 77.27%;
+    --color-swatch-edge: rgba(255, 255, 255, .14);
+}
+
+#garage-modal .garage-color-option.is-selected {
+    outline: 2px solid var(--text-color);
+    outline-offset: -1px;
+}
+
+#garage-modal :is(.garage-trail-row, .garage-decal-row, .garage-paint-row.is-unused) .garage-paint-label { grid-column: 1 / -1; }
+
+#garage-modal .garage-color-option:disabled { opacity: .4; cursor: default; }
+
+#garage-modal #garage-trail-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+
+#garage-modal .garage-color-option:focus-visible,
+#garage-modal .garage-color-option.is-menu-selected {
+    box-shadow: var(--menu-ring);
+}
+
+@media (max-width: 560px) {
+    #garage-modal .garage-car-stage { height: 10rem; }
+    #garage-modal .garage-paint-label { font-size: .8rem; }
+}

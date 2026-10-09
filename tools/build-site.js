@@ -2,6 +2,7 @@ import { cpSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { syncLpShowcaseUi } from './generate-lp-showcase.js';
 
 // Builds site/dist for the miniracer.club Pages project: the promo page from
 // LP/, the online Mapmaker with Test Drive at /mapmaker, and the car pictures
@@ -15,6 +16,8 @@ cpSync(join(repoRoot, 'LP'), dist, {
     recursive: true,
     filter: (source) => !/(?:README\.md|\.DS_Store)$/.test(source),
 });
+// The preview always gets the current game styles, even without regenerating art.
+syncLpShowcaseUi(join(dist, 'showcase'));
 cpSync(join(repoRoot, 'public', 'assets', 'cars'), join(dist, 'assets', 'cars'), { recursive: true });
 
 await build({

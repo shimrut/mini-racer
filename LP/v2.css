@@ -1,0 +1,166 @@
+@import url('showcase/ui/fonts.css');
+@import url('showcase/ui/foundation.css');
+@import url('showcase/ui/race-hud-and-medals.css');
+@import url('showcase/ui/lobby-and-garage.css');
+@import url('showcase/ui/lobby-modes.css');
+@import url('showcase/ui/garage-workshop.css');
+
+/* A race poster and a showroom, using the game's components and palette. */
+:root { --page: 1320px; }
+html { height: auto; min-height: 100%; scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { height: auto; min-height: 100vh; display: block; overflow: auto; user-select: text; -webkit-user-select: text; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+img { display: block; max-width: 100%; height: auto; }
+figure, p, h1, h2, h3 { margin: 0; }
+[hidden] { display: none !important; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--text-color); outline-offset: 5px; }
+.section-wrap { max-width: var(--page); margin-inline: auto; padding-inline: 56px; }
+.skip-link { position: absolute; top: 8px; left: 8px; padding: 12px; background: var(--text-color); color: var(--bg-color); z-index: 50; transform: translateY(-150%); }
+.skip-link:focus { transform: none; }
+.site-header { position: absolute; inset: 0 0 auto; z-index: 5; padding: 28px 4vw; display: flex; align-items: center; justify-content: space-between; }
+.wordmark { pointer-events: auto; font-size: 2rem; width: max-content; }
+.wordmark .lobby-title__mini { font-size: .62em; opacity: 1; }
+.wordmark .lobby-title__racer { font-size: 1em; opacity: 1; }
+.site-header nav { display: flex; gap: 30px; }
+.site-header nav a, .site-footer > a:last-child { font-family: var(--header-font); font-style: italic; font-weight: 900; font-size: 1rem; letter-spacing: -.03em; text-transform: uppercase; }
+.hero { position: relative; min-height: 760px; height: min(920px,100svh); overflow: hidden; isolation: isolate; }
+.poster-scene { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
+.poster-track { position: absolute; width: 145%; max-width: none; left: 11%; top: -40%; transform: rotate(-21deg); opacity: .95; mask-image: linear-gradient(to right,transparent 0%,#000 32%); }
+.poster-car { position: absolute; width: 54%; max-width: 860px; right: -2%; top: 34%; transform: rotate(-21deg); filter: drop-shadow(0 28px 12px rgba(0,0,0,.5)); animation: car-arrival .85s var(--ease-glide) both; }
+.poster-ghost { position: absolute; width: 30%; right: 7%; top: 8%; transform: rotate(-21deg); opacity: .22; }
+.hero-copy { position: relative; max-width: 1500px; margin: auto; padding: 142px 4vw 60px; }
+.hero .lobby-title { font-size: clamp(150px,16vw,230px); width: max-content; }
+.hero .lobby-title__mini { font-size: .62em; animation: slideInLeft .5s var(--ease-glide) both; }
+.hero .lobby-title__racer { font-size: 1em; animation: slideInRight .6s var(--ease-glide) .1s both; }
+.hero-tagline { font-family: var(--header-font); font-weight: 900; font-style: italic; text-transform: uppercase; font-size: clamp(24px,2.8vw,40px); line-height: 1.02; letter-spacing: -.025em; margin-top: 30px; }
+.hero-description { color: var(--text-dim); font-size: 1rem; margin-top: 20px; }
+.hero-actions { display: flex; align-items: center; gap: 18px; margin-top: 26px; flex-wrap: wrap; }
+.button.main-menu__item--primary { display: inline-flex; width: auto; margin: 0; min-width: 210px; }
+.text-link.lobby-mode-action { display: inline-flex; margin: 0; }
+.hero-actions .lobby-mode-action__label { font-size: 1.1rem; }
+.play-note { color: var(--text-muted); font-size: .75rem; margin-top: 12px; }
+.modes { background: var(--bg-surface); position: relative; padding-block: 42px 36px; }
+.mode-picker { display: flex; justify-content: center; gap: 20px; max-width: 820px; margin-inline: auto; }
+.mode-picker .main-menu__item { width: auto; margin: 0; padding: .8rem 1.6rem; font-size: clamp(20px,2.8vw,32px); line-height: 1; }
+.mode-picker .main-menu__label { white-space: nowrap; font-size: inherit; font-style: italic; font-weight: 900; letter-spacing: -.02em; }
+.mode-picker .main-menu__item:not([aria-selected="true"]) { color: var(--text-dim); }
+.mode-panel { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.35fr); gap: 50px; align-items: center; min-height: 450px; animation: mode-arrival .2s ease-out; }
+h2 { font-family: var(--header-font); font-weight: 900; font-style: italic; font-size: clamp(48px,5.5vw,78px); text-transform: uppercase; line-height: .95; letter-spacing: -.035em; }
+.mode-copy > p { color: var(--text-dim); max-width: 32ch; font-size: 1.05rem; line-height: 1.6; margin-top: 24px; }
+.mode-copy .text-link { padding-left: 0; margin-top: 18px; }
+.mode-copy .lobby-mode-action__label { font-size: 1rem; }
+.race-scene { position: relative; width: 100%; aspect-ratio: 1.4; }
+.race-scene > img, .race-scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.race-caption { position: absolute; inset: auto 5% -4%; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.race-caption strong { font-family: var(--header-font); font-size: 1rem; font-weight: 900; font-style: italic; text-transform: uppercase; }
+.replay-label { display: block; color: var(--text-muted); font-size: .7rem; margin-top: 4px; }
+.replay-controls { display: flex; align-items: center; gap: 8px; }
+.race-time { font-family: var(--mono-font); font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.race-time span { font-size: .75rem; margin-left: 4px; color: var(--text-dim); }
+.replay-controls button { width: 44px; height: 44px; border: 0; background: transparent; border-radius: var(--radius-full); }
+.campaign-scene { min-width: 0; position: relative; height: 400px; display: flex; align-items: center; justify-content: center; }
+.campaign-scene > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: .22; }
+.medal-art { display: flex; gap: 14px; position: relative; width: 100%; align-items: center; justify-content: center; }
+.medal-slot { width: 145px; min-width: 0; }
+.medal-slot .medal-svg { width: 100%; height: auto; aspect-ratio: 1; }
+.duel-scene { min-width: 0; position: relative; height: 400px; overflow: hidden; }
+.duel-road { position: absolute; inset: 26% -20%; transform: rotate(-23deg); background: #334155; border-block: 8px dashed var(--accent-color); }
+.duel-scene img { position: absolute; width: 48%; transform: rotate(-23deg); }
+.duel-ghost { right: 1%; top: 12%; opacity: .3; }
+.duel-car { left: 0; top: 44%; }
+.track-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 35px; max-width: 850px; margin: 34px auto 0; }
+.track-strip img { width: 100%; height: 100px; object-fit: contain; }
+.track-strip figcaption { text-align: center; font-size: .85rem; font-weight: 900; font-style: italic; text-transform: uppercase; margin-top: 10px; }
+.garage { position: relative; overflow: hidden; isolation: isolate; padding-block: 100px; }
+.garage-backdrop { position: absolute; inset: 0 -20% 0 38%; background: var(--accent-color); clip-path: polygon(18% 0,100% 0,100% 100%,0 100%); z-index: -1; }
+.garage-layout { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.4fr); gap: 45px; align-items: center; }
+.garage-copy h2 { font-size: clamp(52px,7vw,105px); }
+.garage-copy > p:not(.garage-note) { color: var(--text-dim); font-size: 1rem; line-height: 1.6; max-width: 29ch; margin-top: 22px; }
+.garage #garage-modal { margin-top: 26px; }
+.garage #garage-modal .garage-paint-row { padding-inline: 0; }
+.garage-note { color: var(--text-muted); font-size: .75rem; margin-top: 12px; }
+.garage-stage { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.garage-stage img { width: 115%; max-width: none; transform: rotate(-14deg); filter: drop-shadow(0 22px 10px rgba(0,0,0,.5)); transition: transform .25s var(--ease-glide); }
+.garage-stage:hover img { transform: rotate(-10deg) scale(1.02); }
+.controls { display: flex; justify-content: space-between; align-items: center; gap: 30px; padding-block: 38px; }
+.controls p { font-size: .9rem; line-height: 1.7; color: var(--text-dim); }
+.controls p:first-child { color: var(--text-color); font-size: 1rem; margin-bottom: 8px; }
+.key { display: inline-grid; place-items: center; width: 27px; height: 27px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-color); }
+.site-footer { display: flex; align-items: center; justify-content: space-between; padding-block: 24px; }
+@keyframes car-arrival { from { opacity: 0; transform: translate(-40px,20px) rotate(-21deg); } to { opacity: 1; transform: translate(0,0) rotate(-21deg); } }
+@keyframes mode-arrival { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media(max-width:1050px) {
+  .hero { min-height: 720px; height: 850px; max-height: none; }
+  .hero-copy { padding-top: 150px; }
+  .hero .lobby-title { font-size: 16vw; }
+  .poster-track { width: 170%; left: 7%; top: -10%; }
+  .poster-car { top: 64%; width: 58%; right: -6%; }
+  .poster-ghost { top: 42%; }
+  .section-wrap { padding-inline: 40px; }
+  .mode-panel { gap: 28px; min-height: 410px; }
+  .mode-copy h2 { font-size: clamp(42px,5.5vw,56px); }
+  .garage { padding-block: 80px; }
+  .garage-layout { gap: 30px; }
+  .medal-art { gap: 8px; }
+}
+@media(max-width:767px) {
+  .section-wrap { padding-inline: 24px; }
+  .site-header { padding: 22px 24px; }
+  .wordmark { font-size: 1.65rem; }
+  .site-header nav { gap: 18px; }
+  .site-header nav a { font-size: .85rem; }
+  .site-header nav a:nth-child(2) { display: none; }
+  .hero { height: 830px; min-height: 830px; }
+  .hero-copy { padding: 110px 24px 0; }
+  .hero .lobby-title { font-size: clamp(90px,24vw,175px); }
+  .hero-tagline { font-size: 24px; margin-top: 20px; }
+  .hero-description { font-size: .9rem; margin-top: 14px; }
+  .hero-actions { gap: 10px 16px; margin-top: 20px; }
+  .button.main-menu__item--primary { min-width: 0; font-size: 1.4rem; padding: 1rem 1.15rem; }
+  .hero-actions .text-link { padding: 0; }
+  .hero-actions .lobby-mode-action__label { font-size: 1rem; }
+  .poster-track { width: 250%; left: -70%; top: 23%; transform: rotate(-21deg); mask-image: linear-gradient(to bottom,transparent 0%,transparent 40%,#000 65%); }
+  .poster-car { width: 105%; right: -13%; top: 63%; }
+  .poster-ghost { width: 55%; right: -9%; top: 50%; }
+  .modes { padding-block: 26px 30px; }
+  .mode-picker { gap: 4px; }
+  .mode-picker .main-menu__item { padding: .8rem .65rem; font-size: clamp(16px,4.4vw,23px); }
+  .mode-picker .main-menu__label { white-space: normal; }
+  .mode-panel { grid-template-columns: 1fr; gap: 24px; min-height: 0; padding-top: 36px; }
+  .mode-copy h2 { font-size: 48px; }
+  .mode-copy > p { max-width: 40ch; font-size: .95rem; margin-top: 16px; }
+  .mode-copy .text-link { margin-top: 12px; }
+  .race-scene { margin-bottom: 25px; }
+  .race-caption { inset: auto 1% -12%; }
+  .race-time { font-size: 1.4rem; }
+  .race-caption strong { font-size: .85rem; }
+  .campaign-scene, .duel-scene { height: 285px; }
+  .medal-slot { width: 100px; }
+  .track-strip { gap: 10px; margin-top: 38px; }
+  .track-strip img { height: 65px; }
+  .track-strip figcaption { font-size: .65rem; line-height: 1.1; }
+  .garage { padding-block: 48px 65px; }
+  .garage-layout { grid-template-columns: 1fr; gap: 70px; }
+  .garage-copy h2 { font-size: clamp(60px,18vw,72px); }
+  .garage-copy > p:not(.garage-note) { max-width: 34ch; }
+  .garage-backdrop { inset: 55% -60% -8% -10%; clip-path: polygon(20% 12%,100% 0,100% 100%,0 100%); }
+  .garage-stage img { width: 100%; transform: rotate(-14deg); }
+  .controls { align-items: flex-start; flex-direction: column; padding-block: 30px 20px; gap: 22px; }
+  .site-footer > a:last-child { font-size: .8rem; }
+}
+@media(max-width:370px) {
+  .site-header nav a:first-child { display: none; }
+  .hero { min-height: 780px; height: 780px; }
+  .hero-copy { padding-top: 102px; }
+  .hero .lobby-title { font-size: 90px; }
+  .hero-actions { max-width: 250px; }
+  .poster-car { top: 68%; width: 112%; right: -15%; }
+  .poster-ghost { top: 58%; }
+  .poster-track { top: 40%; }
+}
+@media(prefers-reduced-motion:reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .hero .lobby-title__mini, .hero .lobby-title__racer { opacity: 1; }
+}

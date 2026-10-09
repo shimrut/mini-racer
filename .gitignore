@@ -13,6 +13,7 @@ tools/*
 !tools/generate-player-car-assets.js
 !tools/generate-share-images.js
 !tools/generate-lp-assets.js
+!tools/generate-lp-showcase.js
 !tools/build-site.js
 !tools/analyze-unused-css.js
 !tools/vitest-global-setup.js
