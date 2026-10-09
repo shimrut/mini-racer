@@ -2,18 +2,22 @@ import { redis } from '@devvit/redis';
 import type { Competition } from './competition.js';
 import {
     isCompleteOpponentRecord,
+    isOpponentCandidateRecord,
     parseStoredEntry,
     readEntryByPlayerId,
     readPlayerRank,
 } from './competition-leaderboard.js';
 import { readPlayerProfileMap } from './competition-identity.js';
 import { getPlayerTrackPbRecord, getPlayerTrackPbRecords } from './pb-ghost-store.js';
+import { isMovedPbRecord } from './pb-ghost-archive-ref.js';
+import { resolveMovedPbGhost } from '../blob/archived-ghost.js';
 import { resolveLeaderboardDisplayName } from '../../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../../game/track/tracks.js';
 import { loadStoredTracks } from '../tracks/stored-catalog.js';
 
 const OPPONENT_WINDOW_SIZE = 10;
 const OPPONENT_WINDOW_LIMIT = 6;
+const NEXT_RIVAL_MOVED_READS = 2;
 
 export type OpponentRowSelection = {
     kind: 'row';
@@ -148,11 +152,16 @@ async function prepareRowOpponentRace({
         ) {
             return { status: 409, body: { error: 'Leaderboard row changed. Refresh and choose again.', reason: 'selection_changed' } };
         }
-        const record = await getPlayerTrackPbRecord({
+        const track = TRACKS[competition.trackKey];
+        const stored = await getPlayerTrackPbRecord({
             playerId: candidate.member,
             competition,
-            track: TRACKS[competition.trackKey],
+            track,
         });
+        // A moved ghost is read first; a failed read refuses the race, as a missing ghost does.
+        const { record } = isOpponentCandidateRecord(entry, stored, competition)
+            ? await resolveMovedPbGhost(stored, competition, track)
+            : { record: null };
         if (!isCompleteOpponentRecord(entry, record, competition)) {
             return { status: 409, body: { error: 'That opponent ghost is unavailable.', reason: 'ghost_unavailable' } };
         }
@@ -195,6 +204,8 @@ async function prepareNextFasterOpponentRace({
 
     const track = TRACKS[competition.trackKey];
     let fullWindows = 0;
+    // Each moved ghost costs a blob read; after this many tries the lookup passes moved rows by.
+    let movedReadsLeft = NEXT_RIVAL_MOVED_READS;
 
     for (let window = 0; window < OPPONENT_WINDOW_LIMIT; window += 1) {
         // Devvit keeps start low, even with reverse.
@@ -226,7 +237,12 @@ async function prepareNextFasterOpponentRace({
             const entry = parseStoredEntry(rawEntries[index], competition.trackKey);
             if (!entry) continue;
             if (entry.bestTimeMs >= benchmarkTimeMs) continue;
-            const record = pbRecords.get(member) ?? null;
+            let record = pbRecords.get(member) ?? null;
+            if (isMovedPbRecord(record)) {
+                if (movedReadsLeft <= 0 || !isOpponentCandidateRecord(entry, record, competition)) continue;
+                movedReadsLeft -= 1;
+                record = (await resolveMovedPbGhost(record, competition, track)).record;
+            }
             if (!isCompleteOpponentRecord(entry, record, competition)) continue;
 
             const displayName = await readDisplayName(member);

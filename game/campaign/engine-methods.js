@@ -473,6 +473,25 @@ function selectedCampaignSeriesId(engine) {
     return engine.campaignSeriesId;
 }
 
+// Each PB request or install takes a new number; an answer applies only while its number is the latest.
+function beginCampaignPbRequest(engine, raceId) {
+    engine.campaignPbGenerationByRaceId ??= Object.create(null);
+    const generation = (engine.campaignPbGenerationByRaceId[raceId] || 0) + 1;
+    engine.campaignPbGenerationByRaceId[raceId] = generation;
+    return generation;
+}
+
+function isCampaignPbRequestCurrent(engine, raceId, generation) {
+    return engine.campaignPbGenerationByRaceId?.[raceId] === generation;
+}
+
+// A PB whose moved ghost could not be read now is not cached, so the next start asks again.
+function rememberCampaignPersonalBest(engine, raceId, personalBest) {
+    engine.campaignPbGhostByRaceId ??= Object.create(null);
+    if (personalBest?.ghostUnavailable) delete engine.campaignPbGhostByRaceId[raceId];
+    else engine.campaignPbGhostByRaceId[raceId] = personalBest || null;
+}
+
 export const campaignEngineMethods = {
     // Shows another series on the Campaign screen. Its stages paint at once from
     // the stage list, and its progress arrives with the next bootstrap.
@@ -680,7 +699,7 @@ export const campaignEngineMethods = {
 
     async loadInitialCampaignPersonalBest(stage = this.activeCampaignStage) {
         if (!stage?.raceId) return null;
-        this.campaignPbGhostByRaceId ??= Object.create(null);
+        const generation = beginCampaignPbRequest(this, stage.raceId);
         let response = null;
         try {
             response = await getCampaignPbGhost(stage.raceId);
@@ -688,7 +707,8 @@ export const campaignEngineMethods = {
             console.warn('Campaign PB ghost was unavailable during startup:', error);
         }
         const personalBest = response?.ok ? response.body?.personalBest : null;
-        this.campaignPbGhostByRaceId[stage.raceId] = personalBest || null;
+        if (!isCampaignPbRequestCurrent(this, stage.raceId, generation)) return personalBest;
+        rememberCampaignPersonalBest(this, stage.raceId, personalBest || null);
         if (personalBest) this.applyCampaignPersonalBest(stage, personalBest);
         return personalBest;
     },
@@ -908,6 +928,7 @@ export const campaignEngineMethods = {
             });
             this.campaignPbGhostByRaceId ??= Object.create(null);
             const cachedPersonalBest = this.campaignPbGhostByRaceId[stage.raceId];
+            const ghostGeneration = cachedPersonalBest ? null : beginCampaignPbRequest(this, stage.raceId);
             const ghostRequest = cachedPersonalBest
                 ? null
                 : getCampaignPbGhost(stage.raceId).catch((error) => {
@@ -957,14 +978,10 @@ export const campaignEngineMethods = {
             if (startRequest) void this.confirmCampaignRaceStart(stage, startRequest);
             if (ghostRequest) {
                 void ghostRequest.then((response) => {
-                    if (!response) return;
-                    this.campaignPbGhostByRaceId[stage.raceId] = response.ok
-                        ? response.body?.personalBest || null
-                        : null;
-                    this.applyCampaignPersonalBest(
-                        stage,
-                        response.ok ? response.body?.personalBest : null,
-                    );
+                    if (!response || !isCampaignPbRequestCurrent(this, stage.raceId, ghostGeneration)) return;
+                    const personalBest = response.ok ? response.body?.personalBest || null : null;
+                    rememberCampaignPersonalBest(this, stage.raceId, personalBest);
+                    this.applyCampaignPersonalBest(stage, personalBest);
                 });
             }
         } catch (error) {
@@ -1773,16 +1790,19 @@ export const campaignEngineMethods = {
         }
 
         if (ghost === 'install') {
-            this.campaignPbGhostByRaceId ??= Object.create(null);
-            this.campaignPbGhostByRaceId[stage.raceId] = personalBest;
+            beginCampaignPbRequest(this, stage.raceId);
+            rememberCampaignPersonalBest(this, stage.raceId, personalBest);
             this.applyCampaignPersonalBest(stage, personalBest);
         } else if (ghost !== 'skip') {
             try {
+                const generation = beginCampaignPbRequest(this, stage.raceId);
                 const ghostResponse = await getCampaignPbGhost(stage.raceId);
-                this.applyCampaignPersonalBest(
-                    stage,
-                    ghostResponse.ok ? ghostResponse.body?.personalBest : null,
-                );
+                if (isCampaignPbRequestCurrent(this, stage.raceId, generation)) {
+                    this.applyCampaignPersonalBest(
+                        stage,
+                        ghostResponse.ok ? ghostResponse.body?.personalBest : null,
+                    );
+                }
             } catch (ghostError) {
                 console.warn('Campaign result was saved, but PB ghost refresh failed:', ghostError);
             }

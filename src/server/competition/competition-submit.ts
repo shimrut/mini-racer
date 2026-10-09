@@ -8,6 +8,7 @@ import {
     writeEntry,
 } from './competition-leaderboard.js';
 import { upsertPlayerTrackPersonalBest } from './pb-ghost-store.js';
+import { resolveMovedPbGhost, toGamePbRecord } from '../blob/archived-ghost.js';
 import { validateDailyGpReplayDetailed, type ReplayValidationResult } from './replay-validator.js';
 import {
     acquireRedisLock,
@@ -368,9 +369,12 @@ export async function submitCompetitionRun(
         console.error('Challenge PB persistence failed after a valid run:', trackPbSettled.reason);
     }
     const trackPbResult = trackPbSettled.status === 'fulfilled' ? trackPbSettled.value : null;
+    // A kept moved row is read, so the answer carries its ghost as for any other row.
+    const resolvedTrackPb = await resolveMovedPbGhost(trackPbResult?.record ?? null, competition, track);
+    const trackPbRecord = resolvedTrackPb.record;
     if (
-        trackPbResult?.record
-        && isCompleteOpponentRecord(storedEntry, trackPbResult.record, competition)
+        trackPbRecord
+        && isCompleteOpponentRecord(storedEntry, trackPbRecord, competition)
         && storedEntry.opponentRaceReady !== true
     ) {
         try {
@@ -388,10 +392,10 @@ export async function submitCompetitionRun(
             trackPbPersistenceStatus: trackPbAvailable
                 ? (trackPbResult!.improved ? 'stored' : 'unchanged')
                 : 'unavailable',
-            trackPersonalBest: trackPbResult?.record ?? null,
-            trackBestTimeMs: trackPbResult?.record.bestTimeMs ?? null,
+            trackPersonalBest: toGamePbRecord(trackPbRecord, resolvedTrackPb.ghostUnavailable),
+            trackBestTimeMs: trackPbRecord?.bestTimeMs ?? null,
             trackPbImproved: trackPbResult?.improved ?? false,
-            trackGhostAvailable: Boolean(trackPbResult?.record.ghost),
+            trackGhostAvailable: Boolean(trackPbRecord?.ghost) || resolvedTrackPb.ghostUnavailable,
             completedLaps: storedEntry.completedLaps,
             checkpointTimesSec: storedEntry.checkpointTimesSec ?? null,
             validationMethod: storedEntry.validationMethod ?? 'strict-replay',

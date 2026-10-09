@@ -27,6 +27,8 @@ import {
     getPlayerTrackPbRecord,
     seedPlayerTrackPersonalBest,
 } from '../competition/pb-ghost-store.js';
+import { isMovedPbRecord } from '../competition/pb-ghost-archive-ref.js';
+import { resolveMovedPbGhost } from '../blob/archived-ghost.js';
 import {
     readGuestPromotionTarget,
     hasRecordedCompletedRace,
@@ -301,7 +303,7 @@ export async function getServerPlayerTrackPbSummaries({
                 bestTimeMs: record.bestTimeMs,
                 checkpointTimesSec: record.checkpointTimesSec,
                 lapCompletionTimesSec: record.lapCompletionTimesSec,
-                ghostAvailable: Boolean(record.ghost),
+                ghostAvailable: Boolean(record.ghost) || isMovedPbRecord(record),
             }
             : null;
     }
@@ -359,10 +361,15 @@ export async function getServerPlayerPbGhost({
         };
     }
 
-    const record = await readOrSeedTrackPersonalBest({
+    const stored = await readOrSeedTrackPersonalBest({
         playerId: identity.canonicalPlayerId,
         challenge,
     });
+    const { record, ghostUnavailable } = await resolveMovedPbGhost(
+        stored,
+        toDailyCompetition(challenge),
+        TRACKS[challenge.trackKey],
+    );
     return {
         playerId: identity.canonicalPlayerId,
         challengeId: challenge.id,
@@ -374,6 +381,7 @@ export async function getServerPlayerPbGhost({
                 lapCompletionTimesSec: record.lapCompletionTimesSec,
                 updatedAt: record.updatedAt,
                 ghost: record.ghost,
+                ...(ghostUnavailable ? { ghostUnavailable: true as const } : {}),
             }
             : null,
     };

@@ -54,6 +54,7 @@ import {
     getPlayerTrackPbRecord,
     type PlayerTrackPbRecord,
 } from '../competition/pb-ghost-store.js';
+import { resolveMovedPbGhost, toGamePbRecord } from '../blob/archived-ghost.js';
 import { redisCompressed } from '@devvit/redis';
 import {
     getCarUnlockSnapshot,
@@ -1250,18 +1251,21 @@ export async function getServerCampaignPbGhost({
     const stage = getCampaignStage(raceId);
     if (!stage) return { status: 404, body: { error: 'Campaign race not found.' } };
     await loadStageTracks([stage]);
-    const personalBest = await getPlayerTrackPbRecord({
+    const competition = competitionFor(stage);
+    const track = TRACKS[stage.trackKey];
+    const stored = await getPlayerTrackPbRecord({
         playerId: identity.canonicalPlayerId,
-        competition: competitionFor(stage),
-        track: TRACKS[stage.trackKey],
+        competition,
+        track,
     });
+    const resolved = await resolveMovedPbGhost(stored, competition, track);
     return {
         status: 200,
         body: {
             campaignId: stage.seriesId,
             raceId: stage.raceId,
             trackKey: stage.trackKey,
-            personalBest,
+            personalBest: toGamePbRecord(resolved.record, resolved.ghostUnavailable),
         },
     };
 }

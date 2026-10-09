@@ -11,6 +11,7 @@ import {
 import { createSharedStandingsCacheKey, type Competition } from './competition.js';
 import { readPlayerProfileMap, type LoadedPlayerProfile } from './competition-identity.js';
 import { getPlayerTrackPbRecords } from './pb-ghost-store.js';
+import { isMovedPbRecord } from './pb-ghost-archive-ref.js';
 import { normalizeCheckpointTimesSec } from '../../../game/shared/checkpoint-times.js';
 import { resolveLeaderboardDisplayName } from '../../../game/shared/leaderboard-identity.js';
 import { TRACKS } from '../../../game/track/tracks.js';
@@ -138,6 +139,25 @@ export function isCompleteOpponentRecord(
     );
 }
 
+// A row that may be offered as an opponent: a full ghost, or a moved one that is read before its race starts.
+export function isOpponentCandidateRecord(
+    entry: DailyGpLeaderboardEntry,
+    record: {
+        bestTimeMs: number;
+        checkpointTimesSec: number[] | null;
+        ghost?: { finishTimeMs: number } | null;
+        ghostArchive?: unknown;
+    } | null,
+    competition: Competition,
+): boolean {
+    if (!isMovedPbRecord(record)) return isCompleteOpponentRecord(entry, record, competition);
+    const checkpointCount = (TRACKS[competition.trackKey]?.checkpoints?.length || 0)
+        * competition.lapCount;
+    return record!.bestTimeMs === entry.bestTimeMs
+        && Array.isArray(record!.checkpointTimesSec)
+        && record!.checkpointTimesSec.length === checkpointCount;
+}
+
 export function withOpponentRaceReady(
     entry: DailyGpLeaderboardEntry,
     record: {
@@ -222,7 +242,7 @@ async function readRowsForRankedMembers(
             ? false
             : typeof entry.opponentRaceReady === 'boolean'
                 ? entry.opponentRaceReady
-                : isCompleteOpponentRecord(
+                : isOpponentCandidateRecord(
                     entry,
                     pbRecords.get(member.member) ?? null,
                     competition,

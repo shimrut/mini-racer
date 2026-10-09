@@ -1,4 +1,5 @@
 import { redisCompressed as redis } from '@devvit/redis';
+import { isMovedPbRecord, isPbGhostArchiveRef, type PbGhostArchiveRef } from './pb-ghost-archive-ref.js';
 import type { Competition } from './competition.js';
 import {
     createTrackFingerprint,
@@ -22,12 +23,7 @@ import { playerFieldHash } from '../redis/redis-names.js';
 import { queueRacedBoard } from '../player/raced-list.js';
 import { acquireRedisLockWithRetry } from '../redis/redis-lock-retry.js';
 
-// Blob location of a moved ghost; the record keeps `ghost: null` and this reference (sha256 of the full text).
-export type PbGhostArchiveRef = {
-    v: 1;
-    key: string;
-    sha256: string;
-};
+export { isMovedPbRecord, isPbGhostArchiveRef, type PbGhostArchiveRef };
 
 export type PlayerTrackPbRecord = {
     schemaVersion: typeof PB_GHOST_SCHEMA_VERSION;
@@ -43,19 +39,6 @@ export type PlayerTrackPbRecord = {
     ghostArchive?: PbGhostArchiveRef;
     updatedAt: string;
 };
-
-const BLOB_KEY_MAX_BYTES = 900;
-
-export function isPbGhostArchiveRef(value: unknown): value is PbGhostArchiveRef {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    const ref = value as Partial<PbGhostArchiveRef>;
-    return ref.v === 1
-        && typeof ref.key === 'string'
-        && ref.key.length > 0
-        && Buffer.byteLength(ref.key, 'utf8') <= BLOB_KEY_MAX_BYTES
-        && typeof ref.sha256 === 'string'
-        && /^[0-9a-f]{64}$/.test(ref.sha256);
-}
 
 const PB_LOCK_TTL_MS = 30_000;
 const PB_LOCK_RETRY_DELAYS_MS = [20, 20, 20, 20];
@@ -84,6 +67,13 @@ function playerChallengeLockKey(competitionId: string, playerId: string): string
     return `dailygp:challenge-pb-lock:${competitionId}:${playerHash}`;
 }
 
+// The decoded text of each parsed moved row, for the copy check; never sent to the game.
+const movedRowTexts = new WeakMap<PlayerTrackPbRecord, string>();
+
+export function movedRowText(record: PlayerTrackPbRecord): string | null {
+    return movedRowTexts.get(record) ?? null;
+}
+
 function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null {
     if (!raw) return null;
     try {
@@ -105,7 +95,7 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
         const lapCount = rulesRevision === 1 && (value.lapCount === 2 || value.lapCount === 3)
             ? value.lapCount
             : 1;
-        return {
+        const record: PlayerTrackPbRecord = {
             schemaVersion: PB_GHOST_SCHEMA_VERSION,
             trackKey: value.trackKey,
             trackFingerprint: value.trackFingerprint,
@@ -125,6 +115,8 @@ function parseRecord(raw: string | null | undefined): PlayerTrackPbRecord | null
             ...(isPbGhostArchiveRef(value.ghostArchive) ? { ghostArchive: value.ghostArchive } : {}),
             updatedAt: value.updatedAt,
         };
+        if (isMovedPbRecord(record)) movedRowTexts.set(record, raw);
+        return record;
     } catch (_error) {
         return null;
     }

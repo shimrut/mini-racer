@@ -44,6 +44,8 @@ vi.mock('../src/server/competition/competition-leaderboard.js', async (importOri
 
 vi.mock('../src/server/competition/pb-ghost-store.js', () => ({
     upsertPlayerTrackPersonalBest: (...args) => mockUpsertPlayerTrackPersonalBest(...args),
+    // A record from this mock was never read from Redis, so it has no stub text to check a copy against.
+    movedRowText: () => null,
 }));
 
 const competition = {
@@ -381,5 +383,37 @@ describe('submitCompetitionRun', () => {
             },
         );
         expect(mockRedisIncrBy).toHaveBeenCalledWith(competition.standingsRevisionKey, 1);
+    });
+
+    it('answers a slower run that keeps a moved PB with an unavailable ghost when the copy cannot be checked', async () => {
+        const { submitCompetitionRun } = await import('../src/server/competition/competition-submit.ts');
+        mockReadEntryByPlayerId.mockResolvedValue(null);
+        mockUpsertPlayerTrackPersonalBest.mockResolvedValue({
+            improved: false,
+            record: {
+                bestTimeMs: 12_000,
+                checkpointTimesSec: [4, 8, 12],
+                ghost: null,
+                ghostArchive: { v: 1, key: 'daily-ghosts/v1/daily-gp-2026-08-23/x-0123456789abcdef.gz', sha256: 'a'.repeat(64) },
+            },
+        });
+
+        const outcome = await submitCompetitionRun({
+            competition,
+            playerId: 'reddit:pm-user',
+            trackKey: 'circuit',
+            replay: { inputs: [{ frames: 120, left: false, right: false, relaunchDelay: false }] },
+        });
+
+        expect(outcome.status).toBe(200);
+        expect(outcome.body.trackPbPersistenceStatus).toBe('unchanged');
+        expect(outcome.body.trackGhostAvailable).toBe(true);
+        expect(outcome.body.trackPersonalBest).toEqual({
+            bestTimeMs: 12_000,
+            checkpointTimesSec: [4, 8, 12],
+            ghost: null,
+            ghostUnavailable: true,
+        });
+        expect(mockRedisHSet).not.toHaveBeenCalledWith(competition.entryHashKey, expect.anything());
     });
 });

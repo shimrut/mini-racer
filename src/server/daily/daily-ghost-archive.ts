@@ -13,6 +13,11 @@ import {
     type BlobStore,
 } from '../blob/blob-store.js';
 import { challengeCollectionKey, isPbGhostArchiveRef, type PbGhostArchiveRef } from '../competition/pb-ghost-store.js';
+import {
+    buildGhostStub as buildDailyGhostStub,
+    dailyGhostBlobKey,
+    dailyGhostBlobPrefix,
+} from '../blob/ghost-archive-copy.js';
 import { storedRunGhost } from '../competition/pb-ghost-pack.js';
 import {
     guestProgressSelectionAccountPendingKeyForHash,
@@ -112,13 +117,7 @@ export function dailyGhostArchiveSweepRefsKey(challengeId: string): string {
 
 const BLOB_PREFIX = 'daily-ghosts/v1';
 
-export function dailyGhostBlobPrefix(challengeId: string): string {
-    return `${BLOB_PREFIX}/${challengeId}/`;
-}
-
-export function dailyGhostBlobKey(challengeId: string, field: string, sha256: string): string {
-    return `${dailyGhostBlobPrefix(challengeId)}${field}-${sha256.slice(0, 16)}.gz`;
-}
+export { buildDailyGhostStub, dailyGhostBlobKey, dailyGhostBlobPrefix };
 
 const LOCK_TTL_MS = 55_000;
 // Blob calls end by T + 22 s and commits start by T + 25 s; Reddit stops a request at 30 s.
@@ -297,15 +296,6 @@ function isStub(run: { value: Record<string, unknown> } | null): boolean {
     return Boolean(run && (run.value.ghost === null || run.value.ghost === undefined)
         && run.value.ghostPacked === undefined
         && isPbGhostArchiveRef(run.value.ghostArchive));
-}
-
-// The row left in Redis: every field kept, with the ghost replaced by the reference.
-export function buildDailyGhostStub(fullText: string, ref: PbGhostArchiveRef): string {
-    const value = JSON.parse(fullText) as Record<string, unknown>;
-    value.ghost = null;
-    delete value.ghostPacked;
-    value.ghostArchive = ref;
-    return JSON.stringify(value);
 }
 
 // A ghost no bigger than its stub stays, because moving it saves nothing.

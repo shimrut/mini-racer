@@ -58,8 +58,14 @@ export class PbGhostService {
     if (typeof challengeId !== 'string' || !challengeId.trim()) return null;
     const normalizedId = challengeId.trim();
     this.bumpRequestGeneration(normalizedId);
-    this.recordCache.set(normalizedId, record ?? null);
+    this.rememberRecord(normalizedId, record ?? null);
     return record ?? null;
+  }
+
+  // A record whose moved ghost could not be read now is not cached, so the next request asks again.
+  rememberRecord(challengeId, record) {
+    if (record?.ghostUnavailable) this.recordCache.delete(challengeId);
+    else this.recordCache.set(challengeId, record);
   }
 
   async getSummaries(challengeIds) {
@@ -111,7 +117,7 @@ export class PbGhostService {
     }
 
     const record = payload?.personalBest ?? payload?.trackPb ?? payload?.record ?? null;
-    this.recordCache.set(normalizedId, record);
+    this.rememberRecord(normalizedId, record);
     return record;
   }
 }
