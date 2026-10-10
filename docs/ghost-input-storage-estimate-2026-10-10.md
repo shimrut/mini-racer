@@ -26,6 +26,18 @@ The test autopilot (`tests/helpers/autopilot.js`) drove every track for 1 and 3 
 - Ghosts are about 75% of storage (see `mobile-backend-hosting-costs-2026-10-04.md`). An 80-88% ghost cut would shrink total storage by roughly 60-65%.
 - Head-to-head and podium posts embed ghosts too, so their post data would shrink the same way.
 
+## Example: 500k ghosts, 10 s track, 5 taps per second
+
+Each tap is a press and a release, so about 100 key changes per race. The pose figure uses autopilot runs of about 10 s. The input figures use 200 simulated tap tapes.
+
+| | Per ghost | 500k ghosts |
+|---|---|---|
+| Ghost today | ~1.25 KB | ~625 MB |
+| Inputs, current format | ~0.45 KB | ~225 MB |
+| Inputs, compact format | ~0.23 KB | ~115 MB |
+
+Ghost data only. Each stored record also carries ~0.2-0.3 KB of other fields, whichever format is used.
+
 ## Trade-offs
 
 - Playback must re-run the race physics on the device. The server already does this, so the code exists.
