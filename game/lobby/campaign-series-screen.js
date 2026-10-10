@@ -1,11 +1,12 @@
 import { CAMPAIGN_SERIES } from '../campaign/manifest.js';
 import { DEFAULT_TRACK_KEY, hasTrack } from '../track/catalog.js';
 import { getCampaignSeriesGrounds, getCampaignSeriesSurfaceLabel } from '../campaign/series-surfaces.js';
-import { renderTrackPreviewCanvas, trackPreviewPixelScale } from '../ui/track-carousel.js';
+import { trackPreviewPixelScale } from '../ui/track-carousel.js';
+import { renderTrackStartPicture } from '../ui/track-start-picture.js';
 import { formatSeriesMedals, MEDALS_PER_STAGE } from './campaign-series-picker.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
 
-// One row per series: picture, name, stage count and ground, medal count and bar.
+// One card per series: the start of its first track, name, stage count and ground, medal count and bar.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // The road icon of the Tracks button in the lobby header (Font Awesome Free v7.3.1).
@@ -19,8 +20,9 @@ const GROUND_PREVIEW_TRACK_KEYS = Object.freeze({
     grip: 'gripCircuit',
 });
 
-const PREVIEW_CSS_WIDTH = 80;
-const PREVIEW_CSS_HEIGHT = 58;
+// Wider than the card picture box; the box crops it from the left.
+const PREVIEW_CSS_WIDTH = 330;
+const PREVIEW_CSS_HEIGHT = 110;
 
 function previewTrackKeyFor(series) {
     const firstStageTrackKey = series.stages[0]?.trackKey;
@@ -81,6 +83,7 @@ function buildRow(row, onChoose) {
     const scale = trackPreviewPixelScale();
     canvas.width = PREVIEW_CSS_WIDTH * scale;
     canvas.height = PREVIEW_CSS_HEIGHT * scale;
+    canvas.dataset.trackKey = row.previewTrackKey;
     preview.appendChild(canvas);
 
     const text = document.createElement('span');
@@ -110,9 +113,7 @@ function buildRow(row, onChoose) {
     medals.append(count, bar);
 
     button.append(preview, text, medals);
-    renderTrackPreviewCanvas(canvas, { trackKey: row.previewTrackKey }, {
-        cacheNamespace: 'campaign-series',
-    });
+    renderTrackStartPicture(canvas, row.previewTrackKey, { pixelScale: scale });
     return button;
 }
 
@@ -123,4 +124,11 @@ export function renderCampaignSeriesList(container, rows, { onChoose = null } = 
     if (container.dataset.rowsKey === key) return;
     container.dataset.rowsKey = key;
     container.replaceChildren(...rows.map((row) => buildRow(row, onChoose)));
+}
+
+// Draws the pictures again, for example with the car the player just chose in the Garage.
+export function refreshCampaignSeriesPictures(container) {
+    for (const canvas of container?.querySelectorAll?.('.campaign-series-row__preview canvas') ?? []) {
+        renderTrackStartPicture(canvas, canvas.dataset.trackKey, { pixelScale: canvas.width / PREVIEW_CSS_WIDTH });
+    }
 }

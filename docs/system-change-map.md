@@ -235,21 +235,20 @@ flowchart LR
   out of the Start Race row and preserves the text hierarchy at short heights.
   Home keeps its Daily, Campaign, Garage, and Settings mode-action
   list. Daily and Campaign fill the selector area inside the shared lobby shell
-  with one race-programme poster: the mode sits at the left of the billing line
-  and the Daily date or selected Campaign track name at its right above the
-  circuit, the personal-best
-  icon/rank and medal ladder below it, and one Start Race action after it. The
-  actual Mini Racer wordmark remains in the shared top header, outside the
-  horizontal rail. The header's mode label and divider are also fixed; only the
-  right-side Daily date or Campaign track name is repainted when the centred card changes. The
-  selected track's bold name, separator dot, and `Lap`/`Laps`
-  count are a secondary line under that red action, so the race brief follows
-  the control and is not repeated in the poster's upper-right corner. The selected track schematic is
-  the background artwork, neighboring
-  tracks crop at the selector edges, and no card or inner preview panel is
-  visible. The poster uses the existing racing palette, Outfit / JetBrains Mono,
-  border tokens, medal/lock assets, and motion vocabulary. Each schematic places
-  the player's currently selected Garage car at
+  with one shared schematic and selected caption: track name and native rank
+  share the first row, laps/surface and native medals share the second.
+  The fixed Mini Racer header, toolbar and mode switch stay above the rail;
+  Start Race is a single-line action below it. Expiry, pagination count, PB and
+  repeated header/CTA identity are removed. Full-width cards clip neighbor artwork at rest while
+  keeping both diagrams paintable during native swiping and chevron motion. The shared carousel paints identity on
+  selection and same-ID refreshes, and its existing track preload repaints the
+  current selection after definitions load. Street is shown explicitly.
+  Locked requirements, placeholder and verification-error states retain their
+  native gating, with rank hidden/disabled when unavailable. Short landscape
+  puts artwork beside the caption; Challenge and Community keep their layouts.
+  Carousel height-only resizes refit diagrams without recentering, so locked
+  footer changes cannot interrupt a horizontal gesture.
+  Each schematic places the player's currently selected Garage car at
   the start pose instead of the generic direction triangle; the shared loaded
   sprite and its asset key invalidate both Daily and Campaign preview caches
   when the selection changes. Its preview size uses the race renderer's live
@@ -259,16 +258,10 @@ flowchart LR
   car-to-track proportion across different tracks and DPRs while leaving the
   deliberately larger standalone post-preview car unchanged. The
   existing Back, Standings, Tracks, Garage, and Settings toolbar stays in the top header
-  as one right-aligned icon-only rail, with Tracks between Standings and Garage, while the billing starts at the
-  upper-left beside it and one centered Start Race action anchors the bottom.
+  as one right-aligned icon-only rail, with Tracks between Standings and Garage, while the mode switch sits
+  below it and one centered Start Race action anchors the bottom.
   The buttons retain accessible aria-labels and their original compact minimum
-  tap area. The track name now travels with that action as its smaller race
-  brief, with a dot between the track name and `N Lap(s)`; the mode at the left
-  and run/date billing at the right in the fixed header; the selected schematic
-  and status span the poster's side peek to align with the shell. The billing and scoreline
-  keep their readable context while the schematic gives up height first; at
-  500px viewport height and below, the reduced secondary detail protects the
-  track, requirement, and action from overlap.
+  tap area.
   Pressing Start Race in either selector eases the full lobby surface to the
   track over 100ms while any required track preparation continues behind it;
   the countdown begins once both the fade and preparation are complete.
@@ -284,9 +277,8 @@ flowchart LR
   overlay becomes `display: none`; this prevents the lap HUD from jumping after
   the race chrome has appeared.
   Standings resolves the carousel's currently centred track at click time.
-  The top-right Tracks icon, Daily's expiry line, and `current / total` counter
-  open the shared Tracks modal on the Daily playlist. The same icon and
-  Campaign's `current / total` counter open that modal on Campaign stages: unlocked tiles start the
+  The top-right Tracks icon opens the shared Tracks modal on the current
+  Daily or Campaign tab. Unlocked Campaign tiles start the
   stage, locked tiles close and centre that poster on the carousel. The modal
   keeps a fixed `Tracks` title with `Daily` and `Campaign` tabs, so the player
   can switch modes without leaving it. Each panel uses a two-across grid of

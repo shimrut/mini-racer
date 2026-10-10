@@ -38,11 +38,9 @@ describe('Campaign locked-stage medal progress visual', () => {
         expect(ui).not.toContain('requirement-label');
         expect(ui).toContain("status.className = 'track-carousel__requirement-medal'");
         expect(ui).toContain('status.append(createRequirementMedalIcon(requirement))');
-        expect(ui).toContain('foot.append(requirement, meta, verificationError, medal)');
         expect(ui).not.toContain("status.textContent = requirement.satisfied ? '✓' : '•'");
         expect(ui).toContain('preview.append(previewArt, gate)');
         expect(ui).toContain('parts.gate.hidden = !Boolean(card.locked)');
-        expect(ui).toContain('parts.meta.hidden = locked || Boolean(verificationError)');
         expect(ui).toContain('parts.medal.hidden = locked');
         expect(lockIcon).toContain("path.setAttribute('fill', 'currentColor')");
         expect(lockIcon).toContain("lock.setAttribute('viewBox', '0 -32 384 544')");

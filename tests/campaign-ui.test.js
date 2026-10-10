@@ -1909,7 +1909,7 @@ describe('Campaign lobby and shared modal adapters', () => {
             );
             expect(html).toMatch(
                 new RegExp(
-                    `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-next"[\\s\\S]*id="${prefix}-carousel-navigation"[\\s\\S]*id="${prefix}-carousel-count"`,
+                    `id="${prefix}-carousel-prev"[\\s\\S]*id="${prefix}-carousel-next"`,
                 ),
             );
             expect(html).not.toMatch(
@@ -2493,7 +2493,7 @@ describe('Campaign lobby and shared modal adapters', () => {
         expect(label.hidden).toBe(true);
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
-        expect(rule.hidden).toBe(false);
+        expect(rule.hidden).toBe(true);
         expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('daily');
 
@@ -2501,17 +2501,16 @@ describe('Campaign lobby and shared modal adapters', () => {
             { trackName: 'Classic Circuit', objectiveParams: { lapCount: 1 } },
             { trackName: 'Classic Circuit', laps: 1 },
         );
-        expect(selectionTrack.textContent).toBe('Classic Circuit');
-        expect(selectionLaps.textContent).toBe('1 Lap');
-        expect(selectionLaps.hidden).toBe(false);
-        expect(selection.hidden).toBe(false);
+        expect(selectionTrack.textContent).toBe('');
+        expect(selectionLaps.hidden).toBe(true);
+        expect(selection.hidden).toBe(true);
 
         lobby.showCampaign();
         expect(subhead.hidden).toBe(false);
         expect(label.hidden).toBe(true);
         expect(track.hidden).toBe(true);
         expect(track.textContent).toBe('');
-        expect(rule.hidden).toBe(false);
+        expect(rule.hidden).toBe(true);
         expect(selection.hidden).toBe(true);
         expect(body.dataset.lobbyMode).toBe('campaign');
 
@@ -2521,10 +2520,9 @@ describe('Campaign lobby and shared modal adapters', () => {
             unlocked: true,
             laps: 3,
         });
-        expect(selectionTrack.textContent).toBe('Imaginary Number');
-        expect(selectionTrack.textContent).not.toBe('Stage 10');
-        expect(selectionLaps.textContent).toBe('3 Laps');
-        expect(selection.hidden).toBe(false);
+        expect(selectionTrack.textContent).toBe('');
+        expect(selectionLaps.hidden).toBe(true);
+        expect(selection.hidden).toBe(true);
 
         lobby.showChallenge({
             ranked: true,
@@ -2568,17 +2566,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         const originalDocument = global.document;
         const label = createElement('span');
         label.className = 'main-menu__label';
-        const brief = createElement('span');
-        brief.className = 'main-menu__race-brief';
-        const track = createElement('span');
-        track.className = 'main-menu__race-brief-track';
-        const separator = createElement('span');
-        separator.className = 'main-menu__race-brief-separator';
-        const laps = createElement('span');
-        laps.className = 'main-menu__race-brief-laps';
-        brief.children.push(track, separator, laps);
         const primary = createElement('button');
-        primary.children.push(label, brief);
+        primary.children.push(label);
         global.document = {
             getElementById: (id) => (id === 'campaign-primary-btn' ? primary : null),
             querySelector: () => null,
@@ -2606,10 +2595,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             laps: 1,
         });
         expect(label.textContent).toBe('Start Race');
-        expect(track.textContent).toBe('Number Zero');
-        expect(separator.hidden).toBe(false);
-        expect(laps.textContent).toBe('1 Lap');
-        expect(laps.attributes['aria-label']).toBe('1 Lap');
         expect(primary.disabled).toBe(false);
 
         lobby.setCampaignSelectedStage({
@@ -2619,10 +2604,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             laps: 3,
         });
         expect(label.textContent).toBe('Start Race');
-        expect(track.textContent).toBe('Number One');
-        expect(separator.hidden).toBe(false);
-        expect(laps.textContent).toBe('3 Laps');
-        expect(laps.attributes['aria-label']).toBe('3 Laps');
         expect(primary.disabled).toBe(false);
 
         lobby.setCampaignSelectedStage({
@@ -2632,10 +2613,6 @@ describe('Campaign lobby and shared modal adapters', () => {
             laps: 2,
         });
         expect(label.textContent).toBe('Locked');
-        expect(track.textContent).toBe('Number Two');
-        expect(separator.hidden).toBe(false);
-        expect(laps.textContent).toBe('2 Laps');
-        expect(laps.attributes['aria-label']).toBe('2 Laps');
         expect(primary.disabled).toBe(true);
 
         lobby.setCampaignSelectedStage({
@@ -2655,17 +2632,8 @@ describe('Campaign lobby and shared modal adapters', () => {
         const originalDocument = global.document;
         const label = createElement('span');
         label.className = 'main-menu__label';
-        const brief = createElement('span');
-        brief.className = 'main-menu__race-brief';
-        const track = createElement('span');
-        track.className = 'main-menu__race-brief-track';
-        const separator = createElement('span');
-        separator.className = 'main-menu__race-brief-separator';
-        const laps = createElement('span');
-        laps.className = 'main-menu__race-brief-laps';
-        brief.children.push(track, separator, laps);
         const primary = createElement('button');
-        primary.children.push(label, brief);
+        primary.children.push(label);
         const standings = createElement('button');
         const elements = { 'campaign-primary-btn': primary, 'lobby-mode-standings-btn': standings };
         global.document = {
@@ -2685,8 +2653,6 @@ describe('Campaign lobby and shared modal adapters', () => {
 
         lobby.setCampaignSelectedStage({ id: 'growing-v1-more', placeholder: true, unlocked: false, trackName: 'In design' });
         expect(label.textContent).toBe('Soon');
-        expect(track.textContent).toBe('In design');
-        expect(laps.hidden).toBe(true);
         expect(primary.disabled).toBe(true);
         expect(standings.disabled).toBe(true);
 

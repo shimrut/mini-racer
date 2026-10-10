@@ -145,62 +145,6 @@ describe('daily carousel card model', () => {
     });
 });
 
-describe('Daily Start Race race brief', () => {
-    it('puts a bold track name, separator, and labelled lap count below Start Race', () => {
-        const originalDocument = global.document;
-        const track = { hidden: true, textContent: '' };
-        const separator = { hidden: true, textContent: '·' };
-        const laps = {
-            hidden: true,
-            textContent: '',
-            setAttribute: vi.fn(),
-            removeAttribute: vi.fn(),
-        };
-        const brief = {
-            hidden: true,
-            textContent: '',
-            setAttribute: vi.fn(),
-            querySelector: (selector) => ({
-                '.main-menu__race-brief-track': track,
-                '.main-menu__race-brief-separator': separator,
-                '.main-menu__race-brief-laps': laps,
-            }[selector] || null),
-        };
-        const button = {
-            querySelector: (selector) => selector === '.main-menu__race-brief' ? brief : null,
-        };
-        global.document = {
-            getElementById: (id) => id === 'daily-challenge-start-btn' ? button : null,
-        };
-
-        try {
-            const lobby = new LobbyUi();
-            lobby.setDailySelectedChallenge(
-                { id: 'multi-lap-day' },
-                { trackName: 'Classic Circuit', laps: 3 },
-            );
-            expect(track.textContent).toBe('Classic Circuit');
-            expect(track.hidden).toBe(false);
-            expect(separator.hidden).toBe(false);
-            expect(laps.textContent).toBe('3 Laps');
-            expect(laps.hidden).toBe(false);
-            expect(laps.setAttribute).toHaveBeenCalledWith('aria-label', '3 Laps');
-            expect(brief.hidden).toBe(false);
-
-            lobby.setDailySelectedChallenge(
-                { id: 'single-lap-day' },
-                { trackName: 'Sunlit Temple', laps: 1 },
-            );
-            expect(track.textContent).toBe('Sunlit Temple');
-            expect(separator.hidden).toBe(false);
-            expect(laps.textContent).toBe('1 Lap');
-            expect(laps.setAttribute).toHaveBeenLastCalledWith('aria-label', '1 Lap');
-        } finally {
-            global.document = originalDocument;
-        }
-    });
-});
-
 function createStubbedCarousel(count = 5, { cardWidth = 240, viewportWidth = 320 } = {}) {
     const onSelect = vi.fn();
     const onOpenLeaderboard = vi.fn();
@@ -280,104 +224,6 @@ function stubRailRebuild(carousel, rail) {
     }));
 }
 
-describe('Daily tracks opener', () => {
-    it('wires the Daily expiry line and counter to the Tracks list', () => {
-        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
-        expect(engineSource).toContain(
-            'const openDailyTracks = () => void this.openDailyChallengePlaylist();',
-        );
-        expect(engineSource).toContain(
-            'this.dailyCarousel.expiryLine?.addEventListener("click", openDailyTracks);',
-        );
-        expect(engineSource).toContain(
-            'this.dailyCarousel.navigation?.addEventListener("click", openDailyTracks);',
-        );
-        expect(engineSource).not.toContain(
-            'this.campaignCarousel.navigation?.addEventListener("click", openDailyTracks);',
-        );
-    });
-
-    it('wires the Campaign counter to the Tracks list', () => {
-        const engineSource = readFileSync(new URL('../game/engine.js', import.meta.url), 'utf8');
-        expect(engineSource).toMatch(
-            /invokeModeMethod\(\s*"campaign",\s*"openCampaignTracks"/,
-        );
-        expect(engineSource).toContain(
-            'this.campaignCarousel.navigation?.addEventListener("click", openCampaignTracks);',
-        );
-        expect(engineSource).toContain('onOpenTracks:');
-        expect(engineSource).toContain('void this.openDailyChallengePlaylist();');
-    });
-});
-
-describe('TrackCarousel expiry line', () => {
-    function stubExpiryLine(carousel, resolveExpiry) {
-        const line = { textContent: '', hidden: true };
-        Object.defineProperty(carousel, 'expiryLine', { get: () => line });
-        carousel.resolveExpiry = resolveExpiry;
-        return line;
-    }
-
-    it('follows the selected day and clears when there is nothing to say', () => {
-        const { carousel } = createStubbedCarousel(2);
-        const line = stubExpiryLine(carousel, (card) => ({
-            c0: { label: 'Expires on Aug 03', refreshMs: null },
-            c1: { label: 'Expires in 15h', refreshMs: null },
-        }[card?.challengeId] || { label: '', refreshMs: null }));
-
-        carousel.applySelectionClasses();
-        expect(line.textContent).toBe('Expires on Aug 03');
-        expect(line.hidden).toBe(false);
-
-        carousel._selectedIndex = 1;
-        carousel.applySelectionClasses();
-        expect(line.textContent).toBe('Expires in 15h');
-
-        carousel._selectedIndex = -1;
-        carousel.applySelectionClasses();
-        expect(line.textContent).toBe('');
-        expect(line.hidden).toBe(true);
-    });
-
-    it('keeps one pending redraw at a time, at the interval the label asks for', () => {
-        vi.useFakeTimers();
-        try {
-            const { carousel } = createStubbedCarousel(1);
-            let remainingMinutes = 3;
-            const line = stubExpiryLine(carousel, () => ({
-                label: `Expires in ${remainingMinutes}m`,
-                refreshMs: remainingMinutes > 0 ? 60 * 1000 : null,
-            }));
-
-            carousel.applySelectionClasses();
-            expect(line.textContent).toBe('Expires in 3m');
-            expect(vi.getTimerCount()).toBe(1);
-
-            remainingMinutes = 2;
-            vi.advanceTimersByTime(60 * 1000);
-            expect(line.textContent).toBe('Expires in 2m');
-            expect(vi.getTimerCount()).toBe(1);
-
-            carousel.applySelectionClasses();
-            expect(vi.getTimerCount()).toBe(1);
-
-            remainingMinutes = 0;
-            vi.advanceTimersByTime(60 * 1000);
-            expect(vi.getTimerCount()).toBe(0);
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it('does nothing without a line or a resolver, as Campaign has neither', () => {
-        const { carousel } = createStubbedCarousel(2);
-        Object.defineProperty(carousel, 'expiryLine', { get: () => null });
-
-        expect(() => carousel.applySelectionClasses()).not.toThrow();
-        expect(carousel._expiryTimer).toBe(null);
-    });
-});
-
 describe('TrackCarousel selection', () => {
     it('steps with A/D and arrows and stops at both ends', () => {
         const { carousel, onSelect } = createStubbedCarousel(3);
@@ -415,25 +261,6 @@ describe('TrackCarousel selection', () => {
         carousel.select(2);
         expect(prevBtn.disabled).toBe(false);
         expect(nextBtn.disabled).toBe(true);
-    });
-
-    it('shows the selected track position between the navigation controls', () => {
-        const { carousel, countLabel, navigation } = createStubbedCarousel(3);
-
-        carousel.syncNavButtons();
-        expect(navigation.hidden).toBe(false);
-        expect(countLabel.textContent).toBe('1 / 3');
-        expect(countLabel.setAttribute).toHaveBeenLastCalledWith(
-            'aria-label',
-            'Track 1 of 3',
-        );
-
-        carousel.select(2);
-        expect(countLabel.textContent).toBe('3 / 3');
-        expect(countLabel.setAttribute).toHaveBeenLastCalledWith(
-            'aria-label',
-            'Track 3 of 3',
-        );
     });
 
     it('hides both chevrons when there is only one day to show', () => {
@@ -814,8 +641,9 @@ describe('TrackCarousel selection', () => {
     it('keeps the standings value icon-only while preserving the rank action', () => {
         const carousel = new TrackCarousel();
         carousel._footParts = {
-            bestCell: { hidden: true, classList: { toggle: vi.fn() } },
-            bestValue: { textContent: '' },
+            foot: { hidden: true },
+            name: { textContent: '', title: '' },
+            detail: { hidden: true, textContent: '' },
             rank: {
                 hidden: true,
                 disabled: true,
@@ -828,7 +656,6 @@ describe('TrackCarousel selection', () => {
             medal: { hidden: true, disabled: false, dataset: { medalKey: '' }, setAttribute: vi.fn(), removeAttribute: vi.fn() },
             requirement: { hidden: false },
             requirementList: { replaceChildren: vi.fn() },
-            meta: { hidden: true },
             verificationError: { hidden: true, textContent: '' },
         };
 
@@ -849,7 +676,6 @@ describe('TrackCarousel selection', () => {
         expect(parts.rankValue.textContent).toBe('#4');
         expect(parts.rankMedal.hidden).toBe(true);
         expect(parts.verificationError.hidden).toBe(true);
-        expect(parts.meta.hidden).toBe(false);
         expect(parts.rank.setAttribute).toHaveBeenCalledWith(
             'aria-label',
             'Circuit standings. Your rank: #4',

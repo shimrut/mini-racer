@@ -10,6 +10,9 @@ vi.mock('../game/ui/track-carousel.js', () => ({
     renderTrackPreviewCanvas: vi.fn(),
     trackPreviewPixelScale: () => 1,
 }));
+vi.mock('../game/ui/track-start-picture.js', () => ({
+    renderTrackStartPicture: vi.fn(),
+}));
 vi.mock('../game/campaign/service.js', async (importOriginal) => ({
     ...(await importOriginal()),
     getCampaignBootstrap: vi.fn(),

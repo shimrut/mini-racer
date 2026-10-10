@@ -188,20 +188,17 @@ target time in one row.
 Daily and Campaign share one responsive poster composition rather than
 maintaining mode-specific card layouts:
 
-- `lobby-modes.css` owns the shared Daily/Campaign header in flow, the top-right
-  toolbar, mode pane, bottom primary row, and the two-line Daily/Campaign Start
-  Race action layout. A pending Start spinner sits to the left of that stack so
-  the button does not grow a third row. The Campaign mode button has a fixed
-  `6.5rem` width and a label span that truncates long selected-series names with
-  an ellipsis. Its arrow points down on the Campaign series list and up otherwise;
-  Daily and the series list use the Campaign label. There is no dropdown. Selected
-  track name and laps remain in the right-hand subhead; narrow Campaign
-  track labels truncate with an ellipsis instead of extending past the edge.
-- `styles/lobby-and-garage.css` owns the shared primary-button typography,
-  including the smaller header-font race-brief line with the bold selected track
-  name, separator dot, and singular/plural lap count under Start Race.
-- `track-carousel.css` owns the poster rail and its two-band card: bounded
-  circuit schematic and player status. Identity belongs to the lobby header.
+- `lobby-modes.css` owns the fixed wordmark, toolbar, mode switch and separate
+  bottom action row. Daily and Campaign show a single-line Start Race label;
+  loading, retry and locked labels retain their native behavior. The Campaign
+  switch retains its fixed `6.5rem` width and selected-series ellipsis.
+- `styles/lobby-and-garage.css` owns primary-button typography. The smaller
+  race-brief remains available to Challenge and Community; Daily/Campaign remove
+  their duplicated brief and hide the right-hand header selection/divider.
+- `track-carousel.css` owns the schematic and selected caption. Caption row 1
+  contains track name and native rank button; row 2 contains laps/surface and the native medal ladder. The name uses Outfit italic 900 at 1.5rem;
+  metadata uses JetBrains Mono at 0.68rem. Long names truncate while preserving
+  rank, with the full name retained in the native title and card accessible label.
 - `game/ui/track-carousel.js` generates the shared DOM. Daily and Campaign model
   builders supply different data without duplicating markup.
 - `#start-group` remains the only width owner. The carousel reads its measured
@@ -228,38 +225,26 @@ maintaining mode-specific card layouts:
   `minmax(0, 1fr)` and Start Race gets its own intrinsic row. Neither is
   positioned, sticky, or layered. The pane, carousel, and mode-specific shell
   clip their own paint so transient WebKit resize states cannot draw poster
-  content beneath the action. Inside each poster, the status footer owns a
-  fixed `4rem` status band and the artwork is clipped to the card itself. The
-  personal-best icon, standings value, and medal ladder remain present for open cards,
-  while locked cards replace that context with a two-item prerequisite checklist.
-  Tapping the medal ladder opens the same MEDALS mini overlay used on the finish
-  screen, mounted on `#start-overlay` so it covers the lobby.
-- The Daily/Campaign carousel stacks the schematic, the `current / total`
-  counter, then the track's own footer (time, rank, medals) — everything below
-  the artwork describes the track above it. Daily's expiry line and counter
-  open the Tracks list; Campaign's counter opens the same list with Campaign
-  stages. That list uses a fixed `Tracks` header with `Daily` and `Campaign`
-  tabs below it. Each tab owns its own equal `repeat(2, minmax(0, 1fr))`
-  tile panel (preview with medal top-left and rank `#x` top-right when known,
-  name on the left, laps on the right), scoped under `#daily-playlist-modal`
-  so lobby posters stay wide hero cards. The tabs remain switchable while the
-  modal is open, and the two panels keep their rendered data independent. Both panels share the same
-  desktop/mobile grid and keyboard-selection rules; visibility uses the native
-  `hidden` property.
-  Previous and Next leave that stack:
-  they are circular icon buttons grid-placed into row 1 with `align-self:
-  center` and `justify-self: start`/`end`, so they flank the schematic and stay
-  centred on artwork whose height is only resolved at layout time. Absolute
-  offsets from the carousel's own edges could not track that `1fr` row. They
-  are direct children of `.track-carousel` rather than of
-  `.track-carousel__navigation`, which now carries only the counter;
-  `syncNavButtons()` still hides that wrapper when the rail is empty and the
-  buttons themselves below two cards. Their 2.5rem circles overlay the outer
-  edge of the scroll viewport, so a swipe has to start inboard of them. The
-  challenge poster keeps its original two-row layout.
-- The Daily/Campaign header remains in normal flow above the rail. The actual
-  `.lobby-title` is the fixed Mini Racer wordmark, and `.lobby-subhead` owns the
-  mode label, divider, and right-side Daily date or Campaign track selection.
+  content beneath the action. The footer has intrinsic height and 1.25rem
+  clearance before Start Race. It contains the two-row caption and, when needed,
+  native unlock requirements or verification errors. Rank is explicitly hidden
+  and disabled for locked, placeholder and verification-error states; the empty
+  rail hides and clears the footer. Medal targets still open the shared MEDALS
+  overlay on `#start-overlay`.
+- Daily/Campaign remove expiry, pagination count and personal-best time from the
+  main carousel. The top-right Tracks icon retains the shared Daily/Campaign
+  Tracks modal and two-across tile panels. Previous/Next stay direct children of
+  the carousel, centered on its artwork row, and hide below two cards. The rail's
+  gesture, centering, edge spacers and selected-card behavior remain intact.
+- At landscape heights of 500px or less, artwork and caption use separate
+  columns. Short portrait retains the stacked caption. Full-width cards keep
+  neighbor artwork outside the settled viewport; the Challenge poster retains
+  its own layout.
+- The fixed Mini Racer header and mode switch stay in normal flow above the
+  rail. Selecting a track repaints its caption without repeating identity in
+  the header or CTA. The carousel owns caption updates and uses its existing track preload to
+  repaint the current selection when definitions arrive. Street is named explicitly,
+  including legacy tracks whose definition omits the default ground field.
 - The wordmark is the route back to the mode menu. `.lobby-title` stays the `h1`
   and keeps `pointer-events: none`; the `.lobby-title__home` button inside it
   takes them back, so the hit area is the letters rather than the full header
@@ -268,16 +253,8 @@ maintaining mode-specific card layouts:
   otherwise pick all of those up from the UA sheet. It is `disabled` on Home,
   which keeps it out of the tab order there, and its `:disabled` rule restores
   `color` and `opacity` so the UA's grey does not reach "MINI".
-  Carousel movement
-  updates only `[data-lobby-mode-selection]`; the wordmark, mode label, and
-  divider keep their layout coordinates. Daily/Campaign reuse the compact
-  carousel wordmark cap and mono billing scale; Home keeps its larger display
-  treatment. Campaign repeats the selected track name in the right-side header;
-  both modes also carry it in the Start Race action instead of repeating it in
-  the poster.
-- The header billing line spans the shell beside the Back/Standings/Garage/
-  Settings rail. The preview and status footer remain clipped to the selected
-  card and cannot paint into the adjacent track or Start Race row.
+  Carousel movement updates the shared caption; the wordmark and switch retain
+  their positions. The caption also repaints on same-ID model refreshes.
 - The rail's lane is pinned, not scaled. `.track-carousel__viewport` is
   `position: absolute; inset: 0` inside the carousel, so the rail and every card
   are stretched to the row the pane actually granted. A percentage height there
@@ -287,12 +264,17 @@ maintaining mode-specific card layouts:
   intrinsic height and the carousel's clip removes the scoreline. No height on
   the rail, the lane, or the card may depend on that chain.
 - Cards, rail, and preview stay transparent and shadowless. The selected
-  schematic is the visual anchor; neighboring schematics crop at the edges.
+  schematic is the visual anchor. Lobby cards span the measured viewport, with
+  the existing diagram inset kept as card padding. Both cards remain paintable
+  while scrolling; selected-state visibility switches must not hide artwork.
 - Each poster is a two-band grid: bounded schematic hero and status. The preview
   canvas owns the first row rather than sitting behind the header or footer, so
   high-contrast road geometry cannot collide with either reading. The card's
   `overflow: hidden` remains the paint boundary; the separate Start Race row is
   never part of that canvas.
+- The carousel ResizeObserver refits artwork on height changes but recentres
+  only when the measured width changes. Locked requirements can change footer
+  height during a swipe; that must not snap or cancel the horizontal gesture.
 - The preview bitmap is fitted from the measured middle row. The track can grow
   into the available hero space, while a short WebView gives up artwork before
   it gives up the title, scoreline, or locked requirements.
@@ -310,7 +292,7 @@ maintaining mode-specific card layouts:
   placeholder. The total placeholder becomes the same white check state when
   that gate is satisfied.
 - The locked gate leaves only an opaque, medal-shaped lock plate over the
-  schematic. Two plain prerequisite lines sit in the fixed status footer below
+  schematic. Two plain prerequisite lines sit in the intrinsic footer below
   the track, using natural-case display type so no copy is laid over the
   artwork or made to compete with the title. The large lock uses the medal SVG
   itself as the single opaque plate; it does not stack a second CSS shape behind
@@ -322,33 +304,19 @@ maintaining mode-specific card layouts:
 - Billing and unplayed scoreline context use `--text-dim`; live values use
   `--text-color`; red is the lobby and poster wordmark structure — `RACER`, the
   active run, and Start Race — and nothing else on the poster.
-- The lobby header owns the fixed Mini Racer wordmark above the schematic. Mode
-  billing anchors left and `[data-lobby-mode-selection]` closes the same divider
-  on the right; `game/lobby/ui.js` changes only that Daily date or Campaign track
-  name when the carousel selection changes. The selected card's bold track name, separator
-  dot, and lap count are rendered as the secondary race-brief line under the
-  red Start Race action. A locked stage keeps that brief while the primary label
-  changes to `Locked`.
 - Daily and Campaign put Back, Standings, Tracks, Garage, and Settings in one compact
   right-aligned icon-only rail. Tracks sits between Standings and Garage, matching
   the old main-menu order. The buttons retain their accessible `aria-label`
   values and original compact minimum `2.75rem` tap area; Home and Challenge
   keep their existing navigation treatments.
-- The lobby header keeps billing and the fixed Mini Racer wordmark in its own
+- The lobby header keeps the mode switch and fixed Mini Racer wordmark in its own
   stable flow above the rail. At `max-height: 500px`, the middle hero and lock
   plate compact first, and the footer plus separate Start Race row remain
   contained without removing the open-card medal ladder.
-- The personal-best stopwatch and standings ladder are inline SVGs with intrinsic
-  `16 × 16` dimensions as well as the shared scoreline CSS size. Embedded clients
-  can therefore not collapse either icon while refreshing or serving a partial
-  stylesheet. The standings button keeps its accessible rank label while showing
-  the same icon used by the top toolbar.
-- The personal-best icon/time and standings icon/value share the same centered
-  cross-axis in their score cells. The PB/standings meta group centers its
-  children as one unit, and the medal ladder remains anchored to the footer's
-  right edge.
-- The status footer has no separating top border; the bounded track hero flows
-  directly into the PB/standings/medal status line.
+- The standings icon retains its intrinsic `16 × 16` SVG dimensions and
+  accessible rank label. Rank and medal buttons retain native callbacks,
+  keyboard activation, focus rings and target popovers. The caption has no
+  separating border or additional container decoration.
 
 Selection is a behavior contract as well as a visual one. The centred card must
 remain the source for Start Race and Standings, and measured pixel edge spacers,

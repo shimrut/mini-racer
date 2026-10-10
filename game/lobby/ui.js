@@ -14,12 +14,12 @@ import {
 } from './service.js';
 import { applyAvatar } from '../ui/avatar.js';
 import { createMedalIconSvg } from '../medals/medal-icon.js';
-import { formatLapsLabel } from '../shared/laps-label.js';
+import { formatLapsAndGroundLabel } from '../shared/laps-label.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
 import { TRACK_GROUNDS, getStoredTrackGroundKey } from '../track/grounds.js';
 import { setButtonBlock, setText } from '../ui/dom.js';
 import { campaignHasSeriesChoice, getCampaignSeries } from '../campaign/manifest.js';
-import { buildCampaignSeriesRows, renderCampaignSeriesList } from './campaign-series-screen.js';
+import { buildCampaignSeriesRows, refreshCampaignSeriesPictures, renderCampaignSeriesList } from './campaign-series-screen.js';
 import { COMMUNITY_VISIBLE } from '../community/visibility.js';
 
 const LOBBY_MODES = ['home', 'daily', 'campaign', 'community', 'challenge'];
@@ -33,11 +33,6 @@ const BLOCKING_OVERLAY_IDS = [
 
 function setAvatar(element, url, label) {
     applyAvatar(element, url, { alt: label, genericClass: 'challenge-avatar--generic' });
-}
-
-// "2 Laps", or "2 Laps · Dirt" on a track that is not tarmac.
-function formatLapsAndGroundLabel(laps, groundLabel, separator = ' · ') {
-    return [formatLapsLabel(laps), groundLabel].filter(Boolean).join(separator);
 }
 
 function setSubheadSelection(element, trackName, laps, groundLabel = null) {
@@ -151,11 +146,7 @@ export class LobbyUi {
         this.communityStartError = null;
         this._campaignPrimaryLoading = false;
         this._campaignSelectedStage = null;
-        this._dailySelectedTrackName = null;
-        this._dailySelectedLaps = null;
-        this._dailySelectedTrackKey = null;
         this._groundLabelLoads = new Set();
-        this._campaignSelectedBillingLabel = null;
         this._dailyStartError = null;
         this._campaignStartError = null;
         // null: no selected race. false: its track is not prepared yet, so
@@ -490,39 +481,22 @@ export class LobbyUi {
             track.hidden = true;
             track.textContent = '';
         }
-        const billingLabel = this.mode === 'daily'
-            ? this._dailySelectedTrackName?.trim() || null
-            : this.mode === 'campaign'
-                ? this._campaignSelectedBillingLabel
-                : this.mode === 'challenge'
-                    ? this.challengeState?.trackName?.trim() || null
-                    : this.mode === 'community'
-                        ? this.communityMaps.find((map) => map.id === this.communitySelectedMapId)?.name || null
-                    : null;
-        const billingLaps = this.mode === 'daily'
-            ? this._dailySelectedLaps
-            : this.mode === 'campaign'
-                ? this.getCampaignPrimaryLaps()
-                : this.mode === 'challenge'
-                    ? this.challengeState?.laps ?? null
-                    : this.mode === 'community'
-                        ? 1
-                    : null;
-        const billingTrackKey = this.mode === 'daily'
-            ? this._dailySelectedTrackKey
-            : this.mode === 'campaign'
-                ? this.getCampaignPrimaryTrackKey()
-                : this.mode === 'challenge'
-                    ? this.challengeState?.trackKey ?? null
-                    : null;
-        if (this.mode === 'home') {
+        if (this.mode === 'home' || this.mode === 'daily' || this.mode === 'campaign') {
             if (rule) rule.hidden = true;
             setSubheadSelection(selection, null, null);
             return;
         }
+        const billingLabel = this.mode === 'challenge'
+            ? this.challengeState?.trackName?.trim() || null
+            : this.mode === 'community'
+                ? this.communityMaps.find((map) => map.id === this.communitySelectedMapId)?.name || null
+                : null;
+        const billingLaps = this.mode === 'challenge'
+            ? this.challengeState?.laps ?? null
+            : this.mode === 'community' ? 1 : null;
+        const billingTrackKey = this.mode === 'challenge' ? this.challengeState?.trackKey ?? null : null;
         if (rule) rule.hidden = false;
         setSubheadSelection(selection, billingLabel, billingLaps, this.getGroundLabel(billingTrackKey));
-        if (this.isCampaignSeriesView() && selection) selection.hidden = true;
     }
 
     // The ground name of a non-tarmac track, or null. The name lives in the
@@ -536,8 +510,6 @@ export class LobbyUi {
                 void loadClientTrack(trackKey).then((loaded) => {
                     if (!loaded || getStoredTrackGroundKey(loaded) === null) return;
                     this.syncLobbySubheadDetail();
-                    if (this.mode === 'daily') this.renderDaily();
-                    if (this.mode === 'campaign') this.renderCampaign();
                     if (this.mode === 'challenge') this.renderChallenge();
                 }).catch(() => {});
             }
@@ -804,16 +776,7 @@ export class LobbyUi {
         });
     }
 
-    setDailySelectedChallenge(challenge = null, card = null) {
-        this._dailySelectedTrackName = typeof card?.trackName === 'string'
-            ? card.trackName
-            : (typeof challenge?.trackName === 'string' ? challenge.trackName : null);
-        this._dailySelectedLaps = Number.isInteger(card?.laps)
-            ? card.laps
-            : (Number.isInteger(challenge?.laps) ? challenge.laps : null);
-        this._dailySelectedTrackKey = typeof card?.trackKey === 'string'
-            ? card.trackKey
-            : (typeof challenge?.trackKey === 'string' ? challenge.trackKey : null);
+    setDailySelectedChallenge() {
         this.syncLobbySubheadDetail();
         this.renderDaily();
     }
@@ -850,17 +813,10 @@ export class LobbyUi {
             this.dailyPrimaryBtn?.querySelector('.main-menu__label'),
             this._dailyStartError ? 'Retry Start' : 'Start Race',
         );
-        setRaceBriefText(
-            this.dailyPrimaryBtn?.querySelector('.main-menu__race-brief'),
-            this._dailySelectedTrackName,
-            this._dailySelectedLaps,
-            this.getGroundLabel(this._dailySelectedTrackKey),
-        );
     }
 
     setCampaignSelectedStage(stage = null) {
         this._campaignSelectedStage = stage;
-        this._campaignSelectedBillingLabel = this.getCampaignPrimaryTrackName();
         this.syncLobbySubheadDetail();
         this.renderCampaign();
         this.syncModeToolbarState();
@@ -873,21 +829,6 @@ export class LobbyUi {
         if (stage) return stage.unlocked ? 'Start Race' : 'Locked';
         return this.campaignState.primaryLabel
             || (this._campaignPrimaryLoading ? 'Loading' : '');
-    }
-
-    getCampaignPrimaryLaps() {
-        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
-        return stage?.laps ?? stage?.lapCount ?? null;
-    }
-
-    getCampaignPrimaryTrackKey() {
-        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
-        return typeof stage?.trackKey === 'string' ? stage.trackKey : null;
-    }
-
-    getCampaignPrimaryTrackName() {
-        const stage = this._campaignSelectedStage || this.campaignState.nextStage;
-        return typeof stage?.trackName === 'string' ? stage.trackName : null;
     }
 
     renderCampaignView() {
@@ -918,6 +859,11 @@ export class LobbyUi {
         }
     }
 
+    // The series pictures show the player's car, so a Garage change draws them again.
+    refreshCampaignSeriesPictures() {
+        refreshCampaignSeriesPictures(this.campaignSeriesList);
+    }
+
     renderCampaign() {
         this.renderCampaignView();
         this.renderRaceStartMessage('campaign-start-message', this._campaignStartError);
@@ -933,12 +879,6 @@ export class LobbyUi {
         setSwappingText(
             this.campaignPrimaryBtn.querySelector('.main-menu__label'),
             this.getCampaignPrimaryLabel(),
-        );
-        setRaceBriefText(
-            this.campaignPrimaryBtn.querySelector('.main-menu__race-brief'),
-            this.getCampaignPrimaryTrackName(),
-            this.getCampaignPrimaryLaps(),
-            this.getGroundLabel(this.getCampaignPrimaryTrackKey()),
         );
     }
 

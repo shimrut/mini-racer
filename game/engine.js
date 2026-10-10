@@ -86,7 +86,6 @@ import {
   clearDailyChallengeSnapshotFreshness,
   confirmDailyChallengeShare,
   getActiveDailyChallenge,
-  getDailyChallengeExpiry,
   getDailyChallengeSnapshot,
   isDailyRaceWarmupCurrent,
   previewDailyChallengeShare,
@@ -360,7 +359,6 @@ export class RealTimeRacer {
       onSelect: (challenge, card) => this.handleDailyCarouselSelect(challenge, card),
       onOpenLeaderboard: (challenge) => this.openDailyCarouselStandings(challenge),
       onSettle: (card) => this.handleDailyCarouselSettled(card),
-      resolveExpiry: (card) => getDailyChallengeExpiry(card?.challenge),
       ...previewCarOptions,
     });
     subscribeToDailyChallengeSnapshots(() => {
@@ -564,6 +562,7 @@ export class RealTimeRacer {
       modal: this.modal,
       onCarSkinChanged: () => {
         void this.syncCarSpriteAsset();
+        this.lobbyUi?.refreshCampaignSeriesPictures?.();
         if (this.status === "ready") {
           this.requestRender();
         }
@@ -586,15 +585,7 @@ export class RealTimeRacer {
     this.interactions.bindPrimaryActions();
     this.dailyChallengeUi.bindPlaylistModal();
     this.dailyCarousel.bind();
-    const openDailyTracks = () => void this.openDailyChallengePlaylist();
-    this.dailyCarousel.expiryLine?.addEventListener("click", openDailyTracks);
-    this.dailyCarousel.navigation?.addEventListener("click", openDailyTracks);
     this.campaignCarousel.bind();
-    const openCampaignTracks = () => void this.invokeModeMethod(
-      "campaign",
-      "openCampaignTracks",
-    );
-    this.campaignCarousel.navigation?.addEventListener("click", openCampaignTracks);
     this.lobbyUi.bind();
     this.garage.bind();
     this.hud.setPauseVisible(false);

@@ -234,9 +234,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-label {
 }
 
 body[data-lobby-mode="challenge"] .lobby-subhead__rule,
-body[data-lobby-mode="community"] .lobby-subhead__rule,
-body[data-lobby-mode="daily"] .lobby-subhead__rule,
-body[data-lobby-mode="campaign"] .lobby-subhead__rule {
+body[data-lobby-mode="community"] .lobby-subhead__rule {
     grid-column: 2;
     display: block;
     width: 100%;
@@ -245,9 +243,7 @@ body[data-lobby-mode="campaign"] .lobby-subhead__rule {
 }
 
 body[data-lobby-mode="challenge"] .lobby-mode-selection,
-body[data-lobby-mode="community"] .lobby-mode-selection,
-body[data-lobby-mode="daily"] .lobby-mode-selection,
-body[data-lobby-mode="campaign"] .lobby-mode-selection {
+body[data-lobby-mode="community"] .lobby-mode-selection {
     grid-column: 3;
     display: inline-flex;
     flex-direction: column;
@@ -376,8 +372,7 @@ body[data-lobby-mode="campaign"] .lobby-panes {
     outline: none;
 }
 
-.track-carousel--lobby.is-menu-selected .track-carousel__count {
-    color: var(--text-color);
+.track-carousel--lobby.is-menu-selected .track-carousel__caption {
     box-shadow: var(--menu-ring);
 }
 
@@ -730,11 +725,11 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     text-overflow: ellipsis;
 }
 
-/* Campaign series screen: one row per series, with track picture, name, stages and ground, and medal bar. */
+/* Campaign series screen: one card per series, with the start of its first track, name, stages and ground, and medal bar. */
 .campaign-series-list {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.6rem;
     width: 100%;
     min-height: 0;
     overflow-y: auto;
@@ -747,26 +742,37 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     display: none;
 }
 
+/* The text stacks on the faded left of the picture; the bar comes first, so all bars line up. */
 .campaign-series-row {
+    position: relative;
+    isolation: isolate;
     display: grid;
-    grid-template-columns: 5rem minmax(0, 1fr) 7rem;
-    /* The outer rows take the picture height, so the two text lines stay tight. */
-    grid-template-rows: 1fr auto auto 1fr;
-    gap: 0 1rem;
+    flex: none;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+        "name name"
+        "info info"
+        "bar count";
+    align-content: center;
+    justify-items: start;
+    gap: 0.35rem 0.6rem;
     width: 100%;
+    min-height: 5.75rem;
     margin: 0;
-    padding: 0.55rem 0.6rem;
+    padding: 0.85rem 1rem;
+    overflow: hidden;
     color: var(--text-color);
     text-align: left;
-    background: none;
-    border: 0;
+    background: var(--bg-surface);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-lg);
     cursor: pointer;
-    transition: background-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
+    transition: background-color var(--dur-base) ease, border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
 }
 
 .campaign-series-row:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), var(--bg-surface);
+    border-color: var(--border-default);
 }
 
 .campaign-series-row.is-menu-selected {
@@ -774,29 +780,37 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 }
 
 .campaign-series-row__preview {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: -1;
     display: block;
-    grid-row: 1 / 5;
-    align-self: center;
-    width: 100%;
-    aspect-ratio: 80 / 58;
+    width: 72%;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 55%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 55%);
 }
 
 .campaign-series-row__preview canvas {
     display: block;
     width: 100%;
     height: 100%;
+    object-fit: cover;
+    object-position: right center;
 }
 
-/* Name and count share the first line, ground and bar the second, so they align. */
 .campaign-series-row__text,
 .campaign-series-row__medals {
     display: contents;
 }
 
+.campaign-series-row__name,
+.campaign-series-row__info,
+.campaign-series-row__count {
+    text-shadow: 0 1px 3px rgba(2, 6, 23, 0.9);
+}
+
 .campaign-series-row__name {
-    grid-area: 2 / 2;
-    align-self: end;
-    min-width: 0;
+    grid-area: name;
+    max-width: 100%;
     overflow: hidden;
     /* The italic slant needs room, or the clip cuts the last letter. */
     padding-inline-end: 0.1em;
@@ -819,12 +833,11 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 
 /* Stage count and road icon read as one group, set apart from the ground. */
 .campaign-series-row__info {
-    grid-area: 3 / 2;
+    grid-area: info;
     display: flex;
     align-items: center;
     gap: 0.9rem;
     min-width: 0;
-    margin-top: 0.5rem;
 }
 
 .campaign-series-row__stages {
@@ -844,12 +857,10 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 }
 
 .campaign-series-row__count {
-    grid-area: 2 / 3;
+    grid-area: count;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    align-self: end;
-    justify-self: start;
     color: var(--text-color);
 }
 
@@ -867,11 +878,10 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
 }
 
 .campaign-series-row__bar {
-    grid-area: 3 / 3;
+    grid-area: bar;
     display: block;
-    align-self: end;
-    /* Centres the bar on the ground line. */
-    margin-bottom: calc((0.68rem * 1.4 - 6px) / 2);
+    align-self: center;
+    width: 5.5rem;
     height: 6px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.1);
@@ -887,19 +897,7 @@ body[data-lobby-mode="campaign"] .lobby-mode-selection__track {
     border-radius: inherit;
 }
 
-@media (max-width: 480px) {
-    .campaign-series-row {
-        grid-template-columns: 4.5rem minmax(0, 1fr) 6.5rem;
-        column-gap: 0.75rem;
-    }
-}
-
 @media (max-width: 400px) {
-    .campaign-series-row {
-        grid-template-columns: 4rem minmax(0, 1fr) 5.5rem;
-        column-gap: 0.6rem;
-    }
-
     .campaign-series-row__name {
         font-size: 1.1rem;
     }

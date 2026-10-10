@@ -274,12 +274,6 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel__card-foot\s*\{[^}]*border-top:/s,
         );
         expect(lobbyModeStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*text-align:\s*right;[^}]*text-transform:\s*uppercase;/s,
-        );
-        expect(lobbyModeStyles).toMatch(
-            /body\[data-lobby-mode="daily"\] \.lobby-mode-selection,[\s\S]*body\[data-lobby-mode="campaign"\] \.lobby-mode-selection\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*flex-end;/s,
-        );
-        expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-selection__laps\s*\{[^}]*color:\s*var\(--text-muted\);[^}]*font-size:\s*0\.6rem;/s,
         );
     });
@@ -533,33 +527,6 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel__nav\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*2\.75rem;/s,
         );
         expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.25rem 4rem;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__navigation\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*display:\s*grid;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby:has\(\.track-carousel__expiry\)\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 1\.1rem 1\.25rem 4rem;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*grid-area:\s*2 \/ 1;[^}]*font-family:\s*var\(--mono-font\);[^}]*text-align:\s*center;[^}]*text-transform:\s*uppercase;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby \.track-carousel__expiry\s*\{[^}]*cursor:\s*pointer;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /#daily-carousel-navigation,\s*#campaign-carousel-navigation\s*\{[^}]*cursor:\s*pointer;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__navigation\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby:has\(\.track-carousel__expiry\) \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*4 \/ 1;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel--lobby \.track-carousel__card-foot\s*\{[^}]*grid-area:\s*3 \/ 1;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
             /\.track-carousel--lobby \.track-carousel__nav\s*\{[^}]*grid-area:\s*1 \/ 1;[^}]*position:\s*static;[^}]*inset:\s*auto;[^}]*align-self:\s*center;/s,
         );
         expect(trackCarouselStyles).toMatch(
@@ -572,15 +539,6 @@ describe('game stylesheet architecture', () => {
             /\.track-carousel--lobby \.track-carousel__nav--next\s*\{[^}]*justify-self:\s*end;/s,
         );
         expect(trackCarouselStyles).not.toContain('.track-carousel__nav-label');
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__count\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*text-align:\s*center;/s,
-        );
-        expect(trackCarouselStyles).toMatch(
-            /\.track-carousel__count\s*\{[^}]*padding:\s*0\.2rem 0\.5rem;[^}]*border-radius:\s*var\(--radius-full\);/s,
-        );
-        expect(lobbyModeStyles).toMatch(
-            /\.track-carousel--lobby\.is-menu-selected \.track-carousel__count\s*\{[^}]*color:\s*var\(--text-color\);[^}]*box-shadow:\s*var\(--menu-ring\);/s,
-        );
         expect(lobbyModeStyles).toMatch(
             /\.lobby-mode-toolbar__action\s*\{[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*width:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*height:\s*clamp\(2\.6rem,\s*10vw,\s*3rem\);[^}]*min-width:\s*2\.75rem;[^}]*min-height:\s*2\.75rem;/s,
         );
@@ -610,13 +568,7 @@ describe('game stylesheet architecture', () => {
         expect(ui).toContain('preview.append(previewArt, gate)');
         expect(ui).toContain('gate.append(previewLock)');
         expect(ui).toContain('requirement.append(requirementList)');
-        expect(ui).toContain('foot.append(requirement, meta, verificationError, medal)');
-        expect(ui).toContain('meta.append(bestCell, rank)');
-        expect(ui).toContain('createPersonalBestIcon');
-        expect(ui).toContain("viewBox', '0 0 448 512'");
-        expect(ui).toContain("setAttribute('width', '16')");
-        expect(ui).toContain("setAttribute('height', '16')");
-        expect(ui).toContain("aria-label', 'Personal best'");
+        expect(ui).not.toContain('createPersonalBestIcon');
         expect(ui).toContain('createStandingsIcon');
         expect(ui).toContain("viewBox', '0 0 640 640'");
         expect(ui).toContain('STANDINGS_ICON_PATH');

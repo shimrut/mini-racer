@@ -12,9 +12,13 @@ vi.mock('../game/ui/track-carousel.js', () => ({
     renderTrackPreviewCanvas: vi.fn(),
     trackPreviewPixelScale: () => 1,
 }));
+vi.mock('../game/ui/track-start-picture.js', () => ({
+    renderTrackStartPicture: vi.fn(),
+}));
 // Mini Rally is held back from players; these tests need it live.
 vi.mock('../game/track/live-grounds.js', () => import('./helpers/live-grounds-with-dirt.js'));
-import { buildCampaignSeriesRows, renderCampaignSeriesList } from '../game/lobby/campaign-series-screen.js';
+import { buildCampaignSeriesRows, refreshCampaignSeriesPictures, renderCampaignSeriesList } from '../game/lobby/campaign-series-screen.js';
+import { renderTrackStartPicture } from '../game/ui/track-start-picture.js';
 import { LobbyUi } from '../game/lobby/ui.js';
 import { clearStoredSeriesForTests, registerStoredSeries } from '../game/campaign/stored-series.js';
 
@@ -37,6 +41,24 @@ describe('Campaign series screen', () => {
         const rows = buildCampaignSeriesRows({});
         expect(rows.map((row) => row.previewTrackKey))
             .toEqual(['numberZero', 'countryRoad']);
+    });
+
+    it('draws the start of the first stage in each card, and draws it again on a refresh', () => {
+        renderTrackStartPicture.mockClear();
+        const container = document.createElement('div');
+        renderCampaignSeriesList(container, buildCampaignSeriesRows({}));
+        const canvases = [...container.querySelectorAll('.campaign-series-row__preview canvas')];
+        expect(renderTrackStartPicture.mock.calls.map(([canvas, trackKey, options]) => [canvas, trackKey, options]))
+            .toEqual([
+                [canvases[0], 'numberZero', { pixelScale: 1 }],
+                [canvases[1], 'countryRoad', { pixelScale: 1 }],
+            ]);
+        expect(canvases.map((canvas) => [canvas.width, canvas.height])).toEqual([[330, 110], [330, 110]]);
+
+        renderTrackStartPicture.mockClear();
+        refreshCampaignSeriesPictures(container);
+        expect(renderTrackStartPicture.mock.calls.map(([canvas, trackKey]) => [canvas, trackKey]))
+            .toEqual([[canvases[0], 'numberZero'], [canvases[1], 'countryRoad']]);
     });
 
     it('shows mixed published stages using actual surfaces and the first stage picture', () => {
@@ -149,9 +171,8 @@ describe('Campaign series screen in the lobby', () => {
         lobby.showCampaign({ view: 'stages', seriesId: 'numbered-v1', series });
         lobby.setCampaignSelectedStage({ trackName: 'Number Zero', laps: 2, unlocked: true });
         const selection = document.querySelector('[data-lobby-mode-selection]');
-        expect(selection.hidden).toBe(false);
-        expect(selection.textContent).toContain('Number Zero');
-        expect(selection.textContent).toContain('2 Laps');
+        expect(selection.hidden).toBe(true);
+        expect(selection.textContent.trim()).toBe('');
         lobby.showDaily({});
         button.click();
         expect(onSelectCampaign).toHaveBeenCalledTimes(4);

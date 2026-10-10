@@ -417,7 +417,6 @@ describe('campaign placeholder after the last stage', () => {
         const dom = new JSDOM(`<div id="campaign-carousel">
             <div id="campaign-carousel-viewport"><div id="campaign-carousel-rail"></div></div>
             <button id="campaign-carousel-prev"></button><button id="campaign-carousel-next"></button>
-            <div id="campaign-carousel-navigation"><span id="campaign-carousel-count"></span></div>
         </div>`);
         const originals = { document: global.document, window: global.window };
         global.document = dom.window.document;
@@ -452,7 +451,10 @@ describe('campaign placeholder after the last stage', () => {
             expect(card.querySelector('.track-carousel__gate').hidden).toBe(true);
 
             const parts = carousel._footParts;
-            expect(parts.meta.hidden).toBe(true);
+            expect(parts.rank.hidden).toBe(true);
+            expect(parts.rank.disabled).toBe(true);
+            expect(parts.name.textContent).toBe('In design');
+            expect(parts.detail.hidden).toBe(true);
             expect(parts.medal.hidden).toBe(true);
             expect(parts.medal.disabled).toBe(true);
             expect(parts.requirement.hidden).toBe(true);
@@ -462,7 +464,7 @@ describe('campaign placeholder after the last stage', () => {
         }
     });
 
-    it('counts only the stages, and shows no number on the placeholder', () => {
+    it('navigates through stages to the placeholder without a counter', () => {
         const { carousel, document, restore } = mountCarousel();
         try {
             carousel.render([
@@ -470,15 +472,13 @@ describe('campaign placeholder after the last stage', () => {
                 { challengeId: 'growing-v1-01', challenge: { id: 'growing-v1-01' }, trackName: 'B', medalTiers: [] },
                 { challengeId: 'growing-v1-more', challenge: { id: 'growing-v1-more', placeholder: true }, trackName: 'In design', placeholder: true },
             ], { selectedChallengeId: 'growing-v1-01' });
-            const count = document.getElementById('campaign-carousel-count');
-            expect(count.textContent).toBe('2 / 2');
-            expect(count.getAttribute('aria-label')).toBe('Track 2 of 2');
+            expect(document.getElementById('campaign-carousel-count')).toBeNull();
+            expect(carousel._footParts.name.textContent).toBe('B');
             expect(document.getElementById('campaign-carousel-next').disabled).toBe(false);
 
             carousel.step(1);
             expect(carousel.getSelectedChallenge().placeholder).toBe(true);
-            expect(count.textContent).toBe('');
-            expect(count.hasAttribute('aria-label')).toBe(false);
+            expect(carousel._footParts.name.textContent).toBe('In design');
             expect(document.getElementById('campaign-carousel-next').disabled).toBe(true);
         } finally {
             restore();

@@ -18,6 +18,7 @@ import {
     setGhostCompactionStep,
 } from './competition/ghost-compaction.js';
 import { createTelemetryRouter } from '@devvit/analytics/server/reddit';
+import { createPlaytestRedisTrace } from './redis/playtest-redis-trace.js';
 import { isDailyGpChallengePlayable } from './daily/daily-gp-model.js';
 import {
     getServerDailyGpChallenge,
@@ -398,6 +399,8 @@ export function createServerApp({
     registerRoutes?: (app: express.Application) => void;
 } = {}) {
     const app = express();
+    // Playtest only: logs Redis transport failures with the work in flight; a published version skips it.
+    app.use(createPlaytestRedisTrace());
     app.use(express.json({ limit: '256kb' }));
     app.use(createTelemetryRouter());
     // Without a known live layout, never answer as if the app layout were live; only trackless routes skip this.

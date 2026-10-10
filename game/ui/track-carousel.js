@@ -3,6 +3,8 @@ import { getMedalRowSlots } from '../medals/medal-timing.js';
 import { openMedalTimesPopover } from '../race/ui-modal-content.js';
 import { renderCachedTrackPreviewCanvas } from '../track/preview-renderer.js';
 import { getLoadedClientTrack, loadClientTrack } from '../track/client-registry.js';
+import { getTrackGround } from '../track/grounds.js';
+import { formatLapsAndGroundLabel } from '../shared/laps-label.js';
 import { getTrackDefinitionIdentity } from '../track/definition-identity.js';
 import { createLockIconSvg } from './lock-icon.js';
 import { createPlaceholderTrackSvg } from './placeholder-track-art.js';
@@ -70,26 +72,8 @@ function createRequirementMedalIcon(requirement) {
     return icon;
 }
 
-const PERSONAL_BEST_ICON_PATH =
-    'M168.5 0c-13.3 0-24 10.7-24 24s10.7 24 24 24l32 0 0 25.3c-108 11.9-192 103.5-192 214.7 0 119.3 96.7 216 216 216s216-96.7 216-216c0-39.8-10.8-77.1-29.6-109.2l28.2-28.2c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-23.4 23.4c-32.9-30.2-75.2-50.3-122-55.5l0-25.3 32 0c13.3 0 24-10.7 24-24s-10.7-24-24-24l-112 0zm80 184l0 104c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-104c0-13.3 10.7-24 24-24s24 10.7 24 24z';
 const STANDINGS_ICON_PATH =
     'M353.8 118.1L330.2 70.3C326.3 62 314.1 61.7 309.8 70.3L286.2 118.1L233.9 125.6C224.6 127 220.6 138.5 227.5 145.4L265.5 182.4L256.5 234.5C255.1 243.8 264.7 251 273.3 246.7L320.2 221.9L366.8 246.3C375.4 250.6 385.1 243.4 383.6 234.1L374.6 182L412.6 145.4C419.4 138.6 415.5 127.1 406.2 125.6L353.9 118.1zM288 320C261.5 320 240 341.5 240 368L240 528C240 554.5 261.5 576 288 576L352 576C378.5 576 400 554.5 400 528L400 368C400 341.5 378.5 320 352 320L288 320zM80 384C53.5 384 32 405.5 32 432L32 528C32 554.5 53.5 576 80 576L144 576C170.5 576 192 554.5 192 528L192 432C192 405.5 170.5 384 144 384L80 384zM448 496L448 528C448 554.5 469.5 576 496 576L560 576C586.5 576 608 554.5 608 528L608 496C608 469.5 586.5 448 560 448L496 448C469.5 448 448 469.5 448 496z';
-
-function createPersonalBestIcon() {
-    const icon = document.createElementNS(SVG_NS, 'svg');
-    icon.classList.add('track-carousel__spec-icon');
-    icon.setAttribute('viewBox', '0 0 448 512');
-    icon.setAttribute('width', '16');
-    icon.setAttribute('height', '16');
-    icon.setAttribute('role', 'img');
-    icon.setAttribute('aria-label', 'Personal best');
-    icon.setAttribute('focusable', 'false');
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', PERSONAL_BEST_ICON_PATH);
-    path.setAttribute('fill', 'currentColor');
-    icon.append(path);
-    return icon;
-}
 
 function createStandingsIcon() {
     const icon = document.createElementNS(SVG_NS, 'svg');
@@ -234,7 +218,6 @@ export class TrackCarousel {
         onSelect = null,
         onOpenLeaderboard = null,
         onSettle = null,
-        resolveExpiry = null,
         getPreviewCarImage = null,
         getPreviewCarAssetKey = null,
         getPreviewCarWorldSize = null,
@@ -244,8 +227,6 @@ export class TrackCarousel {
         this.onSelect = onSelect;
         this.onOpenLeaderboard = onOpenLeaderboard;
         this.onSettle = onSettle;
-        this.resolveExpiry = resolveExpiry;
-        this._expiryTimer = null;
         this.getPreviewCarImage = getPreviewCarImage;
         this.getPreviewCarAssetKey = getPreviewCarAssetKey;
         this.getPreviewCarWorldSize = getPreviewCarWorldSize;
@@ -269,9 +250,6 @@ export class TrackCarousel {
     get rail() { return this.element('rail'); }
     get prevBtn() { return this.element('prev'); }
     get nextBtn() { return this.element('next'); }
-    get navigation() { return this.element('navigation'); }
-    get countLabel() { return this.element('count'); }
-    get expiryLine() { return this.element('expiry'); }
     get status() { return this.element('status'); }
 
     bind() {
@@ -300,9 +278,9 @@ export class TrackCarousel {
         });
         if (typeof ResizeObserver === 'function') {
             this._resizeObserver = new ResizeObserver(() => {
-                this.syncCardWidth();
+                const widthChanged = this.syncCardWidth();
                 this.fitPreviews();
-                this.scrollToSelected({ animate: false });
+                if (widthChanged) this.scrollToSelected({ animate: false });
             });
             this._resizeObserver.observe(viewport);
         }
@@ -330,7 +308,9 @@ export class TrackCarousel {
     } = {}) {
         for (const card of cards) {
             if (card?.trackKey && !getLoadedClientTrack(card.trackKey)) {
-                void loadClientTrack(card.trackKey).catch(() => {});
+                void loadClientTrack(card.trackKey)
+                    .then(() => this.paintFoot(this.getSelectedCard()))
+                    .catch(() => {});
             }
         }
 
@@ -352,6 +332,11 @@ export class TrackCarousel {
             rail.replaceChildren();
             this._elements = [];
             this._selectedIndex = -1;
+            if (this._footParts) {
+                this._footParts.foot.hidden = true;
+                setText(this._footParts.name, '');
+                setText(this._footParts.detail, '');
+            }
             this.syncNavButtons();
             this.onSelect?.(null, null);
             return;
@@ -474,12 +459,15 @@ export class TrackCarousel {
         const requirementList = document.createElement('div');
         requirementList.className = 'track-carousel__requirement-list';
 
-        const meta = document.createElement('div');
-        meta.className = 'track-carousel__meta';
+        const caption = document.createElement('div');
+        caption.className = 'track-carousel__caption';
+        const name = document.createElement('p');
+        name.className = 'track-carousel__name';
+        const detail = document.createElement('p');
+        detail.className = 'track-carousel__detail';
         const verificationError = document.createElement('div');
         verificationError.className = 'track-carousel__verification-error';
         verificationError.hidden = true;
-        const [bestCell, bestValue] = createSpecCell(createPersonalBestIcon());
         const [rank, rankValue, rankIcon] = createSpecCell(createStandingsIcon(), 'button');
         rank.classList.add('track-carousel__rank');
         rank.addEventListener('click', (event) => {
@@ -493,7 +481,6 @@ export class TrackCarousel {
         rankMedal.className = 'track-carousel__unlock-medal-host';
         rankMedal.hidden = true;
         requirement.append(requirementList);
-        meta.append(bestCell, rank);
 
         const medal = document.createElement('button');
         medal.type = 'button';
@@ -504,10 +491,12 @@ export class TrackCarousel {
             this.openSelectedMedalTimes();
         });
 
-        foot.append(requirement, meta, verificationError, medal);
+        caption.append(name, rank, detail, medal);
+        foot.append(caption, requirement, verificationError);
+        foot.hidden = true;
 
         return {
-            foot, requirement, requirementList, meta, bestCell, bestValue,
+            foot, caption, name, detail, requirement, requirementList,
             rank, rankValue, rankIcon, rankMedal, medal, verificationError,
         };
     }
@@ -524,28 +513,16 @@ export class TrackCarousel {
         if (renderPreview && parts.canvas) this.renderPreview(parts.canvas, card);
     }
 
-    paintExpiry(card) {
-        if (this._expiryTimer) {
-            clearTimeout(this._expiryTimer);
-            this._expiryTimer = null;
-        }
-        const line = this.expiryLine;
-        if (!line) return;
-
-        const { label = '', refreshMs = null } = this.resolveExpiry?.(card) || {};
-        line.textContent = label;
-        line.hidden = !label;
-        if (Number.isFinite(refreshMs) && refreshMs > 0) {
-            this._expiryTimer = setTimeout(
-                () => this.paintExpiry(this.getSelectedCard()),
-                refreshMs,
-            );
-        }
-    }
-
     paintFoot(card) {
         if (!this._footParts || !card) return;
         const parts = this._footParts;
+        parts.foot.hidden = false;
+        setText(parts.name, card.trackName || '');
+        parts.name.title = card.trackName || '';
+        const track = getLoadedClientTrack(card.trackKey) || legacyPreviewTracks?.[card.trackKey];
+        const groundLabel = track ? getTrackGround(track).label : null;
+        parts.detail.hidden = Boolean(card.placeholder) || !Number.isInteger(card.laps);
+        setText(parts.detail, parts.detail.hidden ? '' : formatLapsAndGroundLabel(card.laps, groundLabel, '\u2002·\u2002'));
 
         if (this.root) {
             this.root.classList.toggle('is-locked', Boolean(card.locked));
@@ -554,7 +531,8 @@ export class TrackCarousel {
         // The placeholder has no time, rank or medals; Start says why it cannot race.
         if (card.placeholder) {
             parts.requirement.hidden = true;
-            parts.meta.hidden = true;
+            parts.rank.hidden = true;
+            parts.rank.disabled = true;
             parts.verificationError.hidden = true;
             parts.medal.hidden = true;
             parts.medal.disabled = true;
@@ -566,10 +544,6 @@ export class TrackCarousel {
             ? card.verificationError.trim()
             : '';
         
-        parts.bestCell.hidden = locked;
-        parts.bestCell.classList.toggle('is-muted', !card.bestLabel);
-        setText(parts.bestValue, card.bestLabel || '—');
-
         if (locked) {
             const meter = card.lockMeter || null;
             parts.rank.hidden = true;
@@ -588,10 +562,10 @@ export class TrackCarousel {
             }
         } else {
             parts.rankMedal.hidden = true;
-            parts.rank.hidden = false;
+            parts.rank.hidden = Boolean(verificationError);
             parts.rankValue.hidden = false;
             parts.rankIcon.hidden = false;
-            parts.rank.disabled = false;
+            parts.rank.disabled = Boolean(verificationError);
             setText(parts.rankValue, card.rankPending ? '···' : (card.rankLabel || '—'));
             parts.rank.classList.toggle('is-muted', card.rankPending || !card.rankLabel);
             parts.rank.setAttribute(
@@ -628,7 +602,6 @@ export class TrackCarousel {
         parts.requirement.hidden = !locked;
         parts.verificationError.hidden = !verificationError;
         setText(parts.verificationError, verificationError);
-        parts.meta.hidden = locked || Boolean(verificationError);
         parts.medal.hidden = locked;
         parts.medal.disabled = locked || !tiers.length;
         if (locked || !tiers.length) {
@@ -780,7 +753,6 @@ export class TrackCarousel {
         if (card) {
             this.paintFoot(card);
         }
-        this.paintExpiry(card);
 
         this.updateProximity();
     }
@@ -810,25 +782,8 @@ export class TrackCarousel {
 
     syncNavButtons() {
         const count = this._cards.length;
-        const trackCount = this._cards.filter((card) => !card.placeholder).length;
         const prev = this.prevBtn;
         const next = this.nextBtn;
-        const navigation = this.navigation;
-        const countLabel = this.countLabel;
-        const selectedIndex = count > 0
-            ? Math.min(Math.max(this._selectedIndex, 0), count - 1)
-            : -1;
-        if (navigation) navigation.hidden = count === 0;
-        // The placeholder is not a track, so it has no number.
-        const counted = count > 0 && !this._cards[selectedIndex]?.placeholder;
-        if (countLabel) {
-            countLabel.textContent = counted ? `${selectedIndex + 1} / ${trackCount}` : '';
-            if (counted) {
-                countLabel.setAttribute('aria-label', `Track ${selectedIndex + 1} of ${trackCount}`);
-            } else {
-                countLabel.removeAttribute('aria-label');
-            }
-        }
         if (prev) {
             prev.disabled = count === 0 || this._selectedIndex <= 0;
             prev.hidden = count < 2;
@@ -879,7 +834,9 @@ export class TrackCarousel {
         const host = this.root || this.rail;
         const width = viewport?.clientWidth || 0;
         if (!host || !(width > 0)) return false;
-        host.style?.setProperty?.('--track-carousel-card-width', `${width}px`);
+        const value = `${width}px`;
+        if (host.style?.getPropertyValue?.('--track-carousel-card-width') === value) return false;
+        host.style?.setProperty?.('--track-carousel-card-width', value);
         return true;
     }
 
