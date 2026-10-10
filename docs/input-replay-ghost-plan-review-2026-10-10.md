@@ -9,9 +9,10 @@ The approach is right. It can be built once the fixes below are added.
 
 ## Confirmed in code
 
-- **Keep record version 2.** A new version would make old servers delete the row
-  during rollout (`pb-ghost-store.ts:240`, `cleanupUnusable`). Guest transfer
-  would also mark it obsolete.
+- **Keep record version 2.** A normal read leaves a row alone. But an old server
+  that saves a personal best deletes any row whose version does not match, time
+  included (`pb-ghost-store.ts:240`; `cleanupUnusable` is set only by the save
+  path). Guest transfer would also mark the row obsolete.
 - **A faster time replaces the whole row.** `encodeStoredPbRecord` writes the
   full new row, so the old `ghost` or `ghostPacked` field drops off.
 - **The packing job already skips rows without a position list**
@@ -37,24 +38,36 @@ Rebuilding a ghost takes 7–57 ms here. Three-lap races are the slowest.
 
 1. **Head-to-head needs no change.** It builds its ghost from the run the player
    just submitted, not from a saved row (`head-to-head-runtime.ts:57`). Take it
-   off the rebuild list.
-2. **Rebuild inside the existing hook.** `resolveMovedPbGhost` already runs at the
-   Daily and Campaign PB replies, the submit reply and both opponent paths. Make
-   it rebuild button rows too. Only the podium freeze (`daily-gp-store.ts:1213`)
-   needs its own call.
+   off the rebuild list. This holds as long as the check keeps building that
+   ghost in memory.
+2. **Rebuild inside the existing hook.** `resolveMovedPbGhost` runs for the Daily
+   and Campaign PB replies and for the submit reply, including when the new time
+   does not win. Make it rebuild button rows too. The podium freeze
+   (`daily-gp-store.ts:1213`) skips this hook and needs its own call. Opponent
+   races need fix 4.
 3. **Submit reply when the time is not beaten.** The kept row can be a button
    row. The game installs this reply directly without asking again, so it needs
    a rebuilt ghost. Otherwise the ghost disappears until reload. Fix 2 covers this.
-4. **"Has a ghost" flags.** Each of these must count a button row:
-   - Daily PB summary `ghostAvailable` (`player-account-store.ts:318`). The game
-     only fetches the ghost when this is true.
-   - Submit `trackGhostAvailable` (`competition-submit.ts:398`). Fix 2 covers it.
-   - `isOpponentCandidateRecord` (`competition-leaderboard.ts:143`). Count button
+4. **Opponent races never reach the rebuild.** Both opponent paths first ask
+   whether the row already holds a position list. They call the hook only for a
+   moved row (`competition-opponent-race.ts:162,241`). A button row fails that
+   question, so the race is refused. Until something is moved to blob storage,
+   that is every opponent race against a new best. The standings still show the
+   race icon, because it comes from the ghost built at submit time
+   (`withOpponentRaceReady`). Fix:
+   - `isOpponentCandidateRecord` (`competition-leaderboard.ts:143`) counts button
      rows without replaying, because standings use it.
-5. **Cap rebuilds in "next faster rival".** It can check up to 60 rivals. Rebuild
-   only rows that pass the time and checkpoint check, and cap rebuilds the way
-   moved ghosts are capped (`NEXT_RIVAL_MOVED_READS`, 2). Without a cap, a physics
-   change could cost about 1–3 s in one request.
+   - Both paths send button rows through the rebuild.
+   - "Next faster rival" can check up to 60 rivals. Cap rebuilds the way moved
+     ghosts are capped (`NEXT_RIVAL_MOVED_READS`, 2). Without a cap, a physics
+     change could cost about 1–3 s in one request.
+5. **"Has a ghost" flags.** Both must count a button row:
+   - Submit `trackGhostAvailable` (`competition-submit.ts:398`). When the reply
+     is not the full saved row and this is false, the game skips the ghost
+     refresh (`scoreboard/engine-methods.js:377`). Fix 2 covers it.
+   - Daily PB summary `ghostAvailable` (`player-account-store.ts:318`). It does
+     not stop the request: the game still asks for the ghost when it prepares a
+     race. Keep it accurate anyway.
 6. **Keep the field when reading.** `parseRecord` drops unknown fields
    (`pb-ghost-store.ts:77`). It must keep `inputReplay`, or every reader sees "no
    ghost". Remove it in `toGamePbRecord` before sending to the game.
@@ -93,5 +106,6 @@ Rebuilding a ghost takes 7–57 ms here. Three-lap races are the slowest.
   - The tie rule.
   - Mixed rows in the first move.
   - Daily and Campaign restore of a button row.
+  - An opponent race against a new button-list best.
   - A failed rebuild gives "no ghost".
   - The rival rebuild cap.
