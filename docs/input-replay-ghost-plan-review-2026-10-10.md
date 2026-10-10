@@ -49,12 +49,14 @@ Rebuilding a ghost takes 7–57 ms here. Three-lap races are the slowest.
    row. The game installs this reply directly without asking again, so it needs
    a rebuilt ghost. Otherwise the ghost disappears until reload. Fix 2 covers this.
 4. **Opponent races never reach the rebuild.** Both opponent paths first ask
-   whether the row already holds a position list. They call the hook only for a
-   moved row (`competition-opponent-race.ts:162,241`). A button row fails that
-   question, so the race is refused. Until something is moved to blob storage,
-   that is every opponent race against a new best. The standings still show the
-   race icon, because it comes from the ghost built at submit time
-   (`withOpponentRaceReady`). Fix:
+   whether the row already holds a position list. The chosen-rank path
+   (`competition-opponent-race.ts:162`) calls the hook for a moved row or for a
+   row that has a position list. The next-rival path (`:241`) calls it only for a
+   moved row. A button row fails both checks, so the race is refused with "ghost
+   unavailable". Until something is moved to blob storage, that is every opponent
+   race against a new best. The standings still show the race icon, because the
+   submit sets it from the ghost just built in memory (`withOpponentRaceReady`,
+   `competition-submit.ts:274`). Fix:
    - `isOpponentCandidateRecord` (`competition-leaderboard.ts:143`) counts button
      rows without replaying, because standings use it.
    - Both paths send button rows through the rebuild.
@@ -64,7 +66,7 @@ Rebuilding a ghost takes 7–57 ms here. Three-lap races are the slowest.
 5. **"Has a ghost" flags.** Both must count a button row:
    - Submit `trackGhostAvailable` (`competition-submit.ts:398`). When the reply
      is not the full saved row and this is false, the game skips the ghost
-     refresh (`scoreboard/engine-methods.js:377`). Fix 2 covers it.
+     refresh (`scoreboard/engine-methods.js:376`). Fix 2 covers it.
    - Daily PB summary `ghostAvailable` (`player-account-store.ts:318`). It does
      not stop the request: the game still asks for the ghost when it prepares a
      race. Keep it accurate anyway.
